@@ -1,0 +1,9 @@
+# Generated matrices — cells are produced from the axes, never committed.
+# Committing them would make the generator's output editable by hand, which is
+# exactly the drift the admission rule exists to prevent.
+/generated/
+
+# Local run artifacts
+*.log
+*.tmp
+/out/
