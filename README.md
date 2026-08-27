@@ -36,3 +36,18 @@ had no name and no home. This is it.
 **Design stage.** Nothing is built yet, deliberately: the point is to decide
 what earns a place *before* copying anything, not to fork 661 files and sort
 them afterwards.
+
+## Authorship & AI collaboration
+
+Zymbol is designed by
+**[OscarE.EspinozaB](https://github.com/zymbol-lang/interpreter/commits?author=OscarEEspinozaB)**.
+Every decision about the language and about what this layer grades originates
+from and is controlled by its author. ZyDDT, like the interpreter and like the
+LDV applications, is built with **[Claude Code](https://claude.ai/code)**
+(Anthropic) as the engineering team, under the author's direction. The use of AI
+is transparent and intentional — it is not concealed or minimized.
+
+What AI does not replace: the design rationale, the specification that guides
+each feature, the judgment on what earns a place here and what does not, and the
+final say on every merged change. See [`CHARTER.md`](CHARTER.md) § 8 for why
+that distinction is load-bearing *for a test layer specifically*.

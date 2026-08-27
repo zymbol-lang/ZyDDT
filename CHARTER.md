@@ -10,6 +10,10 @@
 >
 > **Method.** Every claim of a defect below is one that was actually found and
 > is named. Nothing here is a hypothetical failure mode.
+>
+> **Authorship.** Designed by the project's author; built with Claude Code
+> (Anthropic) as the engineering team. § 8 says why that disclosure belongs in a
+> charter for a *test* layer rather than only in a README.
 
 ---
 
@@ -22,6 +26,7 @@
 5. [What survives the move unchanged](#5-what-survives-the-move-unchanged)
 6. [The denominator](#6-the-denominator)
 7. [What a verdict means](#7-what-a-verdict-means)
+8. [Authorship & AI collaboration](#8-authorship--ai-collaboration)
 
 ---
 
@@ -293,6 +298,65 @@ green about:
 - A **red** is a regression, not noise. As of 2026-08-26 the old gate reached
   fully green for the first time, which is the precondition for this to be true —
   a permanently-red gate is one nobody reads.
+
+---
+
+## 8. Authorship & AI collaboration
+
+Zymbol is designed by
+**[OscarE.EspinozaB](https://github.com/zymbol-lang/interpreter/commits?author=OscarEEspinozaB)**.
+Every decision about the language, and about what this layer grades, originates from and is
+controlled by its author. ZyDDT is built with **[Claude Code](https://claude.ai/code)**
+(Anthropic) as the engineering team, under the author's direction — as the interpreter is
+(`interpreter/README.md` § Authorship & AI Collaboration) and as the LDV applications are
+(`interpreter/LDV.md` § 7). The use of AI is transparent and intentional; it is not concealed
+or minimized.
+
+The disclosure belongs in this charter and not only in a README, because a **test** layer
+built with assistance has two hazards that a normal codebase does not, and § 3's admission
+rule is the answer to the first of them.
+
+### 8.1 Volume is cheap, and volume looks like coverage
+
+Writing tests is the single easiest thing to ask an assistant for, and the output is
+plausible, well-formatted and endless. A suite can be grown to any size in an afternoon, and
+size is the one property of a suite that is visible without reading it. That is the trap: a
+large suite *feels* like coverage, answers no question about what is missing, and costs
+real time on every commit forever.
+
+The admission rule (§ 3) exists for this. It is not a style preference:
+
+> Every case is a CELL of a declared matrix, generated rather than written, or a PIN of a
+> named finding carrying its ID.
+
+Under that rule, "add more tests" is not an available action. The available actions are
+*declare an axis* — which requires saying what the axis **is** — and *record a finding* —
+which requires the finding to **exist**. Both resist bulk by construction, which is what a
+guard has to do when the thing it guards against is effortless.
+
+### 8.2 A test can inherit the misunderstanding it should catch
+
+The sharper hazard: the same assistant that writes an engine can write the test that grades
+it, and encode the same wrong belief in both. This is not hypothetical. In `zymbol.js`,
+`lifetimeWarnForIterator` carried a long, confident comment explaining that it had been
+calibrated against the CLI, including a measured-sounding claim about how many programs it
+fired on. Measured on 2026-08-26: the CLI warned on **0** of 222 example programs and that
+function warned on **121**. The prose was assured and it was wrong, and it had stood because
+nothing compared the two engines *on diagnostics*.
+
+The defence is structural, and it is why ZyDDT is differential rather than assertion-based
+wherever it can be:
+
+- A **cell** does not assert what the answer should be. It asks every surface the same
+  question and requires the answers to be identical. No belief about the right answer is
+  encoded, so no wrong belief can be encoded either.
+- Where a cell must assert — a golden, a rejected form — the assertion is recorded from a
+  **run** and reviewed as a diff, never written by hand from what someone expects.
+- A **pin** asserts, but it inherits its assertion from a finding that a real domain produced
+  (`interpreter/LDV.md` § 7.2: an unknown-unknown is unknown to the assistant too).
+
+Stated as a rule: **prefer a question all surfaces must answer alike over a claim about what
+the answer is.** A shared misunderstanding survives the second form and dies in the first.
 
 ---
 
