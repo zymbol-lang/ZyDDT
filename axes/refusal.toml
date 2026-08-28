@@ -1,0 +1,53 @@
+# The refusal axis — forms every engine must refuse.
+#
+# Carried over in spirit from ZyQuality's `reject/` (MIGRATION § 4): "the
+# inverse assertion, which no consensus run can make".  A consensus run asks
+# whether the engines agree; three engines that all wrongly ACCEPT a malformed
+# program agree perfectly.  So this axis is the one place a claim is made rather
+# than a question asked, and the claim is the weakest one that still bites:
+# whatever the message, the program must not run.
+#
+# `expect` is what makes that different from `verdict.toml`, and it is only
+# legitimate here because the assertion does not encode a belief about the
+# *answer* — only about the *category* of answer.
+
+id      = "refusal"
+what    = "malformed programs no engine may accept"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"        # any error; static or runtime is not asserted here
+
+[[cell]]
+id   = "assign-no-rhs"
+what = "an assignment whose right-hand side is missing"
+# DIVERGES as of 2026-08-27, zymbol 0.0.9: zytw and zyvm both answer
+#   `error: expected expression, found Assign`
+# and zyjs accepts the program, running it to completion with only
+#   `warning: unused variable 'x'`
+#
+# Same family as DM-06 (`>> 1 == 1` parsed by zyjs and refused by the Rust
+# engines), which was closed on 2026-08-18 by narrowing `parseOutput` from
+# `parseExpr` to `parseAdditive`.  This is a different site — the right-hand
+# side of an assignment, not an output argument — and the narrowing did not
+# reach it.  Whether it becomes a numbered entry is the author's call; as a
+# cell it needs no ID, which is exactly why the axis form finds things the
+# finding-by-finding form waits for.
+src  = """
+x = =
+"""
+
+[[cell]]
+id   = "output-unparenthesised-comparison"
+what = "a bare comparison as an output argument"
+# The original DM-06. Kept as a cell so the fix is held down by the axis rather
+# than by anyone remembering it — a closed finding with no cell is a finding
+# that will be reopened by the next refactor.
+src  = """
+>> 1 == 1 ¶
+"""
+
+[[cell]]
+id   = "undefined-variable"
+what = "a name that was never defined"
+src  = """
+>> noexiste ¶
+"""

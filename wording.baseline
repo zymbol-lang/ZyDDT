@@ -1,0 +1,9 @@
+# Cells where every engine does the same thing and says it differently.
+# Recorded by `zyddt axis --regen-baseline`, which is deliberate and
+# separate: this file may shrink on its own, and may never grow on its
+# own. A line appearing here that was not written on purpose is a new
+# one-sided message, which is the thing zyquality/messages/ counts
+# statically and this counts as it is actually emitted.
+refusal/output-unparenthesised-comparison
+refusal/undefined-variable
+verdict-shape/error-static

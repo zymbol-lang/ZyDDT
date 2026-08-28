@@ -1,0 +1,88 @@
+# The verdict axis — what an engine can answer about a program.
+#
+# This is the axis every other axis is read through, so it is the first one
+# declared: before asking whether the engines agree about `#?`, the layer has to
+# agree with itself about what "agree" means.
+#
+# The values are not opinions.  Each is a shape that was measured on all three
+# engines on 2026-08-27, and the last one exists because the measurement
+# contradicted the obvious design.
+
+id     = "verdict-shape"
+what   = "the four answers an engine can give, and the one signal that is not one"
+engines = ["zytw", "zyvm", "zyjs"]
+
+# No axis-level `expect`: the five cells are five different categories, so one
+# claim could not cover them.  Each cell declares its own instead.
+#
+# The first draft declared none at all, on the grounds that a pure differential
+# encodes no belief and therefore cannot encode a wrong one (CHARTER § 8.2).
+# That reasoning is right in general and wrong here, for one reason: these cells
+# are NAMED for the category they produce.  `error-static` asserts something in
+# its own identity, and without an `expect` the assertion is decorative — if all
+# three engines started answering `warn`, the differential would stay green and
+# the axis would silently stop testing the thing it is called.
+#
+# A claim already made in a cell's name should be made where the runner can read
+# it.  It is checked per ENGINE and on every outcome, so a divergence names which
+# engine failed to reach the category rather than only reporting that they
+# differ — see HALLAZGOS/INDICE.md § 1.
+
+[[cell]]
+id     = "ok"
+expect = "ok"
+what = "runs to completion, says nothing"
+src  = """
+x = 2
+>> x + 3 ¶
+"""
+
+[[cell]]
+id     = "warn"
+expect = "warn"
+what = "runs to completion, and says something that is not fatal"
+# An unused variable: the cheapest warning all three engines define.  The
+# program still runs and still prints, which is the whole point of the
+# distinction — a warning is not a failure with a softer word.
+src  = """
+sin_usar = 7
+>> "hola" ¶
+"""
+
+[[cell]]
+id     = "error-static"
+expect = "error"
+what = "refused before running: nothing executed, nothing printed"
+src  = """
+>> noexiste ¶
+"""
+
+[[cell]]
+id     = "error-runtime"
+expect = "error"
+what = "started, printed, then died"
+# The partial output is part of the answer and stays in the record.  An engine
+# that dies at a different point has not agreed, even if it dies of the same
+# thing.
+src  = """
+>> "antes" ¶
+a = 1
+b = 0
+>> a / b ¶
+"""
+
+[[cell]]
+id     = "exit-is-not-a-verdict"
+expect = "ok"
+what = "a healthy program that chooses to exit 3"
+# The cell that decides the runner's design.  A top-level `<~ n` is the
+# program's exit status (GAP-ZYB-006), and all three engines honour it: measured
+# rc=3 here.  So exit status is a thing the PROGRAM chooses, and classifying on
+# it would call this failure and — worse — call `<~ 0` after a fatal diagnostic
+# a success.  The verdict is read from stderr; the exit code rides along as
+# data, and is compared, because two engines that print the same text and leave
+# with different statuses have not answered the same question.
+src  = """
+>> "adios" ¶
+<~ 3
+"""

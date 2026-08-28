@@ -1,0 +1,109 @@
+# The surfaces ZyDDT runs a program through.
+#
+# Carried over from ZyQuality's engines.toml, which got the shape right: adding
+# an engine is an entry here, never a patch to the runner, and removing one is
+# the same edit backwards with a reason attached.
+#
+# What is new is `phase`.  ZyQuality ran one command per engine and compared its
+# stdout.  A program has two observable moments — what the engine says about it
+# without running it, and what it does when it runs — and the 2026-08 findings
+# that the gate could not see (a warning emitted on 121 files by one engine and
+# 0 by another) all live in the first.  So an engine declares both, and a case
+# may ask either.
+#
+#   cmd        argv for executing the program;   {file} is the program
+#   check_cmd  argv for analysing without running it.  Optional: an engine
+#              without one is simply not asked static questions, rather than
+#              failing them all.
+#
+# Relative paths resolve against ZyDDT's own directory, not the caller's —
+# other repositories delegate here and run from their own tree, where
+# `../web/tests/run_one.mjs` points at nothing.
+#
+# `${NAME:-default}` expands from the environment.  That is how a release gate
+# points the layer at an installed package instead of a build tree:
+#
+#   ZYMBOL_BIN=/usr/bin/zymbol zyddt ask cases/…
+#
+# An engine whose binary is absent is reported BLOCKED and never counted as a
+# pass.  A gate must not read "nothing ran" as "nothing failed".
+
+[[engine]]
+id        = "zytw"
+cmd       = ["${ZYMBOL_BIN:-zymbol}", "run", "{file}"]
+check_cmd = ["${ZYMBOL_BIN:-zymbol}", "check", "{file}"]
+desc      = "Rust tree-walker — the diagnostics bench"
+
+[[engine]]
+id        = "zyvm"
+cmd       = ["${ZYMBOL_BIN:-zymbol}", "run", "--vm", "{file}"]
+check_cmd = ["${ZYMBOL_BIN:-zymbol}", "check", "{file}"]
+desc      = "Rust register VM — the future default"
+
+[[engine]]
+id        = "zyjs"
+cmd       = ["node", "${ZYJS_HARNESS:-../web/tests/run_one.mjs}", "{file}"]
+desc      = "JavaScript engine behind the playground (driver lives in web/)"
+# No check_cmd: the browser engine has no separate analyse-only entry point.
+# run_one.mjs calls checkSource itself before executing, so its static
+# diagnostics arrive on the run path — which is why `zyddt ask --phase static`
+# reports it SKIPPED rather than silently passing it.
+
+# ── Normalisation ────────────────────────────────────────────────────────────
+# Every rule below exists because a measurement forced it.  A normalisation
+# with no reason is indistinguishable from a difference somebody hid.
+
+[normalise]
+
+# The Rust CLI writes ANSI colour into a pipe and does not honour NO_COLOR.
+# Measured 2026-08-27: `NO_COLOR=1 zymbol run x.zy 2>&1 | cat -v` still emits
+# ESC[1mESC[31merror.  Without stripping, zytw and zyjs disagree on every
+# diagnostic ever emitted.
+strip_ansi = true
+
+# The Rust engines render the offending source line and a caret underneath it;
+# zyjs renders neither.  It is the same fact drawn twice, so it is presentation,
+# not an answer.
+drop_source_excerpt = true
+
+# Location: zytw/zyvm say `--> /abs/path.zy:2:4`, zyjs says `--> line 2`.
+# The path is machine-dependent — it leaked a scratchpad path in the very first
+# probe — so only the line survives into the compared record.
+keep_location = "line"
+
+# The column is real information that two of three engines carry.  It is
+# recorded in every observation and excluded from the default cross-engine
+# comparison, because zyjs cannot produce one at all: comparing it would report
+# a fixed, unfixable difference on every diagnostic and drown the real ones.
+# Declared here rather than hidden in the runner so the hole is visible as a
+# hole.  Re-enable with `zyddt ask --strict-column` once zyjs carries columns.
+compare_column = false
+
+# ── Oracles ──────────────────────────────────────────────────────────────────
+# These do not run Zymbol.  They run the same computation written in another
+# language, which is what gives a case an answer independent of every engine.
+# Carried over from ZyQuality's engines.toml, where the idea was already right
+# and had no consumer.
+#
+# This is the answer to the question a differential cannot ask.  `zyddt ask`
+# requires the three engines to agree, and three engines that agree WRONGLY
+# agree perfectly — the same hazard CHARTER § 8.2 names for a test written by
+# the assistant that wrote the engine.  An oracle's answer was authored outside
+# Zymbol entirely, so a shared misunderstanding cannot reach it.
+#
+# An oracle is never "the engine under test".  It is never cited for anything it
+# does not itself decide: `py` is authoritative about integer arithmetic and
+# says nothing about how Zymbol formats a dictionary.  A cell that needs an
+# oracle for formatting does not want an oracle, it wants a golden.
+
+[[oracle]]
+id   = "py"
+cmd  = ["python3", "{file}"]
+ext  = ".py"
+desc = "CPython — arbitrary-precision integers, the authority on integer maths"
+
+[[oracle]]
+id   = "js"
+cmd  = ["node", "{file}"]
+ext  = ".mjs"
+desc = "Node — f64 semantics, BigInt available"

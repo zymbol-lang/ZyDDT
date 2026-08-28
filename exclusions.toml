@@ -1,0 +1,73 @@
+# What must not be judged on which surface, and why.
+#
+# ── Why one table and not a directory ────────────────────────────────────────
+#
+# The obvious move is to put the cases zyjs cannot run in a folder of their own
+# and point the browser engine away from it.  ZyQuality did the equivalent and
+# it is the mistake `corpus.toml` was written to undo: there were FOUR lists —
+# a `@vm-skip` marker, a `VM_COMPARE_EXCLUDE` regex, a 40-entry `SKIP_SET`
+# literal inside test_runner.mjs, and a `grep -L lib_time` — none of which could
+# see the others, all claiming to describe the same corpus.  A file excluded
+# from the JavaScript comparison because it shelled out was still counted as a
+# divergence by another engine.
+#
+# An exclusion is a property of the CASE, not of whoever is running it, and it
+# is never all-or-nothing: `<\ shell \>` has no browser equivalent, and that is
+# a reason to not judge zyjs on it — not a reason to stop judging zytw and zyvm,
+# which is exactly what moving the file elsewhere would do.  So the case stays
+# where it belongs, runs everywhere it can, and this table says where it may
+# not be graded.
+#
+# ── Why the list is a measurement ────────────────────────────────────────────
+#
+# The number of entries here is the homology marker between the browser engine
+# and the Rust ones: zyjs is the Rust engines minus its environment, and every
+# line below names a piece of environment.  ZyQuality's went 41 → 34 as the gap
+# closed.  A line that disappears is progress; a line that appears without a
+# reason is a bug somebody hid.
+#
+# ── rule ─────────────────────────────────────────────────────────────────────
+#   match     glob over the case id.  Cells are `axis/cell`, pins are their
+#             path under cases/.  `*` stays inside a segment, `**` crosses.
+#   engines   engine ids the rule applies to.  Omitting it means EVERY engine,
+#             which is how you say "this case's output is not a function of the
+#             program" rather than "this engine is behind".
+#   tag       groups rules so a gate can drop a whole class:
+#             `zyddt suite --without BASH_EXEC`
+#   reason    why.  REQUIRED.  An exclusion whose reason nobody wrote down is
+#             indistinguishable from a bug somebody hid.
+#
+# The four tags below are the ones ZyQuality actually measured, carried over
+# with their wording.  Do not invent a fifth without a case that needs it.
+
+# ── `<\ shell \>` ────────────────────────────────────────────────────────────
+# 17 files in ZyQuality. A browser cannot fork a process.
+
+[[rule]]
+match   = "environment/shell-*"
+engines = ["zyjs"]
+tag     = "BASH_EXEC"
+reason  = "`<\\ shell \\>` has no browser equivalent"
+
+# ── Rules removed because they had no case ──────────────────────────────────
+#
+# TUI (`raw mode and key input need a real terminal`) and STD_DB (`std/db is
+# ODBC; a browser has no equivalent`) were written here first, from ZyQuality's
+# list, and `zyddt axis` immediately reported both as DEAD RULES: they matched
+# no case, because ZyDDT has no TUI or std/db cell yet.
+#
+# They are not kept "for later".  A rule matching nothing is the failure this
+# file's own header describes — a list that has stopped describing anything —
+# and keeping two of them would teach the reader that a dead rule is normal.
+# They come back in the same commit as the cell that needs them, which is the
+# only commit in which they can be verified.
+#
+# Their wording, for whoever writes that cell:
+#
+#     tag = "TUI"      reason = "raw mode and key input need a real terminal"
+#     tag = "STD_DB"   reason = "std/db is ODBC; a browser has no equivalent"
+#
+# STD_DB is also droppable for the RUST engines in a release gate
+# (`--without STD_DB`): they have std/db only when built with the feature and an
+# ODBC driver present, and a release package has neither.  That is what
+# ZyQuality's VM_COMPARE_EXCLUDE existed for.

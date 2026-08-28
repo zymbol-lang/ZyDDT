@@ -1,0 +1,62 @@
+# The environment axis — what the engines cannot be asked alike.
+#
+# Every cell here runs on the Rust engines and is EXCLUDED on zyjs by a rule in
+# exclusions.toml, one tag per class.  The axis exists so those exclusions are
+# EXERCISED rather than asserted: a rule that matches no case is a dead rule and
+# `zyddt axis` reports it as one, because an exclusion nobody tested is a claim
+# nobody checked.
+#
+# ── The first draft of this file was wrong, and the way it was wrong is the
+# argument for the axis ──────────────────────────────────────────────────────
+#
+# It opened with `<\ "echo hola" \>` and all three engines answered `hola`, so
+# the exclusion looked unnecessary.  zyjs does not run commands: `case
+# 'BashExec'` in zymbol.js is a stub that special-cases `date` formats and
+# `echo`, and returns `Date.now() * 1e6 + random()` for everything else.  The
+# cell had landed on the one command the stub happens to get right.
+#
+# That is worse than an engine that cannot do a thing: it is an engine that
+# answers anyway.  A cell chosen badly here would have made a green row out of
+# a capability that does not exist.  Each cell below is chosen so the stub
+# cannot coincide with the real answer.
+#
+# The sources below use TOML's ''' literal string, not """.  A basic string
+# processes escapes, so `<\ ... \>` had to be written `<\\ ... \\>` and the
+# shell's own backslashes doubled again on top — four levels deep, in a file
+# whose whole job is to be read.  A literal string is passed through verbatim.
+
+id      = "environment"
+what    = "capabilities a browser does not have, judged on the engines that do"
+engines = ["zytw", "zyvm", "zyjs"]
+# zyjs is named deliberately.  Declaring the full set and excluding by rule
+# keeps the hole visible at run time; dropping zyjs from this line would hide
+# it and leave the rule dead.
+
+[[cell]]
+id   = "shell-pipe"
+what = "a command whose output comes from a pipeline"
+# The stub cannot special-case this: it does not run `wc`.  On zytw/zyvm it is
+# the number of lines printf emitted.
+src  = '''
+n = <\ "printf 'a\\nb\\nc\\n' | wc -l" \>
+>> n
+'''
+
+[[cell]]
+id   = "shell-arith"
+what = "a command that computes something"
+src  = '''
+r = <\ "expr 6 \* 7" \>
+>> r
+'''
+
+[[cell]]
+id   = "shell-echo-substitution"
+what = "an echo whose text is not literal"
+# `echo` IS special-cased by the stub — but only when the command contains no
+# `$`.  This is the boundary of the one thing it gets right, and it is here so
+# that the special case is pinned by a cell rather than by memory.
+src  = '''
+v = <\ "echo $((2 + 3))" \>
+>> v
+'''
