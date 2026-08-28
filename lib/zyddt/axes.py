@@ -35,6 +35,7 @@ class Cell:
     skip: str | None = None      # a skipped cell names what it skips, and why
     oracle: tuple[str, str] | None = None   # (oracle id, source)
     expect: str | None = None    # overrides the axis's, for one cell
+    oracle_literal_ok: str | None = None   # why the answer may appear in the src
 
     @property
     def path(self) -> Path:
@@ -67,7 +68,7 @@ def load_all(only: list[str] | None = None) -> list[Axis]:
             expect=d.get("expect"),
             cells=[Cell(path.stem, c["id"], c.get("what", ""),
                         c["src"], c.get("skip"), _oracle_of(c, path),
-                        c.get("expect"))
+                        c.get("expect"), c.get("oracle_literal_ok"))
                    for c in d.get("cell", [])],
         ))
     return out
@@ -84,6 +85,43 @@ def _oracle_of(cell: dict, path: Path) -> tuple[str, str] | None:
             f"zyddt: {path.name}: cell '{cell['id']}' declares {len(o)} oracles. "
             f"One case, one independent answer.")
     return next(iter(o.items()))
+
+
+def suggestive(cell: Cell, oracle_out: str) -> str | None:
+    """Is this oracle checking anything, or confirming a number typed twice?
+
+    An oracle is a check only when BOTH SIDES COMPUTE, by the same route.  The
+    `i53-boundary` cell shipped as:
+
+        src       >> 9007199254740991 ¶      a LITERAL, chosen knowing the answer
+        oracle    print(2**53 - 1)           a COMPUTATION
+
+    Those two do not do the same thing.  Zymbol printed back a constant typed to
+    match what Python computes, so the "check" confirmed only that the same
+    number had been typed twice — and would have stayed green through any change
+    to how Zymbol computes anything.
+
+    The mechanical test for that exact fraud: does the oracle's answer appear
+    verbatim in the Zymbol source?  If it does, the answer was written into the
+    program the oracle is supposed to be checking.
+
+    It is a HEURISTIC and says so.  `>> 1 + 0 ¶` legitimately contains its own
+    answer, so this warns rather than fails, and `oracle_literal_ok = "reason"`
+    silences it — with a reason, like every other exclusion in this layer.
+    Returns the offending line, or None.
+    """
+    if cell.oracle_literal_ok:
+        return None
+    body = "\n".join(l for l in cell.src.splitlines()
+                      if not l.lstrip().startswith("//"))
+    for line in oracle_out.splitlines():
+        line = line.strip()
+        # Short answers collide by accident: "2" is in half of all arithmetic.
+        # Below four characters the test says more about the alphabet than about
+        # the cell, so it is not applied.
+        if len(line) >= 4 and line in body:
+            return line
+    return None
 
 
 def generate(axes: list[Axis], oracles: dict | None = None) -> list[Cell]:

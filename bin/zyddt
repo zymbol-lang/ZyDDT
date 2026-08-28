@@ -339,6 +339,18 @@ def cmd_axis(args, cfg) -> int:
                     noverdict += 1
                     worst = worse(worst, NOVERDICT)
                     continue
+                sus = A.suggestive(cell, raw.stdout)
+                if sus is not None:
+                    # Not a failure of the engines. A failure of the CELL: the
+                    # oracle is confirming a number that was typed into the very
+                    # program it is supposed to be checking.
+                    worst = worse(worst, NOVERDICT)
+                    noverdict += 1
+                    print(f"{R.yellow('SUGGESTIVE')}  {label}  "
+                          f"{R.dim('the oracle answer ' + repr(sus) + ' appears in the .zy source')}")
+                    print(R.dim("    an oracle checks nothing unless both sides compute;"
+                                ' silence with oracle_literal_ok = "reason"'))
+                    continue
                 if raw.stdout != v.out:
                     wrong += 1
                     worst = worse(worst, RED)

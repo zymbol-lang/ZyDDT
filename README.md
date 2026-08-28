@@ -69,7 +69,7 @@ Each answers something the one above it cannot.
 |---|---|---|
 | `ask` — **differential** | did every engine answer alike? | always, wherever it can decide. It encodes no belief about the right answer, so it cannot encode a wrong one ([`CHARTER.md`](CHARTER.md) § 8.2) |
 | `expect` — **category** | did each engine reach the required category? | a malformed program, or any cell named for what it produces. Checked per engine on every outcome, so a divergence **names** the engine that is out of compliance rather than only reporting that they differ |
-| `oracle` — **independent answer** | is what they agree on *right*? | anywhere another language can decide it. `zytw` and `zyvm` share the whole front end and `zyjs` was ported from them, so a wrong answer they all inherited is a green row |
+| `oracle` — **independent answer** | is what they agree on *right*? | anywhere another language can decide it — and only where **both sides compute, by the same route**. `zytw` and `zyvm` share the whole front end and `zyjs` was ported from them, so a wrong answer they all inherited is a green row |
 | `check` — **golden** | is one engine still doing exactly this? | when the differential cannot decide. Recorded from a run and reviewed as a diff, never typed from what somebody expects |
 
 And one mechanism for what cannot be asked at all: [`exclusions.toml`](exclusions.toml),
@@ -85,12 +85,13 @@ routing comes out of the run rather than out of a reading.
 
 ```text
 axis             cells  agree  oracled  narrowed  wording  diverge  wrong
-arithmetic           4      4        4         0        0        0      0
+arithmetic           6      5        4         0        0        1      0
+diagnostic           3      0        0         0        0        3      0
 environment          3      3        0         3        0        0      0
-refusal              3      0        0         0        2        1      0
+refusal              3      0        0         0        2        0      1
 verdict-shape        5      4        0         0        1        0      0
 pins                 1      1        —         0        —        0      —
-selftest            41     41        —         —        —        —      —
+selftest            42     42        —         —        —        —      —
 ```
 
 `oracled` is the honest count of cells where agreement is not the only evidence.
@@ -104,8 +105,10 @@ cannot be mistaken for any. An axis nobody has declared has no row here, and tha
 absence is worth more than a green tick on a suite that never asked
 ([`CHARTER.md`](CHARTER.md) § 6).
 
-The one red is real and was found by the first run of the first axis:
-[`ZYJS-001`](HALLAZGOS/zyjs.md). `x = =` is refused by `zytw` and `zyvm` and
+Every red is in [`HALLAZGOS/zyjs.md`](HALLAZGOS/zyjs.md), and all three were
+found by cells rather than by looking.
+
+[`ZYJS-001`](HALLAZGOS/zyjs.md) came out of the first run of the first axis. `x = =` is refused by `zytw` and `zyvm` and
 **accepted** by `zyjs`, which runs it to completion with only an unused-variable
 warning. Tracing it found the cause, and it is wider than the cell:
 `parsePrimary` in `zymbol.js` ends by consuming **any** token it does not
@@ -119,6 +122,19 @@ underneath it, at the bottom of `parsePrimary`.
 
 As a cell it needed no ID, which is exactly why the axis form finds what the
 finding-by-finding form waits for.
+
+`ZYJS-002` and `ZYJS-003` came out of **repairing a bad cell**. `i53-boundary`
+shipped with a literal on the Zymbol side and a computation on the Python side —
+two copies of one number, checking nothing. Writing it honestly turned up a
+diagnostic that carries no line number in `zyjs`, folds its guidance into the
+message instead of a `= help:` line, and — one probe further — surfaces a raw
+JavaScript `RangeError` as `error: Invalid code point NaN` for all four base
+prefixes. None of it was visible to the old gate by construction: a consensus run
+compares stdout, and a refusal has none.
+
+The guard against that class of bad cell is now mechanical
+([`VERDICTS.md`](VERDICTS.md) § 8): if the oracle's answer appears verbatim in
+the `.zy` source, the cell gives no verdict.
 
 ## Authorship & AI collaboration
 

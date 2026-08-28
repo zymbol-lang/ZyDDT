@@ -279,10 +279,40 @@ thing under test, and is never cited for anything it does not itself decide:
 CPython is the authority on integer arithmetic and says nothing about how Zymbol
 formats a dictionary. A cell that wants that wants a golden.
 
-### The way an oracle goes wrong
+### The two ways an oracle goes wrong
 
-It asserts *another* language's answer about this one. Both mismatches on the
-first run of `axes/arithmetic.toml` were the oracle's fault, not the engines':
+**One: it does not check anything.** The `i53-boundary` cell shipped like this,
+and it is worth looking at before writing another one:
+
+```toml
+src       = '>> 9007199254740991 ¶'    # a LITERAL, typed knowing the answer
+oracle.py = 'print(2**53 - 1)'         # a COMPUTATION
+```
+
+The two sides do not do the same thing. Zymbol prints back a constant chosen to
+match what Python computes, so the "check" confirms only that the same number was
+typed twice — and it would have stayed green through any change to how Zymbol
+computes anything at all.
+
+> **An oracle is a check only when both sides compute, by the same route.**
+
+That is mechanically testable for the exact fraud above: does the oracle's answer
+appear verbatim in the Zymbol source? If it does, the answer was written into the
+program the oracle is supposed to be deciding. `zyddt axis` reports it as
+`SUGGESTIVE` and gives no verdict for that cell.
+
+It is a heuristic and says so — `>> 1000 + 0 ¶` legitimately contains its own
+answer — so it warns rather than fails, it does not apply below four characters
+(`42` is in half of all arithmetic), and `oracle_literal_ok = "reason"` silences
+it, with a reason, like every other exclusion here.
+
+The route matters as much as the expression. The boundary cell now reads
+`(2 ^ 52) + (2 ^ 52 - 1)` on both sides, because `2 ^ 53 - 1` cannot be used at
+all — see below.
+
+**Two: it asserts *another* language's answer about this one.** Both mismatches
+on the first run of `axes/arithmetic.toml` were the oracle's fault, not the
+engines':
 
 | cell | Zymbol | naive Python oracle |
 |---|---|---|
@@ -297,6 +327,24 @@ they encode written beside them.
 An oracle that needs a comment saying **which** rule it encodes is an oracle
 earning its place: the language had made that decision and nothing executable
 recorded it.
+
+### Where an oracle cannot exist at all
+
+`>> 2 ^ 53 - 1 ¶` is `Runtime error: integer overflow: 2 ^ 53` in all three
+engines. `print(2**53 - 1)` is `9007199254740991`. **Neither is wrong.**
+
+`^` binds tighter than `-`, so the intermediate is 9007199254740992 — outside
+±(2^53−1) — and a fail-closed model must refuse it even though the subtraction
+would have brought the result back into range. Python has no boundary to cross.
+
+So the two languages do not share a number model at that point, which is the
+whole reason the cell exists, and an oracle there would be asserting Python's
+answer about Zymbol. The cell carries `expect = "error"` and no oracle, and the
+absence is written into it as the finding. `expect` is the strongest claim that
+is actually true of both: *whatever the message, this must not produce a number.*
+
+A cell that cannot have an oracle should say so where the next reader will look.
+An oracle quietly omitted is indistinguishable from one nobody got round to.
 
 ---
 
