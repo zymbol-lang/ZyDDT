@@ -1,0 +1,60 @@
+# The diagnostic axis — a refusal is not one answer, it is three.
+#
+# `axes/refusal.toml` asks whether a malformed program is refused.  This axis
+# asks whether the refusal is USABLE: does it say where, and does it say it in
+# the one spelling the project settled on?
+#
+# It exists because the gate could never see any of this.  CHARTER § 2.1: the
+# consensus run compares stdout, and a refusal has none.  Every finding here was
+# invisible to ZyQuality by construction.
+
+id      = "diagnostic"
+what    = "a refusal that cannot be located or read is not a usable refusal"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+# `expect` is the floor: whatever else differs, these must not run.  The axis is
+# about what happens ABOVE that floor, which the differential judges.
+
+[[cell]]
+id   = "location-on-a-lexer-error"
+what = "a diagnostic raised while tokenising still has to say which line"
+# DIVERGES 2026-08-28 (ZYJS-002).  zytw/zyvm say `--> file:2:5`; zyjs says
+# nothing at all, because the diagnostic carries no `line` field and
+# run_one.mjs only writes the location `if (d.line != null)`.
+#
+# The line is on line TWO on purpose.  A cell whose error is on line 1 cannot
+# tell "reports the line" from "reports 1 for everything".
+src  = """
+x = 1
+y = 9007199254740992
+"""
+
+[[cell]]
+id   = "guidance-spelling"
+what = "guidance goes on its own `= help:` line, not inside the message"
+# Same divergence, other half.  zytw writes
+#     error: integer literal out of range: '9007199254740992'
+#       = help: integers range from … (±2⁵³−1)
+# and zyjs folds the guidance into the message between parentheses.
+#
+# Not cosmetic: `= help:` is the spelling the whole toolchain agreed on, and the
+# `=` is what a reader (and zyq) uses to tell guidance from the message itself.
+# Folded into parentheses it cannot be separated by anything.
+src  = """
+>> 9007199254740992 ¶
+"""
+
+[[cell]]
+id   = "base-prefix-with-no-digits"
+what = "a base prefix with no digits after it is a language error, not a crash"
+# ZYJS-003.  All four prefixes, one defect: `0x`, `0b`, `0o`, `0d` each collect
+# their digits with a `while` that may match none, then call
+# `String.fromCodePoint(parseInt('', N))` — `fromCodePoint(NaN)` throws, and the
+# raw JavaScript RangeError reaches the user as `error: Invalid code point NaN`.
+#
+# It is refused either way, so `expect = "error"` is met and the axis floor does
+# not catch it.  What catches it is the differential: an engine that answers
+# with its own implementation's exception has not diagnosed anything.
+src  = """
+>> 0xZZ ¶
+"""

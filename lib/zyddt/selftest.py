@@ -293,6 +293,28 @@ def _():
 
 # ── Axes and the generator ───────────────────────────────────────────────────
 
+@case("axes/suggestive-oracle-is-caught",
+      "an oracle whose answer is typed into the .zy source checks nothing")
+def _():
+    # The exact cell that shipped: the zymbol side printed a literal chosen
+    # knowing the answer, the python side computed it. Two copies of one number.
+    fraud = A.Cell("x", "c", "", ">> 9007199254740991 ¶\n")
+    assert A.suggestive(fraud, "9007199254740991\n") == "9007199254740991"
+
+    honest = A.Cell("x", "c", "", ">> (2 ^ 52) + (2 ^ 52 - 1) ¶\n")
+    assert A.suggestive(honest, "9007199254740991\n") is None
+
+    # Short answers collide by accident, so the test does not apply below four
+    # characters: "42" is in half of all arithmetic sources.
+    short = A.Cell("x", "c", "", ">> 6 * 7 ¶\n")
+    assert A.suggestive(short, "42\n") is None
+
+    # And it is a heuristic, so a declared reason silences it.
+    excused = A.Cell("x", "c", "", ">> 1000 + 0 ¶\n",
+                     oracle_literal_ok="the addend is the answer here")
+    assert A.suggestive(excused, "1000\n") is None
+
+
 @case("axes/one-oracle-per-cell",
       "two oracles that disagree is a question about the oracles")
 def _():
