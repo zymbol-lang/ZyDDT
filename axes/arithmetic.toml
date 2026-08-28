@@ -114,6 +114,32 @@ expect = "error"
 # actually true of both: whatever the message, this must not produce a number.
 #
 # Measured 2026-08-28, identical in all three engines, message included.
+#
+# ── Is refusing this normal, or is it Zymbol's design? ───────────────────────
+# Both.  It is a deliberate choice, and real languages sit at every point of the
+# spectrum.  Measured 2026-08-28, each in its own runtime:
+#
+#   Zymbol        2 ^ 53 - 1        refused: `integer overflow: 2 ^ 53`
+#   Rust (debug)  2i64.pow(63)      panic: attempt to exponentiate with overflow
+#   Rust (release)                  wraps, silently
+#   C signed                        undefined behaviour
+#   C unsigned    2^64 then -1      0, then 18446744073709551615 — the RIGHT
+#                                   answer, reached by wrapping TWICE.  Luck,
+#                                   not soundness: `2^64 / 2` gives 0.
+#   Java                            wraps, silently
+#   JavaScript    2**53 - 1         9007199254740991 — works
+#   Python        2**53 - 1         9007199254740991 — no boundary at all
+#
+# Zymbol sits with Rust-in-debug, at the strict end.  Nothing here is unusual;
+# what is unusual is how many of the others are silently wrong instead.
+#
+# The sharp part: Zymbol is STRICTER THAN THE ENGINE THAT MOTIVATED ITS BOUND.
+# JavaScript computes `2**53` happily — it is an exact f64 (9007199254740992).
+# MAX_SAFE_INTEGER is a convention there, not a limit of the type.  And that is
+# exactly why the bound exists: measured, `2**53 === 2**53 + 1` is **true** in
+# JavaScript.  Past the safe range the arithmetic still answers, and lies.
+# Zymbol made the safe range its TYPE and fails on leaving it, which is the more
+# honest of the two and the whole point of i53 being fail-closed.
 src  = """
 >> 2 ^ 53 - 1 ¶
 """
