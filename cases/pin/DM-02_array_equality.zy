@@ -1,0 +1,25 @@
+// PIN DM-02 — `==` between arrays answered #0 only in the register VM.
+// Closed 2026-08-18 by adding the `Array` arm to `Value::equals` and
+// `cmp_direct` in zymbol-vm/src/lib.rs; both had a `Tuple` arm and no `Array`
+// one, so arrays fell through to `_ => false`.
+//
+// Why the pin is worth its line: `corpus/bugs/bug_vm_tuple_equality.zy` had
+// covered the same question FOR TUPLES since v0.0.5, and the neighbouring case
+// is exactly what made the gap feel covered. A pin that is one line away from
+// an existing case is the kind that gets talked out of existence.
+//
+// Measuring it turned up a second divergence, fixed at the same time and
+// asserted here too: `[1, 2, 3] == [1, 2.0, 3]`. `1 == 1.0` is #1, so element
+// equality has to be the same relation as scalar equality.
+//
+// Named-tuple equality is DM-22 and was deliberately NOT fixed. It is not
+// asserted here — a pin that quietly covers an open finding reports it as
+// closed.
+a = [1, 2, 3]
+b = [1, 2, 3]
+>> (a == b) ¶
+c = [1, 2.0, 3]
+>> (a == c) ¶
+>> ([] == []) ¶
+>> ([[1, 2], [3]] == [[1, 2], [3]]) ¶
+>> (a <> [1, 2, 4]) ¶

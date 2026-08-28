@@ -1,0 +1,5 @@
+// SEED — not a cell and not a pin: the one program whose only job is to prove
+// that an engine can be invoked at all.  `zyddt engines` runs it to decide
+// whether an engine is available, so it must exercise nothing that could fail
+// for a reason other than "this engine is not there".
+>> "hola" ¶

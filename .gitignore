@@ -7,3 +7,7 @@
 *.log
 *.tmp
 /out/
+
+# Python bytecode from lib/zyddt/
+__pycache__/
+*.pyc

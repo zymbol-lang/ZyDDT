@@ -1,0 +1,609 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+"""zyddt — ask every engine the same question and require the same answer.
+
+    zyddt engines                     what can run, and what cannot
+    zyddt gen [AXIS...]               write every cell from axes/*.toml
+    zyddt axis [AXIS...]              generate, run, and publish the denominator
+    zyddt observe FILE                what each engine said about one program
+    zyddt ask FILE...                 CELL: all engines must answer alike
+    zyddt check FILE...               PIN: compare against the recorded .observed
+    zyddt check --regen FILE...       record it (deliberate, and a reviewable diff)
+    zyddt selftest                    grade the runner itself — needs no engine
+    zyddt suite                       the whole layer, one verdict
+
+Exit codes, the same contract every other repository's wrapper already honours:
+
+    0   green
+    1   red — a real disagreement, or a golden that no longer holds
+    2   no verdict — an engine did not answer, so nothing may be called a pass
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+
+from zyddt import axes as A            # noqa: E402
+from zyddt import compare as C         # noqa: E402
+from zyddt import engines as E          # noqa: E402
+from zyddt import exclude as X         # noqa: E402
+from zyddt import observe as O          # noqa: E402
+from zyddt import report as R           # noqa: E402
+from zyddt import selftest as S        # noqa: E402
+
+GREEN, RED, NOVERDICT = C.GREEN, C.RED, C.NOVERDICT
+worse = C.worse
+
+
+def _observe_all(cfg, engs, file: Path, phase: str, timeout: float,
+                 case_id: str | None = None, table=None, without=()):
+    """Run every engine, except the ones a rule excuses from this case.
+
+    An excluded engine is never invoked.  That is the point the exclusion table
+    exists to make: `<\\ shell \\>` in zyjs does not fail, it ANSWERS — with
+    `Date.now() * 1e6 + random()` from the stub in zymbol.js — so running it and
+    discarding the result is not the same as not asking.  A discarded answer is
+    one refactor away from being read.
+    """
+    out = []
+    for e in engs:
+        rule = table.excluded(case_id, e.id, without) if (table and case_id) else None
+        if rule is not None:
+            out.append(O.Observation(e.id, phase, "EXCLUDED", None, -1, "",
+                                     excluded=rule))
+            continue
+        out.append(O.classify(E.run(e, file, phase, timeout), cfg.normalise))
+    return out
+
+
+def _case_id(file: Path) -> str:
+    """The stable name a rule in exclusions.toml matches against.
+
+    A generated cell is `axis/cell`; a pin is its path under cases/.  Never the
+    filesystem path as given on the command line — a rule that matched
+    `generated/environment/shell-pipe.zy` from one directory and
+    `../ZyDDT/generated/...` from another would fire depending on where the
+    caller stood, which is precisely the "describes the runner, not the corpus"
+    failure corpus.toml called out.
+    """
+    f = file.resolve()
+    root = Path(__file__).resolve().parents[1]
+    for base in (root / "generated", root / "cases"):
+        if f.is_relative_to(base):
+            return str(f.relative_to(base).with_suffix(""))
+    return str(f.with_suffix("").name)
+
+
+def _indent(text: str, pad: str = "      ") -> str:
+    return "\n".join(pad + l for l in text.rstrip("\n").splitlines())
+
+
+# ── engines ──────────────────────────────────────────────────────────────────
+def cmd_engines(args, cfg) -> int:
+    probe = Path(__file__).resolve().parents[1] / "cases" / "seed" / "hello.zy"
+    rc = GREEN
+    for e in cfg.engines:
+        ok_run = "—"
+        if probe.exists():
+            r = E.run(e, probe, "run", args.timeout)
+            ok_run = R.green("available") if not r.blocked else R.red(r.blocked)
+            if r.blocked:
+                rc = NOVERDICT
+        static = "yes" if e.check_cmd else R.dim("no static phase")
+        print(f"  {R.bold(e.id):<14} {ok_run:<24} {static:<18} {R.dim(e.desc)}")
+    return rc
+
+
+# ── observe ──────────────────────────────────────────────────────────────────
+def cmd_observe(args, cfg) -> int:
+    engs = cfg.by_id(args.engines)
+    for file in args.files:
+        print(R.bold(str(file)))
+        for obs in _observe_all(cfg, engs, file, args.phase, args.timeout):
+            print(f"  {obs.engine:<8} {R.verdict(obs.verdict)}")
+            print(_indent(O.render(obs), "      " + R.dim("│ ")))
+    return GREEN
+
+
+def _print_consensus(label: str, con, pad: str = "    ") -> None:
+    """One printer, so `ask` and `axis` cannot drift into two vocabularies."""
+    if con.outcome == C.DIVERGE:
+        print(f"{R.red('DIVERGE')}     {label}")
+        for members in con.shape_groups:
+            who = ",".join(m.engine for m in members)
+            print(f"{pad}{R.bold(who):<20} {R.verdict(members[0].verdict)}")
+            print(_indent(O.render(members[0]), pad + "    " + R.dim("| ")))
+    elif con.outcome == C.WORDING:
+        print(f"{R.yellow('WORDING')}     {label}  {R.verdict(con.verdict)}  "
+              f"{R.dim('same behaviour, different words')}")
+        for members in con.wording_groups:
+            who = ",".join(m.engine for m in members)
+            for d in members[0].diags:
+                print(f"{pad}{R.bold(who):<20} {'; '.join(d.render()).strip()}")
+    elif con.outcome == C.PARTIAL:
+        print(f"{R.yellow('PARTIAL')}     {label}  {R.verdict(con.verdict)}")
+    elif con.outcome == C.NO_VERDICT:
+        print(f"{R.bold(R.red('NO VERDICT'))}  {label}")
+        for o in con.answered:
+            print(f"{pad}{o.engine:<8} {R.verdict(o.verdict)}  {R.dim('answered alone')}")
+    for o in con.blocked:
+        print(f"{pad}{o.engine:<8} {R.red('BLOCKED')}  {o.blocked}")
+    for o in con.excluded:
+        print(f"{pad}{o.engine:<8} {R.dim('excluded')}  "
+              f"{R.dim(o.excluded.tag + ': ' + o.excluded.reason)}")
+
+
+# ── ask — the CELL primitive ─────────────────────────────────────────────────
+def cmd_ask(args, cfg) -> int:
+    """No expectation is written down.  Every engine is asked the same question
+    and the answers must be identical.
+
+    CHARTER § 8.2: a cell encodes no belief about the right answer, so it cannot
+    encode a wrong one.  This is the form to prefer wherever it can decide.
+    """
+    engs = cfg.by_id(args.engines)
+    table = X.load()
+    worst = GREEN
+    for file in args.files:
+        obs = _observe_all(cfg, engs, file, args.phase, args.timeout,
+                           _case_id(file), table, tuple(args.without))
+        con = C.consensus(obs, cfg.normalise.compare_column)
+        if con.outcome == C.AGREE:
+            cov = "" if con.full else R.dim(f"  [{con.coverage}]")
+            print(f"{R.green('AGREE')}       {file}  {R.verdict(con.verdict)}{cov}")
+            for o in con.excluded:
+                print(f"    {o.engine:<8} {R.dim('excluded')}  "
+                      f"{R.dim(o.excluded.tag + ': ' + o.excluded.reason)}")
+            continue
+        _print_consensus(str(file), con)
+        worst = worse(worst, RED if con.outcome == C.DIVERGE else NOVERDICT)
+    return worst
+
+
+# ── check — the PIN primitive ────────────────────────────────────────────────
+def cmd_check(args, cfg) -> int:
+    """Where a differential cannot decide, a recorded observation does.
+
+    The golden is per engine, because the engines legitimately differ in what
+    they *can* say (zyjs carries no column) and a pin's job is to hold one
+    engine's behaviour still.  `--regen` records; reading the diff is the review.
+    """
+    engs = cfg.by_id(args.engines)
+    worst = GREEN
+    for file in args.files:
+        for obs in _observe_all(cfg, engs, file, args.phase, args.timeout):
+            gold = file.with_suffix(f".{obs.engine}.observed")
+            actual = O.render(obs)
+
+            if args.regen:
+                if obs.status == "BLOCKED":
+                    print(f"{R.red('SKIP')}        {gold.name}  {obs.blocked}")
+                    worst = worse(worst, NOVERDICT)
+                    continue
+                changed = not gold.exists() or gold.read_text() != actual
+                gold.write_text(actual)
+                print(f"{R.yellow('RECORDED') if changed else R.dim('unchanged')}    {gold.name}")
+                continue
+
+            if obs.status == "BLOCKED":
+                print(f"{R.red('BLOCKED')}     {gold.name}  {obs.blocked}")
+                worst = worse(worst, NOVERDICT)
+                continue
+            if not gold.exists():
+                print(f"{R.red('NO GOLDEN')}   {gold.name}  {R.dim('run with --regen')}")
+                worst = worse(worst, NOVERDICT)
+                continue
+            expected = gold.read_text()
+            if expected == actual:
+                print(f"{R.green('HOLDS')}       {gold.name}  {R.verdict(obs.verdict)}")
+            else:
+                print(f"{R.red('BROKE')}       {gold.name}")
+                import difflib
+                for l in difflib.unified_diff(
+                    expected.splitlines(), actual.splitlines(),
+                    "recorded", "now", lineterm="", n=1
+                ):
+                    print("      " + (R.red(l) if l.startswith("-") else
+                                       R.green(l) if l.startswith("+") else R.dim(l)))
+                worst = worse(worst, RED)
+    return worst
+
+
+# ── gen / axis — the CELL machinery ──────────────────────────────────────────
+def cmd_gen(args, cfg) -> int:
+    axes = A.load_all(args.axes or None)
+    if not axes:
+        print("zyddt: no axes declared in axes/", file=sys.stderr)
+        return NOVERDICT
+    cells = A.generate(axes, cfg.oracles)
+    for ax in axes:
+        print(f"  {R.bold(ax.id):<20} {len(ax.cells):>3} cells  {R.dim(ax.what)}")
+    print(R.dim(f"  → {len(cells)} files under generated/"))
+    return GREEN
+
+
+def cmd_axis(args, cfg) -> int:
+    """Run every cell of every axis and publish the denominator.
+
+    CHARTER § 6: the number that was missing was never the number of bugs — it
+    was how many places two engines COULD disagree.  A row here is that number,
+    per axis.  An axis nobody has declared has no row, and that absence is worth
+    more than a green tick on a suite that never asked.
+    """
+    axes = A.load_all(args.axes or None)
+    if not axes:
+        print("zyddt: no axes declared in axes/", file=sys.stderr)
+        return NOVERDICT
+    A.generate(axes, cfg.oracles)
+
+    table = X.load()
+    baseline = _load_baseline()
+    wording_now: set[str] = set()
+    worst = GREEN
+    rows = []
+
+    for ax in axes:
+        engs = cfg.by_id(ax.engines or None)
+        agreed = diverged = worded = wrong = noverdict = narrowed = oracled = 0
+
+        for cell in ax.cells:
+            label = f"{ax.id}/{cell.id}"
+            if cell.skip:
+                # A skipped cell names the axis value it skips and why, so a
+                # hole in a matrix is visible AS a hole (CHARTER § 5).
+                print(f"{R.yellow('SKIP')}        {label}  {cell.skip}")
+                noverdict += 1
+                worst = worse(worst, NOVERDICT)
+                continue
+
+            dropped = table.dropped_class(label, tuple(args.without))
+            if dropped is not None:
+                print(f"{R.dim('DROPPED')}     {label}  "
+                      f"{R.dim(dropped.tag + ' — asked for with --without')}")
+                noverdict += 1
+                continue
+            obs = _observe_all(cfg, engs, cell.path, args.phase, args.timeout,
+                               label, table, tuple(args.without))
+            con = C.consensus(obs, cfg.normalise.compare_column)
+
+            # ── Compliance: does each engine reach the required category? ──
+            # Before the branches, not after, and per ENGINE rather than per
+            # consensus.  A DIVERGE used to stop here and report only that the
+            # engines differ — which is a fact about a pair and routes nowhere.
+            # Naming the engine that is out of compliance is what turns an
+            # observation into a finding somebody can file.
+            required = cell.expect or ax.expect
+            bad = C.offenders(obs, required) if required else []
+            if bad:
+                wrong += 1
+                worst = worse(worst, RED)
+                print(f"{R.red('WRONG')}       {label}  {R.dim(cell.what)}")
+                for o in obs:
+                    if o.status in ("BLOCKED", "EXCLUDED"):
+                        continue
+                    ok = o.status == required
+                    mark = R.green("cumple") if ok else R.red("INCUMPLE")
+                    print(f"    {R.bold(o.engine):<18} {R.verdict(o.verdict):<22} "
+                          f"{mark} {R.dim('expect=' + required)}")
+                    if not ok:
+                        print(_indent(O.render(o), "        " + R.dim("| ")))
+                who = ",".join(o.engine for o in bad)
+                print(R.dim(f"    → HALLAZGOS/"
+                            f"{who if len(bad) == 1 else 'GLOBAL'}.md"))
+                continue
+
+            if con.outcome == C.DIVERGE:
+                diverged += 1
+                worst = worse(worst, RED)
+                _print_consensus(f"{label}  {R.dim(cell.what)}", con)
+                # A divergence where every engine still meets the required
+                # category: they disagree about HOW, not about WHAT. Worth
+                # saying, because it routes to the global file, not to one
+                # engine's.
+                if required:
+                    print(R.dim(f"    every engine reaches expect={required}; "
+                                f"they differ in how → HALLAZGOS/GLOBAL.md"))
+                continue
+            if con.outcome == C.NO_VERDICT:
+                noverdict += 1
+                worst = worse(worst, NOVERDICT)
+                _print_consensus(label, con)
+                continue
+
+            v = con.answered[0]
+
+            # ── The oracle: is the answer they agree on also RIGHT? ─────
+            # Placed BEFORE the wording and partial branches, not after.  It sat
+            # after them at first, so a cell whose engines split only on the
+            # WORDING of a diagnostic never had its answer checked at all — the
+            # gate would carry a known, baselined wording split and silently stop
+            # verifying the output underneath it.  Every outcome that reaches
+            # here shares one `shape_key`, and stdout is part of that key, so
+            # `v.out` is every answering engine's output.
+            #
+            # It is not reachable from DIVERGE or NO_VERDICT, and deliberately:
+            # an oracle run against engines that disagree answers a question
+            # nobody asked ("which of them is right") when the finding is that
+            # they differ at all.
+            if cell.oracle and C.oracle_applies(con.outcome):
+                oid, _ = cell.oracle
+                orc = cfg.oracles[oid]
+                raw = E.run_oracle(orc, cell.oracle_path(orc.ext), args.timeout)
+                if raw.blocked:
+                    print(f"{R.yellow('NO ORACLE')}   {label}  {raw.blocked}")
+                    noverdict += 1
+                    worst = worse(worst, NOVERDICT)
+                    continue
+                if raw.stdout != v.out:
+                    wrong += 1
+                    worst = worse(worst, RED)
+                    print(f"{R.red('WRONG ANSWER')} {label}  "
+                          f"{R.dim('all engines agree, and the oracle disagrees')}")
+                    print(f"    {R.bold('engines'):<20} {v.out.strip()!r}")
+                    print(f"    {R.bold(orc.id + ' oracle'):<20} {raw.stdout.strip()!r}")
+                    print(R.dim(f"    {orc.desc}"))
+                    continue
+                oracled += 1
+
+            if not con.full:
+                narrowed += 1
+
+            if con.outcome == C.WORDING:
+                worded += 1
+                wording_now.add(label)
+                if label not in baseline:
+                    worst = worse(worst, RED)      # a NEW wording split is a red
+                    print(f"{R.red('NEW WORDING')} {label}  "
+                          f"{R.dim('not in wording.baseline')}")
+                    _print_consensus(label, con)
+                elif args.verbose:
+                    _print_consensus(label, con)
+                continue
+
+            if con.outcome == C.PARTIAL:
+                noverdict += 1
+                worst = worse(worst, NOVERDICT)
+                _print_consensus(label, con)
+                continue
+
+            agreed += 1
+            if args.verbose or not con.full:
+                cov = "" if con.full else R.dim(f"  [{con.coverage}]")
+                print(f"{R.green('AGREE')}       {label}  {R.verdict(v.verdict)}{cov}")
+                for o in con.excluded:
+                    print(f"    {o.engine:<8} {R.dim('excluded')}  "
+                          f"{R.dim(o.excluded.tag + ': ' + o.excluded.reason)}")
+
+        rows.append((ax.id, len(ax.cells), agreed, worded, diverged, wrong,
+                     noverdict, narrowed, oracled))
+
+    if args.regen_baseline:
+        if args.axes:
+            print(R.red("zyddt: --regen-baseline needs a full run — a partial one "
+                        "would erase entries it never asked about"), file=sys.stderr)
+            return NOVERDICT
+        _save_baseline(wording_now)
+        print(R.yellow(f"\n  wording.baseline rewritten: {len(wording_now)} entries"))
+        return GREEN
+
+    # Only over the axes that actually ran.  `zyddt axis environment` compared
+    # the whole baseline against one axis's results and announced that three
+    # splits had closed; they had simply not been asked.  A partial run may not
+    # report a global improvement.
+    ran = {ax.id for ax in axes}
+    healed = {e for e in baseline - wording_now if e.split("/", 1)[0] in ran}
+    if healed:
+        print(R.green(f"\n  {len(healed)} wording split(s) closed since the baseline: "
+                      + ", ".join(sorted(healed))))
+        print(R.dim("  rerun with --regen-baseline to lock the improvement in"))
+
+    print()
+    print(f"  {'axis':<22}{'cells':>6}{'agree':>7}{'oracled':>9}{'narrowed':>10}"
+          f"{'wording':>9}{'diverge':>9}{'wrong':>7}{'no verdict':>12}")
+    for name, cells, ag, wd, dv, wr, nv, nr, orc in rows:
+        print(f"  {name:<22}{cells:>6}{ag:>7}"
+              f"{(R.green(str(orc)) if orc else R.dim('0')):>9}"
+              f"{(R.dim(str(nr)) if nr else '0'):>10}"
+              f"{(R.yellow(str(wd)) if wd else '0'):>9}"
+              f"{(R.red(str(dv)) if dv else '0'):>9}"
+              f"{(R.red(str(wr)) if wr else '0'):>7}"
+              f"{(R.yellow(str(nv)) if nv else '0'):>12}")
+    print(R.dim("  oracled  = agreed AND checked against an implementation that is not ours"))
+    print(R.dim("  narrowed = agreed, but a rule excused an engine: fewer surfaces asked"))
+    print(R.dim("  an axis that is not declared has no row, and that is the honest gap"))
+
+    dead = table.dead_rules()
+    if dead:
+        # `zyq audit` is right to call these dead: a rule matching no case is
+        # either a case deleted without its exclusion, or an exclusion written
+        # for a case that never existed. Both are how a list stops describing
+        # anything. Only meaningful over a FULL run, so it is silent when the
+        # caller narrowed the axes.
+        if not args.axes:
+            print()
+            for r in dead:
+                print(f"  {R.yellow('DEAD RULE')}  {r.match:<28} {R.dim(r.tag)}  "
+                      f"{R.dim('matched no case')}")
+            worst = worse(worst, NOVERDICT)
+    return worst
+
+
+BASELINE = Path(__file__).resolve().parents[1] / "wording.baseline"
+
+
+def _load_baseline() -> set[str]:
+    """Cells where the engines behave alike and word it differently.
+
+    A list rather than a count, because a count that stays at 3 while one split
+    closes and another opens is a green gate over a regression.  This is the
+    `messages/` rule applied to what is actually emitted at runtime: it may
+    fall, and it may not rise.
+    """
+    if not BASELINE.exists():
+        return set()
+    return {l.split("#", 1)[0].strip() for l in BASELINE.read_text().splitlines()
+            if l.split("#", 1)[0].strip()}
+
+
+def _save_baseline(entries: set[str]) -> None:
+    header = (
+        "# Cells where every engine does the same thing and says it differently.\n"
+        "# Recorded by `zyddt axis --regen-baseline`, which is deliberate and\n"
+        "# separate: this file may shrink on its own, and may never grow on its\n"
+        "# own. A line appearing here that was not written on purpose is a new\n"
+        "# one-sided message, which is the thing zyquality/messages/ counts\n"
+        "# statically and this counts as it is actually emitted.\n"
+    )
+    BASELINE.write_text(header + "".join(f"{e}\n" for e in sorted(entries)))
+
+
+# ── selftest — grading the grader ────────────────────────────────────────────
+def cmd_selftest(args, cfg) -> int:
+    """Two halves. The cold one needs no engine, on purpose: if it did, a broken
+    engine would look like a broken runner and the test would be useless exactly
+    when it matters."""
+    passed, total, failures = S.run(args.verbose)
+    for f in failures:
+        print(f"  {R.red('FAIL')}  {f}")
+    tick = R.green("ok") if not failures else R.red("FAILED")
+    print(f"  cold  {passed}/{total} {tick}  "
+          f"{R.dim('classifier, parser, comparator, globs, config')}")
+
+    # The live half. Separate, and named, because it is the one that can fail
+    # for a reason that is not the runner's fault.
+    probe = Path(__file__).resolve().parents[1] / "cases" / "seed" / "hello.zy"
+    live_bad = []
+    for e in cfg.engines:
+        obs = O.classify(E.run(e, probe, "run", args.timeout), cfg.normalise)
+        if obs.status == "BLOCKED":
+            live_bad.append(f"{e.id}: {obs.blocked}")
+        elif obs.verdict != "ok" or obs.out != "hola\n":
+            live_bad.append(f"{e.id}: answered {obs.verdict} {obs.out!r}, "
+                            f"expected ok 'hola\\n'")
+    # The command surface. Separate from both halves above because it needs the
+    # engines AND the runner, and it is the only thing that would have caught a
+    # NameError in a command body.
+    smoke_bad = S.smoke_cli(Path(__file__).resolve())
+    for b in smoke_bad:
+        print(f"  {R.red('FAIL')}  cmd/{b}")
+    smoke_tick = R.green("ok") if not smoke_bad else R.red("FAILED")
+    print(f"  cmd   {len(S.SMOKE) - len(smoke_bad)}/{len(S.SMOKE)} {smoke_tick}  "
+          f"{R.dim('every subcommand survives being called')}")
+
+    for b in live_bad:
+        print(f"  {R.red('FAIL')}  live/{b}")
+    live_tick = R.green("ok") if not live_bad else R.red("FAILED")
+    print(f"  live  {len(cfg.engines) - len(live_bad)}/{len(cfg.engines)} {live_tick}  "
+          f"{R.dim('every engine runs the seed and answers it right')}")
+
+    if failures or smoke_bad:
+        return RED
+    return NOVERDICT if live_bad else GREEN
+
+
+# ── suite — one command, one verdict ─────────────────────────────────────────
+def cmd_suite(args, cfg) -> int:
+    """What every other repository's wrapper delegates to.
+
+    The order is not cosmetic.  Availability is checked FIRST and its failure is
+    terminal, because everything after it would otherwise report "nothing ran"
+    as "nothing failed" — the one thing ZyQuality's governance forbids and the
+    reason its wrappers exit 2 rather than 0 when the layer is absent.
+    """
+    # The runner first. Every number below is meaningless if the thing
+    # producing it is wrong, and a broken runner reports the ENGINES — which is
+    # how ZyQuality's reversed argv and missing module resolver both showed up
+    # as divergences rather than as harness defects.
+    print(R.bold("  selftest"))
+    if cmd_selftest(args, cfg) == RED:
+        print(R.red("\n  the runner does not grade correctly; nothing below is evidence"))
+        return NOVERDICT
+
+    print(R.bold("\n  engines"))
+    rc = cmd_engines(args, cfg)
+    if rc != GREEN:
+        print(R.red("\n  an engine did not answer; nothing below may be called a pass"))
+        return NOVERDICT
+
+    print(R.bold("\n  axes") + R.dim("   (cells, generated from axes/*.toml)"))
+    rc = worse(rc, cmd_axis(args, cfg))
+
+    pins = sorted((Path(__file__).resolve().parents[1] / "cases" / "pin").glob("*.zy"))
+    print(R.bold("\n  pins") + R.dim(f"   ({len(pins)} named finding{'' if len(pins) == 1 else 's'})"))
+    if pins:
+        args.files = [q.relative_to(Path.cwd()) if q.is_relative_to(Path.cwd())
+                      else q for q in pins]
+        rc = worse(rc, cmd_ask(args, cfg))
+    else:
+        print(R.dim("    none recorded yet"))
+
+    print()
+    if rc == GREEN:
+        print("  " + R.green(R.bold("GREEN")) + R.dim(
+            " — nothing regressed in what has been declared."
+            "  It does not mean correct: see the undeclared axes above."))
+    elif rc == RED:
+        print("  " + R.red(R.bold("RED")) + " — a regression, not noise.")
+    else:
+        print("  " + R.yellow(R.bold("NO VERDICT")) +
+              " — something did not answer, so nothing is a pass.")
+    return rc
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(prog="zyddt", description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--engines", type=lambda s: s.split(","),
+                   help="comma-separated ids (default: all in engines.toml)")
+    p.add_argument("--phase", choices=["run", "static"], default="run",
+                   help="execute the program, or only analyse it")
+    p.add_argument("--timeout", type=float, default=30.0)
+    p.add_argument("--without", action="append", default=[], metavar="TAG",
+                   help="drop a whole exclusion class for every engine, e.g.\n                        --without STD_DB for a release package with no ODBC")
+    p.add_argument("--strict-column", action="store_true",
+                   help="compare the diagnostic column too. engines.toml leaves it\n                        off because zyjs cannot produce one at all; this is the\n                        switch for the day it can")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="print agreeing cells too, not only the failures")
+    sub.add_parser("engines", help="what can run, and what cannot")
+    sub.add_parser("selftest", help="grade the runner itself — needs no engine")
+    sub.add_parser("suite", help="the whole layer, one verdict")
+    for name, help_ in (("gen", "write every cell from axes/*.toml"),
+                        ("axis", "generate, run, and publish the denominator")):
+        sp = sub.add_parser(name, help=help_)
+        sp.add_argument("axes", nargs="*", help="axis file stems (default: all)")
+        if name == "axis":
+            sp.add_argument("--regen-baseline", action="store_true",
+                            help="record today's wording splits as the baseline")
+    for name, help_ in (("observe", "what each engine said"),
+                        ("ask", "CELL: all engines must answer alike"),
+                        ("check", "PIN: compare against the recorded .observed")):
+        sp = sub.add_parser(name, help=help_)
+        sp.add_argument("files", nargs="+", type=Path)
+        if name == "check":
+            sp.add_argument("--regen", action="store_true",
+                            help="record the observation instead of comparing it")
+
+    args = p.parse_args()
+    # `suite` reuses the other handlers, so give it the fields they read.
+    for attr, default in (("axes", []), ("files", []), ("regen", False),
+                          ("regen_baseline", False)):
+        if not hasattr(args, attr):
+            setattr(args, attr, default)
+    cfg = E.load()
+    if args.strict_column:
+        cfg = dataclasses.replace(
+            cfg, normalise=dataclasses.replace(cfg.normalise, compare_column=True))
+    return {"engines": cmd_engines, "observe": cmd_observe, "ask": cmd_ask,
+            "check": cmd_check, "gen": cmd_gen, "axis": cmd_axis,
+            "suite": cmd_suite, "selftest": cmd_selftest}[args.cmd](args, cfg)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

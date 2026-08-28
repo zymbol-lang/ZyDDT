@@ -1,0 +1,84 @@
+# The arithmetic axis — where agreement is not enough.
+#
+# Three engines agreeing about `6 * 7` is worth very little: they agree because
+# two of them share a front end and the third was ported from it.  A wrong
+# answer they all inherited is a green row.
+#
+# So every cell here carries an ORACLE: the same computation in Python, whose
+# answer was authored outside Zymbol entirely.  The engines must agree with each
+# other AND with it.  `zyddt axis` reports `WRONG ANSWER` when they agree and the
+# oracle says otherwise, which is the one thing a differential can never say.
+#
+# The oracle is cited only for what it actually decides.  CPython is the
+# authority on integer arithmetic; it is NOT an authority on how Zymbol formats
+# a dictionary, and a cell that wants that wants a golden instead.
+
+id      = "arithmetic"
+what    = "integer and float arithmetic, checked against an implementation that is not ours"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id   = "product"
+what = "integer multiplication"
+src  = """
+>> 6 * 7 ¶
+"""
+oracle.py = """
+print(6 * 7)
+"""
+
+[[cell]]
+id   = "integer-division"
+what = "`/` between two integers truncates toward zero (DI-06)"
+# The first draft of this oracle was `print(7 / 2)` and reported WRONG ANSWER
+# against all three engines, which were right.  Zymbol's `/` between Ints
+# truncates toward zero like C and Go (DI-06: `7/2 → 3`, `-5/2 → -2`); Python 3
+# gives a real number and offers `//` separately.
+#
+# That is the failure mode an oracle has to be written against: it asserts
+# ANOTHER language's answer about this one unless somebody writes down which
+# rule is being checked.  An oracle written carelessly is a second wrong belief,
+# not a check on the first.  The `-5` case is included because truncation and
+# flooring only differ on negatives — `7/2` alone cannot tell them apart.
+src  = """
+>> 7 / 2 ¶
+>> (-5) / 2 ¶
+"""
+oracle.py = """
+import math
+print(math.trunc(7 / 2))      # toward zero, not floor
+print(math.trunc(-5 / 2))     # -2, not -3
+"""
+
+[[cell]]
+id   = "modulo-negative"
+what = "`%` follows the same truncating division (DI-06)"
+# Same trap, sharper: `-7 % 3` is -1 in Zymbol and 2 in Python, and neither is
+# wrong — Python floors, C truncates, and Zymbol's `%` has to agree with its own
+# `/`.  `math.fmod` is the truncating one.
+#
+# A cell where the oracle needs a comment saying WHICH rule it encodes is a cell
+# earning its place: the language had made this decision and nothing executable
+# recorded it.
+src  = """
+>> (-7) % 3 ¶
+>> 7 % (-3) ¶
+"""
+oracle.py = """
+import math
+print(int(math.fmod(-7, 3)))  # -1: sign follows the dividend
+print(int(math.fmod(7, -3)))  #  1
+"""
+
+[[cell]]
+id   = "i53-boundary"
+what = "the largest integer the model allows"
+# The integer is ±(2^53−1), fail-closed, in all engines since v0.0.9.  Python's
+# is arbitrary precision, so the oracle is authoritative RIGHT UP TO the
+# boundary and useless past it — which is exactly why the boundary is the cell.
+src  = """
+>> 9007199254740991 ¶
+"""
+oracle.py = """
+print(2**53 - 1)
+"""
