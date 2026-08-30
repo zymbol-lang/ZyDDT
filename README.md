@@ -35,15 +35,18 @@ had no name and no home. This is it.
 
 **The runner exists; the corpus does not.** That order is deliberate — the point
 was to decide what earns a place *before* copying anything, not to fork 661 files
-and sort them afterwards. What runs today is the machinery for asking, plus the
-first two axes and the first pin.
+and sort them afterwards. What runs today is the machinery for asking, eight
+declared axes — three of them crossed matrices — and the first pin. Not one file
+has been copied over from ZyQuality yet, and the axes have already produced six
+findings the 661-file corpus could not see.
 
 ```bash
-./bin/zyddt suite                  # the whole layer, one verdict
+./bin/zyddt suite                  # the whole layer, one verdict — 390 cells, ~30 s
 ./bin/zyddt selftest               # grade the runner itself
 ./bin/zyddt engines                # what can run, and what cannot
 ./bin/zyddt gen                    # write every cell from axes/*.toml
 ./bin/zyddt axis                   # generate, run, publish the denominator
+./bin/zyddt --detail N axis        # how many reds quote their output (default 8)
 ./bin/zyddt ask FILE...            # CELL: every engine must answer alike
 ./bin/zyddt check FILE...          # PIN: compare against the recorded .observed
 ./bin/zyddt observe FILE           # what each engine said, verbatim
@@ -88,10 +91,13 @@ axis             cells  agree  oracled  narrowed  wording  diverge  wrong
 arithmetic           6      5        4         0        0        1      0
 diagnostic           3      0        0         0        0        3      0
 environment          3      3        0         3        0        0      0
-refusal              3      0        0         0        2        0      1
+numerals            69     69       69         0        0        0      0
+operator           252    102        0         0       42      108      0
+refusal              4      0        0         0        2        1      1
+type-symbol         48     48        0         0        0        0      0
 verdict-shape        5      4        0         0        1        0      0
 pins                 1      1        —         0        —        0      —
-selftest            42     42        —         —        —        —      —
+selftest            50     50        —         —        —        —      —
 ```
 
 `oracled` is the honest count of cells where agreement is not the only evidence.
@@ -100,13 +106,49 @@ and it matters most for this pair: with `zyjs` excused, only `zytw` and `zyvm`
 remain, and they share the lexer, the parser and the semantic analyser, so the
 whole front-end question goes unasked.
 
-Four axes and one pin is not coverage, and the table is written this way so it
-cannot be mistaken for any. An axis nobody has declared has no row here, and that
-absence is worth more than a green tick on a suite that never asked
+Eight axes and one pin is not coverage either, and the table is written this way
+so it cannot be mistaken for any. An axis nobody has declared has no row here,
+and that absence is worth more than a green tick on a suite that never asked
 ([`CHARTER.md`](CHARTER.md) § 6).
 
-Every red is in [`HALLAZGOS/zyjs.md`](HALLAZGOS/zyjs.md), and all three were
-found by cells rather than by looking.
+`numerals` and `type-symbol` are the first two axes generated from a **crossed
+matrix** rather than written point by point, and `numerals` is what the shape was
+for: `zyquality/corpus/i18n/numerals/` is 69 files that differ only in which
+digit block they substitute, and this is the same 69 as one declaration plus one
+template — with an oracle each, which the corpus's goldens could not have, since
+a golden records what the engines said and cannot disagree with them.
+
+`operator` is the first axis large enough to be worth its own warning. 14
+operators × 18 type pairs is 252 questions nobody had asked, and 150 of them are
+red on the first run. That is not 150 findings: it is **six**, each printed once
+per cell it touches. The report quotes the first eight reds of an axis in full
+and lists the rest by name (`zyddt --detail N axis`, `-v` for all); the counts
+above are never shortened.
+
+Every red is filed, and every one was found by a cell rather than by looking:
+
+| finding | cells | what |
+|---|---:|---|
+| [`ZYVM-001`](HALLAZGOS/zyvm.md) | 40 | the VM **runs what the tree-walker refuses** — `7 && 3` prints `#1`, `"ab" / "cd"` prints `[ab]` |
+| [`ZYJS-004`](HALLAZGOS/zyjs.md) | 70 | the browser engine writes a runtime **warning to stdout**, into the program's own output |
+| [`ZYJS-006`](HALLAZGOS/zyjs.md) | 54 | `[object Object]` and `undefined` inside a diagnostic, and a dictionary called `Tuple` |
+| [`ZYJS-005`](HALLAZGOS/zyjs.md) | 34 | `&&`/`\|\|` on non-booleans: no warning, no refusal, an answer |
+| [`GLOBAL-001`](HALLAZGOS/GLOBAL.md) | 28 | the same impossible comparison refused in three different wordings |
+| [`ZYVM-002`](HALLAZGOS/zyvm.md) | 10 | the diagnostic for `-` quotes the guidance for `+` |
+
+The first is the one to read. `zyvm` is **the future default engine**, and 40
+programs that `zymbol run` refuses are run to completion by `zymbol run --vm`.
+Both of the CHARTER's reasons for why the old gate could not see it apply at
+once: no corpus file writes `7 && 3`, and a consensus run compares stdout, which
+a refusal does not have.
+
+The wording splits are **not** baselined. `wording.baseline` records what is
+known and tolerated, and these forty-two are the visible half of `GLOBAL-001`
+and `ZYVM-002` — recording them would file them as accepted before anybody
+decided they were.
+
+The three older findings came out of the four hand-written axes, and are kept
+here because how each was found is the argument for the form that found it.
 
 [`ZYJS-001`](HALLAZGOS/zyjs.md) came out of the first run of the first axis. `x = =` is refused by `zytw` and `zyvm` and
 **accepted** by `zyjs`, which runs it to completion with only an unused-variable

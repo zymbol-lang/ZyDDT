@@ -34,6 +34,31 @@ Esa última línea es el encaminamiento, y sale de la ejecución. Antes el infor
 decía sólo `DIVERGE`, que es un hecho sobre **una pareja** y no se archiva en
 ningún sitio: «difieren» no dice quién está mal.
 
+### Cuando el eje no tiene `expect`, el encaminamiento lo pone una lectura
+
+Y hay que decir cuál. Un eje puramente diferencial —`operator` es el primero
+grande— no declara ninguna categoría, a propósito: escribir la respuesta
+correcta de 252 combinaciones sería inventarla (CHARTER § 8.2). Sin `expect` el
+runner sólo puede decir `DIVERGE`, que por § 3 encamina a `GLOBAL.md`.
+
+Las seis entradas que salieron del eje `operator` el 2026-08-29 **no** están
+todas allí, y la razón es que en cinco de ellas la lectura sí encuentra un
+culpable, y encontrarlo es información que se perdería archivándolas juntas:
+
+| entrada | por qué a un fichero de motor |
+|---|---|
+| `ZYVM-001` | los dos motores Rust emiten **el mismo aviso** y luego uno para y el otro no: el desacuerdo no está en ver el problema, está en qué se hace después |
+| `ZYVM-002` | `zytw` y `zyjs` dicen lo mismo; la VM es la que se sale |
+| `ZYJS-004` | canal, no contenido: el texto es el correcto en los tres, y sólo uno lo pone en stdout |
+| `ZYJS-005` | dos motores avisan, el tercero no tiene la comprobación |
+| `ZYJS-006` | el diagnóstico enseña valores del anfitrión JavaScript; ningún otro motor puede tener ese defecto |
+| `GLOBAL-001` | **se queda**: los tres redactan distinto y ninguno es la referencia |
+
+La regla que sale de eso: *cuando el runner dice `DIVERGE`, el fichero lo elige
+quien escribe el hallazgo, y el hallazgo tiene que decir por qué ese fichero.*
+Si no puede decirlo, es `GLOBAL.md` — que es lo que significa «sin culpable
+único», no «sin culpable evidente».
+
 ---
 
 ## 2. Por qué un fichero por motor
