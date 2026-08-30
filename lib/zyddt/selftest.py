@@ -396,6 +396,118 @@ def _():
     assert C.worse(C.GREEN, C.GREEN) == C.GREEN
 
 
+# ── The matrix ───────────────────────────────────────────────────────────────
+#
+# The generator is the one part of this layer that can manufacture coverage that
+# does not exist.  A template that expands wrong still writes a `.zy`, the `.zy`
+# still runs, and the run is still counted in the denominator — so the cell is
+# reported as coverage of a question it never asked.  Every case below is one
+# way that could happen.
+
+def _dim(name, values, **defaults):
+    return {"name": name, "values": values, "defaults": defaults}
+
+
+@case("matrix/cross-product-is-every-point",
+      "two dimensions produce n×m cells, not n+m")
+def _():
+    cells = A._matrix_cells(
+        {"dimension": [_dim("op", ["a", "b", "c"]), _dim("v", ["x", "y"])],
+         "matrix": {"id": "«op»-«v»", "src": ">> «op» «v» ¶"}},
+        "t", Path("t.toml"))
+    assert len(cells) == 6, len(cells)
+    assert {c.id for c in cells} == {"a-x", "a-y", "b-x", "b-y", "c-x", "c-y"}
+
+
+@case("matrix/placeholder-is-not-a-brace",
+      "a template body is Zymbol, and Zymbol spends braces")
+def _():
+    # The reason the delimiter is «…». `str.format` would read `{ <~ a }` as a
+    # field name and raise, and `{name}` inside a Zymbol string is an
+    # interpolation the generator must leave alone.
+    src = 'f(a) { <~ a }\n>> "hola {name}" ¶\n>> «v» ¶'
+    got = A.expand(src, {"v": {"id": "x", "v": "7"}}, "t")
+    assert "{ <~ a }" in got and '"hola {name}"' in got and ">> 7 ¶" in got
+
+
+@case("matrix/unknown-name-is-fatal",
+      "a typo that expanded to nothing would be counted as coverage")
+def _():
+    for bad in ("«nope»", "«v.nofield»"):
+        try:
+            A.expand(bad, {"v": {"id": "x", "v": "7"}}, "t")
+        except SystemExit:
+            continue
+        raise AssertionError(f"{bad} expanded silently")
+
+
+@case("matrix/duplicate-cell-id-is-fatal",
+      "two cells with one name are one file, and the denominator counts both")
+def _():
+    import tempfile, tomllib
+    p = Path(tempfile.mkdtemp()) / "dup.toml"
+    # `id` names only the first dimension, so the second collapses: four points
+    # of the matrix write two files, and the two survivors are whichever ran
+    # last. The generator would report four cells either way.
+    p.write_text('id = "d"\n'
+                 '[[dimension]]\nname = "a"\nvalues = ["p", "q"]\n'
+                 '[[dimension]]\nname = "b"\nvalues = ["r", "s"]\n'
+                 '[matrix]\nid = "«a»"\nsrc = ">> 1 ¶"\n', encoding="utf-8")
+    d = tomllib.loads(p.read_text(encoding="utf-8"))
+    ids = [c.id for c in A._matrix_cells(d, "dup", p)]
+    assert len(ids) == 4 and len(set(ids)) == 2, ids   # the collision is real
+    try:
+        A.load_all_from(p.parent)                       # and load_all refuses it
+    except SystemExit as e:
+        assert "twice" in str(e), e
+        return
+    raise AssertionError("an axis whose cells collide onto one file was accepted")
+
+
+@case("matrix/value-id-must-be-a-filename",
+      "there is no slugification, because two guesses that collide merge two points")
+def _():
+    try:
+        A._values_of({"name": "op", "values": ["+"]}, "t.toml")
+    except SystemExit:
+        return
+    raise AssertionError("'+' was accepted as a cell id")
+
+
+@case("matrix/defaults-fill-only-what-a-value-omits",
+      "one field that varies on two values stays out of the other sixty-seven")
+def _():
+    vals = A._values_of(
+        {"name": "s", "defaults": {"decimal": "."},
+         "values": [{"id": "a"}, {"id": "b", "decimal": "\u066b"}]}, "t.toml")
+    assert vals[0]["decimal"] == "." and vals[1]["decimal"] == "\u066b"
+
+
+@case("matrix/skip-states-a-reason-and-names-the-point",
+      "CHARTER § 5: a hole in a matrix has to be visible AS a hole")
+def _():
+    coords = {"op": {"id": "pow"}, "pair": {"id": "int-int"}}
+    r = A._skip_reason([{"when": {"op": "pow"}, "reason": "why"}], coords, "t")
+    assert r is not None and "op=pow" in r and "why" in r
+    assert A._skip_reason([{"when": {"op": "plus"}, "reason": "w"}], coords, "t") is None
+    try:
+        A._skip_reason([{"when": {"op": "pow"}}], coords, "t")
+    except SystemExit:
+        return
+    raise AssertionError("a skip with no reason was accepted")
+
+
+@case("matrix/skip-may-not-name-an-undeclared-dimension",
+      "a skip on a dimension that does not exist would never match and never say so")
+def _():
+    try:
+        A._skip_reason([{"when": {"nope": "x"}, "reason": "r"}],
+                       {"op": {"id": "pow"}}, "t")
+    except SystemExit:
+        return
+    raise AssertionError("a skip named a dimension the matrix does not declare")
+
+
 # ── The command surface ──────────────────────────────────────────────────────
 
 # Every subcommand, with arguments cheap enough to run on every selftest.
