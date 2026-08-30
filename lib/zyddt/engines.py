@@ -78,8 +78,55 @@ class Oracle:
 
 
 @dataclass(frozen=True)
+class Surface:
+    """A LEXER the language ships that is not an engine.
+
+    The playground's highlighter and the VS Code grammar read Zymbol and mark
+    it up; they never run it, so they have no stdout to compare and no verdict
+    to classify.  What they can be asked is the one question CHARTER § 4 poses:
+    *what did you leave unmarked?*  A token a highlighter does not know is a
+    token the reader cannot ask about, because the same file is the hover index.
+
+    The driver lives with the surface it drives — `web/tests/`, `vscode/tests/`
+    — for the same reason `run_one.mjs` lives in `web/`: it needs that
+    repository's module, and ZyDDT reaches back only to *run* something.  Each
+    driver prints `line<TAB>column<TAB>text` and grades nothing.
+
+    `tolerate` is the judgement, and it is HERE rather than in a driver so that
+    the rule is declared once, with a reason, where somebody reading the layer
+    will find it.  A surface with no `tolerate` tolerates nothing.
+    """
+
+    id: str
+    cmd: list[str]
+    desc: str
+    tolerate: str = ""
+    reason: str = ""
+
+    def argv(self, files: list[Path]) -> list[str]:
+        """`{file}` expands to EVERY file, so one process answers the sweep.
+
+        Node costs about eighty milliseconds to start and the grammar driver
+        pays for an Oniguruma WASM load on top; one process per file made the
+        sweep take over a minute, which is long enough that the runner's own
+        smoke test timed out on its own subcommand."""
+        out: list[str] = []
+        for a in self.cmd:
+            a = _expand(a)
+            if a == "{file}":
+                out.extend(str(Path(f).resolve()) for f in files)
+            else:
+                out.append(a)
+        return out
+
+    def excused(self, text: str) -> bool:
+        return bool(self.tolerate) and re.fullmatch(self.tolerate, text) is not None
+
+
+@dataclass(frozen=True)
 class Config:
     engines: list[Engine] = field(default_factory=list)
+    surfaces: list[Surface] = field(default_factory=list)
     oracles: dict = field(default_factory=dict)
     normalise: Normalise = field(default_factory=Normalise)
 
@@ -108,7 +155,17 @@ def load(path: Path | None = None) -> Config:
     oracles = {o["id"]: Oracle(o["id"], o["cmd"], o.get("ext", ".txt"),
                                o.get("desc", ""))
                for o in data.get("oracle", [])}
-    return Config(engines=engines, oracles=oracles,
+    surfaces = [
+        Surface(
+            id=s["id"],
+            cmd=s["cmd"],
+            desc=s.get("desc", ""),
+            tolerate=s.get("tolerate", ""),
+            reason=s.get("reason", ""),
+        )
+        for s in data.get("surface", [])
+    ]
+    return Config(engines=engines, surfaces=surfaces, oracles=oracles,
                   normalise=Normalise(**data.get("normalise", {})))
 
 

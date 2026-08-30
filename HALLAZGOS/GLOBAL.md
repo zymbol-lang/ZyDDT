@@ -27,7 +27,9 @@ función declarada dentro de un bloque, y el del navegador sí.
 
 ## Abiertos
 
-**Ninguno.**
+| | | |
+|---|---|---|
+| [`GLB-006`](#glb-006--hay-un-tercer-resaltador-y-nadie-lo-mira) | abierto | el curso lleva su propia copia, 1798 líneas sin marcar |
 
 ## Cerrados
 
@@ -484,6 +486,68 @@ Con la convención aplicada en los cuatro sitios, `zyq suite --only lsp` va a
 ### Qué lo sujeta
 
 [`ZYQ-001_convencion_de_nombre.zy`](../cases/pin/ZYQ-001_convencion_de_nombre.zy).
+
+---
+
+## GLB-006 — Hay un tercer resaltador, y nadie lo mira
+
+**Estado:** **abierto** — pendiente de tu veredicto
+**Clase:** ninguna de las tres. No discrepan los motores: hay una **superficie
+que el CHARTER no declara** y que por tanto ningún gate recorre.
+**Encontrado por:** buscar los ficheros de la superficie 4 para construirle una
+suite, y encontrar tres en vez de uno.
+
+### Qué se observa
+
+`aprende_zymbol/zymbol-highlight.js`, cuya primera línea dice:
+
+```js
+/* Zymbol syntax highlighter — ported directly from web/playground.html */
+```
+
+Portado, y desde entonces a la deriva: **223 líneas frente a las 430** del
+original. Barrido contra el corpus con el mismo método de CHARTER § 4:
+
+| | `web/src/playground/highlight.js` | `aprende_zymbol/zymbol-highlight.js` |
+|---|---:|---:|
+| líneas con algo sin marcar | **0** | **1798** |
+
+Lo que deja desnudo son exactamente los defectos que la auditoría del playground
+corrigió, más uno propio:
+
+- **773 `#`** — la familia entera del `#`, que es el caso que el CHARTER cita
+  como «328 `#` sin marcar en el corpus» para la versión de entonces;
+- **653 `.`**;
+- y **pares suplentes partidos** (`\ud805`, `\ud835`, …): parte los dígitos
+  fuera del BMP por la mitad, así que ninguna de las 31 escrituras astrales que
+  el lenguaje soporta se colorea entera.
+
+### Por qué importa más de lo que parece
+
+`aprende_zymbol` es **el curso**: es donde alguien ve Zymbol por primera vez. El
+código que peor se colorea de todo el proyecto es el que se enseña primero.
+
+Y el repositorio no tiene gate ninguno, así que esto no se degradó — nunca se
+midió.
+
+### Qué habría que decidir
+
+1. **Que el curso cargue el resaltador del playground** en vez de una copia.
+   Es un fichero ES-module y el curso usa un script de globales de navegador,
+   así que hace falta un envoltorio pequeño; a cambio la copia desaparece y con
+   ella la deriva.
+2. **Declararlo superficie 6** en `CHARTER.md` § 4 y graduarlo aquí, con su
+   propio driver. Sigue habiendo dos implementaciones que mantener, pero al
+   menos la divergencia se ve.
+3. **Reescribir la copia** al nivel del original. Es lo que ya se hizo una vez,
+   y esta ficha existe porque volvió a pasar.
+
+La 1 es la única que quita el problema en lugar de vigilarlo.
+
+### Qué lo sujeta
+
+**Nada.** El repositorio del curso no está en el gate, y añadirlo es parte de la
+decisión.
 
 ---
 

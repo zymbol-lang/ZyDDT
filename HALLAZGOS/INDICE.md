@@ -30,7 +30,9 @@ delante — la más cara, `GLB-005`, resultó valer **un fichero de 84**.
 | [`zytw.md`](zytw.md) | 0 | 0 |
 | [`zyvm.md`](zyvm.md) | 0 | 2 |
 | [`zyjs.md`](zyjs.md) | 0 | 10 |
-| [`GLOBAL.md`](GLOBAL.md) | 0 | 6 |
+| [`GLOBAL.md`](GLOBAL.md) | **1** | 6 |
+| [`highlight.md`](highlight.md) | 0 | 1 |
+| [`tmgrammar.md`](tmgrammar.md) | 0 | 1 |
 
 Los seis dicen lo mismo sobre el método: **una aplicación completa encuentra lo
 que ningún corpus puede**, porque un corpus se escribe un fichero cada vez y
@@ -201,11 +203,16 @@ Van a `GLOBAL.md`:
 | [`zyjs.md`](zyjs.md) | hallazgos cuyo culpable es el motor del navegador |
 | [`GLOBAL.md`](GLOBAL.md) | sin culpable único — § 3 |
 
-Las otras dos superficies (el resaltador del playground y la gramática de VS
-Code, `CHARTER.md` § 4) **no tienen fichero todavía**, porque ZyDDT aún no las
-ejecuta. Cuando las ejecute, `highlight.md` y `tmgrammar.md` — no antes: un
-fichero vacío esperando enseña que la ausencia de hallazgos es un estado normal,
-y aquí significa que nadie ha mirado.
+| [`highlight.md`](highlight.md) | el resaltador del playground — y el índice que lee su hover |
+| [`tmgrammar.md`](tmgrammar.md) | la gramática de VS Code, tokenizada con `vscode-textmate` |
+
+Los dos últimos **nacieron el 2026-08-30**, que es cuando `zyddt surfaces`
+empezó a ejecutarlos. Antes no existían a propósito: un fichero vacío esperando
+enseña que la ausencia de hallazgos es un estado normal, y hasta ese día
+significaba que nadie había mirado.
+
+Las cinco superficies del CHARTER están graduadas. Hay una **sexta sin
+declarar** — el resaltador propio del curso — y es [`GLB-006`](GLOBAL.md).
 
 ---
 

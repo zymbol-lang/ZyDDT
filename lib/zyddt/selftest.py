@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import axes as A
+from . import engines as E
 from . import compare as C
 from . import exclude as X
 from . import observe as O
@@ -508,6 +509,37 @@ def _():
     raise AssertionError("a skip named a dimension the matrix does not declare")
 
 
+# ── Surfaces: the tolerance rule ─────────────────────────────────────────────
+
+@case("surface tolerates what it declares", "and nothing else")
+def _():
+    surf = E.Surface(id="s", cmd=[], desc="", tolerate=r"[][(){}\s]+")
+    for text in ("(", ")", "()", "] {", "  "):
+        assert surf.excused(text), f"should tolerate {text!r}"
+    # The two the corpus actually found, and the reason the rule is narrow: a
+    # `|` inside `0x|…|` and a bare `#` are operators, not punctuation.
+    for text in ("|", "#", "$++", "(a"):
+        assert not surf.excused(text), f"should NOT tolerate {text!r}"
+
+
+@case("a surface with no rule tolerates nothing", "the default is strict")
+def _():
+    surf = E.Surface(id="s", cmd=[], desc="")
+    for text in ("(", " ", "|", ""):
+        assert not surf.excused(text), f"should NOT tolerate {text!r}"
+
+
+@case("engines.toml declares both lexer surfaces", "or the gate grades three of five")
+def _():
+    cfg = E.load()
+    ids = {s.id for s in cfg.surfaces}
+    assert ids == {"highlight", "tmgrammar"}, ids
+    # A tolerance without a reason is indistinguishable from a gap somebody hid
+    # — the rule corpus.toml states about exclusions, applied here.
+    for s in cfg.surfaces:
+        assert not s.tolerate or s.reason, f"{s.id} tolerates without saying why"
+
+
 # ── The command surface ──────────────────────────────────────────────────────
 
 # Every subcommand, with arguments cheap enough to run on every selftest.
@@ -520,6 +552,7 @@ SMOKE: list[tuple[str, list[str]]] = [
     ("observe", ["generated/verdict/ok.zy"]),
     ("ask", ["generated/verdict/ok.zy"]),
     ("check", ["--regen", "cases/seed/hello.zy"]),
+    ("surfaces", []),
 ]
 
 

@@ -42,6 +42,7 @@ been copied over from ZyQuality yet, and the axes have produced ten findings the
 
 ```bash
 ./bin/zyddt suite                  # the whole layer, one verdict — 394 cells, ~30 s
+./bin/zyddt surfaces               # the two lexers: what did they leave unmarked
 ./bin/zyddt selftest               # grade the runner itself
 ./bin/zyddt engines                # what can run, and what cannot
 ./bin/zyddt gen                    # write every cell from axes/*.toml
@@ -97,9 +98,16 @@ operator               252    252        0         0        0        0      0
 refusal                 13     12        0         0        1        0      0
 type-symbol             48     48        0         0        0        0      0
 verdict-shape            5      5        0         0        0        0      0
-pins                     9      9        —         0        —        0      —
+pins                    11     11        —         0        —        0      —
+surfaces                 2      2        —         0        —        0      —
 selftest                50     50        —         —        —        —      —
 ```
+
+`surfaces` is the two lexers CHARTER § 4 declares and this layer did not grade:
+the playground's highlighter and the VS Code grammar. They never run a program,
+so they have no verdict to classify — they are asked what they left unmarked,
+over the same cells and pins the engines answer. Both are clean; both were not
+on the first run.
 
 `oracled` is the honest count of cells where agreement is not the only evidence:
 **109 of 439**. `integer-arithmetic` exists to raise it where it was lowest —
