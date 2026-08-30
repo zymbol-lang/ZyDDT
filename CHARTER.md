@@ -167,21 +167,63 @@ The rule makes size a **consequence** rather than a decision:
 
 ### 3.2 What a matrix looks like
 
-An axis is declared, not discovered. Example, drawn from real divergences:
+An axis is declared, not discovered. It names its dimensions, and one template
+is crossed against every point of them. This is `axes/type-symbol.toml`, cut
+down:
 
 ```toml
-[[axis]]
-id     = "type-symbol"
-what   = "`#?` names every value's type, in every engine"
-values = ["###", "##.", "##\"", "##'", "##?", "##]", "##[", "##)", "##(", "##_", "##!"]
+id      = "type-symbol"
+what    = "`#?` names every value's kind, count and display, in every engine"
 engines = ["zytw", "zyvm", "zyjs"]
-# 11 values × 3 engines = 33 cells, generated.
-# The cell (##!, zyvm) is where `##!` was answered instead of `##Index`.
-# The cell (##!, zyjs) is where `##_` was.
+
+[[dimension]]
+name     = "value"
+defaults = { prelude = "" }
+values = [
+  { id = "int",   kind = "Int",   expr = "42" },
+  { id = "array", kind = "Array", expr = "[1, 2, 3]" },
+  { id = "error", kind = "Error", expr = "g()", prelude = "g() { … }" },
+  # … 16 in all
+]
+
+[[dimension]]
+name   = "field"
+values = [ { id = "symbol", n = "1" }, { id = "count", n = "2" },
+           { id = "display", n = "3" } ]
+
+[matrix]
+id   = "«value.id»-«field.id»"
+what = "the «field.id» of `#?` on a «value.kind»"
+src  = """
+«value.prelude»
+v = «value.expr»
+>> (v#?)[«field.n»] ¶
+"""
 ```
 
-The point is not the 33 cells. It is that after declaring the axis, *"is the
-error value covered?"* stops being a question anybody has to remember to ask.
+16 × 3 = 48 cells, written to `generated/type-symbol/`, one file each. The
+placeholder is `«…»` and not `{…}` because a template's body is Zymbol and
+Zymbol spends braces on function bodies and string interpolation.
+
+The point is not the 48 cells. It is that after declaring the axis, *"is the
+lambda's arity covered?"* stops being a question anybody has to remember to ask.
+
+Three properties the mechanism has to have, and each is a selftest case:
+
+- **an unknown `«name»` is fatal.** A typo that expanded to nothing would still
+  write a `.zy`, still run, and still be counted — a cell reported as coverage
+  of a question it never asked;
+- **two cells may not share an id.** They would be one file, the matrix would
+  silently lose a point, and the denominator would count both;
+- **a skipped point names itself.** `[[matrix.skip]]` takes a `when` and a
+  mandatory `reason`, and the report prints the coordinates, so a hole in a
+  matrix is visible as a hole rather than as a smaller matrix.
+
+An axis may also declare a `[[cell]]` directly, and several do. That is a matrix
+of one point, written out because the point carries an essay — `arithmetic`'s
+`i53-overflow-of-an-intermediate` is three screens of measurement against six
+other languages. It is not an exception to the rule; it is the degenerate case
+of it.
 
 ### 3.3 Where the axes come from
 

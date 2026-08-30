@@ -215,6 +215,22 @@ third. Neither of them is "write another test".
 committed and must not be edited: `generated/` is in `.gitignore` precisely so
 the declaration stays the truth.
 
+Usually this means **adding a row to a dimension**, and the sibling cells come
+with it. Every script in `axes/numerals.toml` is one line of this shape:
+
+```toml
+  { id = "adlam", name = "Adlam", base = "1E950", zero = "𞥐", nine = "𞥙" },
+```
+
+The day the lexer's `DIGIT_BLOCKS` grows a seventieth entry, that is the whole
+change here: one more line produces a cell, a Python oracle computed from the
+block base alone, and a row in the denominator. The template it crosses is the
+one the other 69 already answer, so the new script is asked exactly what they
+are asked — which is the property a hand-written seventieth file could not have,
+and the reason the corpus's 69 could drift from each other and did.
+
+Writing the point out is the other form, for when the point carries an essay:
+
 ```toml
 [[cell]]
 id   = "some-value"
@@ -224,6 +240,9 @@ src  = """
 """
 ```
 
+Both produce the same `Cell`. `CHARTER.md` § 3.2 has the full matrix syntax and
+the three properties the generator has to guarantee.
+
 **A pin** — one minimal reproduction of a named finding, in `cases/pin/`, named
 for the ID it carries. A pin with no ID is a file nobody can explain, and the
 header says what it protects and what it deliberately does not:
@@ -231,8 +250,10 @@ header says what it protects and what it deliberately does not:
 > Named-tuple equality is DM-22 and was deliberately NOT fixed. It is not
 > asserted here — a pin that quietly covers an open finding reports it as closed.
 
-A skipped cell names the axis value it is skipping and why (`skip = "reason"`),
-so a hole in a matrix is visible **as a hole** rather than as a smaller matrix.
+A skipped cell names the axis value it is skipping and why — `skip = "reason"`
+on a written cell, `[[matrix.skip]]` with a `when` and a mandatory `reason` on a
+matrix — so a hole in a matrix is visible **as a hole** rather than as a smaller
+matrix. The report prints the coordinates it skipped, not just the count.
 
 Two things a cell may add, and both change what its green means:
 

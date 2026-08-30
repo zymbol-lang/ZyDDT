@@ -1,0 +1,160 @@
+# The numerals axis — the shape ZyQuality already had right, declared once.
+#
+# `zyquality/corpus/i18n/numerals/` is 69 files, one per script, each a copy of
+# the same program with a different digit block substituted in.  CHARTER § 2.2
+# names it the counter-example already in the tree: it is exhaustive over a
+# DECLARED axis, so its coverage is a fact rather than a hope.  It was also
+# written out sixty-nine times, which means the answer to *"is Ol Chiki
+# covered?"* lived in a directory listing, and the answer to *"is anything
+# missing?"* lived nowhere at all.
+#
+# This file is that axis.  The values below are `DIGIT_BLOCKS` from
+# `zymbol-lexer/src/digit_blocks.rs` — the table the language itself consults —
+# transcribed mechanically, ids and all.  69 values × 1 template = 69 cells, and
+# adding the 70th script to the language is one row here.
+#
+# ── This axis has an oracle, and that is unusual for i18n ────────────────────
+#
+# Most output questions have no independent authority: no other language can say
+# how Zymbol renders a dictionary.  This one does, because the rule is arithmetic
+# and Unicode publishes it:
+#
+#     digit_at(d) = chr(block_base + d)
+#
+# So Python can compute what every one of the 69 scripts must print, from the
+# block base alone, without knowing anything about Zymbol.  That turns 69 cells
+# from *"the three engines agree"* into *"the three engines agree AND the answer
+# is right"* — which matters here more than almost anywhere, because a shared
+# lookup table is exactly the kind of thing three engines inherit identically
+# and identically wrong.
+#
+# ── What the template asks, and why each line is there ───────────────────────
+#
+#   12 * 34     a COMPUTED integer.  A literal would be a number typed twice —
+#               see `arithmetic.toml`'s i53-boundary and `axes.suggestive`.
+#   0 - 7       the sign.  `-` stays ASCII in every script; `numeral_mode.rs`
+#               says so and nothing executable said it.
+#   19.0 / 4    the separator.  `4.75` is `٤٫٧٥` under Arabic and `४.७५` under
+#               Devanagari: exactly two of the 69 blocks encode their own
+#               decimal separator, and the rule is Unicode's, not a locale's.
+#   (3 > 2)     a boolean.  `#1` renders its digit through the script and keeps
+#               an ASCII `#`, which is a rule with no other test.
+#
+# The parentheses around the comparisons are not style: a bare `>> 3 > 2 ¶` is
+# refused by both Rust engines (DM-06), so the template that would read better
+# is the one that does not run.
+
+id      = "numerals"
+what    = "every digit block the lexer declares, printed through `#NN#`"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[dimension]]
+name     = "script"
+defaults = { decimal = "." }
+# `base` is the codepoint written the way Unicode writes it — a STRING, because
+# the template prints it as `U+0660` and TOML's `0x0660` is the integer 1632.
+# The oracle
+# derives everything it needs from `zero`, because that is what the language
+# does — `digit_value = codepoint − block_base`.
+values = [
+  { id = "ascii", name = "ASCII", base = "0030", zero = "0", nine = "9" },
+  { id = "arabic-indic", name = "Arabic-Indic", base = "0660", zero = "٠", nine = "٩", decimal = "٫" },
+  { id = "extended-arabic-indic", name = "Extended Arabic-Indic", base = "06F0", zero = "۰", nine = "۹", decimal = "٫" },
+  { id = "nko", name = "NKo", base = "07C0", zero = "߀", nine = "߉" },
+  { id = "devanagari", name = "Devanagari", base = "0966", zero = "०", nine = "९" },
+  { id = "bengali", name = "Bengali", base = "09E6", zero = "০", nine = "৯" },
+  { id = "gurmukhi", name = "Gurmukhi", base = "0A66", zero = "੦", nine = "੯" },
+  { id = "gujarati", name = "Gujarati", base = "0AE6", zero = "૦", nine = "૯" },
+  { id = "oriya", name = "Oriya", base = "0B66", zero = "୦", nine = "୯" },
+  { id = "tamil", name = "Tamil", base = "0BE6", zero = "௦", nine = "௯" },
+  { id = "telugu", name = "Telugu", base = "0C66", zero = "౦", nine = "౯" },
+  { id = "kannada", name = "Kannada", base = "0CE6", zero = "೦", nine = "೯" },
+  { id = "malayalam", name = "Malayalam", base = "0D66", zero = "൦", nine = "൯" },
+  { id = "sinhala-archaic", name = "Sinhala Archaic", base = "0DE6", zero = "෦", nine = "෯" },
+  { id = "thai", name = "Thai", base = "0E50", zero = "๐", nine = "๙" },
+  { id = "lao", name = "Lao", base = "0ED0", zero = "໐", nine = "໙" },
+  { id = "tibetan", name = "Tibetan", base = "0F20", zero = "༠", nine = "༩" },
+  { id = "myanmar", name = "Myanmar", base = "1040", zero = "၀", nine = "၉" },
+  { id = "myanmar-shan", name = "Myanmar Shan", base = "1090", zero = "႐", nine = "႙" },
+  { id = "khmer", name = "Khmer", base = "17E0", zero = "០", nine = "៩" },
+  { id = "mongolian", name = "Mongolian", base = "1810", zero = "᠐", nine = "᠙" },
+  { id = "limbu", name = "Limbu", base = "1946", zero = "᥆", nine = "᥏" },
+  { id = "new-tai-lue", name = "New Tai Lue", base = "19D0", zero = "᧐", nine = "᧙" },
+  { id = "tai-tham-hora", name = "Tai Tham Hora", base = "1A80", zero = "᪀", nine = "᪉" },
+  { id = "tai-tham-tham", name = "Tai Tham Tham", base = "1A90", zero = "᪐", nine = "᪙" },
+  { id = "balinese", name = "Balinese", base = "1B50", zero = "᭐", nine = "᭙" },
+  { id = "sundanese", name = "Sundanese", base = "1BB0", zero = "᮰", nine = "᮹" },
+  { id = "lepcha", name = "Lepcha", base = "1C40", zero = "᱀", nine = "᱉" },
+  { id = "ol-chiki", name = "Ol Chiki", base = "1C50", zero = "᱐", nine = "᱙" },
+  { id = "vai", name = "Vai", base = "A620", zero = "꘠", nine = "꘩" },
+  { id = "saurashtra", name = "Saurashtra", base = "A8D0", zero = "꣐", nine = "꣙" },
+  { id = "kayah-li", name = "Kayah Li", base = "A900", zero = "꤀", nine = "꤉" },
+  { id = "javanese", name = "Javanese", base = "A9D0", zero = "꧐", nine = "꧙" },
+  { id = "myanmar-tai-laing", name = "Myanmar Tai Laing", base = "A9F0", zero = "꧰", nine = "꧹" },
+  { id = "cham", name = "Cham", base = "AA50", zero = "꩐", nine = "꩙" },
+  { id = "meetei-mayek", name = "Meetei Mayek", base = "ABF0", zero = "꯰", nine = "꯹" },
+  { id = "klingon-piqad", name = "Klingon pIqaD", base = "F8F0", zero = "", nine = "" },
+  { id = "fullwidth", name = "Fullwidth", base = "FF10", zero = "０", nine = "９" },
+  { id = "osmanya", name = "Osmanya", base = "104A0", zero = "𐒠", nine = "𐒩" },
+  { id = "hanifi-rohingya", name = "Hanifi Rohingya", base = "10D30", zero = "𐴰", nine = "𐴹" },
+  { id = "brahmi", name = "Brahmi", base = "11066", zero = "𑁦", nine = "𑁯" },
+  { id = "sora-sompeng", name = "Sora Sompeng", base = "110F0", zero = "𑃰", nine = "𑃹" },
+  { id = "chakma", name = "Chakma", base = "11136", zero = "𑄶", nine = "𑄿" },
+  { id = "sharada", name = "Sharada", base = "111D0", zero = "𑇐", nine = "𑇙" },
+  { id = "khudawadi", name = "Khudawadi", base = "112F0", zero = "𑋰", nine = "𑋹" },
+  { id = "newa", name = "Newa", base = "11450", zero = "𑑐", nine = "𑑙" },
+  { id = "tirhuta", name = "Tirhuta", base = "114D0", zero = "𑓐", nine = "𑓙" },
+  { id = "modi", name = "Modi", base = "11650", zero = "𑙐", nine = "𑙙" },
+  { id = "takri", name = "Takri", base = "116C0", zero = "𑛀", nine = "𑛉" },
+  { id = "ahom", name = "Ahom", base = "11730", zero = "𑜰", nine = "𑜹" },
+  { id = "warang-citi", name = "Warang Citi", base = "118E0", zero = "𑣠", nine = "𑣩" },
+  { id = "dives-akuru", name = "Dives Akuru", base = "11950", zero = "𑥐", nine = "𑥙" },
+  { id = "bhaiksuki", name = "Bhaiksuki", base = "11C50", zero = "𑱐", nine = "𑱙" },
+  { id = "masaram-gondi", name = "Masaram Gondi", base = "11D50", zero = "𑵐", nine = "𑵙" },
+  { id = "gunjala-gondi", name = "Gunjala Gondi", base = "11DA0", zero = "𑶠", nine = "𑶩" },
+  { id = "kawi", name = "Kawi", base = "11F50", zero = "𑽐", nine = "𑽙" },
+  { id = "mro", name = "Mro", base = "16A60", zero = "𖩠", nine = "𖩩" },
+  { id = "tangsa", name = "Tangsa", base = "16AC0", zero = "𖫀", nine = "𖫉" },
+  { id = "pahawh-hmong", name = "Pahawh Hmong", base = "16B50", zero = "𖭐", nine = "𖭙" },
+  { id = "mathematical-bold", name = "Mathematical Bold", base = "1D7CE", zero = "𝟎", nine = "𝟗" },
+  { id = "mathematical-double-struck", name = "Mathematical Double-struck", base = "1D7D8", zero = "𝟘", nine = "𝟡" },
+  { id = "mathematical-sans-serif", name = "Mathematical Sans-serif", base = "1D7E2", zero = "𝟢", nine = "𝟫" },
+  { id = "mathematical-sans-serif-bold", name = "Mathematical Sans-serif Bold", base = "1D7EC", zero = "𝟬", nine = "𝟵" },
+  { id = "mathematical-monospace", name = "Mathematical Monospace", base = "1D7F6", zero = "𝟶", nine = "𝟿" },
+  { id = "nyiakeng-puachue-hmong", name = "Nyiakeng Puachue Hmong", base = "1E140", zero = "𞅀", nine = "𞅉" },
+  { id = "wancho", name = "Wancho", base = "1E2F0", zero = "𞋰", nine = "𞋹" },
+  { id = "nag-mundari", name = "Nag Mundari", base = "1E4F0", zero = "𞓰", nine = "𞓹" },
+  { id = "adlam", name = "Adlam", base = "1E950", zero = "𞥐", nine = "𞥙" },
+  { id = "segmented-lcd", name = "Segmented/LCD", base = "1FBF0", zero = "🯰", nine = "🯹" },
+]
+
+[matrix]
+id   = "«script.id»"
+what = "«script.name» (U+«script.base»)"
+src  = """
+#«script.zero»«script.nine»#
+>> 12 * 34 ¶
+>> 0 - 7 ¶
+>> 19.0 / 4 ¶
+>> (3 > 2) ¶
+>> (2 > 3) ¶
+"""
+oracle.py = """
+# «script.name», block base U+«script.base».  Nothing here knows any Zymbol:
+# the digit is the codepoint offset, which is Unicode's rule, and the decimal
+# separator is the one Unicode names for the script — ASCII '.' for all but the
+# two Arabic blocks.
+zero, dec = ord("«script.zero»"), "«script.decimal»"
+
+
+def digits(x):
+    return "".join(chr(zero + int(c)) if c.isdigit() else dec if c == "." else c
+                   for c in str(x))
+
+
+print(digits(12 * 34))
+print(digits(0 - 7))
+print(digits(19.0 / 4))
+print("#" + digits(1))     # a bool keeps an ASCII '#' and scripts its digit
+print("#" + digits(0))
+"""

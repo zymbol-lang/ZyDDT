@@ -1,0 +1,90 @@
+# The type-symbol axis — CHARTER § 3.2's own worked example, declared.
+#
+# `#?` is the one operator that answers a question about every value in the
+# language, so it is the one place where "every value kind" is a real axis and
+# not a metaphor.  `GUIDE.md` § 2 tabulates thirteen kinds and what each answers;
+# this file is that table, crossed with the three fields of the tuple `#?`
+# returns.  13 × 3 = 39 cells.
+#
+# ── Why the field is a dimension and not three lines of one cell ─────────────
+#
+# Because a divergence has to name a point.  A cell that printed all three
+# fields would report "the dictionary disagrees" and leave the reader to find
+# out which part; as a dimension, the failing cell is called
+# `dictionary-count`, and that is the finding written down.
+#
+# It is also where the known history is.  CHARTER § 3.3 lists this axis under
+# the most valuable of the three sources — an LDV finding that turned out to be
+# a family: `#?`'s count answering 0 for Unit, `""`, `[]` and `#()` came out of
+# ZyBank's `es_nulo`, and the SECOND field is exactly where that lived.  The
+# register VM has its own history in the FIRST and THIRD: it built the tuple in
+# the wrong order, and `zymbol_type_name` wrote `##[]` where the tree-walker
+# wrote `##]`.  Three fields, three different bugs, none of which would have
+# been separable inside a single cell.
+#
+# ── Why there is no oracle and no expect ────────────────────────────────────
+#
+# No other language can be an authority on what Zymbol calls a dictionary, so
+# an oracle here would assert Python's opinion about Zymbol (VERDICTS § 8, "the
+# two ways an oracle goes wrong").  And the symbols are not writable in source —
+# `(v#?)[1] == ##]` is `error: expected expression, found Hash`, measured
+# 2026-08-29 — so the cell cannot check itself either.
+#
+# That leaves the differential, which is the honest instrument here: it encodes
+# no belief, so it cannot encode a wrong one (CHARTER § 8.2).  What the axis
+# adds over three engines agreeing is the DENOMINATOR: after this file, "is the
+# lambda's arity covered?" has an answer that is not somebody's memory.
+
+id      = "type-symbol"
+what    = "`#?` names every value's kind, count and display, in every engine"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[dimension]]
+name     = "value"
+defaults = { prelude = "" }
+# One representative per kind in GUIDE.md § 2's table.  `list` and `array` are
+# the same type read two ways — `##]` when the elements are one type, `##[` when
+# they are not — so both are here: the reading is what diverged, not the type.
+values = [
+  { id = "int",        kind = "Int",        expr = "42" },
+  { id = "float",      kind = "Float",      expr = "3.14" },
+  { id = "string",     kind = "String",     expr = "\"hola\"" },
+  { id = "char",       kind = "Char",       expr = "'A'" },
+  { id = "bool",       kind = "Bool",       expr = "#1" },
+  { id = "array",      kind = "Array",      expr = "[1, 2, 3]" },
+  { id = "list",       kind = "List",       expr = "#[1, \"dos\"]" },
+  { id = "tuple",      kind = "Tuple",      expr = "(1, 2)" },
+  { id = "dictionary", kind = "Dictionary", expr = "#(x: 1, y: 2)" },
+  { id = "function",   kind = "Function",   expr = "f", prelude = "f(a, b) { <~ a + b }" },
+  { id = "lambda",     kind = "Lambda",     expr = "(a, b) -> a + b" },
+  { id = "error",      kind = "Error",      expr = "g()", prelude = "g() { !? { <~ [1, 2][99] } :! { <~ _err } }" },
+  { id = "unit",       kind = "Unit",       expr = "##_" },
+  # The four zero-counts that ZyBank's `es_nulo` ran into.  They are values of
+  # kinds already above, and they are separate points because the finding was
+  # not about the kind: `#?`'s second field answers 0 for all four, so a program
+  # that asked "is it empty?" by the count could not tell an empty string from
+  # the absence of a value.  MEMORY: "nunca preguntar por la cuenta de `#?`".
+  { id = "string-empty", kind = "String (empty)", expr = "\"\"" },
+  { id = "array-empty",  kind = "Array (empty)",  expr = "[]" },
+  { id = "dict-empty",   kind = "Dictionary (empty)", expr = "#()" },
+]
+
+[[dimension]]
+name = "field"
+# The tuple `#?` returns, one field at a time.  GUIDE.md § 2 documents what each
+# means per kind; the counts in particular are not uniform — a String's is its
+# character length, a Function's is its arity, an Error's is its message length.
+values = [
+  { id = "symbol",  n = "1" },
+  { id = "count",   n = "2" },
+  { id = "display", n = "3" },
+]
+
+[matrix]
+id   = "«value.id»-«field.id»"
+what = "the «field.id» of `#?` on a «value.kind»"
+src  = """
+«value.prelude»
+v = «value.expr»
+>> (v#?)[«field.n»] ¶
+"""
