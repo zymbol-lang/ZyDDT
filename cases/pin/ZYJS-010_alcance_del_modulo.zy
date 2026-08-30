@@ -1,0 +1,29 @@
+// PIN ZYJS-010 — a module's function ran in the CALLER's scope.
+//
+// Two halves of one defect, both found by validating against the LDV
+// applications and both closed 2026-08-30:
+//
+//   · a sibling's write was invisible.  `leer()` calls `_asegurar()`, which
+//     builds the module's state, and then read the `#0` the module starts
+//     with — because the frame carried a COPY of that state instead of the
+//     module's own scope.  ZyBank's locale dispatcher is exactly this shape
+//     and died four locales down with `$? not supported on bool`.
+//
+//   · a bare-name call found the caller's variable.  `saluda()` calls its own
+//     `idiomas()`, and this file deliberately names a local array the same
+//     thing.  `klingon_galaxy` does exactly that — an array of locales named
+//     after the function that produces it — and the call died with
+//     `'…' is not a function`.
+//
+// The rule both Rust engines follow: a function's frame sits over the globals
+// of the file it was WRITTEN in.  For a function from another file that scope
+// is live and shared, because module state is mutable; for one written here it
+// is copied, so a write inside dies with the call (ERROR-ZYB-002).
+<# ./module_state/lib => L
+
+// El nombre choca a propósito con la función del módulo.
+idiomas = ["a", "b"]
+
+>> L::leer() ¶
+>> L::saluda() ¶
+>> (idiomas$#) ¶

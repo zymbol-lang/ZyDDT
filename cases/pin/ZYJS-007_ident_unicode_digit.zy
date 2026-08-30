@@ -1,0 +1,33 @@
+// PIN ZYJS-007 — an identifier that ends in a non-ASCII digit.
+//
+// The Rust lexer continues an identifier on `is_alphanumeric()`, and `२` — the
+// Devanagari two — is alphanumeric. zyjs continued on `0-9` alone, so
+// `कार्यस्थितिः२ = अ::प्रतिकृतिः(…)` lexed as an identifier, a NUMBER, and then
+// the `=`: three tokens where the language has one name.
+//
+// It did not fail. `parsePrimary`'s catch-all swallowed the `=` and left a
+// statement that did nothing, so Chaturanga's alpha-beta test ran here with a
+// wrong parse, correctly under both Rust engines, and nothing said so. Closing
+// ZYJS-001 turned the silent mis-parse into a visible refusal, and the refusal
+// is what named this.
+//
+// Found by validating against the LDV applications, not by the corpus: no
+// corpus file names a variable in Sanskrit. Closed 2026-08-30.
+//
+// One script per family the language claims to support, because the rule is
+// about the Unicode category and not about Devanagari.
+क२ = 5
+>> क२ ¶
+متغير٣ = 7
+>> متغير٣ ¶
+变量９ = 11
+>> 变量９ ¶
+x9 = 1
+>> x9 ¶
+// And the thing that must NOT change: a digit still STARTS a number, in any
+// script, so `२२` is twenty-two and not a name. Written as output rather than
+// as `२२ = 0`, which is refused by all three engines in three different
+// wordings — a real difference, but not this pin's question, and a pin that
+// quietly covers an open one reports it as closed.
+>> (२२ + 1) ¶
+>> ٣٤ ¶

@@ -1,0 +1,36 @@
+// PIN ZYJS-011 — `°x` on the right of a juxtaposition dropped the rest of it.
+//
+// `s = °s "x"` is the string accumulator GUIDE.md documents. In zyjs the
+// prefix-hot branch of `ImplicitConcat` returned `items[1]` alone — the `°s` —
+// and threw away every item after it, so the accumulator never grew and the
+// loop produced the empty string.
+//
+// ZyBank's `transliterar()` is that loop, and its four locale cases all came
+// back empty. Nothing else could see it: the corpus writes the accumulator
+// with `°` on the LEFT (`°s = s ch`), which took a different branch and always
+// worked. Closed 2026-08-30.
+//
+// Los iteradores van con `_` a propósito: dos bucles que reutilizan el mismo
+// nombre producen un aviso en los motores Rust y dos en el del navegador, que
+// es una pregunta distinta de la que esta chincheta hace (GLB-003).
+//
+// Las dos formas: con la variable declarada antes del bucle y sin declarar.
+// La segunda es la que separaba a los tres motores — el tree-walker la
+// rechazaba, la VM contestaba `0xxx` y el navegador `0` — porque el neutral de
+// una yuxtaposición es la cadena vacía y sólo el camino de la asignación lo
+// sabía. GLB-002, cerrado el mismo día.
+s = ""
+@ _i:1..3 { s = °s "x" }
+>> "[" s "]" ¶
+
+@ _j:1..3 { t = °t "y" }
+>> "[" t "]" ¶
+
+// Y las formas que ya funcionaban, para que el arreglo no se las lleve por
+// delante: `°` a la izquierda, el acumulador numérico y el de array.
+@ ch:["a", "b", "c"] { °r = r ch }
+>> r ¶
+@ item:[10, 20, 30] { total = °total + item }
+>> total ¶
+@ x:[1, 2, 3] { arr = °arr$+ x }
+>> arr ¶

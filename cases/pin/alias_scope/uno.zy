@@ -1,0 +1,4 @@
+# .alias_scope_uno {
+    #> { saluda }
+    saluda() { <~ "soy uno" }
+}

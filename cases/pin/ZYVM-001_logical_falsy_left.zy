@@ -1,0 +1,8 @@
+// PIN ZYVM-001 — a falsy non-Bool on the left of `&&`.
+//
+// Separate file from `ZYVM-001_logical_short_circuit.zy` because this one is
+// refused and that one answers: a single file would stop at the first refusal
+// and never reach the rest. There is no truthiness in Zymbol — the loop
+// specifier settled that in v0.0.9 — so a `0` here is refused, not read as
+// false. Closed 2026-08-30.
+>> (0 && #1) ¶

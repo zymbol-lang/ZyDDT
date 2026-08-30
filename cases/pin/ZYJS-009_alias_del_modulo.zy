@@ -1,0 +1,21 @@
+// PIN ZYJS-009 — a qualified call inside a module used the CALLER's aliases.
+//
+// `medio.zy` imports `uno` as `A`. This file imports a different module —
+// `dos` — under that same name. Inside `medio::usa()`, `A::saluda()` must mean
+// `medio`'s `A`, and it meant this file's.
+//
+// zyjs kept one alias table per interpreter and a module's functions run on the
+// interpreter that called them, so the lookup was dynamically scoped. Both Rust
+// engines carry the aliases visible where a function was WRITTEN on the
+// function value itself (`ModuleAliases`), and swap them in per frame; zyjs now
+// does the same. Closed 2026-08-30.
+//
+// Found by validating against Chaturanga: `मूल/मतिः.zy` imports `आकलनम्` as `आ`
+// and its test file imports `आकृतिः` under that name, so the whole alpha-beta
+// suite died with "module 'आ' does not export function 'सारणी'". Two modules,
+// one letter, and no corpus file collides two aliases that way.
+<# ./alias_scope/medio => M
+<# ./alias_scope/dos => A
+
+>> M::usa() ¶
+>> A::hola() ¶
