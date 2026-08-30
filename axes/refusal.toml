@@ -51,3 +51,20 @@ what = "a name that was never defined"
 src  = """
 >> noexiste ¶
 """
+
+[[cell]]
+id   = "not-equal-is-not-a-symbol"
+what = "`!=` is not a Zymbol operator; the language spells it `<>`"
+# Arrived here from the operator axis, which had declared `!=` as one of its
+# operators.  It is the mistake a reader brings from every other language, so it
+# is worth a cell — but exactly one: the refusal happens while parsing and never
+# reaches the operands, so crossing it with seventeen type pairs produced
+# seventeen copies of this file.
+#
+# Measured 2026-08-29: all three engines refuse it, and zyjs says
+# `— use '<>' for not-equal` where the Rust engines stop at the refusal. Whether
+# the Rust engines should carry that guidance is the author's call; the cell
+# holds the refusal down either way.
+src  = """
+>> (1 != 2) ¶
+"""

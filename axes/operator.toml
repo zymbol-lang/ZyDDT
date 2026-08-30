@@ -1,0 +1,106 @@
+# The operator axis — the cheapest coverage there is, and the largest hole.
+#
+# CHARTER § 3.3 names three sources for an axis, and this is the third: a
+# reading of the language's own definition.  `GUIDE.md` § 2 tabulates thirteen
+# value kinds and `REFERENCE.md` § 21 tabulates the operators; crossing them is
+# mechanical, and until this file nothing had ever crossed them.  The corpus
+# tested the combinations somebody happened to write a program about.
+#
+# 14 operators × 17 type pairs = 238 cells, and most of them are refusals.  That
+# is not waste: `7 + "a"` must be refused, must be refused by ALL THREE engines,
+# and must be refused the same way — and `zyjs`'s open defect (ZYJS-001,
+# `parsePrimary` swallowing any token it does not recognise) is precisely a
+# machine for accepting things the Rust engines refuse.  An axis of refusals
+# aimed at an engine that over-accepts is the axis that should exist.
+#
+# ── There is no `expect`, deliberately ──────────────────────────────────────
+#
+# It would be wrong in both directions.  `expect = "error"` is false for the ~40
+# cells that are ordinary arithmetic; `expect = "ok"` is false for the rest; and
+# writing the right answer per pair would be 238 assertions typed from what
+# somebody believes the language does — which is the failure CHARTER § 8.2 names
+# and the reason `ask` is the default mechanism.  The differential asks only
+# "did the three agree", encodes no belief, and therefore cannot encode a wrong
+# one.  Where an individual combination turns out to matter enough to assert, it
+# earns a pin with an ID, not an `expect` here.
+#
+# ── The parentheses ─────────────────────────────────────────────────────────
+#
+# `>> (a OP b) ¶` and never `>> a OP b ¶`.  A bare comparison as an output
+# argument is DM-06: refused by both Rust engines, accepted by zyjs before the
+# 2026-08-18 fix.  A template without them would make 68 cells (the five
+# comparison operators and `&&`/`||`) ask about DM-06 instead of about the
+# operator, and every one of them would look like the same finding.
+
+id      = "operator"
+what    = "every binary operator against every pair of value kinds"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[dimension]]
+name = "op"
+# The binary operators GUIDE.md § 6 defines, and only those.  The first draft of
+# this list wrote not-equal as `!=`, which is not a Zymbol operator — the
+# language spells it `<>` and refuses `!=` with a message that says so.  That
+# error made all eighteen `ne-*` cells ask one question ("is `!=` refused?") that
+# the pair dimension could not vary, because the refusal happens at parse time
+# and never reaches the operands: eighteen copies of one test, which is exactly
+# the redundancy CHARTER § 3.1 says a matrix cannot produce.  It could produce it
+# here because the redundancy came from the DECLARATION being wrong, not from the
+# mechanism — the axis was crossing a symbol the language does not have.
+#
+# `!=` is a real question and it now lives in `refusal.toml`, as one cell.
+values = [
+  { id = "plus",  v = "+"  },
+  { id = "minus", v = "-"  },
+  { id = "times", v = "*"  },
+  { id = "div",   v = "/"  },
+  { id = "mod",   v = "%"  },
+  { id = "pow",   v = "^"  },
+  { id = "eq",    v = "==" },
+  { id = "ne",    v = "<>" },
+  { id = "lt",    v = "<"  },
+  { id = "le",    v = "<=" },
+  { id = "gt",    v = ">"  },
+  { id = "ge",    v = ">=" },
+  { id = "and",   v = "&&" },
+  { id = "or",    v = "||" },
+]
+
+[[dimension]]
+name = "pair"
+# Operands are small and computed-safe on purpose: `7 ^ 3` is 343 and `3.5 ^ 2.5`
+# is finite, so no cell in this matrix is secretly the i53 boundary test — that
+# question belongs to `arithmetic.toml` and asking it twice, in a file named for
+# something else, is how a suite stops being able to say what it covers.
+#
+# Both orders of the mixed pairs are here (`int-string` AND `string-int`).  They
+# are not the same cell: `+` is asymmetric in its diagnostics, `<` may be defined
+# one way round and not the other, and an engine that coerces would show it here
+# and nowhere else.
+values = [
+  { id = "int-int",       lhs = "7",          rhs = "3"          },
+  { id = "int-float",     lhs = "7",          rhs = "2.5"        },
+  { id = "float-int",     lhs = "2.5",        rhs = "7"          },
+  { id = "float-float",   lhs = "3.5",        rhs = "2.5"        },
+  { id = "int-string",    lhs = "7",          rhs = "\"a\""      },
+  { id = "string-int",    lhs = "\"a\"",      rhs = "7"          },
+  { id = "string-string", lhs = "\"ab\"",     rhs = "\"cd\""     },
+  { id = "string-char",   lhs = "\"ab\"",     rhs = "'c'"        },
+  { id = "char-char",     lhs = "'a'",        rhs = "'b'"        },
+  { id = "char-int",      lhs = "'a'",        rhs = "7"          },
+  { id = "bool-bool",     lhs = "#1",         rhs = "#0"         },
+  { id = "int-bool",      lhs = "7",          rhs = "#1"         },
+  { id = "array-array",   lhs = "[1, 2]",     rhs = "[3, 4]"     },
+  { id = "array-int",     lhs = "[1, 2]",     rhs = "3"          },
+  { id = "tuple-tuple",   lhs = "(1, 2)",     rhs = "(3, 4)"     },
+  { id = "dict-dict",     lhs = "#(x: 1)",    rhs = "#(y: 2)"    },
+  { id = "unit-unit",     lhs = "##_",        rhs = "##_"        },
+  { id = "int-unit",      lhs = "7",          rhs = "##_"        },
+]
+
+[matrix]
+id   = "«op.id»-«pair.id»"
+what = "`«pair.lhs» «op.v» «pair.rhs»`"
+src  = """
+>> («pair.lhs» «op.v» «pair.rhs») ¶
+"""
