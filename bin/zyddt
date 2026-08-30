@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """zyddt — ask every engine the same question and require the same answer.
 
+    zyddt [--detail N] axis           N = how many reds quote their output (8)
     zyddt engines                     what can run, and what cannot
     zyddt gen [AXIS...]               write every cell from axes/*.toml
     zyddt axis [AXIS...]              generate, run, and publish the denominator
@@ -251,6 +252,29 @@ def cmd_axis(args, cfg) -> int:
         engs = cfg.by_id(ax.engines or None)
         agreed = diverged = worded = wrong = noverdict = narrowed = oracled = 0
 
+        # ── How much of a red gets printed ──────────────────────────────────
+        # A matrix changes what a report has to survive.  One defect in `zyjs`
+        # writes its warning to stdout, and the operator axis prints that same
+        # finding seventy times, in full, with every engine's output quoted:
+        # 2049 lines for one axis, in which the four *other* findings are
+        # invisible.  A report nobody reads is a report that does not exist.
+        #
+        # So the first `--detail N` reds of an axis are quoted in full and the
+        # rest are one line each, with a closing count of what was shortened.
+        # The COUNTS are untouched — every cell still ran, still voted, and
+        # still appears in the row at the foot.  This shortens the rendering and
+        # says so; it never shortens the denominator, which is the one number
+        # this layer exists to publish (CHARTER § 6).
+        budget, shortened = [args.detail], [0]
+
+        def detailed() -> bool:
+            """→ may this red print its observations? Consumes the budget."""
+            if args.verbose or budget[0] > 0:
+                budget[0] -= 1
+                return True
+            shortened[0] += 1
+            return False
+
         for cell in ax.cells:
             label = f"{ax.id}/{cell.id}"
             if cell.skip:
@@ -283,6 +307,10 @@ def cmd_axis(args, cfg) -> int:
                 wrong += 1
                 worst = worse(worst, RED)
                 print(f"{R.red('WRONG')}       {label}  {R.dim(cell.what)}")
+                if not detailed():
+                    print(R.dim(f"    → HALLAZGOS/"
+                                f"{bad[0].engine if len(bad) == 1 else 'GLOBAL'}.md"))
+                    continue
                 for o in obs:
                     if o.status in ("BLOCKED", "EXCLUDED"):
                         continue
@@ -300,6 +328,9 @@ def cmd_axis(args, cfg) -> int:
             if con.outcome == C.DIVERGE:
                 diverged += 1
                 worst = worse(worst, RED)
+                if not detailed():
+                    print(f"{R.red('DIVERGE')}     {label}  {R.dim(cell.what)}")
+                    continue
                 _print_consensus(f"{label}  {R.dim(cell.what)}", con)
                 # A divergence where every engine still meets the required
                 # category: they disagree about HOW, not about WHAT. Worth
@@ -372,7 +403,8 @@ def cmd_axis(args, cfg) -> int:
                     worst = worse(worst, RED)      # a NEW wording split is a red
                     print(f"{R.red('NEW WORDING')} {label}  "
                           f"{R.dim('not in wording.baseline')}")
-                    _print_consensus(label, con)
+                    if detailed():
+                        _print_consensus(label, con)
                 elif args.verbose:
                     _print_consensus(label, con)
                 continue
@@ -391,6 +423,11 @@ def cmd_axis(args, cfg) -> int:
                     print(f"    {o.engine:<8} {R.dim('excluded')}  "
                           f"{R.dim(o.excluded.tag + ': ' + o.excluded.reason)}")
 
+        if shortened[0]:
+            print(R.dim(f"  {shortened[0]} more red cell(s) in '{ax.id}' printed "
+                        f"without their output — `zyddt --detail 0 axis` for "
+                        f"none, `zyddt -v axis` for all, `zyddt observe FILE` "
+                        f"for one"))
         rows.append((ax.id, len(ax.cells), agreed, worded, diverged, wrong,
                      noverdict, narrowed, oracled))
 
@@ -583,6 +620,9 @@ def main() -> int:
 
     p.add_argument("-v", "--verbose", action="store_true",
                    help="print agreeing cells too, not only the failures")
+    p.add_argument("--detail", type=int, default=8, metavar="N",
+                   help="quote the output of at most N red cells per axis "
+                        "(default 8; the counts are never shortened)")
     sub.add_parser("engines", help="what can run, and what cannot")
     sub.add_parser("selftest", help="grade the runner itself — needs no engine")
     sub.add_parser("suite", help="the whole layer, one verdict")
