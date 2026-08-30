@@ -10,6 +10,7 @@
     zyddt ask FILE...                 CELL: all engines must answer alike
     zyddt check FILE...               PIN: compare against the recorded .observed
     zyddt check --regen FILE...       record it (deliberate, and a reviewable diff)
+    zyddt surfaces                    the two lexers: what did they leave unmarked
     zyddt selftest                    grade the runner itself — needs no engine
     zyddt suite                       the whole layer, one verdict
 
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import subprocess
 import sys
 from pathlib import Path
 
@@ -97,6 +99,68 @@ def cmd_engines(args, cfg) -> int:
                 rc = NOVERDICT
         static = "yes" if e.check_cmd else R.dim("no static phase")
         print(f"  {R.bold(e.id):<14} {ok_run:<24} {static:<18} {R.dim(e.desc)}")
+    return rc
+
+
+# ── surfaces — the two lexers that are not engines ───────────────────────────
+def cmd_surfaces(args, cfg) -> int:
+    """What the highlighter and the VS Code grammar left unmarked.
+
+    Graded over ZyDDT's OWN cells and pins, not over a corpus this layer does
+    not own. That is the point rather than a limitation: the surfaces are asked
+    about exactly the programs the engines are asked about, so a form that earns
+    a cell earns it on all five surfaces at once.
+
+    A surface that cannot be started is NO VERDICT, never a pass — the same rule
+    as an absent engine. A driver that crashes on one file is reported and the
+    sweep continues, because "this file breaks the driver" is itself a finding
+    and stopping would hide the rest.
+    """
+    if not cfg.surfaces:
+        print(R.dim("    none declared"))
+        return GREEN
+
+    root = Path(__file__).resolve().parents[1]
+    files = sorted(set(root.glob("generated/**/*.zy")) | set(root.glob("cases/**/*.zy")))
+    rc = GREEN
+
+    for surf in cfg.surfaces:
+        findings: list[tuple[str, str, str, str]] = []
+        try:
+            proc = subprocess.run(surf.argv(files), capture_output=True, text=True,
+                                  timeout=max(args.timeout, 120))
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"  {R.bold(surf.id):<12} {R.red('cannot run')}  {exc}")
+            rc = worse(rc, NOVERDICT)
+            continue
+        if proc.returncode != 0:
+            last = (proc.stderr or "").strip().splitlines()
+            print(f"  {R.bold(surf.id):<12} {R.red('driver failed')}  "
+                  f"{R.dim(last[-1] if last else 'exit ' + str(proc.returncode))}")
+            rc = worse(rc, NOVERDICT)
+            continue
+        for line in proc.stdout.splitlines():
+            parts = line.split("\t")
+            if len(parts) != 4:
+                continue
+            path, ln, col, text = parts
+            if surf.excused(text):
+                continue
+            rel = Path(path)
+            findings.append((str(rel.relative_to(root) if rel.is_relative_to(root) else rel),
+                             ln, col, text))
+
+        n = len(findings)
+        head = R.green("nothing unmarked") if n == 0 else R.red(f"{n} unmarked")
+        print(f"  {R.bold(surf.id):<12} {head:<28} {R.dim(surf.desc)}")
+        if surf.tolerate:
+            print(f"  {'':<12} {R.dim('tolerates ' + surf.tolerate + ' — ' + surf.reason)}")
+        for rel, ln, col, text in findings[: args.detail or 8]:
+            print(f"      {R.dim(rel)}:{ln}:{col}  {R.bold(repr(text))}")
+        if n > (args.detail or 8):
+            print(R.dim(f"      … and {n - (args.detail or 8)} more"))
+        if n:
+            rc = worse(rc, RED)
     return rc
 
 
@@ -582,6 +646,11 @@ def cmd_suite(args, cfg) -> int:
     print(R.bold("\n  axes") + R.dim("   (cells, generated from axes/*.toml)"))
     rc = worse(rc, cmd_axis(args, cfg))
 
+    # The two lexers, before the pins: they read the same programs the axes just
+    # ran, and a surface that cannot be started is NO VERDICT like an engine.
+    print(R.bold("\n  surfaces") + R.dim("   (the two lexers that never run a program)"))
+    rc = worse(rc, cmd_surfaces(args, cfg))
+
     pins = sorted((Path(__file__).resolve().parents[1] / "cases" / "pin").glob("*.zy"))
     print(R.bold("\n  pins") + R.dim(f"   ({len(pins)} named finding{'' if len(pins) == 1 else 's'})"))
     if pins:
@@ -625,6 +694,7 @@ def main() -> int:
                         "(default 8; the counts are never shortened)")
     sub.add_parser("engines", help="what can run, and what cannot")
     sub.add_parser("selftest", help="grade the runner itself — needs no engine")
+    sub.add_parser("surfaces", help="the two lexers: what did they leave unmarked")
     sub.add_parser("suite", help="the whole layer, one verdict")
     for name, help_ in (("gen", "write every cell from axes/*.toml"),
                         ("axis", "generate, run, and publish the denominator")):
@@ -654,7 +724,8 @@ def main() -> int:
             cfg, normalise=dataclasses.replace(cfg.normalise, compare_column=True))
     return {"engines": cmd_engines, "observe": cmd_observe, "ask": cmd_ask,
             "check": cmd_check, "gen": cmd_gen, "axis": cmd_axis,
-            "suite": cmd_suite, "selftest": cmd_selftest}[args.cmd](args, cfg)
+            "suite": cmd_suite, "selftest": cmd_selftest,
+            "surfaces": cmd_surfaces}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

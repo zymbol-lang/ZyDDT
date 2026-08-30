@@ -269,6 +269,25 @@ suite, not as a one-off:
   machinery, not a regex approximation — and flag any operator that lands in the
   bare `source.zymbol` scope.
 
+**Done, 2026-08-30.** `zyddt surfaces` runs both, inside `zyq suite`, over the
+same cells and pins the engines are graded on — so a form that earns a cell
+earns it on all five surfaces at once. A surface is declared in `engines.toml`
+like an engine is, its driver lives with the repository whose module it needs
+(`web/tests/`, `vscode/tests/`), and each driver reports facts and grades
+nothing: what counts as a finding is one rule, declared here, in the layer that
+owns the judgement.
+
+It found two things on the first run, both closed and both invisible to any
+corpus: a base prefix with no digits left its digits unmarked
+([`HALLAZGOS/highlight.md`](HALLAZGOS/highlight.md)), and two Unicode 15.0
+numeral scripts did not match `\p{Nd}` because the bundled Oniguruma's tables
+predate them ([`HALLAZGOS/tmgrammar.md`](HALLAZGOS/tmgrammar.md)).
+
+And it found a **sixth surface nobody had declared**: the course ships its own
+copy of the highlighter, ported from the playground and 200 lines behind it,
+which leaves 1798 lines of the corpus unmarked against the playground's zero.
+That is [`GLB-006`](HALLAZGOS/GLOBAL.md), and it is open.
+
 ---
 
 ## 5. What survives the move unchanged

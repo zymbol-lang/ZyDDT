@@ -107,3 +107,51 @@ id   = "js"
 cmd  = ["node", "{file}"]
 ext  = ".mjs"
 desc = "Node — f64 semantics, BigInt available"
+
+# ── Surfaces ─────────────────────────────────────────────────────────────────
+# The two lexers the language ships that are not engines.
+#
+# CHARTER § 4 declares five surfaces and this layer graded three, because the
+# other two never RUN a program: the playground's highlighter marks it up and
+# the VS Code grammar scopes it. They have no stdout to compare and no verdict
+# to classify — so they are asked the one question they can answer, which is
+# what they left unmarked.
+#
+# That is not cosmetics. `highlight.js` is also the hover index: a token it does
+# not mark is a token the reader cannot ask about. The audit that found five
+# broken operators in it worked exactly this way — strip the markup, look at
+# what is left — rather than by reading the file, which is how those five
+# survived being read.
+#
+# The drivers live with the surface they drive, for the same reason
+# `run_one.mjs` lives in `web/`: each needs its own repository's module, and
+# ZyDDT reaches back only to run something. Both print `line<TAB>col<TAB>text`
+# and grade nothing.
+
+[[surface]]
+id   = "highlight"
+cmd  = ["node", "${ZY_HIGHLIGHT_DRIVER:-../web/tests/highlight_spans.mjs}", "{file}"]
+desc = "the playground's highlighter — and the index its hover help reads"
+# Nothing is excused. Every non-whitespace character it emits outside a span is
+# a token it did not recognise, and the corpus proves that bar is reachable:
+# 661 files, zero unmarked.
+tolerate = ""
+
+[[surface]]
+id   = "tmgrammar"
+cmd  = ["node", "${ZY_TMGRAMMAR_DRIVER:-../vscode/tests/tmgrammar_scopes.mjs}", "{file}"]
+desc = "the VS Code grammar, tokenised with vscode-textmate over Oniguruma"
+# Brackets and braces are excused, and this is the one judgement in the file, so
+# it says why.
+#
+# `(`, `)`, `[`, `]`, `{`, `}` reach no scope of their own in this grammar and
+# an editor does not need them to: bracket matching and colouring in VS Code are
+# not driven by the grammar, and this surface is not a hover index — that is
+# `highlight`, above, where nothing is excused.
+#
+# Measured before writing the rule: of 15 760 unscoped runs over the corpus,
+# 15 745 are pure bracket runs. Grading them would bury the other fifteen, which
+# are the finding — `0x|…|` and the `#,.n|…|` precision family, both of them
+# operators the grammar does not know.
+tolerate = "[][(){}\\s]+"
+reason   = "the grammar does not scope brackets and an editor does not need it to; this surface is not the hover index"
