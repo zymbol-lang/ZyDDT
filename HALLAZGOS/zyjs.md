@@ -8,6 +8,9 @@
 | [`ZYJS-001`](#zyjs-001--el-parser-se-traga-cualquier-token-que-no-reconoce-y-lo-convierte-en-_) | abierto | el parser se traga cualquier token que no reconoce |
 | [`ZYJS-002`](#zyjs-002--los-diagnósticos-del-lexer-llegan-sin-línea-y-la-guía-va-entre-paréntesis) | abierto | los diagnósticos del lexer llegan sin línea |
 | [`ZYJS-003`](#zyjs-003--un-rangeerror-de-javascript-llega-al-usuario-como-diagnóstico) | abierto | un `RangeError` de JavaScript llega como diagnóstico |
+| [`ZYJS-004`](#zyjs-004--el-aviso-de-ejecución-sale-por-stdout-mezclado-con-la-salida-del-programa) | abierto | el aviso de ejecución sale por stdout — 70 celdas |
+| [`ZYJS-005`](#zyjs-005---y--sobre-no-booleanos-ni-avisan-ni-rechazan) | abierto | `&&`/`\|\|` sobre no booleanos: ni avisa ni rechaza — 34 celdas |
+| [`ZYJS-006`](#zyjs-006--el-diagnóstico-enseña-el-javascript-de-debajo-object-object-undefined-y-un-diccionario-llamado-tuple) | abierto | `[object Object]` y `undefined` dentro del diagnóstico — 54 celdas |
 
 ---
 
@@ -239,3 +242,158 @@ y habrá que tocarlo dos veces.
 son celdas todavía**, y deberían serlo en el mismo commit del arreglo: cuatro
 sitios idénticos con una sola celda es un arreglo que vuelve por cualquiera de
 los otros tres.
+
+---
+
+## ZYJS-004 — El aviso de ejecución sale por stdout, mezclado con la salida del programa
+
+**Estado:** abierto — pendiente de tu veredicto
+**Encontrado por:** eje `operator`, 70 de 252 celdas
+**Familia:** canal, no redacción. El texto del aviso es el correcto; va al sitio
+equivocado.
+
+### Qué se observa
+
+```zymbol
+>> ("a" - 7) ¶
+```
+
+```console
+$ node web/tests/run_one.mjs cell.zy 2>/dev/null      # solo stdout
+warning: arithmetic operation on non-numeric type: String
+
+$ node web/tests/run_one.mjs cell.zy >/dev/null       # solo stderr
+Runtime error: arithmetic requires numeric operands: String("a"), Int(7)
+```
+
+En `zytw` y `zyvm` ese aviso va a stderr, junto al error. En `zyjs` va **a la
+salida del programa**.
+
+### Por qué no es el harness
+
+`web/tests/run_one.mjs` sí separa los canales, y lo hace a propósito y con el
+comentario puesto (líneas 149-151 y 163-166): los diagnósticos **estáticos** se
+escriben a `process.stderr`, y el motor recibe un `onError` precisamente para que
+los de ejecución no acaben «in the middle of the program's output».
+
+El aviso de ejecución no usa ese `onError`: sale por `onOutput`, que es el canal
+de `>>`. El harness lo entrega donde el motor lo puso.
+
+### Por qué importa
+
+Un programa correcto que provoque un aviso **imprime el aviso como si fuera su
+salida**. En el playground los dos canales caen en el mismo panel y no se nota;
+por tubería, un `zyjs … | wc -l` cuenta una línea de más, y cualquier consumidor
+de la salida recibe texto que el programa no escribió.
+
+Es además el motivo por el que el eje `operator` tiene 70 celdas rojas de una
+sola causa: la comparación de stdout, que es la que un gate hace primero, ve una
+diferencia en todas ellas.
+
+### El reparto de las 70 celdas
+
+Los cinco operadores aritméticos (`-`, `*`, `/`, `%`, `^`) contra todo par que
+tenga un operando no numérico. `+` no está: tiene su propio camino, que rechaza
+antes de avisar.
+
+### Qué lo sujeta
+
+Las 70 celdas del eje. No hace falta chincheta: la pregunta es un punto de una
+matriz declarada, no un hallazgo con nombre.
+
+---
+
+## ZYJS-005 — `&&` y `||` sobre no booleanos: ni avisan ni rechazan
+
+**Estado:** abierto — pendiente de tu veredicto
+**Encontrado por:** eje `operator`, 34 de 252 celdas
+**Relacionado:** [`ZYVM-001`](zyvm.md) — la misma forma, tres respuestas distintas
+
+### Qué se observa
+
+```zymbol
+>> (7 && 3) ¶
+```
+
+| motor | aviso | resultado |
+|---|---|---|
+| `zytw` | `logical operation on non-boolean type: Int` | **rechaza**: `logical AND requires boolean operands, got Int(7)` |
+| `zyvm` | el mismo aviso | imprime `#1` |
+| `zyjs` | **ninguno** | imprime `#1` |
+
+Tres motores, tres comportamientos. `zyjs` es el único que no dice nada: el
+analizador estático de los dos motores Rust emite el aviso, y el de `zyjs` no
+tiene esa comprobación.
+
+### Por qué se separa de `ZYVM-001`
+
+Porque el arreglo es distinto y el culpable también. Si decides que la respuesta
+correcta es *truthiness*, `ZYVM-001` se cierra y **esto sigue abierto**: seguiría
+faltando el aviso. Si decides que es un error, hay que añadir las dos cosas.
+
+Los 17 pares son todos los que el eje declara excepto `bool-bool`.
+
+### Qué lo sujeta
+
+Las 34 celdas. Cuando decidas cuál es la respuesta correcta, la forma pasa a ser
+un `expect` del eje o una chincheta con ID, no antes: hoy no hay respuesta
+correcta escrita en ningún sitio, y ponerla en un test sería inventarla.
+
+---
+
+## ZYJS-006 — El diagnóstico enseña el JavaScript de debajo: `[object Object]`, `undefined`, y un diccionario llamado `Tuple`
+
+**Estado:** abierto — pendiente de tu veredicto
+**Encontrado por:** eje `operator`, 54 de 252 celdas
+**Familia:** `ZYJS-003` — la excepción del anfitrión llegando al usuario. Allí
+era un `RangeError`; aquí es la interpolación por defecto de un objeto.
+
+### Qué se observa
+
+Tres síntomas, un origen: el mensaje se compone con el valor JavaScript en bruto
+en vez de con la representación del lenguaje.
+
+```zymbol
+>> ((1, 2) / (3, 4)) ¶
+```
+```text
+Runtime error: arithmetic requires numeric operands:
+  tuple([object Object],[object Object]), tuple([object Object],[object Object])
+```
+
+```zymbol
+>> (##_ < ##_) ¶
+```
+```text
+Runtime error: cannot compare unit undefined with unit undefined using operator 'Lt'
+```
+
+```zymbol
+>> (#(x: 1) / #(y: 2)) ¶
+```
+```text
+warning: arithmetic operation on non-numeric type: Tuple
+Runtime error: arithmetic requires numeric operands: tuple([object Object]), tuple([object Object])
+```
+
+El tercero tiene un segundo defecto encima: **un diccionario descrito como
+`Tuple`**. No es un fallo de parseo —`(#(x: 1))#?` contesta `##(` en los tres
+motores, y las 48 celdas del eje `type-symbol` concuerdan—, es que la rama del
+mensaje trata las dos colecciones como una.
+
+Para comparar, lo que dice `zytw` de esa misma línea:
+
+```text
+warning: arithmetic operation on non-numeric type: (x: Int)
+Runtime error: / requires numeric operands — use $/ to split strings
+```
+
+### Alcance
+
+54 celdas: todo par con una tupla, un diccionario o un `##_` dentro de un
+operador que rechaza. Es la cota inferior — el eje sólo cruza un valor por
+especie, y el defecto es de la interpolación, no del valor.
+
+### Qué lo sujeta
+
+Las 54 celdas del eje.
