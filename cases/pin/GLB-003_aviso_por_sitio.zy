@@ -1,0 +1,18 @@
+// PIN GLB-003 — one unused variable per SITE, not per name.
+//
+// Two loops, two iterators, neither used. The Rust engines kept declarations in
+// a map keyed by NAME, so the second `i` displaced the first and one warning
+// came out — pointing at one of the two sites and silently dropping the other.
+// The browser engine warned twice all along.
+//
+// A warning carries a position, so one warning for two sites is not a shorter
+// report: it is a report about one of them. Decided and closed 2026-08-30.
+@ i:1..3 { s = °s "x" }
+@ i:1..3 { t = °t "y" }
+>> s t ¶
+
+// Y la mitad que no debe cambiar: un nombre prefijado con `_` sigue sin avisar,
+// las veces que haga falta.
+@ _k:1..2 { u = °u "z" }
+@ _k:1..2 { v = °v "w" }
+>> u v ¶

@@ -31,6 +31,13 @@ what = "an assignment whose right-hand side is missing"
 # reach it.  Whether it becomes a numbered entry is the author's call; as a
 # cell it needs no ID, which is exactly why the axis form finds things the
 # finding-by-finding form waits for.
+#
+# CLOSED 2026-08-30 (ZYJS-001). The cause was not the assignment: the last two
+# lines of zyjs's `parsePrimary` consumed ANY token no branch recognised and
+# returned a Unit literal, so the stray `=` became `##_` and the assignment came
+# out well-formed. The catch-all is gone; the five sibling forms below are here
+# because one root cause with six symptoms and one cell is a cause that comes
+# back through any of the other five.
 src  = """
 x = =
 """
@@ -67,4 +74,100 @@ what = "`!=` is not a Zymbol operator; the language spells it `<>`"
 # holds the refusal down either way.
 src  = """
 >> (1 != 2) ¶
+"""
+
+# ── The other five faces of ZYJS-001 ─────────────────────────────────────────
+#
+# Every one of these was accepted by zyjs and refused by both Rust engines while
+# `parsePrimary` ended in a catch-all. They are separate cells and not one,
+# because the swallow was reached from a different token each time and a fix
+# that guards only the token somebody tested is not a fix.
+
+[[cell]]
+id   = "expression-is-a-comma"
+what = "a stray comma where an expression belongs"
+src  = """
+x = ,
+"""
+
+[[cell]]
+id   = "expression-is-a-close-paren"
+what = "a stray `)` where an expression belongs"
+src  = """
+x = )
+"""
+
+[[cell]]
+id   = "expression-is-a-close-bracket"
+what = "a stray `]` where an expression belongs"
+src  = """
+x = ]
+"""
+
+[[cell]]
+id   = "expression-is-a-close-brace"
+what = "a stray `}` where an expression belongs"
+src  = """
+x = }
+"""
+
+[[cell]]
+id   = "operand-missing-after-plus"
+what = "an arithmetic operator with nothing after it"
+# Not the same question as the four above: here the swallow was reached from
+# INSIDE an expression that had already started, which is the shape a real typo
+# takes.
+src  = """
+x = 1 + =
+"""
+
+[[cell]]
+id   = "output-is-nothing-at-all"
+what = "a stray `=` in output position"
+# The one that showed the swallow was not about assignment. zyjs printed a blank
+# line and carried on to the next statement, exiting 0.
+src  = """
+>> (= ) ¶
+>> "sigue" ¶
+"""
+
+# ── El operando de un operador `$` es código, y hay que mirarlo ──────────────
+#
+# `zymbol check` no descendía al operando de `$#`, `$?` ni `$??`: los tres
+# brazos de `infer_expr` devolvían su tipo sin inferir lo que tenían dentro, y
+# `infer_expr` es lo que hace las comprobaciones. Todo lo escrito ahí dentro
+# pasaba sin mirar — un nombre que no existe, una llamada con la aridad mal, un
+# parámetro `<~` sin marcar.
+#
+# Lo encontró la validación contra Chaturanga, y la prueba de que el hueco era
+# real es dónde estaban los errores: **cuatro** llamadas de su suite habían
+# olvidado la marca `<~`, y las cuatro estaban dentro de un `$#`. El autor la
+# escribió en todos los sitios donde el analizador miraba.
+
+[[cell]]
+id   = "undefined-inside-a-collection-operand"
+what = "a name that does not exist, as the operand of `$#`"
+src  = """
+s = noexiste$#
+>> s ¶
+"""
+
+[[cell]]
+id   = "undefined-inside-a-contains-operand"
+what = "a name that does not exist, on the right of `$?`"
+src  = """
+s = [1, 2]$? noexiste
+>> s ¶
+"""
+
+[[cell]]
+id   = "arity-inside-a-collection-operand"
+what = "a call with the wrong argument count, as the operand of `$#`"
+# The same call one character to the left — `s = g(1, 2, 3)` — was refused all
+# along. That is the shape of the hole: not a construct nobody checks, a
+# POSITION nobody looked at.
+src  = """
+g(a, b) { <~ [a, b] }
+s = g(1, 2, 3)$#
+>> s ¶
 """

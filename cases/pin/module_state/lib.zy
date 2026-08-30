@@ -1,0 +1,23 @@
+# .module_state_lib {
+    #> { leer, idiomas, saluda }
+
+    estado = #0
+
+    _asegurar() {
+        ? estado == #0 { estado = "construido" }
+    }
+
+    // Lee el estado que su HERMANA acaba de escribir.
+    leer() {
+        _asegurar()
+        <~ estado
+    }
+
+    idiomas() { <~ ["tlh", "en", "es"] }
+
+    // Llama a una función de su propio módulo por nombre desnudo.
+    saluda() {
+        xs = idiomas()
+        <~ xs[1]
+    }
+}

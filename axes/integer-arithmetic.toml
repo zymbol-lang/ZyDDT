@@ -1,0 +1,87 @@
+# The integer-arithmetic axis — the same crossing `operator` makes, with an
+# answer that is not ours.
+#
+# `axes/operator.toml` crosses 14 operators against 18 type pairs and asks only
+# "did the three agree".  For the ~40 cells that are ordinary arithmetic that is
+# a weak question: `zytw` and `zyvm` share the whole front end and `zyjs` was
+# ported from them by hand, so a wrong answer they all inherited is a green row.
+# 330 of ZyDDT's cells are green by agreement and nothing else, and this is the
+# region where that is least comfortable.
+#
+# So: the same six arithmetic operators, against operand pairs chosen to
+# SEPARATE the rules that only differ on negatives, each checked against CPython.
+#
+# ── Writing the oracle was the work ────────────────────────────────────────
+#
+# An oracle asserts another language's answer about this one unless somebody
+# writes down which rule is being checked.  The three rules that differ from
+# Python's defaults, all measured on zymbol 0.0.9 before this file existed:
+#
+#   `/`  truncates TOWARD ZERO (DI-06).  `-7 / 3` is `-2`, not `-3`.  Python's
+#        `//` floors, so the oracle uses `math.trunc(a / b)`.
+#   `%`  takes the sign of the DIVIDEND, like C and unlike Python: `-7 % 3` is
+#        `-1` here and `2` there.  `math.fmod` is the one that agrees.
+#   `^`  with a negative exponent yields a Float, and its rendering matches
+#        Python's `repr` exactly — measured, not assumed.
+#
+# `0` never appears as a right operand: division and modulo by zero are a
+# refusal, which an oracle cannot decide, and mixing a refusal into an axis
+# whose whole point is the VALUE would make the oracle report a wrong answer
+# about a program that was correctly refused.
+
+id      = "integer-arithmetic"
+what    = "the six arithmetic operators on integers, against CPython"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[dimension]]
+name = "op"
+values = [
+  { id = "plus",  v = "+"  },
+  { id = "minus", v = "-"  },
+  { id = "times", v = "*"  },
+  { id = "div",   v = "/"  },
+  { id = "mod",   v = "%"  },
+  { id = "pow",   v = "^"  },
+]
+
+[[dimension]]
+name = "pair"
+# Both signs on both sides, because truncation and flooring agree on every
+# positive pair — `7 / 3` cannot tell them apart and `-7 / 3` can.  `(12, 4)`
+# divides exactly, which is the case where a rounding rule hides.  `(5, 1)` is
+# the identity, where an off-by-one in any of the six shows up bare.
+values = [
+  { id = "pos-pos",   a = "7",   b = "3" },
+  { id = "neg-pos",   a = "-7",  b = "3" },
+  { id = "pos-neg",   a = "7",   b = "-3" },
+  { id = "neg-neg",   a = "-7",  b = "-3" },
+  { id = "exact",     a = "12",  b = "4" },
+  { id = "identity",  a = "5",   b = "1" },
+]
+
+[matrix]
+id   = "«op.id»-«pair.id»"
+what = "`(«pair.a») «op.v» («pair.b»)`"
+src  = """
+>> ((«pair.a») «op.v» («pair.b»)) ¶
+"""
+oracle.py = """
+# Nothing here knows any Zymbol.  The three rules that differ from Python's
+# defaults are spelled out above the axis; this file only applies them.
+import math
+
+a, b, op = («pair.a»), («pair.b»), "«op.v»"
+
+if op == "+":
+    print(a + b)
+elif op == "-":
+    print(a - b)
+elif op == "*":
+    print(a * b)
+elif op == "/":
+    print(math.trunc(a / b))          # toward zero, not floor
+elif op == "%":
+    print(int(math.fmod(a, b)))       # sign of the dividend, not the divisor
+elif op == "^":
+    print(a ** b if b >= 0 else float(a) ** b)
+"""

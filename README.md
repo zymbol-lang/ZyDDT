@@ -36,12 +36,12 @@ had no name and no home. This is it.
 **The runner exists; the corpus does not.** That order is deliberate — the point
 was to decide what earns a place *before* copying anything, not to fork 661 files
 and sort them afterwards. What runs today is the machinery for asking, eight
-declared axes — three of them crossed matrices — and the first pin. Not one file
-has been copied over from ZyQuality yet, and the axes have already produced six
-findings the 661-file corpus could not see.
+declared axes — three of them crossed matrices — and five pins. Not one file has
+been copied over from ZyQuality yet, and the axes have produced ten findings the
+661-file corpus could not see. **All ten are closed.**
 
 ```bash
-./bin/zyddt suite                  # the whole layer, one verdict — 390 cells, ~30 s
+./bin/zyddt suite                  # the whole layer, one verdict — 394 cells, ~30 s
 ./bin/zyddt selftest               # grade the runner itself
 ./bin/zyddt engines                # what can run, and what cannot
 ./bin/zyddt gen                    # write every cell from axes/*.toml
@@ -87,29 +87,38 @@ routing comes out of the run rather than out of a reading.
 ### Where it stands, measured
 
 ```text
-axis             cells  agree  oracled  narrowed  wording  diverge  wrong
-arithmetic           6      5        4         0        0        1      0
-diagnostic           3      0        0         0        0        3      0
-environment          3      3        0         3        0        0      0
-numerals            69     69       69         0        0        0      0
-operator           252    102        0         0       42      108      0
-refusal              4      0        0         0        2        1      1
-type-symbol         48     48        0         0        0        0      0
-verdict-shape        5      4        0         0        1        0      0
-pins                 1      1        —         0        —        0      —
-selftest            50     50        —         —        —        —      —
+axis                 cells  agree  oracled  narrowed  wording  diverge  wrong
+arithmetic               6      6        4         0        0        0      0
+diagnostic               7      7        0         0        0        0      0
+environment              3      3        0         3        0        0      0
+integer-arithmetic      36     36       36         0        0        0      0
+numerals                69     69       69         0        0        0      0
+operator               252    252        0         0        0        0      0
+refusal                 13     12        0         0        1        0      0
+type-symbol             48     48        0         0        0        0      0
+verdict-shape            5      5        0         0        0        0      0
+pins                     9      9        —         0        —        0      —
+selftest                50     50        —         —        —        —      —
 ```
 
-`oracled` is the honest count of cells where agreement is not the only evidence.
+`oracled` is the honest count of cells where agreement is not the only evidence:
+**109 of 439**. `integer-arithmetic` exists to raise it where it was lowest —
+`operator` crosses the same six operators and asks only whether the three
+engines agreed, which is a weak question about a front end two of them share.
+Its oracle was verified by breaking it: flooring instead of truncating reports
+`WRONG ANSWER` on exactly the two mixed-sign pairs, which is what the operand
+pairs were chosen to separate.
 `narrowed` is agreement with a surface excused by a rule — `[2/3]` in the report,
 and it matters most for this pair: with `zyjs` excused, only `zytw` and `zyvm`
 remain, and they share the lexer, the parser and the semantic analyser, so the
 whole front-end question goes unasked.
 
-Eight axes and one pin is not coverage either, and the table is written this way
-so it cannot be mistaken for any. An axis nobody has declared has no row here,
-and that absence is worth more than a green tick on a suite that never asked
-([`CHARTER.md`](CHARTER.md) § 6).
+Nine axes and nine pins is not coverage either, and the table is written this
+way so it cannot be mistaken for any. An axis nobody has declared has no row
+here, and that absence is worth more than a green tick on a suite that never
+asked ([`CHARTER.md`](CHARTER.md) § 6). Of the 394 cells, 321 are green by
+agreement and nothing else: if one of those hides an error all three engines
+share, this layer cannot see it today.
 
 `numerals` and `type-symbol` are the first two axes generated from a **crossed
 matrix** rather than written point by point, and `numerals` is what the shape was
@@ -118,65 +127,106 @@ digit block they substitute, and this is the same 69 as one declaration plus one
 template — with an oracle each, which the corpus's goldens could not have, since
 a golden records what the engines said and cannot disagree with them.
 
-`operator` is the first axis large enough to be worth its own warning. 14
-operators × 18 type pairs is 252 questions nobody had asked, and 150 of them are
-red on the first run. That is not 150 findings: it is **six**, each printed once
-per cell it touches. The report quotes the first eight reds of an axis in full
-and lists the rest by name (`zyddt --detail N axis`, `-v` for all); the counts
-above are never shortened.
+### What the first crossing of `operator` found, and what it cost to close
 
-Every red is filed, and every one was found by a cell rather than by looking:
+14 operators × 18 type pairs is 252 questions nobody had asked, and **150 of them
+were red on the first run** (2026-08-29). That was not 150 findings: it was
+**six**, each printed once per cell it touched. All six are closed, along with
+the three older ones and one that the closing turned up.
 
-| finding | cells | what |
-|---|---:|---|
-| [`ZYVM-001`](HALLAZGOS/zyvm.md) | 40 | the VM **runs what the tree-walker refuses** — `7 && 3` prints `#1`, `"ab" / "cd"` prints `[ab]` |
-| [`ZYJS-004`](HALLAZGOS/zyjs.md) | 70 | the browser engine writes a runtime **warning to stdout**, into the program's own output |
-| [`ZYJS-006`](HALLAZGOS/zyjs.md) | 54 | `[object Object]` and `undefined` inside a diagnostic, and a dictionary called `Tuple` |
-| [`ZYJS-005`](HALLAZGOS/zyjs.md) | 34 | `&&`/`\|\|` on non-booleans: no warning, no refusal, an answer |
-| [`GLOBAL-001`](HALLAZGOS/GLOBAL.md) | 28 | the same impossible comparison refused in three different wordings |
-| [`ZYVM-002`](HALLAZGOS/zyvm.md) | 10 | the diagnostic for `-` quotes the guidance for `+` |
+| finding | cells | what | closed |
+|---|---:|---|---|
+| [`ZYVM-001`](HALLAZGOS/zyvm.md) | 40 | the VM **ran what the tree-walker refuses** — `7 && 3` printed `#1`, `"ab" / "cd"` printed `[ab]` | 2026-08-30 |
+| [`ZYJS-004`](HALLAZGOS/zyjs.md) | 70 | the browser engine wrote a runtime **warning to stdout**, into the program's own output | 2026-08-30 |
+| [`ZYJS-006`](HALLAZGOS/zyjs.md) | 54 | `[object Object]` and `undefined` inside a diagnostic, and a dictionary called `Tuple` | 2026-08-30 |
+| [`ZYJS-005`](HALLAZGOS/zyjs.md) | 34 | `&&`/`\|\|` on non-booleans: no warning, no refusal, an answer | 2026-08-30 |
+| [`GLOBAL-001`](HALLAZGOS/GLOBAL.md) | 28 | the same impossible comparison refused in three different wordings | 2026-08-30 |
+| [`ZYVM-002`](HALLAZGOS/zyvm.md) | 10 | the diagnostic for `-` quoted the guidance for `+` | 2026-08-30 |
+| [`ZYJS-001`](HALLAZGOS/zyjs.md) | 1 | `parsePrimary` swallowed **any** token it did not recognise and returned Unit | 2026-08-30 |
+| [`ZYJS-002`](HALLAZGOS/zyjs.md) | 2 | lexer diagnostics carried no line, and folded their guidance into the message | 2026-08-30 |
+| [`ZYJS-003`](HALLAZGOS/zyjs.md) | 5 | a JavaScript `RangeError` reached the user as `error: Invalid code point NaN` | 2026-08-30 |
 
-The first is the one to read. `zyvm` is **the future default engine**, and 40
-programs that `zymbol run` refuses are run to completion by `zymbol run --vm`.
-Both of the CHARTER's reasons for why the old gate could not see it apply at
-once: no corpus file writes `7 && 3`, and a consensus run compares stdout, which
-a refusal does not have.
+Three decisions unblocked them, and all three are the author's: **`&&` on
+non-booleans is an error** (the v0.0.9 loop-specifier rule — *there is no
+truthiness* — applied to another operator); **tuples do not order**; and **a
+diagnostic names types, not values**, which is the only wording all three engines
+can always produce and which closes `ZYJS-006` by construction.
 
-The wording splits are **not** baselined. `wording.baseline` records what is
-known and tolerated, and these forty-two are the visible half of `GLOBAL-001`
-and `ZYVM-002` — recording them would file them as accepted before anybody
-decided they were.
+### What closing them found that no ficha had
 
-The three older findings came out of the four hand-written axes, and are kept
-here because how each was found is the argument for the form that found it.
+This is the part worth reading, because none of it came from a review:
 
-[`ZYJS-001`](HALLAZGOS/zyjs.md) came out of the first run of the first axis. `x = =` is refused by `zytw` and `zyvm` and
-**accepted** by `zyjs`, which runs it to completion with only an unused-variable
-warning. Tracing it found the cause, and it is wider than the cell:
-`parsePrimary` in `zymbol.js` ends by consuming **any** token it does not
-recognise and returning a Unit literal, so six different malformed programs are
-accepted where both Rust engines refuse them.
+- **The VM's short-circuit still decided by truthiness.** The matrix crosses
+  `&&` with *truthy* left operands, so every cell reached the `And` instruction
+  and went green once that instruction required Bools — while `0 && #1` still
+  answered `#0`, having jumped before it. The jump cannot check for itself
+  (`? 7 { … }` compiles to the same one and is a warning there), so the guard is
+  its own instruction, `RequireBool`.
+- **`zyjs` got chained output right by accident.** `>> a >> b ¶` is two
+  statements, and the browser engine had no such rule: the second `>>` fell into
+  `parsePrimary`'s catch-all, came back as Unit, and Unit prints as nothing.
+  Removing the catch-all put **18 corpus files red at once** and forced the rule
+  to be implemented rather than simulated. The ficha had warned this could
+  happen; it happened.
+- **`zyjs`'s unary operators checked nothing.** `-"a"` answered `NaN`, `!7`
+  answered `#0`. A pin found it by *running*, the first time the question was
+  asked of all three engines at once — unary minus is not in a matrix of binary
+  operators.
 
-It is the same family as `DM-06` — closed on 2026-08-18 by narrowing `zyjs`'s
-`parseOutput` from `parseExpr` to `parseAdditive` — and that fix could not have
-reached this: narrowing decides which grammar is invoked, and the swallow is
-underneath it, at the bottom of `parsePrimary`.
+The forms that had no cell now have one. The five sibling faces of `ZYJS-001`
+and the four sibling base prefixes of `ZYJS-003` are cells of their own axes, in
+the same commit as the fix: a root cause with six symptoms and one cell is a
+cause that comes back through any of the other five.
 
-As a cell it needed no ID, which is exactly why the axis form finds what the
-finding-by-finding form waits for.
+`wording.baseline` carries **one** entry, written on purpose and with its reason
+attached: the Rust engines add `= help: expected signature: g(Number, Number)`
+to an arity refusal, with the parameter types they INFERRED, and `zyjs` has no
+parameter inference to build that with. Reproducing it means building one, which
+is a design decision and not a message fix. What was fixed in the same commit is
+that `zyjs` had no line on that diagnostic at all.
 
-`ZYJS-002` and `ZYJS-003` came out of **repairing a bad cell**. `i53-boundary`
-shipped with a literal on the Zymbol side and a computation on the Python side —
-two copies of one number, checking nothing. Writing it honestly turned up a
-diagnostic that carries no line number in `zyjs`, folds its guidance into the
-message instead of a `= help:` line, and — one probe further — surfaces a raw
-JavaScript `RangeError` as `error: Invalid code point NaN` for all four base
-prefixes. None of it was visible to the old gate by construction: a consensus run
-compares stdout, and a refusal has none.
+### What only the LDV applications found
 
-The guard against that class of bad cell is now mechanical
-([`VERDICTS.md`](VERDICTS.md) § 8): if the oracle's answer appears verbatim in
-the `.zy` source, the cell gives no verdict.
+394 green cells, a 661-file corpus and 222 examples did not see either of these.
+A real program did — which is [`LDV.md`](../interpreter/LDV.md) § 1 in two lines.
+
+- [`ZYJS-007`](HALLAZGOS/zyjs.md), **closed**: zyjs continued an identifier on
+  ASCII digits where the Rust lexer uses `is_alphanumeric()`. Chaturanga is
+  written in Sanskrit and names variables `कार्यस्थितिः२`; the file ran here on a
+  wrong parse, correctly under both Rust engines, and `ZYJS-001`'s catch-all was
+  what hid it. No corpus file names a variable that way.
+- [`GLB-001`](HALLAZGOS/GLOBAL.md), **closed**: filed first as `ZYJS-008` by
+  reading the symptom — zyjs refuses what both Rust engines accept — and the
+  reading was backwards. zyjs was right: the Rust semantic analyser **did not
+  descend into the operand of a `$` operator**, so nothing written there was
+  checked at all. Fixing it surfaced four calls in Chaturanga's own suite
+  missing their `<~` mark, and all four sat inside a `$#`. A blind spot does not
+  leave errors at random; it leaves them in its own shape.
+- [`ZYJS-009`](HALLAZGOS/zyjs.md), **closed**: `alias::f()` inside a module
+  resolved against the **caller's** alias table — dynamic scoping. It needs two
+  different modules to share an alias name, which no corpus file does. With it
+  fixed, Chaturanga's whole suite passes under `zyjs` too, for the first time,
+  and so do GO's and serpiente's.
+- [`ZYJS-010`](HALLAZGOS/zyjs.md), **closed**: a module's function ran in the
+  caller's scope, so the caller's variables shadowed the module's own functions
+  and a sibling's write to module state was invisible. `klingon_galaxy` names an
+  array after the function that produces it; `ZyBank`'s locale dispatcher builds
+  its catalogue in one function and reads it in another. Both are ordinary.
+- [`ZYJS-011`](HALLAZGOS/zyjs.md) and [`GLB-002`](HALLAZGOS/GLOBAL.md),
+  **closed**: `s = °s "x"` — the string accumulator the guide documents —
+  returned only the `°s` and dropped the rest of the juxtaposition; and with `s`
+  undeclared the three engines answered three different things, because the
+  neutral value belongs to the OPERATOR and all three knew that only on the
+  assignment path.
+- [`GLB-003`](HALLAZGOS/GLOBAL.md), **open**: two loops reusing an iterator name
+  warn once in Rust and twice in the browser. Nobody has decided which is right,
+  so nothing asserts it.
+
+All three say the same thing about the denominator: `zyquality/project/apps.toml`
+excludes `zyjs` from the application suites **on purpose** — they are
+command-line programs — so nothing grades that crossing. Checking it here meant
+diffing `zyjs` against its own previous version, file by file, which was the
+only instrument available.
 
 ## Authorship & AI collaboration
 

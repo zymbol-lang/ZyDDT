@@ -14,6 +14,90 @@
 
 ---
 
+## 0. Estado — 2026-08-30
+
+**Los nueve hallazgos abiertos están corregidos.** Los ejes declarados van
+394 de 394 celdas en verde; las 157 rojas del 2026-08-29 son cero.
+
+Y la validación contra las aplicaciones LDV, hecha después, abrió **seis más**:
+**nueve más, todos corregidos**: `ZYJS-007`, `ZYJS-009`, `ZYJS-010`,
+`ZYJS-011` y [`GLB-001`](GLOBAL.md) … [`GLB-005`](GLOBAL.md). Tres de ellos
+necesitaron una decisión del autor, y las tres se tomaron con la medición
+delante — la más cara, `GLB-005`, resultó valer **un fichero de 84**.
+
+| fichero | abiertos | corregidos |
+|---|---:|---:|
+| [`zytw.md`](zytw.md) | 0 | 0 |
+| [`zyvm.md`](zyvm.md) | 0 | 2 |
+| [`zyjs.md`](zyjs.md) | 0 | 10 |
+| [`GLOBAL.md`](GLOBAL.md) | 0 | 6 |
+
+Los seis dicen lo mismo sobre el método: **una aplicación completa encuentra lo
+que ningún corpus puede**, porque un corpus se escribe un fichero cada vez y
+estos defectos necesitan que dos partes de un programa se estorben — dos módulos
+que comparten un nombre de alias, una variable local que se llama como la
+función que la produce, un acumulador escrito con el `°` del lado que el corpus
+no usa.
+
+Tres decisiones de diseño las desbloquearon, y las tres son del autor:
+
+1. **`&&` y `||` sobre no booleanos son un error**, en los tres motores. No era
+   una decisión nueva: la v0.0.9 ya lo había resuelto para el especificador de
+   bucle —*no hay truthiness*— y esto es la misma regla en otro operador.
+2. **Las tuplas no se ordenan.** `(1, 2) < (3, 4)` se rechaza. La tupla es
+   posicional y heterogénea; `==` no se toca.
+3. **Un diagnóstico nombra tipos, no valores.** `String and Char`, no
+   `String("ab") and Char('c')`. Es la única forma que los tres motores pueden
+   emitir siempre, y de paso cierra [`ZYJS-006`](zyjs.md) por construcción.
+
+Lo que **no** estaba en ninguna ficha y salió de aplicarlas:
+
+- el cortocircuito de la VM decidía por truthiness, así que `0 && #1` seguía
+  contestando `#0` con la instrucción ya corregida (nace `RequireBool`);
+- `zyjs` acertaba la salida encadenada `>> a >> b ¶` **por accidente**, apoyada
+  en el cajón de `parsePrimary`: quitarlo puso 18 ficheros del corpus en rojo de
+  golpe y obligó a implementar la regla de verdad;
+- los operadores **unarios** de `zyjs` no comprobaban nada: `-"a"` daba `NaN` y
+  `!7` daba `#0`. Lo encontró una chincheta al ejecutarse, no una lectura.
+
+### Y lo que sólo apareció al validar contra las aplicaciones LDV
+
+Los 394 verdes, el corpus de 661 y los 222 ejemplos no lo vieron; una aplicación
+de verdad, sí. Es `LDV.md` § 1 en dos líneas.
+
+- **`ZYJS-007`** (corregido): el lexer de `zyjs` continuaba un identificador con
+  dígitos **ASCII** donde Rust usa `is_alphanumeric()`. Chaturanga está escrito
+  en sánscrito y nombra variables como `कार्यस्थितिः२`; el fichero corría aquí con
+  un parseo equivocado, correctamente bajo los dos motores Rust, y el cajón de
+  `ZYJS-001` era lo que lo tapaba. Ningún fichero del corpus nombra así.
+- **[`GLB-001`](GLOBAL.md)** (corregido): se archivó primero como `ZYJS-008`
+  leyendo el síntoma —`zyjs` rechaza lo que los dos motores Rust aceptan— y la
+  lectura estaba **al revés**. `zyjs` tenía razón: el analizador semántico de
+  Rust **no descendía al operando de un operador `$`**, así que no comprobaba
+  nada escrito ahí dentro. Al arreglarlo aparecieron cuatro llamadas de la suite
+  de Chaturanga a las que les faltaba la marca `<~`, y las cuatro estaban dentro
+  de un `$#`: el hueco no dejó errores al azar, los dejó **con su forma**.
+- **`ZYJS-009`** (corregido): `alias::f()` dentro de un módulo resolvía con la
+  tabla de alias **del llamante**. Ámbito dinámico. Hace falta que dos módulos
+  distintos compartan un nombre de alias, y eso no lo hace ningún fichero del
+  corpus — un corpus se escribe un fichero cada vez. Con el arreglo, **la suite
+  entera de Chaturanga pasa también en `zyjs`**, y con ella la de GO y la de
+  serpiente.
+
+Las tres comparten una lección sobre el denominador: `project/apps.toml` excluye
+a `zyjs` de las suites de aplicación **a propósito** —son programas de línea de
+órdenes— así que ese cruce no lo recorre ningún gate. Comprobarlo aquí exigió
+comparar `zyjs` **contra su propia versión anterior**, fichero a fichero, que es
+el único instrumento que había.
+
+Y una sobre el encaminamiento: `ZYJS-008` se archivó contra el motor equivocado
+porque no lo produjo el runner sino una lectura, y § 1 dice que el motor lo nombra
+el runner. Cuando no hay runner que lo diga, **«el que se sale» no es lo mismo
+que «el que está mal»** — y en una pareja que comparte analizador, el que se sale
+es justamente el que mira.
+
+---
+
 ## 1. La regla
 
 > Un hallazgo se archiva contra **el motor que tiene que cambiar**, y ese motor
@@ -52,7 +136,7 @@ culpable, y encontrarlo es información que se perdería archivándolas juntas:
 | `ZYJS-004` | canal, no contenido: el texto es el correcto en los tres, y sólo uno lo pone en stdout |
 | `ZYJS-005` | dos motores avisan, el tercero no tiene la comprobación |
 | `ZYJS-006` | el diagnóstico enseña valores del anfitrión JavaScript; ningún otro motor puede tener ese defecto |
-| `GLOBAL-001` | **se queda**: los tres redactan distinto y ninguno es la referencia |
+| `GLOBAL-001` | **se quedó**: los tres redactaban distinto y ninguno era la referencia. Lo resolvió una decisión del autor, no una lectura del runner |
 
 La regla que sale de eso: *cuando el runner dice `DIVERGE`, el fichero lo elige
 quien escribe el hallazgo, y el hallazgo tiene que decir por qué ese fichero.*

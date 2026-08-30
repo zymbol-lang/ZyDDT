@@ -4,6 +4,19 @@
 # own. A line appearing here that was not written on purpose is a new
 # one-sided message, which is the thing zyquality/messages/ counts
 # statically and this counts as it is actually emitted.
-refusal/output-unparenthesised-comparison
-refusal/undefined-variable
-verdict-shape/error-static
+refusal/arity-inside-a-collection-operand
+
+# refusal/arity-inside-a-collection-operand — anotada el 2026-08-30.
+#
+# Los tres rechazan y dicen lo mismo; los dos motores Rust añaden además
+# `= help: expected signature: g(Any, Any)` y zyjs no.
+#
+# No se cierra barato, y por eso está aquí en vez de arreglada: esa guía no
+# repite la aridad, imprime los tipos INFERIDOS de los parámetros — `g(Number,
+# Number)` cuando el cuerpo hace aritmética con ellos, `g(Any, Number)` cuando
+# sólo uno. zyjs no tiene inferencia de parámetros, así que reproducir el texto
+# significa construirla, y eso es una decisión de diseño, no un arreglo de un
+# mensaje.
+#
+# Lo que sí se arregló en el mismo commit: a zyjs le faltaba la LÍNEA en este
+# diagnóstico —los nodos `Call` y `CallExpr` no llevaban `line`— y ya la lleva.

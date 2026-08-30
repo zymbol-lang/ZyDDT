@@ -1,0 +1,16 @@
+// PIN GLB-005 — the module-name convention, enforced by everything or by nothing.
+//
+// `sub/m.zy` declares `# .m`. The dotted form names the whole path, so it has
+// to be `.sub_m`. Until 2026-08-30 only `zymbol check` said so: `run`, `--vm`
+// and the browser engine all printed `hola`. A convention one tool out of four
+// enforces is a lint anybody can route around by using a different command.
+//
+// Underneath it, a defect that had nothing to do with the decision: the name
+// being demanded was computed from the path AS SPELLED at the call site, so the
+// same file asked for `modules_scope_m` from one directory and `_m` from
+// another, and nothing could satisfy both. Every application suite that runs
+// from its own directory hit it. The Rust side canonicalises now; the browser
+// side derives the directory from the IMPORTER plus the import path, which is
+// the same fact reached the only way that engine can reach it.
+<# ./e001/sub/m => M
+>> M::f() ¶

@@ -1,0 +1,4 @@
+# .alias_scope_dos {
+    #> { hola }
+    hola() { <~ "soy dos" }
+}

@@ -55,6 +55,40 @@ what = "a base prefix with no digits after it is a language error, not a crash"
 # It is refused either way, so `expect = "error"` is met and the axis floor does
 # not catch it.  What catches it is the differential: an engine that answers
 # with its own implementation's exception has not diagnosed anything.
+#
+# CLOSED 2026-08-30. The three prefixes below are cells for the reason the
+# finding gave: four sites written identically, guarded in one commit, and one
+# cell over them is three sites nothing holds down.
 src  = """
 >> 0xZZ ¶
+"""
+
+[[cell]]
+id   = "binary-prefix-with-no-digits"
+what = "`0b` with no binary digits after it"
+src  = """
+>> 0b22 ¶
+"""
+
+[[cell]]
+id   = "octal-prefix-with-no-digits"
+what = "`0o` with no octal digits after it"
+src  = """
+>> 0o99 ¶
+"""
+
+[[cell]]
+id   = "decimal-prefix-with-no-digits"
+what = "`0d` with no decimal digits after it"
+src  = """
+>> 0dAA ¶
+"""
+
+[[cell]]
+id   = "bare-prefix-with-nothing-after-it"
+what = "a base prefix at the very end of the expression"
+# The easiest of the five to write by accident, and the one where the `while`
+# has no chance at all of matching.
+src  = """
+>> 0x ¶
 """

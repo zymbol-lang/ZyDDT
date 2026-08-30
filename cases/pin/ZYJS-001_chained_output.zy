@@ -1,0 +1,17 @@
+// PIN ZYJS-001 — what the catch-all was hiding.
+//
+// `>> a >> b ¶` on one line is two output statements; both Rust engines break
+// at the second `>>` (`parse_output`, io.rs). zyjs had no such rule and got the
+// right answer anyway: the second `>>` fell through `parsePrimary`'s catch-all,
+// came back as a Unit literal, and Unit prints as nothing.
+//
+// Removing the catch-all is what made the hole visible — 18 corpus files, all
+// of them chained output, went red at once. The rule is implemented now rather
+// than simulated. Closed 2026-08-30.
+//
+// A pin and not a corpus file: the corpus files that exercise this are about
+// lambdas and pipes and happen to print this way, so a change here would be
+// diagnosed as a lambda regression.
+n = 5
+>> "a: " >> n ¶
+>> "x" >> "y" >> "z" ¶

@@ -1,0 +1,9 @@
+// PIN ZYVM-002 — the message named the code route, not the operator.
+//
+// The VM read every arithmetic operand through one macro whose String branch
+// carried the guidance for `+`, so `-"a"` was refused with advice about
+// concatenating strings. The tree-walker said `negation requires numeric
+// operand`. Unary minus is not in the operator matrix — it crosses BINARY
+// operators — so nothing held this down. Closed 2026-08-30.
+x = -"a"
+>> x ¶

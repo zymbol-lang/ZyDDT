@@ -1,0 +1,22 @@
+// PIN ZYVM-001 — the half the operator matrix could not reach.
+//
+// The axis crosses `&&` and `||` with pairs whose left operand is TRUTHY, so
+// every one of its cells reached the `And` / `Or` instruction and was refused
+// once that instruction required Bools. A FALSY non-Bool never gets there: the
+// VM short-circuits first, on `JumpIfNot`, which decides by truthiness — so
+// `0 && #1` still answered `#0` after the instruction was fixed, and `##_ && #1`
+// with it.
+//
+// The jump cannot do the checking itself: `? 7 { … }` compiles to the same
+// JumpIfNot and is a warning there, not an error. So the guard is its own
+// instruction, `RequireBool`, emitted before the jump by `compile_and` and
+// `compile_or`. Closed 2026-08-30.
+//
+// The cases that must still ANSWER are here too. A pin that only asserts the
+// refusals would be satisfied by an engine that refuses `&&` outright.
+>> (#1 && #1) ¶
+>> (#1 && #0) ¶
+>> (#0 && #1) ¶
+>> (#1 || #0) ¶
+>> (#0 || #1) ¶
+>> (#0 || #0) ¶
