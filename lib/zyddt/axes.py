@@ -6,10 +6,33 @@ written, so the matrix's coverage is a property of the declaration and not of
 anyone's memory.  `generated/` is in .gitignore for the same reason: a cell that
 can be edited by hand is a cell that will be, and then the declaration stops
 being the truth.
+
+An axis declares its cells one of two ways, and both produce the same `Cell`:
+
+  **`[[cell]]`** — one point, written out, because the point carries an essay.
+  `axes/arithmetic.toml`'s `i53-overflow-of-an-intermediate` is three screens of
+  measured comparison against six other languages; it is one cell and always
+  will be.  This is a matrix of one point, not an exception to the rule.
+
+  **`[[dimension]]` + `[matrix]`** — the cross product, which is the form the
+  admission rule was written for.  Declaring the 69 digit blocks once produces
+  69 cells including the scripts nobody wrote a file for, and *"is Ol Chiki
+  covered?"* stops being a question anybody has to remember to ask.
+
+── Why the placeholder is «…» and not {…} ───────────────────────────────────
+
+Because a template's body is Zymbol, and Zymbol spends braces: `f(a) { <~ a }`
+is a function body and `"hola {name}"` is an interpolation.  A `str.format`
+template would have to escape every one of them, in a file whose whole job is to
+be read — and the escaping would be invisible in the generated `.zy`, so the
+first person to copy a working program into a matrix would get a cell that
+silently means something else.  `«…»` appears nowhere in the language.
 """
 
 from __future__ import annotations
 
+import itertools
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +68,161 @@ class Cell:
         return GEN_DIR / self.axis / f"{self.id}.oracle{ext}"
 
 
+# ── The matrix ───────────────────────────────────────────────────────────────
+
+PLACEHOLDER = re.compile(r"«\s*([a-z_][a-z0-9_]*)(?:\.([a-z_][a-z0-9_]*))?\s*»")
+
+#: The field a bare `«op»` reads.  A dimension value written as a plain string
+#: becomes `{id: <it>, v: <it>}`, so `«op»` and `«op.v»` are the same thing and
+#: `«op.id»` is what names the file.
+DEFAULT_FIELD = "v"
+
+ID_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+@dataclass(frozen=True)
+class Dimension:
+    """One axis of the cross product: a name and the values it ranges over."""
+    name: str
+    values: tuple[dict[str, str], ...]
+
+
+def _values_of(dim: dict, axis: str) -> tuple[dict[str, str], ...]:
+    """Normalise a declared value list into records, and refuse a bad id.
+
+    A value may be written as a plain string when the string is already a legal
+    filename (`"int"`, `"7"`), or as a table when it is not (`+`, `#(x: 1)`) or
+    when the cell needs more than one field.  There is deliberately no
+    slugification: turning `+` into `plus` and `-` into `minus` is a guess, and
+    two guesses that collide would silently merge two points of the matrix into
+    one file.  The author names the point.
+    """
+    # `defaults` is what keeps a field that varies on two values out of the other
+    # sixty-seven.  Only Arabic encodes its own decimal separator, so the
+    # numerals axis declares `decimal = "."` once and the two Arabic rows
+    # override it — rather than 67 rows restating the same character, where a
+    # single omission would be a hard error and a single typo would not.
+    base = {k: str(v) for k, v in dim.get("defaults", {}).items()}
+    out = []
+    for raw in dim.get("values", []):
+        v = dict(base)
+        v.update({"id": str(raw), DEFAULT_FIELD: str(raw)} if not isinstance(raw, dict)
+                 else {k: str(x) for k, x in raw.items()})
+        if "id" not in v:
+            raise SystemExit(
+                f"zyddt: {axis}: dimension '{dim.get('name')}' has a value with no "
+                f"`id`. A value that is not a legal filename must name itself: "
+                f"{{ id = \"plus\", v = \"+\" }}")
+        if not ID_OK.match(v["id"]):
+            raise SystemExit(
+                f"zyddt: {axis}: dimension '{dim.get('name')}' value id "
+                f"{v['id']!r} is not a filename. Give it an explicit `id`.")
+        out.append(v)
+    if not out:
+        raise SystemExit(f"zyddt: {axis}: dimension '{dim.get('name')}' "
+                         f"declares no values, so it multiplies the matrix by nothing")
+    ids = [v["id"] for v in out]
+    dup = {i for i in ids if ids.count(i) > 1}
+    if dup:
+        raise SystemExit(f"zyddt: {axis}: dimension '{dim.get('name')}' repeats "
+                         f"value id(s) {sorted(dup)}")
+    return tuple(out)
+
+
+def expand(template: str, coords: dict[str, dict[str, str]], where: str) -> str:
+    """Substitute every «dim» / «dim.field» against one point of the matrix.
+
+    Unknown names are a hard error rather than an empty string.  A typo that
+    expanded to nothing would still generate a `.zy`, still run, and still be
+    counted in the denominator — a cell that asks a different question from the
+    one declared, reported as coverage.
+    """
+    def one(m: re.Match) -> str:
+        dim, field = m.group(1), m.group(2) or DEFAULT_FIELD
+        if dim not in coords:
+            raise SystemExit(f"zyddt: {where}: «{m.group(0)[1:-1]}» names no "
+                             f"dimension. Declared: {', '.join(sorted(coords))}")
+        val = coords[dim]
+        if field not in val:
+            raise SystemExit(
+                f"zyddt: {where}: value '{val['id']}' of dimension '{dim}' has no "
+                f"field '{field}'. It has: {', '.join(sorted(val))}")
+        return val[field]
+    return PLACEHOLDER.sub(one, template)
+
+
+def _skip_reason(skips: list[dict], coords: dict[str, dict[str, str]],
+                 axis: str) -> str | None:
+    """→ why this point of the matrix is not asked, naming the point.
+
+    CHARTER § 5: an exclusion requires a reason, and it is stricter for a cell —
+    a skipped cell names the axis value it skips, so a hole in a matrix is
+    visible AS a hole rather than as a smaller matrix.
+    """
+    for sk in skips:
+        when = sk.get("when")
+        if not when:
+            raise SystemExit(f"zyddt: {axis}: a matrix skip with no `when` would "
+                             f"delete the whole matrix")
+        if "reason" not in sk:
+            raise SystemExit(f"zyddt: {axis}: matrix skip {when} states no reason. "
+                             f"A skip nobody explained is a bug somebody hid.")
+        hit = True
+        for dim, want in when.items():
+            if dim not in coords:
+                raise SystemExit(f"zyddt: {axis}: skip names dimension '{dim}', "
+                                 f"which the matrix does not declare")
+            want = want if isinstance(want, list) else [want]
+            if coords[dim]["id"] not in want:
+                hit = False
+                break
+        if hit:
+            at = ", ".join(f"{d}={coords[d]['id']}" for d in sorted(when))
+            return f"{at} — {sk['reason']}"
+    return None
+
+
+def _matrix_cells(d: dict, stem: str, path: Path) -> list[Cell]:
+    """The cross product of every declared dimension, one Cell per point."""
+    dims = [Dimension(dim.get("name", ""), _values_of(dim, path.name))
+            for dim in d.get("dimension", [])]
+    for dim in dims:
+        if not dim.name:
+            raise SystemExit(f"zyddt: {path.name}: a dimension with no `name` "
+                             f"cannot be referred to from the template")
+    m = d["matrix"]
+    for required in ("id", "src"):
+        if required not in m:
+            raise SystemExit(f"zyddt: {path.name}: [matrix] declares no `{required}`")
+    skips = m.get("skip", [])
+    cells: list[Cell] = []
+    for point in itertools.product(*(dim.values for dim in dims)):
+        coords = {dim.name: v for dim, v in zip(dims, point)}
+        at = "/".join(v["id"] for v in point)
+        where = f"{path.name} [matrix] at {at}"
+        cid = expand(m["id"], coords, where)
+        if not ID_OK.match(cid):
+            raise SystemExit(f"zyddt: {where}: cell id {cid!r} is not a filename")
+        oracle = None
+        if "oracle" in m:
+            if len(m["oracle"]) != 1:
+                raise SystemExit(f"zyddt: {path.name}: [matrix] declares "
+                                 f"{len(m['oracle'])} oracles. One case, one "
+                                 f"independent answer.")
+            oid, osrc = next(iter(m["oracle"].items()))
+            oracle = (oid, expand(osrc, coords, where))
+        cells.append(Cell(
+            stem, cid,
+            expand(m.get("what", ""), coords, where),
+            expand(m["src"], coords, where),
+            _skip_reason(skips, coords, path.name),
+            oracle,
+            m.get("expect"),
+            m.get("oracle_literal_ok"),
+        ))
+    return cells
+
+
 @dataclass(frozen=True)
 class Axis:
     id: str
@@ -55,21 +233,57 @@ class Axis:
 
 
 def load_all(only: list[str] | None = None) -> list[Axis]:
+    return load_all_from(AXES_DIR, only)
+
+
+def load_all_from(where: Path, only: list[str] | None = None) -> list[Axis]:
+    """`load_all` against any directory — the seam the selftest needs.
+
+    The cold section may not read `axes/`: a case that asserted something about
+    the real declarations would start failing the day an axis was edited, which
+    is the grader reporting on the corpus instead of on itself.
+    """
     out = []
-    for path in sorted(AXES_DIR.glob("*.toml")):
+    for path in sorted(where.glob("*.toml")):
         if only and path.stem not in only:
             continue
-        d = tomllib.loads(path.read_text(encoding="utf-8"))
+        try:
+            d = tomllib.loads(path.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError as e:
+            # A traceback here would be the runner falling over, which is the one
+            # thing `zyddt selftest`'s cmd section grades — and the reader needs
+            # the line, not the parser's call stack. The commonest cause by far:
+            # a TOML inline table may not span lines, so a value record wrapped
+            # for width stops being one.
+            raise SystemExit(f"zyddt: {path.name}: {e}\n"
+                             f"       (a value record `{{ id = … }}` must fit on "
+                             f"one line — TOML inline tables do not wrap)")
         axis_id = d.get("id", path.stem)
+        cells = [Cell(path.stem, c["id"], c.get("what", ""),
+                      c["src"], c.get("skip"), _oracle_of(c, path),
+                      c.get("expect"), c.get("oracle_literal_ok"))
+                 for c in d.get("cell", [])]
+        if "matrix" in d:
+            cells += _matrix_cells(d, path.stem, path)
+        elif "dimension" in d:
+            raise SystemExit(f"zyddt: {path.name}: declares dimensions and no "
+                             f"[matrix] to cross them with")
+        # Two cells with one name are one file: the second overwrites the first,
+        # the matrix silently loses a point, and the denominator still counts
+        # both.  That is the one way this mechanism could report coverage it
+        # does not have, so it is checked here rather than trusted.
+        ids = [c.id for c in cells]
+        dup = sorted({i for i in ids if ids.count(i) > 1})
+        if dup:
+            raise SystemExit(f"zyddt: {path.name}: {len(dup)} cell id(s) declared "
+                             f"twice: {', '.join(dup[:5])}"
+                             + (" …" if len(dup) > 5 else ""))
         out.append(Axis(
             id=axis_id,
             what=d.get("what", ""),
             engines=d.get("engines", []),
             expect=d.get("expect"),
-            cells=[Cell(path.stem, c["id"], c.get("what", ""),
-                        c["src"], c.get("skip"), _oracle_of(c, path),
-                        c.get("expect"), c.get("oracle_literal_ok"))
-                   for c in d.get("cell", [])],
+            cells=cells,
         ))
     return out
 
