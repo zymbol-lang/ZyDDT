@@ -27,9 +27,14 @@ and what does not.
 | **ZyDDT** (here) | do all engines still answer the same, correctly? | regressions in what we already know | milliseconds |
 
 LDV is the microscope; ZyDDT is the alarm. LDV's decalogue already says this —
-point 7, *"regressions belong to a different layer"*, and point 8, *"the
+point 7, *"regressions belong to a different layer first"*, and point 8, *"the
 knowledge has to be moved into something that costs milliseconds"*. That layer
 had no name and no home. This is it.
+
+*First*, not *only*: the LDV applications stay in a gate of their own after
+their release (`zyquality/project`, and `ZyFmtCheck`'s default body). They are a
+second alarm — slower, and it tells you a program broke rather than which rule
+did. ZyDDT is the one that names the rule.
 
 ## Status
 
