@@ -39,9 +39,11 @@ the case nobody could think of until a real domain forced it.
 
 Its decalogue then says, twice, where the findings must go:
 
-> **7 — Regressions belong to a different layer.** Each finding is distilled into
-> a minimal, fast, automated case […] The application is never the regression
-> test; it is where the regression test came from.
+> **7 — Regressions belong to a different layer first.** Each finding is
+> distilled into a minimal, fast, automated case […] and a finding is not closed
+> until it is there. That layer is the first line and it is the one that *names*
+> what broke […] The rule this point exists to enforce is that no finding may
+> live **only** in the application.
 >
 > **8 — […] Once one is found, the knowledge has to be moved into something that
 > costs milliseconds, or it will be lost the next time somebody refactors the
@@ -50,6 +52,14 @@ Its decalogue then says, twice, where the findings must go:
 That layer has existed as a pile of files and a runner. It has never had a
 charter, an admission rule, or a way to answer *what is not covered*. ZyDDT is
 that layer, named and given one.
+
+Point 7 was reworded on 2026-08-31, and the rewording matters here. It used to
+end *"the application is never the regression test"*, which was not true of the
+workspace it described: seven of the eight LDV applications are in a gate
+(`zyquality/project`, `gate = true`) and `ZyFmtCheck` runs over them by default.
+What survives is the half ZyDDT is built on — the cheap layer is the **first**
+line, and it is the one that turns *"囲碁 went red"* into a diagnosis. The
+application is a second, coarser alarm, not a substitute for this one.
 
 The relationship is a loop, and both halves are load-bearing:
 
