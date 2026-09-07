@@ -30,6 +30,7 @@ función declarada dentro de un bloque, y el del navegador sí.
 | | | |
 |---|---|---|
 | [`GLB-006`](#glb-006--hay-un-tercer-resaltador-y-nadie-lo-mira) | abierto | el curso lleva su propia copia, 1798 líneas sin marcar |
+| [`GLB-007`](#glb-007--un-rechazo-dentro-de-un-bloque-de-una-línea-se-lleva-por-delante-la-llave-que-lo-cierra) | **corregido 2026-09-07** | `skip_statement` produce la cascada que fue escrito para evitar |
 
 ## Cerrados
 
@@ -562,3 +563,89 @@ acuerdo **no** es la única prueba, y vale 73 sobre 394.
 Dicho de otra forma: de las 394 celdas, 321 están verdes por acuerdo y nada más.
 Si alguna esconde un error de los tres, ZyDDT no puede verlo hoy, y ésa es la
 lectura correcta de la ausencia en este fichero.
+
+
+---
+
+## GLB-007 — Un rechazo dentro de un bloque de una línea se lleva por delante la llave que lo cierra
+
+**Estado:** **corregido 2026-09-07**
+**Encontrado por:** `chained-index/array-in-loop` y `chained-index/deep-in-loop`
+**Motores:** `zytw` y `zyvm` (comparten parser). `zyjs` da un solo error.
+**Clase:** la **1** — dos motores contra uno, y el que se sale son los dos.
+
+### Qué se observa
+
+Cualquier rechazo del parser dentro de un bloque escrito en una línea sale
+**dos** veces: el rechazo real, y detrás un `expected '}' to close block` que
+habla de una llave que sí estaba.
+
+```zymbol
+m = [[1,2],[3,4]]
+@ i:1..2 { >> m[i][1] ¶ }
+```
+
+```
+error: chained index does not exist: 'm[…][…]' is not a form of Zymbol
+  --> 2:15
+error: expected '}' to close block          ← no falta ninguna llave
+  --> 3:1
+```
+
+### No es del rechazo nuevo — es de `skip_statement`
+
+Se vio con `chained index` porque ese eje es el que lo cruzó con un bucle, pero
+el rechazo **preexistente** hace lo mismo, medido el mismo día:
+
+```zymbol
+@ i:1..2 { m[i][1] = 7 }     // `indexed assignment` + `expected '}'`
+```
+
+La causa está en `zymbol-parser/src/lib.rs`. Un rechazo que ya ha decidido que
+la sentencia entera está mal llama a `skip_statement()`, que para **en** el `}`
+sin consumirlo — correcto. Después `parse_block` recibe el `Err` y llama a
+`skip_statement()` **otra vez** como recuperación, y esa segunda llamada avanza
+un token incondicionalmente («a skip that can consume nothing turns recovery
+into a loop»). Ese token es la llave.
+
+### La ironía, que es lo que la hace digna de un número
+
+`skip_statement` existe **exactamente** para esto. Su propio comentario lo dice:
+
+> so `a[2] = 99` reported the real refusal … and then `unexpected token:
+> Integer(99)`, a second error about the leftovers of the first … A reader
+> cannot act on that, and it buries the message that matters.
+
+Arregló la cascada de los restos de la sentencia y abrió otra, un token más
+allá, con la llave del bloque. El aviso es la forma del defecto, no su tamaño:
+**una recuperación tiene que saber si alguien ya recuperó.**
+
+### Cómo se corrigió, y el intento que hubo que descartar
+
+**Lo primero que probé no valía, y el modo de fallar es la parte útil.** Guardé
+en el parser dónde había terminado el último `skip_statement` y no avanzaba si
+se le llamaba otra vez en la misma posición sobre un `}`. Cerró la cascada y
+abrió un **bucle infinito**: un fichero de `}` sueltos colgaba `zymbol check`
+para siempre, porque la posición no distingue «alguien ya saltó» de «el salto
+anterior me dejó aquí». Medido contra la línea base — que no cuelga — antes de
+descartarlo.
+
+La corrección es más simple y va a la causa: **un rechazo no salta la
+sentencia**. Los dos bucles de recuperación —el de `parse_block` y el de nivel
+de fichero— ya llaman a `skip_statement` en su rama `Err`, así que hacerlo
+también en el rechazo lo ejecutaba dos veces, y el `advance()` incondicional de
+la segunda vez se comía la llave. Se retiraron las tres llamadas: las dos de
+`variables.rs` y la de `reject_chained_index`.
+
+**Y faltaba una segunda mitad**, que el eje siguió señalando: cuando el rechazo
+cae en la CONDICIÓN de un `?`, no hay ningún `parse_block` corriendo que sea
+dueño del `{ … }`, así que el salto se paraba en la llave de cierre y la vuelta
+siguiente leía una llave suelta como sentencia. Ahora `skip_statement` cuenta
+llaves: salta el cuerpo entero, y al cerrarlo consume esa llave y sigue la regla
+de línea desde ella —lo que mantiene dentro del salto lo que continúe la
+sentencia, como un `?? { … }`—. Un `}` con `depth == 0` es de un bloque que nos
+envuelve y se deja intacto, que es lo que evita el bucle del primer intento.
+
+Verificado en las dos formas y en las dos posiciones: `?` y `@`, de una línea y
+de varias, con `??` y sin él, más un fichero de llaves sueltas, que sigue
+terminando.

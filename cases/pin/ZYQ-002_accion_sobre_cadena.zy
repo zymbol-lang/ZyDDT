@@ -1,0 +1,27 @@
+// PIN ZYQ-002 — an exception made to preserve a message became a hole in the rule.
+//
+// `arr[i][j]` was closed on 2026-09-06. The first cut let `$~` through, so that
+// `d["x"]["y"]$~ 9` would keep printing the wording already recorded for it
+// (ZyQuality `reject/collections/11`, "this edit has nothing to write into").
+//
+// That exception opened two doors, and they are the two forms that HAVE
+// somewhere to put their result — which is why neither ever reached the edit
+// refusal that was supposed to catch them:
+//
+//     arr[1][1] $~ 0        the statement below
+//     x = arr[1][1] $~ 0    reject/collections/15 in ZyQuality
+//
+// Both returned `[0, 2, 3]` — row 1 with its first element changed — in all
+// three engines, exit 0, no diagnostic. A plausible value through a form that
+// does not exist, which no differential can see: the three agreed perfectly.
+//
+// Closed the same day by removing the exception: the chain is now refused as
+// soon as it is READ, whatever follows the group. `d["x"]["y"]$~ 9` reports the
+// chain instead, which is its first cause. `f()[1]$~ 5` keeps its own wording —
+// there is no chain there, only a call nothing holds.
+//
+// The lesson is the one worth pinning: an exception carved out to protect a
+// MESSAGE is an exception in the RULE.
+arr = [[1,2,3],[4,5,6],[7,8,9]]
+arr[1][1] $~ 0
+>> arr ¶
