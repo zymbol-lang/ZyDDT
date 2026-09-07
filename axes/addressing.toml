@@ -1,0 +1,123 @@
+# The addressing axis — the legal side of the bracket boundary.
+#
+# `chained-index.toml` asserts that `arr[i][j]` is refused.  This file is its
+# other half and works the opposite way: it asserts NOTHING and asks the three
+# engines the same question, because what is at stake here is not whether a form
+# is refused but whether the engines agree on what it means.
+#
+# ── Why the boundary needs a file of its own ────────────────────────────────
+#
+# A refusal rule is only as good as the line it draws, and this one is easy to
+# over-apply: `f()[2]`, `[1,2,3][2]` and `m[[1>1, 1>3] ; [3>1, 3>3]][1]` all read
+# as "a bracket after a bracket" and none of them is a chain.  What is refused is
+# navigating in two hops down the SAME structure; a bracket after something that
+# is not itself an access is one group.
+#
+# The extraction is the case that makes the distinction real rather than verbal.
+# It does not descend into the matrix: it collects values from several paths and
+# BUILDS a collection that was nowhere inside it, so indexing the result is the
+# same act as indexing what a call returned.  Cero usos in the corpus, the
+# applications and the examples, measured 2026-09-07 — which is exactly why it
+# needs a cell: an unused form is the one that breaks unnoticed.
+#
+# ── Why a differential and not goldens ──────────────────────────────────────
+#
+# ZyQuality already holds the values down with a golden
+# (`corpus/collections/frontera_corchete.zy`).  What that cannot do is notice the
+# day one engine starts refusing a form the others accept, which is the failure
+# this rule invites — the refusal was added to three parsers by hand, and three
+# hand-written guards are three chances to draw the line in a different place.
+
+id      = "addressing"
+what    = "one bracket group addresses one element; what is not a chain stays legal"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[dimension]]
+name = "form"
+# Each value carries the prelude it needs and nothing else. A shared prelude
+# looked tidier and made 18 of 23 cells red on the first run — not over the
+# language, but over `unused variable` warnings for the five names each cell did
+# not touch. The differential compares whole output, diagnostics included, which
+# is the point: it also means a cell must not carry scenery.
+defaults = { prelude = "m = [[1,2,3], [4,5,6], [7,8,9]]" }
+values = [
+  { id = "navigator-2",    what = "two steps with `>`",              expr = "m[2>3]" },
+  { id = "navigator-neg",  what = "negative steps",                  expr = "m[-1>-1]" },
+  { id = "navigator-3",    what = "three steps with `>`",            expr = "c[1>2>1]", prelude = "c = [[[1,2],[3,4]], [[5,6],[7,8]]]" },
+  { id = "navigator-var",  what = "steps that are names",            expr = "m[i>j]", prelude = "m = [[1,2,3], [4,5,6], [7,8,9]]\ni = 1\nj = 2" },
+  { id = "navigator-expr", what = "a computed step",                 expr = "m[(i+1)>j]", prelude = "m = [[1,2,3], [4,5,6], [7,8,9]]\ni = 1\nj = 2" },
+  { id = "literal",        what = "indexing an array literal",       expr = "[1,2,3][2]", prelude = "" },
+  { id = "call",           what = "indexing what a call returned",   expr = "f()[2]", prelude = "f() { <~ [10,20,30] }" },
+  { id = "extract-flat",   what = "a flat extraction",               expr = "m[1>1 ; 2>2 ; 3>3]" },
+  { id = "extract-wrap",   what = "a single wrapped path",           expr = "m[[2>3]]" },
+  { id = "extract-range",  what = "a range on the last step",        expr = "m[[2>1..3]]" },
+  { id = "extract-struct", what = "a structured extraction",         expr = "m[[1>1, 1>3] ; [3>1, 3>3]]" },
+  { id = "extract-index",  what = "indexing what an extraction built", expr = "m[[1>1, 1>3] ; [3>1, 3>3]][1]" },
+  { id = "dict-nav",       what = "a dictionary through the navigator", expr = "d[\"a\">\"b\"]", prelude = "d = #(a: #(b: 5))" },
+  { id = "dict-dot",       what = "a dictionary through two dots",   expr = "d.a.b", prelude = "d = #(a: #(b: 5))" },
+  { id = "dict-mixed",     what = "a bracket then a dot",            expr = "d[\"a\"].b", prelude = "d = #(a: #(b: 5))" },
+  { id = "dict-mixed-2",   what = "a dot then a bracket",            expr = "d.a[\"b\"]", prelude = "d = #(a: #(b: 5))" },
+  { id = "string",         what = "indexing a string",               expr = "s[2]", prelude = "s = \"hola\"" },
+  { id = "tuple-in-array", what = "a tuple inside an array",         expr = "t[1>2]", prelude = "t = [(1,2),(3,4)]" },
+]
+
+[matrix]
+id   = "«form.id»"
+what = "«form.what»"
+src  = """
+«form.prelude»
+>> «form.expr» ¶
+"""
+
+# ── The write side ──────────────────────────────────────────────────────────
+#
+# `$~` is where the chain was closed first, so the navigator's write forms are
+# the ones most likely to be caught by a guard drawn one notch too wide.
+
+[[cell]]
+id   = "write-navigator-in-place"
+what = "`m[i>j]$~ v` as a statement — modifies"
+src  = """
+m = [[1,2,3], [4,5,6]]
+m[1>2] $~ 99
+>> m ¶
+"""
+
+[[cell]]
+id   = "write-navigator-build"
+what = "`x = m[i>j]$~ v` — builds, original untouched"
+src  = """
+m = [[1,2,3], [4,5,6]]
+x = m[1>2] $~ 99
+>> x ¶
+>> m ¶
+"""
+
+[[cell]]
+id   = "write-whole-row"
+what = "`m[i]$~ [row]` — one group, replacing a whole element"
+# The form a reader reaches for after the chain is refused, and it must keep
+# working: it addresses ONE element that happens to be a collection.
+src  = """
+m = [[1,2,3], [4,5,6]]
+m[1] $~ [0,0,0]
+>> m ¶
+"""
+
+[[cell]]
+id   = "write-dict-dot"
+what = "`d.x[\"y\"]$~ v` — a receiver inside a name"
+src  = """
+d = #(a: 1, x: #(y: 2))
+d.x["y"] $~ 9
+>> d ¶
+"""
+
+[[cell]]
+id   = "write-navigator-deep"
+what = "`c[i>j>k]$~ v` — three steps"
+src  = """
+c = [[[1,2],[3,4]], [[5,6],[7,8]]]
+c[1>2>1] $~ 0
+>> c ¶
+"""

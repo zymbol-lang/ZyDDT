@@ -29,10 +29,32 @@ delante — la más cara, `GLB-005`, resultó valer **un fichero de 84**.
 |---|---:|---:|
 | [`zytw.md`](zytw.md) | 0 | 0 |
 | [`zyvm.md`](zyvm.md) | 0 | 2 |
-| [`zyjs.md`](zyjs.md) | 0 | 10 |
-| [`GLOBAL.md`](GLOBAL.md) | **1** | 6 |
+| [`zyjs.md`](zyjs.md) | 0 | 12 |
+| [`GLOBAL.md`](GLOBAL.md) | **1** | 7 |
 | [`highlight.md`](highlight.md) | 0 | 1 |
 | [`tmgrammar.md`](tmgrammar.md) | 0 | 1 |
+
+## Estado — 2026-09-07: tres abiertos nuevos, de dos ejes declarados ese día
+
+`axes/chained-index.toml` y `axes/addressing.toml` declaran las dos mitades de
+una sola regla — `arr[i][j]` se rechaza, `arr[i>j]` es la forma — y encontraron
+**tres** cosas en su primera ejecución, ninguna de las cuales estaba buscando
+nadie:
+
+| | qué | dónde |
+|---|---|---|
+| [`GLB-007`](GLOBAL.md) | un rechazo dentro de un bloque de una línea se come la `}` que lo cierra — **el primer arreglo colgaba el parser; ver el hallazgo** | `zytw`+`zyvm`, **preexistente**: el rechazo de `m[i][j] = v` hace lo mismo |
+| [`ZYJS-012`](zyjs.md) | `c[i>j>k]$~ v` no parsea; la lectura de tres pasos sí | `zyjs` |
+| [`ZYJS-013`](zyjs.md) | los pasos del navegador no cuentan como uso: `m[i>j]` avisa `unused variable 'i'` | `zyjs` |
+
+**Las tres quedaron corregidas el mismo día**, y los dos ejes están en verde:
+`chained-index` 38/38, `addressing` 23/23.
+
+Las tres son de la clase que el CHARTER promete y que un corpus escrito a mano
+no alcanza: **nadie las buscaba**. Cero ficheros del corpus, de las aplicaciones
+y de los ejemplos escriben a tres pasos con `$~`, y por eso `ZYJS-012` llevaba
+ahí sin que nadie tropezara. La matriz no necesita que a alguien se le ocurra:
+es un punto, así que se pregunta.
 
 Los seis dicen lo mismo sobre el método: **una aplicación completa encuentra lo
 que ningún corpus puede**, porque un corpus se escribe un fichero cada vez y

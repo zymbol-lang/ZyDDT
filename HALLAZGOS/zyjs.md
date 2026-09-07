@@ -16,8 +16,10 @@
 | [`ZYJS-009`](#zyjs-009--una-llamada-cualificada-dentro-de-un-módulo-usaba-los-alias-del-llamante) | **corregido 2026-08-30** | `alias::f()` dentro de un módulo resolvía con la tabla del llamante |
 | [`ZYJS-010`](#zyjs-010--una-función-de-módulo-corría-en-el-alcance-del-llamante) | **corregido 2026-08-30** | el estado del módulo se copiaba, y el llamante tapaba a sus funciones |
 | [`ZYJS-011`](#zyjs-011--el-acumulador-yuxtapuesto-tiraba-el-resto-de-la-concatenación) | **corregido 2026-08-30** | `s = °s "x"` devolvía sólo `°s` |
+| [`ZYJS-012`](#zyjs-012--la-escritura-profunda-se-queda-en-dos-pasos-cij-k~-v-no-parsea) | **corregido 2026-09-07** | `c[i>j>k]$~ v` no parsea; la LECTURA de tres pasos sí |
+| [`ZYJS-013`](#zyjs-013--los-pasos-del-navegador-no-cuentan-como-uso-de-una-variable) | **corregido 2026-09-07** | `m[i>j]` avisa `unused variable 'i'` |
 
-**Ninguno abierto.**
+**Ninguno abierto.** Los dos últimos se encontraron y se cerraron el 2026-09-07, el mismo día, por el eje `addressing`.
 
 ---
 
@@ -751,3 +753,103 @@ cuatro casos de escritura volvían vacíos.
 [`ZYJS-011_acumulador_yuxtapuesto.zy`](../cases/pin/ZYJS-011_acumulador_yuxtapuesto.zy),
 que además ejercita las tres formas que ya funcionaban para que el arreglo no se
 las lleve por delante.
+
+
+---
+
+## ZYJS-012 — La escritura profunda se queda en dos pasos: `c[i>j>k]$~ v` no parsea
+
+**Estado:** **corregido 2026-09-07**
+**Encontrado por:** `addressing/write-navigator-deep`, celda de `axes/addressing.toml`
+**Clase:** un motor implementa menos que los otros dos
+
+### Qué se observa
+
+```zymbol
+c = [[[1,2],[3,4]], [[5,6],[7,8]]]
+>> c[1>2>1] ¶          // los tres: 3
+c[1>2>1] $~ 0          // zytw y zyvm: escriben.  zyjs: error
+>> c ¶
+```
+
+```
+zytw, zyvm   3
+             [[[1, 2], [0, 4]], [[5, 6], [7, 8]]]
+zyjs         error: Expected RBRACKET, got '>'
+               --> line 3
+```
+
+La **lectura** de tres pasos funciona en los tres (`addressing/navigator-3` está
+en verde). Es la **escritura** la que se queda en dos: `parseNavContent` acepta
+la ruta larga cuando lo que sigue al `]` no es `$~`, y no cuando lo es.
+
+### Por qué importa más de lo que su tamaño sugiere
+
+Es la dirección permisiva al revés, que es la peor para quien escribe en el
+playground: el programa funciona en el CLI y **no** en el navegador. Y llega
+justo cuando el navegador `>` acaba de quedarse como la **única** forma de bajar
+niveles — `arr[i][j]` se cerró el 2026-09-06 —, así que un programa de tres
+niveles que antes se podía escribir encadenando ya no tiene alternativa en zyjs.
+
+### Cómo se encontró
+
+No lo encontró un programa: lo encontró declarar el eje. Cero ficheros del
+corpus, de las aplicaciones y de los ejemplos escriben a tres pasos, medido el
+2026-09-07 — que es exactamente por qué llevaba ahí sin que nadie tropezara.
+
+---
+
+## ZYJS-013 — Los pasos del navegador no cuentan como uso de una variable
+
+**Estado:** **corregido 2026-09-07**
+**Encontrado por:** `addressing/navigator-var` y `addressing/navigator-expr`
+**Clase:** un motor avisa donde los otros dos callan
+
+### Qué se observa
+
+```zymbol
+m = [[1,2,3],[4,5,6]]
+i = 1
+j = 2
+>> m[i>j] ¶
+```
+
+```
+zytw, zyvm   No errors or warnings
+zyjs         warning: unused variable 'i'
+             warning: unused variable 'j'
+```
+
+`i` y `j` se usan: son los pasos de la ruta. El recorrido de variables de zyjs no
+desciende a `spec.path`, así que un nombre que sólo aparece ahí queda contado
+como no usado.
+
+### Por qué es un aviso y no un error, y aun así cuenta
+
+Un falso aviso cuesta más que su ruido: enseña a no leerlos. Y este cae sobre la
+forma que el lenguaje acaba de dejar como **única** para navegar, así que su
+frecuencia sólo puede subir. Familia de [`GLB-001`](GLOBAL.md) — un brazo del
+analizador que no mira dentro de su operando apaga las comprobaciones de todo lo
+que se escriba ahí—, en el otro motor y sobre otro nodo.
+
+
+### Cómo se corrigieron (2026-09-07)
+
+**ZYJS-012.** No era `flattenGtChain`, que ya era recursiva: era el `parseExpr`
+de la posición de sentencia. En `name[…]` el corchete se consume antes de que el
+parser de navegación lo vea, así que la ruta llega como una comparación `>` que
+las ramas de abajo reconstruyen — pero `parseExpr` lee **una** comparación y en
+Zymbol `>` no encadena, así que `m[1>2>1]` dejaba un `>` delante del `]` y moría
+en `Expected RBRACKET`. Ahora se siguen plegando pasos a la izquierda mientras
+haya `>`, que es la forma que `flattenGtChain` ya aplana; el operando se lee con
+`parseAdditive`, por lo mismo que `parseNavAtom`: ahí `>` es separador y no
+operador. La LECTURA nunca estuvo rota — va por `parseNavContent`, que hace ese
+bucle desde siempre.
+
+**ZYJS-013.** `checkExpr` miraba `spec.index`, `spec.from` y `spec.to`, y
+`from`/`to` viven en un ÁTOMO, nunca en el spec: sólo `kind: 'simple'` se
+recorría. `checkNavSpec` recorre ahora las cuatro formas — `simple`, `path`,
+`flat`, `structured` — y los dos tipos de átomo. Escrito sobre las FORMAS y no
+sobre `kind`, para que un spec que gane un campo lo recorra la rama que le toque
+en vez de caerse por un `switch`: el defecto que se arregla es exactamente un
+paso que nadie miraba.

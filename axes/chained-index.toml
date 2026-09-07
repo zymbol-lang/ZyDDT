@@ -1,0 +1,160 @@
+# The chained-index axis — `arr[i][j]` is refused, whatever follows the group.
+#
+# `>` navigates nesting: `arr[i>j]`.  A bracket directly after a bracket walks
+# down the same structure in two hops, which is the one thing the navigator
+# exists to say in one, and it is refused since v0.0.9.
+#
+# ── Why this is an axis and not three `reject/` files ────────────────────────
+#
+# Because the rule is about **how an element is addressed**, and every action in
+# the language can be written after the address.  A hand-written corpus covers
+# the actions somebody thought of; this file crosses the receiver with the whole
+# action vocabulary, so "is `$^+` after a chained receiver covered?" has an
+# answer that is not somebody's memory.
+#
+# That distinction is not theoretical here.  The rule was first cut with an
+# exception — `$~` was let through so a sibling refusal could keep its older
+# wording — and the exception opened exactly two doors: `arr[1][1]$~ 0` and
+# `x = arr[1][1]$~ 0`, both of which HAVE somewhere to put their result and so
+# never reached the refusal meant to catch them.  They returned `[0, 2, 3]` in
+# all three engines and said nothing.  Two cells of this matrix are those two.
+#
+# ── Why `expect = "error"` is legitimate here ───────────────────────────────
+#
+# Same argument as `refusal.toml`: the assertion is about the CATEGORY of the
+# answer, not the answer.  Three engines that all wrongly accept a malformed
+# program agree perfectly, so a differential cannot see this at all — and the
+# two doors above are the proof, since all three engines walked through them
+# together.
+#
+# The legal side of the same boundary is `addressing.toml`, which asserts
+# nothing and asks instead.
+
+id      = "chained-index"
+what    = "`arr[i][j]` is refused for reading and for every action alike"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[dimension]]
+name = "action"
+# What is written after the address.  The point of the axis: the rule governs
+# the address, so the action must not be able to change the verdict.
+values = [
+  { id = "read",        what = "printed",                  stmt = '>> arr[1][1] ¶' },
+  { id = "bind",        what = "bound to a name",          stmt = 'x = arr[1][1]' },
+  { id = "edit",        what = "edited in place with `$~`", stmt = 'arr[1][1] $~ 0' },
+  { id = "build",       what = "built with `$~`, result kept", stmt = 'x = arr[1][1] $~ 0' },
+  { id = "append",      what = "appended to with `$+`",    stmt = 'arr[1][1] $+ 5' },
+  { id = "remove",      what = "removed from with `$-`",   stmt = 'arr[1][1] $- 5' },
+  { id = "sort",        what = "sorted with `$^+`",        stmt = 'arr[1][1] $^+' },
+  { id = "length",      what = "measured with `$#`",       stmt = '>> arr[1][1] $# ¶' },
+  { id = "contains",    what = "asked `$?`",               stmt = '>> arr[1][1] $? 5 ¶' },
+  { id = "slice",       what = "sliced with `$[..]`",      stmt = '>> arr[1][1] $[1..2] ¶' },
+  { id = "assign",      what = "assigned with `=`",        stmt = 'arr[1][1] = 0' },
+  { id = "compound",    what = "assigned with `+=`",       stmt = 'arr[1][1] += 5' },
+  { id = "argument",    what = "passed to a function",     stmt = "f(v) { <~ v }\n>> f(arr[1][1]) ¶" },
+  { id = "condition",   what = "tested in a `?`",          stmt = '? arr[1][1] == 1 { >> "si" ¶ }' },
+  { id = "in-loop",     what = "read inside a loop",       stmt = '@ i:1..2 { >> arr[i][1] ¶ }' },
+]
+
+[[dimension]]
+name = "receiver"
+# The two collections that can be nested, and the two notations that reach into
+# them.  A dictionary is here because the chain was closed for `d["x"]["y"]`
+# first (as a write) and the read had to follow, and because its steps are
+# strings rather than integers — a rule about brackets must not turn out to be a
+# rule about integers.
+values = [
+  { id = "array", what = "an array of arrays", prelude = 'arr = [[1,2,3],[4,5,6],[7,8,9]]' },
+  { id = "deep", what = "an array nested three levels", prelude = 'arr = [[[1,2],[3,4]],[[5,6],[7,8]]]' },
+]
+
+[matrix]
+id   = "«receiver.id»-«action.id»"
+what = "«receiver.what», «action.what», through a chained index"
+src  = """
+«receiver.prelude»
+«action.stmt»
+"""
+
+# ── Points the template cannot reach ────────────────────────────────────────
+#
+# The dimensions above vary the ACTION over one notation. These vary the
+# NOTATION, which the template holds fixed, and each is a distinct way to write
+# the same mistake.
+
+[[cell]]
+id   = "three-groups"
+what = "three bracket groups — the chain is not only about the second"
+src  = """
+c = [[[1,2],[3,4]],[[5,6],[7,8]]]
+>> c[1][2][1] ¶
+"""
+
+[[cell]]
+id   = "navigator-then-bracket"
+what = "a bracket after a navigator group — `m[1>1][1]`"
+# The half a reader writes when they have learned `>` and then reaches one level
+# further. Refusing it is what makes `>` the whole answer rather than a shortcut
+# for the first two steps.
+src  = """
+m = [[[1,2],[3,4]],[[5,6],[7,8]]]
+>> m[1>1][1] ¶
+"""
+
+[[cell]]
+id   = "bracket-then-navigator"
+what = "a navigator group after a bracket — `m[1][1>1]`"
+src  = """
+m = [[[1,2],[3,4]],[[5,6],[7,8]]]
+>> m[1][1>1] ¶
+"""
+
+[[cell]]
+id   = "dictionary-read"
+what = "a dictionary reached with two string groups — `d[\"a\"][\"b\"]`"
+src  = """
+d = #(a: #(b: 5))
+>> d["a"]["b"] ¶
+"""
+
+[[cell]]
+id   = "dictionary-edit"
+what = "the write that was closed first — `d[\"x\"][\"y\"]$~ v`"
+# reject/collections/11 in ZyQuality. It used to DESTROY data: the statement
+# desugared to `d = d["x"]["y"]$~ 9`, so `d` became the inner dictionary and the
+# other keys vanished, exit 0, all three engines agreeing.
+src  = """
+d = #(a: 1, x: #(y: 2))
+d["x"]["y"] $~ 9
+>> d ¶
+"""
+
+[[cell]]
+id   = "computed-steps"
+what = "chained groups whose steps are variables, not literals"
+# A rule enforced on literals and not on names is a rule about the lexer.
+src  = """
+m = [[1,2,3],[4,5,6]]
+i = 1
+j = 2
+>> m[i][j] ¶
+"""
+
+[[cell]]
+id   = "negative-steps"
+what = "chained groups with negative indices"
+src  = """
+m = [[1,2,3],[4,5,6]]
+>> m[-1][-1] ¶
+"""
+
+[[cell]]
+id   = "call-then-chain"
+what = "a chain hanging off a call — `g()[1][2]`"
+# `g()[1]` alone is legal (addressing.toml). The chain is what is refused, and
+# it is refused the same whether a name or a call is underneath it.
+src  = """
+g() { <~ [[1,2],[3,4]] }
+>> g()[1][2] ¶
+"""
