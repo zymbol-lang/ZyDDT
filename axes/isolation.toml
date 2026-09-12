@@ -1,0 +1,294 @@
+# The isolation axis — which names a body may reach across a boundary.
+#
+# ── Why this axis exists ────────────────────────────────────────────────────
+#
+# The author stated the memory model's five premises on 2026-09-12, and they are
+# the first NORMATIVE text about it: `LLM.md` describes what the engines do and
+# `MEMORY_MODEL.md` audits design against implementation, but neither says a
+# rule *must* hold. Premise 2 is the one this axis is built for:
+#
+#   > A variable is only visible and modifiable inside its scope; the ones in
+#   > the main scope, only in the main scope.
+#
+# Four of the five premises hold today and **nothing tests them**. That is the
+# first reason for the axis and it is independent of premise 2: the fences that
+# do work — a block's name unreachable from a function, a caller's local
+# unreachable from a callee — are held down by nobody, and this file is written
+# so that breaking one of them turns a cell red the same day.
+#
+# ── Why `expect` and not `ask` ───────────────────────────────────────────────
+#
+# `zyddt ask` requires the engines to answer alike, and all three agree on the
+# behaviour premise 2 rejects. A differential is green over the whole gap, by
+# construction — the case `VERDICTS.md` § 6 names: *"three engines that agree
+# wrongly agree perfectly"*. So this axis asserts, with the weakest claim that
+# still bites: whatever the message, **this must not run**.
+#
+# An oracle cannot help either. There is no independent implementation that
+# decides whether a Zymbol function may see its file's scope — the question is
+# about Zymbol's rule, not about a computation. `VERDICTS.md` § 8 names that
+# case too, and `expect` is what is left.
+#
+# ── What the matrix crosses ─────────────────────────────────────────────────
+#
+# Two things that are genuinely orthogonal: WHERE a name is born, and HOW the
+# body that reads it is reached. The second dimension exists because of
+# ERROR-ZYB-002 (ZyBank): before 2026-08-24 the same body meant two different
+# things depending on how it was reached — a direct call ran isolated, the same
+# function taken as a value captured — and nothing in the source said which one
+# you were looking at. That incoherence is the reason the isolation was retired
+# rather than enforced. Whatever is decided now, the four readers must answer
+# ALIKE, and a matrix is the only form that keeps asking.
+#
+# ── The state of the `file-var` row, 2026-09-12 ─────────────────────────────
+#
+# Those four cells fail today, in all three engines, and the failure is the
+# open question rather than a regression: the isolation was removed deliberately
+# (`fbccc8e`, 2026-08-24) and `GUIDE.md` § 10b, which documented it as
+# deliberate, was retired with it. They are declared WITHOUT a skip on purpose —
+# a skip would make the hole invisible in exactly the place the author asked for
+# a watch. The axis is not registered in `zyquality/suites.toml` while they are
+# red, so the shared gate keeps its green baseline; registering it is the
+# author's call and belongs with the decision on premise 2.
+#
+# ── What is NOT here ────────────────────────────────────────────────────────
+#
+# Premises 3 and 4 (a module owns its environment; its state is reachable only
+# through its own functions, `E005`) need a second file — a module is a file —
+# and a generated cell is one file. They belong in this axis and cannot be
+# expressed by it yet; until the runner can emit a sibling, they are pins under
+# `cases/pin/` or they are untested. Today they are untested, and saying so here
+# is the point: an axis that quietly covers less than its name claims is the
+# failure this layer exists to prevent.
+
+id      = "isolation"
+what    = "which names a body may reach across a boundary, and which it may not"
+# Every cell of this axis asserts a premise of `zymbol-design/PREMISES.md`, by
+# id. `zyddt premises` crosses the two lists in both directions: a premise with
+# no cell, a cell claiming a premise that does not exist, and a `Held by` naming
+# a cell that is gone are all reported. The declaration is what makes the
+# crossing possible — an axis that measures a rule without saying which rule is
+# a test nobody can trace back to a decision.
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"        # any error; static or runtime is not asserted here
+
+# ── The crossing that must be refused ───────────────────────────────────────
+
+[[dimension]]
+name = "origin"
+# Where the name is born. Every one of these is OUTSIDE the body that reads it,
+# which is the whole content of premise 2.
+#
+# Each `open` READS its own name before the boundary is crossed. Without that
+# the Rust engines add `warning: unused variable` and zyjs does not, and all
+# eight cells reported that difference instead of the crossing — one cell, one
+# question, the same reason `operator.toml` parenthesises its comparisons.
+values = [
+  { id = "file-var",     name = "principal",   decl = "principal = 10", open = "", close = "" },
+  { id = "block-var",    name = "de_bloque",   decl = "", open = "? #1 {\n    de_bloque = 10\n    >> de_bloque ¶", close = "}" },
+  { id = "caller-local", name = "de_llamante", decl = "", open = "llamante() {\n    de_llamante = 10\n    >> de_llamante ¶", close = "}\nllamante()" },
+]
+
+[[dimension]]
+name = "reader"
+# How the body that reads the name is reached. `head`/`tail` wrap the name so
+# the SAME body is expressed four ways; `invoke` reaches it.
+values = [
+  { id = "direct",   head = "lee() { >> ",         tail = " ¶ }",                          invoke = "lee()" },
+  { id = "as-value", head = "lee() { >> ",         tail = " ¶ }",                          invoke = "f = lee\n    f()" },
+  { id = "nested",   head = "lee() { >> ",         tail = " ¶ }\nmedio() { lee() }",       invoke = "medio()" },
+  { id = "lambda",   head = "lee = () -> { >> ",   tail = " ¶ }",                          invoke = "lee()" },
+]
+
+[matrix]
+# Two premises, one situation: these cells show both that a function does not
+# reach outside itself (MEM-2) and that a block does not leak into its container
+# (MEM-6). Writing them twice under two names would be the same test twice.
+premise = ["MEM-2", "MEM-6"]
+id   = "«origin.id»-«reader.id»"
+what = "a «reader.id» read of a «origin.id» from outside its scope"
+src  = """
+«origin.decl»
+«reader.head»«origin.name»«reader.tail»
+«origin.open»
+    «reader.invoke»
+«origin.close»
+"""
+
+# ── The fences that must hold open ──────────────────────────────────────────
+#
+# `expect = "ok"` per cell, overriding the axis. These are premises 1 and 4b:
+# the crossings the language grants on purpose. They pass today and nothing
+# else asserts them, which is why they are here — a granted crossing that
+# quietly stops working is as much a defect as a refused one that starts.
+
+[[cell]]
+id     = "const-is-global"
+premise = "MEM-1"
+what   = "premise 1: a file constant is readable inside a function"
+expect = "ok"
+src    = """
+LIMITE := 99
+lee() { >> LIMITE ¶ }
+lee()
+"""
+
+[[cell]]
+id     = "parameter-is-the-door"
+premise = "MEM-2"
+what   = "premise 2, satisfied: the value crosses as a parameter"
+expect = "ok"
+src    = """
+principal = 10
+lee(v) { >> v ¶ }
+lee(principal)
+"""
+
+[[cell]]
+id     = "output-parameter-marked-both-ends"
+premise = "MEM-5"
+what   = "premise 4b: `<~` at the signature and at the call site"
+expect = "ok"
+src    = """
+sube(b<~) { b = b + 100 }
+y = 1
+sube(y<~)
+>> y ¶
+"""
+
+[[cell]]
+id     = "working-copy-stays-inside"
+premise = "MEM-5"
+what   = "premise 4b's other half: `~` is a working copy the caller never sees"
+expect = "ok"
+src    = """
+trabaja(p~) { p = p * 2   >> p ¶ }
+y = 1
+trabaja(y)
+>> y ¶
+"""
+
+# ── The marks that must be required ─────────────────────────────────────────
+#
+# Premise 4b is only a safeguard if BOTH halves are enforced. These inherit the
+# axis's `expect = "error"`.
+
+[[cell]]
+id   = "output-parameter-unmarked-at-call"
+premise = "MEM-5"
+what = "premise 4b: the signature declares an output, the call site does not say so"
+src  = """
+sube(b<~) { b = b + 100 }
+y = 1
+sube(y)
+>> y ¶
+"""
+
+[[cell]]
+id   = "output-mark-without-an-output-parameter"
+premise = "MEM-5"
+what = "premise 4b: the call site claims an output the signature does not declare"
+src  = """
+sube(b) { b = b + 100 }
+y = 1
+sube(y<~)
+>> y ¶
+"""
+
+# ── MEM-6: the two levels ───────────────────────────────────────────────────
+#
+# The light environment already behaves as MEM-6 requires, in all three engines,
+# and nothing held it. These four cells are that floor. They are cheap and they
+# are the ones that would go unnoticed if a future change to scope handling
+# broke them — a block that started leaking into its container would break no
+# corpus file, because no corpus file asks.
+
+[[cell]]
+id      = "light-block-does-not-leak"
+premise = "MEM-6"
+what    = "a name born in a block does not exist in its strong environment"
+src     = """
+? #1 { x = 1 }
+>> x ¶
+"""
+
+[[cell]]
+id      = "light-block-modifies-its-strong"
+premise = "MEM-6"
+expect  = "ok"
+what    = "a block modifies its container's name — one name, not a shadowing copy"
+src     = """
+x = 1
+? #1 { x = 2 }
+>> x ¶
+"""
+
+[[cell]]
+id      = "light-siblings-are-independent"
+premise = "MEM-6"
+expect  = "ok"
+what    = "two sibling blocks may each hold the same name without meeting"
+src     = """
+? #1 { y = 1   >> y ¶ }
+? #1 { y = 2   >> y ¶ }
+"""
+
+[[cell]]
+id      = "hot-definition-anchors-above"
+premise = "MEM-6"
+expect  = "ok"
+what    = "`°` is how a value survives the block it was written in"
+src     = """
+@ _i:1..3 { °t += _i }
+>> t ¶
+"""
+
+# ── MEM-7: one name, one thing ──────────────────────────────────────────────
+#
+# All four are accepted today, in silence. `two-parameters-alike` is not merely
+# accepted: the three engines answer 2, 1 and 2 — the VM keeps the first
+# parameter and the other two keep the last — so the program's value is decided
+# by the engine that runs it. That is what a name collision inside one container
+# costs when nobody refuses it, and no corpus file writes `f(a, a)`.
+#
+# Red as of 2026-09-12, and red is the honest state: the author decided on
+# 2026-09-12 that these are static errors, and the cells are what will say when
+# they stop being red.
+
+[[cell]]
+id      = "two-parameters-alike"
+premise = "MEM-7"
+what    = "two parameters of one function sharing a name"
+src     = """
+f(a, a) { <~ a }
+>> f(1, 2) ¶
+"""
+
+[[cell]]
+id      = "parameter-named-as-its-function"
+premise = "MEM-7"
+what    = "a parameter carrying the name of the function it belongs to"
+src     = """
+f(f) { <~ f }
+>> f(1) ¶
+"""
+
+[[cell]]
+id      = "variable-and-function-alike"
+premise = "MEM-7"
+what    = "a variable and a function sharing a name in one file"
+src     = """
+dato = 5
+dato() { <~ 9 }
+>> dato " " dato() ¶
+"""
+
+[[cell]]
+id      = "function-defined-twice"
+premise = "MEM-7"
+what    = "one function defined twice in one file"
+src     = """
+f() { <~ 1 }
+f() { <~ 2 }
+>> f() ¶
+"""

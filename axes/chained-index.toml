@@ -34,6 +34,7 @@ id      = "chained-index"
 what    = "`arr[i][j]` is refused for reading and for every action alike"
 engines = ["zytw", "zyvm", "zyjs"]
 expect  = "error"
+premise = "COL-7"
 
 [[dimension]]
 name = "action"
@@ -68,6 +69,12 @@ values = [
   { id = "array", what = "an array of arrays", prelude = 'arr = [[1,2,3],[4,5,6],[7,8,9]]' },
   { id = "deep", what = "an array nested three levels", prelude = 'arr = [[[1,2],[3,4]],[[5,6],[7,8]]]' },
 ]
+
+# Every cell of this axis asserts COL-7 of `zymbol-design/PREMISES.md`: nesting
+# is navigated with `>` and the chained spelling does not exist. The axis
+# predates the premise — it was declared on 2026-09-07 and the id on 2026-09-12
+# — which is exactly the situation ids are for: the coverage was real and
+# nothing connected it to the decision it came from.
 
 [matrix]
 id   = "«receiver.id»-«action.id»"

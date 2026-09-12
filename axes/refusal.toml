@@ -61,6 +61,11 @@ src  = """
 
 [[cell]]
 id   = "not-equal-is-not-a-symbol"
+# SYM-4 of zymbol-design/PREMISES.md — no natural-language words in the grammar,
+# and `!=` is the one a reader brings from every other language. The only cell in
+# this repository that holds a premise of the sign system: its six siblings
+# constrain a proposal rather than a program, and nothing executable can ask them.
+premise = "SYM-4"
 what = "`!=` is not a Zymbol operator; the language spells it `<>`"
 # Arrived here from the operator axis, which had declared `!=` as one of its
 # operators.  It is the mistake a reader brings from every other language, so it

@@ -853,3 +853,60 @@ recorría. `checkNavSpec` recorre ahora las cuatro formas — `simple`, `path`,
 sobre `kind`, para que un spec que gane un campo lo recorra la rama que le toque
 en vez de caerse por un `switch`: el defecto que se arregla es exactamente un
 paso que nadie miraba.
+
+---
+
+## ZYJS-014 — `$+` es O(n²) en el motor del navegador
+
+**Estado:** abierto
+**Encontrado por:** la medición del auto-free del 2026-09-12, como control
+**Familia:** `HLZ-014` — es la nota de `CLAUDE.md` («the browser engine reaches
+the same place by sharing the JavaScript array and **rebuilding it on write**»)
+con su consecuencia medida
+
+### Qué se observa
+
+```zymbol
+a = []
+@ i:1..N { a$+ i }
+>> a$# ¶
+```
+
+| N | `zytw` | `zyvm` | `zyjs` |
+|---:|---:|---:|---:|
+| 5 000 | 0,011 | 0,006 | 0,148 |
+| 20 000 | 0,019 | 0,011 | **2,111** |
+| 200 000 | 0,03 | 0,02 | **no termina en 200 s** |
+
+Cuadruplicar el trabajo multiplica por **14** el tiempo de `zyjs`; los dos
+motores Rust son planos. No es el factor constante que se le supone a un
+intérprete escrito en JavaScript: es otra curva.
+
+### Causa
+
+Probable, sin parche que lo confirme: el modelo de copia al escribir de `zyjs`
+reconstruye el array en cada escritura. Eso da la semántica correcta —y por eso
+los tres motores coinciden en la salida— pero cada `$+` copia lo acumulado.
+
+### Alcance
+
+Todo programa que construya una colección elemento a elemento, que en el
+playground es casi cualquiera. Invisible para el gate por la misma razón que
+`ZYVM-003`: la salida es idéntica en los tres motores, y un diferencial compara
+salidas.
+
+Un dato que conviene medir antes de decidir nada: el playground corre programas
+pequeños, así que puede que esto no le duela a ningún ejemplo real. Lo que no
+puede pasar es que nadie lo sepa.
+
+### Arreglo propuesto
+
+Ninguno todavía: primero medir si algún ejemplo o alguna app LDV alcanza la
+escala en que se nota.
+
+### Qué lo sujeta
+
+`zyquality/cost/`, caso **`growth/append-local`**, desde el 2026-09-12, con
+`n_by_engine = { zyjs = 5000 }` porque a la escala de los motores Rust este
+motor necesita minutos. Marcado `open_finding = { zyjs = "ZYJS-014" }`: se
+reporta KNOWN con su ratio en cada corrida y no enrojece el gate.

@@ -7,8 +7,9 @@
 |---|---|---|
 | [`ZYVM-001`](#zyvm-001--la-vm-ejecuta-lo-que-el-tree-walker-rechaza-40-celdas) | **corregido 2026-08-30** | ejecutaba y contestaba donde `zytw` rechaza — 40 celdas |
 | [`ZYVM-002`](#zyvm-002--el-diagnóstico-de---nombra-al-operador--10-celdas) | **corregido 2026-08-30** | el rechazo de `-` citaba al operador `+` |
+| [`ZYVM-003`](#zyvm-003--acumular-en-el-estado-de-un-módulo-es-on-en-la-vm-y-on-en-el-tree-walker) | **abierto** | acumular en el estado de un módulo es cuadrático: 3,3 s donde el TW tarda 0,013 s |
 
-**Ninguno abierto.**
+**Uno abierto: `ZYVM-003`.**
 
 Las chinchetas que los sujetan:
 
@@ -205,3 +206,90 @@ exactamente la correcta— caía por otra rama y recibía la genérica.
 Las 10 celdas del eje, más
 [`ZYVM-002_negation_quotes_plus.zy`](../cases/pin/ZYVM-002_negation_quotes_plus.zy)
 para el `-` unario, que la matriz de operadores **binarios** no cruza.
+
+---
+
+## ZYVM-003 — Acumular en el estado de un módulo es O(n²) en la VM y O(n) en el tree-walker
+
+**Estado:** abierto
+**Encontrado por:** la medición del auto-free del 2026-09-12, **no por una celda** — el programa apareció como control de otro experimento
+**Familia:** `HLZ-012` / `HLZ-014` (el copy-on-write de los agregados). Es ese mecanismo funcionando en contra
+
+### Qué se observa
+
+```zymbol
+// m/alm.zy
+# alm {
+    #> { llenar, cuanto }
+    datos = []
+    llenar(n) { @ i:1..n { datos$+ i } }
+    cuanto() { <~ datos$# }
+}
+```
+
+Segundos de reloj, un solo módulo, misma máquina:
+
+| N | `zytw` | `zyvm` |
+|---:|---:|---:|
+| 2 000 | 0,006 | 0,010 |
+| 8 000 | 0,011 | 0,183 |
+| 32 000 | **0,013** | **3,299** |
+| 500 000 | 0,10 | **no termina en 60 s** |
+
+De 8 000 a 32 000 el trabajo se multiplica por 4 y el tiempo de la VM por **18**.
+El tree-walker es plano. La misma acumulación sobre una **variable local** es
+lineal en los dos motores (0,34 s para 2 000 000 en ambos), así que no es el
+bucle ni el `$+`: es el estado de módulo.
+
+### Causa
+
+`crates/zymbol-vm/src/lib.rs:3621` y `:4828` — las dos copias del intérprete:
+
+```rust
+&Instruction::LoadGlobal(dst, gvar_idx) => {
+    let val = self.global_vars.get(gvar_idx as usize).cloned()...
+```
+
+El `.cloned()` es barato: desde HLZ-012 un `Value::Array` es un `Rc<Vec<…>>` y
+clonarlo clona el puntero. El coste viene después. Tras el `LoadGlobal` hay
+**dos** dueños del mismo `Rc` —la ranura global y el registro—, así que el `$+`
+siguiente llama a `Rc::make_mut` con un contador de 2 y **copia el vector
+entero**. Una copia por iteración: O(n²).
+
+El tree-walker no paga eso porque escribe sobre la ranura sin sacar una segunda
+referencia a un registro.
+
+Sin confirmar con un parche: el mecanismo es claro y la curva lo acompaña, pero
+nadie ha medido la corrección todavía.
+
+### Alcance
+
+Cualquier módulo que acumule en un agregado, que es el patrón normal de un
+módulo con estado — y **la VM es el futuro motor por defecto**. No lo ve nada:
+el corpus no escribe programas de 32 000 elementos, `bench/` mide programas
+fijos que no tocan estado de módulo, y una divergencia de *tiempo* no es una
+divergencia de *salida*, así que `zyq consensus` la atraviesa sin verla.
+
+Queda por medir si afecta igual a las escrituras de módulo que no son
+agregados (un contador `n = n + 1` no copia nada) y a las aplicaciones LDV, que
+sí guardan tableros y listas en módulos.
+
+### Arreglo propuesto
+
+Que `StoreGlobal`/`LoadGlobal` no dejen dos dueños vivos del mismo `Rc` durante
+una modificación en sitio: o el compilador reconoce el patrón
+*load–modify–store* sobre una global y emite una modificación directa, o
+`LoadGlobal` cede la ranura (`std::mem::take`) cuando el siguiente uso es una
+escritura de vuelta.
+
+**Es propuesta, no decisión.**
+
+### Qué lo sujeta
+
+`zyquality/cost/`, caso **`growth/append-module-state`**, desde el 2026-09-12.
+Un tiempo no es una celda —el diferencial compara salidas y las dos son
+idénticas—, así que la suite mide la **curva**: el mismo programa a N y a 4N,
+con el límite entre lineal (4,0) y cuadrático (16,0). Marcado
+`open_finding = { zyvm = "ZYVM-003" }`, así que se reporta **KNOWN** en cada
+corrida con su ratio y no enrojece el gate: la deuda escrita no es una
+regresión. El día que baje de 6,0 el runner pide cerrar la ficha.
