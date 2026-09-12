@@ -25,8 +25,12 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import fnmatch
+import os
+import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
@@ -620,6 +624,178 @@ def cmd_selftest(args, cfg) -> int:
 
 
 # ── suite — one command, one verdict ─────────────────────────────────────────
+
+# ── The premises ─────────────────────────────────────────────────────────────
+#
+# Every other command here compares an implementation against another
+# implementation. None of them can see a rule that all three engines break
+# together, and none could see MEM-2 being retired on 2026-08-24 — the engine,
+# the guide and the one-page brief moved in one commit and stayed consistent
+# with each other.
+#
+# This one crosses the axes against `zymbol-design/PREMISES.md`, which is a
+# SOURCE: it is not derived from any engine, and it lives in its own repository
+# so that it is not even in the working tree while somebody is fixing one.
+#
+# The crossing is deliberately BIDIRECTIONAL. One direction alone is the failure
+# it exists to prevent:
+#
+#   · premise → cell only, and a cell may claim a premise nobody declared;
+#   · cell → premise only, and a premise may quietly lose the cell that held it
+#     while its `Held by` still names it.
+
+DESIGN_DIR = "ZYMBOL_DESIGN"          # env override, like every path in engines.toml
+# `##` or `###`: the ids sit under a domain heading, and the depth of that
+# heading is the document's business rather than this parser's.
+PREMISE_HEAD = re.compile(r"^#{2,4}\s+([A-Z]{2,6}-\d+)\s+—\s+(.+?)\s*$", re.M)
+CELL_REF = re.compile(r"`([a-z0-9_-]+/[a-z0-9_*-]+)`")
+
+
+def _design_dir() -> Path:
+    env = os.environ.get(DESIGN_DIR)
+    if env:
+        return Path(env).expanduser()
+    return Path(__file__).resolve().parents[2] / "zymbol-design"
+
+
+def _premises_of(text: str) -> dict[str, dict]:
+    """→ {id: {what, held: [glob], stated_empty: bool}} from PREMISES.md.
+
+    The section of an id runs to the next `## ` heading, so a `Held by` is read
+    from its own premise and never from the next one.
+    """
+    out, heads = {}, list(PREMISE_HEAD.finditer(text))
+    stops = [m.start() for m in re.finditer(r"^#{1,4}\s", text, re.M)]
+    for m in heads:
+        nxt = next((s_ for s_ in stops if s_ > m.end()), len(text))
+        body = text[m.end():nxt]
+        held_line = ""
+        for line in body.splitlines():
+            if line.startswith("**Held by**"):
+                held_line = line
+            elif held_line and line.startswith(("`", "(", "not ", "**red**")):
+                held_line += " " + line      # a `Held by` wrapped for width
+            elif held_line:
+                break
+        out[m.group(1)] = {
+            "what": m.group(2),
+            "held": CELL_REF.findall(held_line),
+            "stated_empty": "nothing yet" in held_line,
+            # A third state, and it is not a weaker version of the other two.
+            # MEM and COL constrain what a PROGRAM may do, so a program can be
+            # written that breaks them. Most of SYM constrains what a PROPOSAL
+            # may be — "derive, do not invent" is checked by a reader against an
+            # inventory, and no execution can ask it. Reporting those as holes
+            # would file a property of the domain as debt.
+            "by_review": held_line.strip().startswith("**Held by** — review"),
+        }
+    return out
+
+
+def _declared_premises() -> dict[str, set[str]]:
+    """→ {cell_id_with_axis: {premise_id}} read from the axis TOMLs themselves.
+
+    A set, not one id: a cell measures a situation, and one situation can be
+    evidence for more than one rule. `block-var-direct` shows both that a block
+    does not leak into its container (MEM-6) and that a function does not reach
+    a block (MEM-2), and making it choose would mean writing the same program
+    twice under two names — the redundancy the admission rule forbids.
+
+    Read raw rather than through `axes.load_all`, because `premise` is a
+    property of the DECLARATION: a matrix declares it once for every point it
+    generates, and a `[[cell]]` declares its own.
+    """
+    out = {}
+    for path in sorted(A.AXES_DIR.glob("*.toml")):
+        d = tomllib.loads(path.read_text(encoding="utf-8"))
+        named = {c["id"]: c.get("premise") for c in d.get("cell", [])}
+        # An axis may declare one for all of its cells, the way it declares
+        # `expect`: a matrix's points and the loose `[[cell]]`s beside it are
+        # asking about the same rule, and annotating each by hand is how one
+        # gets forgotten.
+        axis_premise = d.get("premise")
+        matrix_premise = d.get("matrix", {}).get("premise", axis_premise)
+        for cell in A.load_all_from(A.AXES_DIR, [path.stem])[0].cells:
+            if cell.id in named:               # a loose [[cell]]
+                p = named[cell.id] or axis_premise
+            else:                              # generated by the matrix
+                p = matrix_premise or axis_premise
+            if p:
+                out[f"{path.stem}/{cell.id}"] = {p} if isinstance(p, str) else set(p)
+    return out
+
+
+def cmd_premises(args, cfg) -> int:
+    """Cross the declared premises against the cells that claim to hold them."""
+    design = _design_dir()
+    doc = design / "PREMISES.md"
+    if not doc.is_file():
+        print(R.yellow(f"  SKIPPED — {doc} not found"))
+        print(R.dim(f"    clone zymbol-design beside this repository, or set "
+                    f"{DESIGN_DIR}=<path>"))
+        print(R.dim("    exit 2: the check did not run, which is not the same "
+                    "as nothing being wrong"))
+        return NOVERDICT
+
+    premises = _premises_of(doc.read_text(encoding="utf-8"))
+    declared = _declared_premises()
+    known = {f"{ax.id}/{c.id}" for ax in A.load_all() for c in ax.cells}
+    rc, holes, reviewed = GREEN, 0, 0
+
+    # cell → premise: a cell may not claim an id the source does not declare.
+    for cell, pids in sorted(declared.items()):
+        for pid in sorted(pids):
+            if pid not in premises:
+                print(R.red(f"  UNDECLARED  {cell} claims {pid}, "
+                            f"which {doc.name} does not declare"))
+                rc = RED
+
+    for pid in sorted(premises):
+        p = premises[pid]
+        if p["by_review"]:
+            print(f"  {R.dim(pid)}  {R.dim('by review')}  " + R.dim(p["what"]))
+            reviewed += 1
+            continue
+        if p["stated_empty"]:
+            print(R.yellow(f"  {pid}  no cell — ") + R.dim(p["what"]))
+            holes += 1
+            continue
+        if not p["held"]:
+            print(R.red(f"  {pid}  states no `Held by` at all — a premise whose "
+                        f"cells nobody wrote down is a premise nobody is keeping"))
+            rc = RED
+            continue
+        for glob in p["held"]:
+            hit = fnmatch.filter(known, glob)
+            if not hit:
+                # The dead reference: the premise still names a cell that is gone,
+                # which reads as covered and is not.
+                print(R.red(f"  DEAD REF    {pid} names `{glob}`, "
+                            f"which matches no cell"))
+                rc = RED
+                continue
+            # premise → cell: every cell it names must name it back.
+            for cell in hit:
+                if pid not in declared.get(cell, set()):
+                    got = ", ".join(sorted(declared.get(cell, set()))) or "nothing"
+                    print(R.red(f"  ONE-SIDED   {pid} names `{cell}`, "
+                                f"which declares {got}"))
+                    rc = RED
+        if rc == GREEN or True:
+            n = sum(len(fnmatch.filter(known, g)) for g in p["held"])
+            print(f"  {R.green(pid)}  {n} cell(s)  " + R.dim(p["what"]))
+
+    print()
+    print(f"  {len(premises)} premise(s) declared in {doc.name}, "
+          f"{holes} with no cell yet"
+          + (f", {reviewed} checked by review rather than by execution"
+             if reviewed else ""))
+    if holes:
+        print(R.dim("    a premise with no cell is a hole that names itself; "
+                    "it is not a pass and not a failure"))
+    return rc
+
+
 def cmd_suite(args, cfg) -> int:
     """What every other repository's wrapper delegates to.
 
@@ -637,11 +813,25 @@ def cmd_suite(args, cfg) -> int:
         print(R.red("\n  the runner does not grade correctly; nothing below is evidence"))
         return NOVERDICT
 
+    # The declaration, before anything is run. It needs no engine, and it is the
+    # only check here that compares the implementations against something that
+    # is not another implementation. NO VERDICT when zymbol-design is absent is
+    # deliberate: a layer that cannot see the premises cannot report that they
+    # hold.
+    print(R.bold("\n  premises") + R.dim("   (zymbol-design/PREMISES.md, the source)"))
+    rc = cmd_premises(args, cfg)
+    if rc == NOVERDICT:
+        print(R.yellow("\n  the premises could not be read; what follows grades "
+                       "the engines against each other only"))
+    elif rc == RED:
+        print(R.red("\n  a premise and its cells disagree about what holds it"))
+
     print(R.bold("\n  engines"))
-    rc = cmd_engines(args, cfg)
-    if rc != GREEN:
+    rc_engines = cmd_engines(args, cfg)
+    if rc_engines != GREEN:
         print(R.red("\n  an engine did not answer; nothing below may be called a pass"))
         return NOVERDICT
+    rc = worse(rc, rc_engines)
 
     print(R.bold("\n  axes") + R.dim("   (cells, generated from axes/*.toml)"))
     rc = worse(rc, cmd_axis(args, cfg))
@@ -695,6 +885,8 @@ def main() -> int:
     sub.add_parser("engines", help="what can run, and what cannot")
     sub.add_parser("selftest", help="grade the runner itself — needs no engine")
     sub.add_parser("surfaces", help="the two lexers: what did they leave unmarked")
+    sub.add_parser("premises", help="the declared premises, against the cells "
+                                    "that hold them")
     sub.add_parser("suite", help="the whole layer, one verdict")
     for name, help_ in (("gen", "write every cell from axes/*.toml"),
                         ("axis", "generate, run, and publish the denominator")):
@@ -725,7 +917,7 @@ def main() -> int:
     return {"engines": cmd_engines, "observe": cmd_observe, "ask": cmd_ask,
             "check": cmd_check, "gen": cmd_gen, "axis": cmd_axis,
             "suite": cmd_suite, "selftest": cmd_selftest,
-            "surfaces": cmd_surfaces}[args.cmd](args, cfg)
+            "surfaces": cmd_surfaces, "premises": cmd_premises}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

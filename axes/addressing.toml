@@ -31,6 +31,7 @@
 id      = "addressing"
 what    = "one bracket group addresses one element; what is not a chain stays legal"
 engines = ["zytw", "zyvm", "zyjs"]
+premise = "COL-7"
 
 [[dimension]]
 name = "form"
@@ -60,6 +61,12 @@ values = [
   { id = "string",         what = "indexing a string",               expr = "s[2]", prelude = "s = \"hola\"" },
   { id = "tuple-in-array", what = "a tuple inside an array",         expr = "t[1>2]", prelude = "t = [(1,2),(3,4)]" },
 ]
+
+# Every cell of this axis asserts COL-7 of `zymbol-design/PREMISES.md`: nesting
+# is navigated with `>` and the chained spelling does not exist. The axis
+# predates the premise — it was declared on 2026-09-07 and the id on 2026-09-12
+# — which is exactly the situation ids are for: the coverage was real and
+# nothing connected it to the decision it came from.
 
 [matrix]
 id   = "«form.id»"
