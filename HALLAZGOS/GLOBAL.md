@@ -717,7 +717,8 @@ función pueda destruir su propio local.
 
 ## GLB-009 — El estado de un módulo sale al exterior en la VM y en el navegador
 
-**Estado:** abierto
+**Estado:** **cerrado en lo que importa el 2026-09-13** — el estado ya no sale en
+ningún motor. Queda abierta la mitad de menor peso: **cuándo** se detecta
 **Encontrado por:** `modularity/module-state-is-not-exportable`, la primera celda que preguntó por MEM-4
 **Gravedad:** **alta.** Es el cerrojo que impide que el estado de módulo sea una variable global, y **la VM es el futuro motor por defecto**
 
@@ -774,8 +775,35 @@ donde está el defecto.
 
 **Es propuesta, no decisión.**
 
+### Qué se arregló, y dónde
+
+**La VM** — `crates/zymbol-compiler/src/lib.rs`. Al construir la tabla de
+exportación aceptaba `Statement::Assignment` además de `ConstDecl` como origen
+de una constante exportada, así que `#> { n }` con `n = 0` exportaba el valor
+inicial de la variable como si fuera constante. Quitado el brazo. Y un segundo
+arreglo de camino: un alias conocido con un campo desconocido caía a compilar
+`E` como expresión y contestaba `undefined variable 'E'`, que manda al lector a
+buscar una definición que está delante. Ahora dice lo que dice el tree-walker,
+con la lista de lo que el módulo sí tiene.
+
+**El navegador** — `web/src/zymbol/zymbol.js`. La tabla de exportación entregaba
+lo que el nombre tuviera, fuera lo que fuera. Ahora sale una constante o una
+función, y nada más. Su mensaje para `E.n` decía «does not export **function**»,
+que nombraba lo que no era: `.` lee una constante, y ahí es donde acaba quien
+intenta alcanzar el estado de un módulo desde fuera.
+
+### Lo que queda
+
+Los tres motores rechazan y **dicen exactamente la misma frase**. Lo que aún
+diverge es el momento: `zyvm` lo detecta al **compilar**, `zytw` y `zyjs` al
+**ejecutar**. Es la misma familia que `GLB-008` — un motor llega antes que los
+otros a la misma conclusión — y cerrarla es mover la comprobación al análisis
+previo, que es donde `zymbol check` ya la tiene (`E005`).
+
 ### Qué lo sujeta
 
-`modularity/module-state-is-not-exportable`, roja. Y a su lado
-`modularity/module-functions-own-the-state`, verde, que sujeta la mitad
-legítima: el estado persiste entre llamadas y lo llevan las funciones del módulo.
+`modularity/module-state-is-not-exportable`: pasó de **WRONG** —un motor aceptaba
+el programa— a **DIVERGE** por el momento. La diferencia entre esos dos
+veredictos es exactamente lo que se arregló. A su lado
+`modularity/module-functions-own-the-state`, verde, sujeta la mitad legítima: el
+estado persiste entre llamadas y lo llevan las funciones del módulo.
