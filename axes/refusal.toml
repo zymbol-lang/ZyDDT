@@ -176,3 +176,49 @@ g(a, b) { <~ [a, b] }
 s = g(1, 2, 3)$#
 >> s ¶
 """
+
+# ── Dentro del cuerpo de una lambda de bloque (ZYTW-001) ────────────────────
+#
+# Hasta el 2026-09-12 el analizador no entraba en un `-> { … }`: el cuerpo de
+# expresión iba a `infer_expr`, que es lo que comprueba, y el de bloque a
+# `infer_return_type_from_block`, que sólo recolecta tipos de retorno. Todo lo
+# escrito ahí dentro pasaba sin mirar.
+#
+# La celda que lo encontró preguntaba por un nombre fuera de alcance, que es una
+# de las tres mitades. Estas son las otras dos, más la forma mínima de la
+# primera: un hueco de una zona ciega no se cierra con el caso que lo destapó,
+# porque la siguiente regresión entrará por cualquiera de las otras puertas.
+#
+# `m[i][j]` no está aquí a propósito: lo rechaza el PARSER, así que seguía
+# fallando dentro de la lambda incluso cuando el analizador no miraba — y es lo
+# que hacía que la zona ciega no lo pareciera.
+
+[[cell]]
+id   = "undefined-inside-a-lambda-block"
+what = "a name that exists nowhere, inside a lambda's block body"
+src  = """
+f = () -> { >> jamas_definida ¶ }
+f()
+"""
+
+[[cell]]
+id   = "arity-inside-a-lambda-block"
+what = "a call with the wrong argument count, inside a lambda's block body"
+# The body uses BOTH parameters on purpose. With `{ <~ a }` the cell also asked
+# about `unused variable 'b'`, which zyjs reports and the Rust engines do not —
+# one cell, one question.
+src  = """
+g(a, b) { <~ a + b }
+f = () -> { >> g(1) ¶ }
+f()
+"""
+
+[[cell]]
+id   = "output-mark-missing-inside-a-lambda-block"
+what = "a call missing its `<~` mark, inside a lambda's block body"
+src  = """
+sube(b<~) { b = b + 1 }
+y = 1
+f = () -> { sube(y) }
+f()
+"""

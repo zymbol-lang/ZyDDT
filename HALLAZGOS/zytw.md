@@ -13,7 +13,9 @@ este fichero.
 
 ## ZYTW-001 — Una lambda que nombra algo fuera de su alcance: `check` calla, la VM lo rechaza y el tree-walker revienta a mitad de la salida
 
-**Estado:** abierto
+**Estado:** **CORREGIDO 2026-09-12** — y el hueco era mucho mayor de lo que esta
+ficha decía: no era el alcance, era que **el analizador no entraba en el cuerpo
+de una lambda de bloque en absoluto**
 **Encontrado por:** `isolation/block-var-lambda` y `isolation/caller-local-lambda`
 **Familia:** [`ERROR-ZYB-002`](../../ZyBank/HALLAZGOS.md#error-zyb-002) — la sugerencia `°` ya se señaló allí como un empujón hacia el rodeo equivocado, y sigue igual
 
@@ -44,11 +46,30 @@ lo saben antes de ejecutar y el tercero lo descubre con media salida ya escrita.
 
 ### Causa
 
-Sin localizar con precisión. Lo que se sabe: el analizador semántico que
-`zymbol check` ejecuta —y que `zytw` y `zyvm` comparten— **no comprueba los
-nombres libres del cuerpo de una lambda** contra el alcance de su punto de
-creación. La VM lo detecta después, al compilar a bytecode; el tree-walker no
-tiene ese paso y llega a la ejecución.
+**Localizada** (`crates/zymbol-semantic/src/type_check.rs`, brazo `Expr::Lambda`).
+Un cuerpo de lambda tiene dos formas y sólo una se comprobaba:
+
+| forma | a dónde iba | comprobaba |
+|---|---|---|
+| `() -> expr` | `infer_expr` | **sí** — `infer_expr` ES lo que comprueba |
+| `() -> { … }` | `infer_return_type_from_block` | **no** — sólo recolecta tipos de retorno |
+
+Así que dentro de un `-> { … }` **nada semántico se miraba**. Medido el
+2026-09-12, el mismo código dentro y fuera de una lambda de bloque:
+
+| escrito | fuera | dentro |
+|---|---|---|
+| un nombre que no existe en ninguna parte | error | **silencio** |
+| una llamada con la aridad mal | error | **silencio** |
+| una llamada a la que le falta la marca `<~` | error | **silencio** |
+| `m[i][j]` | error | error — lo rechaza el **parser**, no el analizador |
+
+Esa última fila es la que hacía el hueco pequeño a la vista: algo seguía
+fallando ahí dentro, así que no parecía una zona ciega.
+
+Es la misma forma que los operandos de `$#`, `$?` y `$??`, que el comentario
+del propio fichero ya describe: *«un sitio que `infer_expr`/`check_statement`
+no visita es un sitio donde todas las comprobaciones están apagadas»*.
 
 ### Alcance
 
@@ -63,19 +84,44 @@ Dos cosas lo agravan:
   exactamente la objeción que `ERROR-ZYB-002` levantó en agosto contra el mismo
   mensaje.
 
-### Arreglo propuesto
+### Arreglo aplicado
 
-Que la comprobación viva en `zymbol-semantic`, no en el compilador de la VM: es
-lo que `check` ejecuta y lo que el LSP indexa, así que es el único sitio donde
-la respuesta es la misma para los tres motores y para el editor. La VM dejaría
-de necesitar la suya.
+Recorrer el cuerpo con `check_statement` antes de inferir el tipo de retorno.
+Cinco líneas en el brazo `Expr::Lambda`, en el analizador compartido, así que
+vale para los dos motores Rust a la vez. `zyjs` ya lo hacía y no necesitó nada.
 
-**Es propuesta, no decisión.**
+**Y corrigió un falso positivo de paso.** `corpus/memory_correct_01_lambdas.zy`
+—un fichero cuyo título es «uso correcto de lambdas»— tenía grabado como golden
+`error: undefined variable 'first'`:
+
+```zymbol
+apply_twice = (func, value) -> {
+    first = func(value)      // la asignación no se visitaba
+    <~ func(first)           // el `<~` sí, para inferir el retorno → 'first' indefinida
+}
+```
+
+El analizador miraba **sólo los `<~`** del cuerpo y ninguna de las sentencias
+anteriores. El golden guardaba ese falso positivo como comportamiento esperado;
+ahora el programa imprime lo que él mismo dice esperar (7 y 125).
+
+### Impacto, medido antes de dar por bueno
+
+| | |
+|---|---|
+| corpus | 1 golden, y era el falso positivo de arriba; `consensus` sigue 660 de acuerdo y 0 divergiendo |
+| aplicaciones y ejemplos | **0 causados**. Tres ficheros dan error y ninguno es de este cambio: `GO/集計.zy` no contiene una sola lambda de bloque, `ZethyCLI/main.zy` falla en el lexer por una llave sin cerrar, y `ZethyCLI/config.zy` sólo fallaba por la ruta desde la que se le llamaba |
+| `cargo test`, `reject` | sin cambios |
 
 ### Qué lo sujeta
 
-Las dos celdas del eje. Vuelven a rojo el día que el tree-walker se adelante o
-la VM se retrase.
+Las dos celdas del eje, **verdes desde el 2026-09-12**. Vuelven a rojo el día que
+el tree-walker se adelante o la VM se retrase.
+
+Lo que **no** sujeta nada todavía: que el analizador siga entrando en el cuerpo
+de una lambda. Las dos celdas preguntan por un nombre fuera de alcance, no por la
+aridad ni por la marca `<~` escritas ahí dentro, que eran las otras dos mitades
+del hueco. Tres celdas más lo cerrarían.
 
 Y hay una razón estructural para desconfiar del vacío: el tree-walker es **el
 banco de diagnósticos**, así que cuando dos motores discrepan en un mensaje la

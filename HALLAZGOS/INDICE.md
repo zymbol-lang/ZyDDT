@@ -27,7 +27,7 @@ delante — la más cara, `GLB-005`, resultó valer **un fichero de 84**.
 
 | fichero | abiertos | corregidos |
 |---|---:|---:|
-| [`zytw.md`](zytw.md) | **1** | 0 |
+| [`zytw.md`](zytw.md) | 0 | **1** |
 | [`zyvm.md`](zyvm.md) | **1** | 2 |
 | [`zyjs.md`](zyjs.md) | **1** | 12 |
 | [`GLOBAL.md`](GLOBAL.md) | **1** | 7 |
@@ -256,7 +256,7 @@ perfectamente»*.
 | rojas | qué son |
 |---:|---|
 | 4 | la fila `file-var`: una función lee los nombres de nivel de fichero. **No es una regresión**: el aislamiento se retiró a propósito el 2026-08-24 (`fbccc8e`, ZyBank `ERROR-ZYB-002`) y `GUIDE.md` § 10b, que lo documentaba como deliberado, se retiró con él. Son la **decisión pendiente sobre la premisa 2**, no un defecto que arreglar sin validar |
-| 2 | [`ZYTW-001`](zytw.md) — una lambda que nombra algo fuera de su alcance: `check` calla, `zyvm` y `zyjs` lo rechazan estáticamente y el tree-walker revienta con media salida ya escrita |
+| ~~2~~ | [`ZYTW-001`](zytw.md) — **corregida el 2026-09-12**. El hueco era mayor que la ficha: el analizador no entraba en el cuerpo de una lambda de bloque, así que allí dentro un nombre inexistente, una aridad mal y una marca `<~` ausente eran todos silencio |
 
 Las 12 verdes no son decoración: **cuatro de las cinco premisas se cumplen hoy y
 no las sujetaba nada**. Que la constante de fichero llegue a una función, que el
