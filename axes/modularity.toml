@@ -1,0 +1,172 @@
+# The modularity axis — what a module is, and what it does not let through.
+#
+# ── Why this axis did not exist until 2026-09-13 ────────────────────────────
+#
+# Not because nobody thought of it. A module IS a file and a generated cell WAS
+# one file, so four premises — MEM-3, MEM-4, AGT-1, AGT-2 — could not be asked
+# at all. They sat in `zyddt premises` as "no cell" for a week, which is the
+# report doing its job: a hole that names itself.
+#
+# `[cell.files]` is what unblocked them. A cell that declares siblings lives in a
+# directory of its own, so `<# ./m/est => E` resolves exactly as it would in a
+# real project.
+#
+# ── What is at stake here ───────────────────────────────────────────────────
+#
+# AGT-1 and AGT-2 are the two that make Zymbol safe against the supply chain:
+# importing cannot run code, and nothing leaves a module that was not declared.
+# Both were verified by hand on 2026-09-11 and nothing has defended them since.
+# In every other ecosystem the equivalent property is a promise; here it is a
+# refusal with an error code, and now it is a refusal with a cell.
+
+id      = "modularity"
+what    = "a module's environment, its surface, and what importing may do"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+# ── AGT-1: importing executes nothing ───────────────────────────────────────
+
+[[cell]]
+id      = "import-executes-nothing"
+premise = "AGT-1"
+what    = "a module body that computes is refused before a statement runs"
+src     = """
+<# ./m/efecto => X
+>> X::f() ¶
+"""
+[cell.files]
+"m/efecto.zy" = """
+# efecto {
+    #> { f }
+    >> "EFECTO AL IMPORTAR" ¶
+    f() { <~ 1 }
+}
+"""
+
+# ── AGT-2: a module declares its surface ────────────────────────────────────
+
+[[cell]]
+id      = "module-declares-its-surface"
+premise = "AGT-2"
+what    = "a module with no export block is refused, rather than exporting everything"
+src     = """
+<# ./m/sin_export => Y
+>> Y::f() ¶
+"""
+[cell.files]
+"m/sin_export.zy" = """
+# sin_export {
+    f() { <~ 1 }
+}
+"""
+
+[[cell]]
+id      = "undeclared-item-does-not-leave"
+premise = "AGT-2"
+what    = "an item the export block does not name cannot be reached from outside"
+src     = """
+<# ./m/parcial => Z
+>> Z::publica() ¶
+>> Z::privada() ¶
+"""
+[cell.files]
+"m/parcial.zy" = """
+# parcial {
+    #> { publica }
+    publica() { <~ 1 }
+    privada() { <~ 2 }
+}
+"""
+
+# ── MEM-3: a module owns its environment, in both directions ────────────────
+
+[[cell]]
+id      = "module-does-not-see-its-importer"
+premise = "MEM-3"
+what    = "a module body naming the importing script's variable is refused"
+src     = """
+<# ./m/mira => M
+del_importador = 5
+>> M::ver() ¶
+"""
+[cell.files]
+"m/mira.zy" = """
+# mira {
+    #> { ver }
+    ver() { <~ del_importador }
+}
+"""
+
+[[cell]]
+id      = "two-modules-may-hold-one-name"
+premise = "MEM-3"
+expect  = "ok"
+what    = "two modules each holding an `x` do not collide — the case for the whole rule"
+# MEM-7 forbids reusing a name inside one strong environment and leaves it free
+# between them, and this is why: four imported modules that could not each have
+# an `x` would be unsustainable. Stated by the author on 2026-09-12 in exactly
+# those terms.
+src     = """
+<# ./m/a => A
+<# ./m/b => B
+A::pon(7)
+>> "A=" A::lee() " B=" B::lee() ¶
+"""
+[cell.files]
+"m/a.zy" = """
+# a {
+    #> { pon, lee }
+    x = 100
+    pon(v) { x = v }
+    lee() { <~ x }
+}
+"""
+"m/b.zy" = """
+# b {
+    #> { lee }
+    x = 999
+    lee() { <~ x }
+}
+"""
+
+# ── MEM-4: a module's state is written from inside the module ───────────────
+
+[[cell]]
+id      = "module-state-is-not-exportable"
+premise = "MEM-4"
+what    = "a mutable binding cannot be exported — only constants and functions leave"
+# The fence that keeps module state from being a global variable. Measured
+# 2026-09-12: `E005: Item 'n' not found in module`.
+src     = """
+<# ./m/exporta_var => E
+>> E.n ¶
+"""
+[cell.files]
+"m/exporta_var.zy" = """
+# exporta_var {
+    #> { n, sube }
+    n = 0
+    sube() { n = n + 1 }
+}
+"""
+
+[[cell]]
+id      = "module-functions-own-the-state"
+premise = "MEM-4"
+expect  = "ok"
+what    = "a module's own functions read and write its state, and it persists across calls"
+src     = """
+<# ./m/est => E
+E::sube()
+E::sube()
+>> E::lee() ¶
+"""
+[cell.files]
+"m/est.zy" = """
+# est {
+    #> { sube, lee }
+    n = 0
+    sube() { n = n + 1 }
+    lee() { <~ n }
+}
+"""

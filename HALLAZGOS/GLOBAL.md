@@ -649,3 +649,133 @@ envuelve y se deja intacto, que es lo que evita el bucle del primer intento.
 Verificado en las dos formas y en las dos posiciones: `?` y `@`, de una línea y
 de varias, con `??` y sin él, más un fichero de llaves sueltas, que sigue
 terminando.
+
+---
+
+## GLB-008 — Usar un nombre tras `\` se rechaza en los tres, en momentos distintos y diciendo cosas distintas
+
+**Estado:** abierto
+**Encontrado por:** `lifetime/use-after-destruction`, la primera vez que se preguntó
+**Familia:** `AGENTIC.md` G4, que lo tenía anotado como «solo en ejecución» sin saber que zyjs ya lo hacía antes
+
+### Qué se observa
+
+```zymbol
+x = "dato"
+>> x ¶
+\ x
+>> x ¶
+```
+
+| motor | cuándo | qué dice |
+|---|---|---|
+| `zytw`, `zyvm` | **en ejecución**, con «dato» ya impreso | `use after destruction: variable 'x' was destroyed after its last use` |
+| `zyjs` | **antes de ejecutar** | `undefined variable 'x'` — y su ayuda dice «variables must be defined before use» |
+
+`zymbol check` no dice nada por el lado de Rust.
+
+**Cada motor tiene una mitad distinta bien.** El del navegador rechaza en el
+momento correcto —antes de escribir media salida— y el mensaje no menciona que
+hubo una destrucción, así que manda al lector a buscar una definición que existe.
+Los de Rust nombran exactamente lo que pasó y llegan cuando el programa ya
+imprimió.
+
+### Por qué no lo había visto nadie
+
+El corpus tiene dos ficheros que usan `\` —`bug_mm3_destroy_frame_local.zy` y
+`gap01_lifetime_end_noop.zy`— y **los dos destruyen un nombre y no vuelven a
+tocarlo**. El caso del que trata la regla no lo escribía ninguno, así que
+`zyq consensus` nunca lo comparó. Apareció al declarar MEM-8 y escribir su
+primera celda.
+
+Es el argumento de la capa de celdas en una línea: la pregunta no estaba
+esperando a que alguien tropezara con ella, estaba esperando a que alguien la
+hiciera.
+
+### Arreglo propuesto
+
+Las dos mitades son compatibles: la comprobación va a `zymbol-semantic`, donde
+`check` la ejecuta, **con el texto de los motores Rust**. `zyjs` conserva el
+momento y gana el mensaje; `zytw` y `zyvm` conservan el mensaje y ganan el
+momento. Nadie cede nada.
+
+Hay una decisión detrás y es del autor: hoy `\` es un error de **ejecución** en
+Rust, y hacerlo estático es lo que `AGENTIC.md` G4 pide sin haberlo decidido.
+Lo que este hallazgo añade es que ya no es una mejora hipotética — un motor lo
+hace.
+
+**Es propuesta, no decisión.**
+
+### Qué lo sujeta
+
+`lifetime/use-after-destruction`, roja hasta que los tres coincidan. Las otras
+tres celdas del eje sujetan lo que ya funciona: que `\` no queme el nombre
+(reasignar lo revive), que destruir lo terminado sea lo corriente, y que una
+función pueda destruir su propio local.
+
+---
+
+## GLB-009 — El estado de un módulo sale al exterior en la VM y en el navegador
+
+**Estado:** abierto
+**Encontrado por:** `modularity/module-state-is-not-exportable`, la primera celda que preguntó por MEM-4
+**Gravedad:** **alta.** Es el cerrojo que impide que el estado de módulo sea una variable global, y **la VM es el futuro motor por defecto**
+
+### Qué se observa
+
+```zymbol
+// m/exporta_var.zy
+# exporta_var {
+    #> { n, sube }      // `n` es una VARIABLE, no una constante
+    n = 0
+    sube() { n = n + 1 }
+}
+```
+
+```zymbol
+<# ./m/exporta_var => E
+>> E.n ¶
+```
+
+| | |
+|---|---|
+| `zymbol check` | `error: E005: Item 'n' not found in module` ✔ |
+| `zytw` | `Runtime error: Module 'E' has no constant 'n'` ✔ |
+| `zyvm` | **imprime `0`** ✘ |
+| `zyjs` | **imprime `0`** ✘ |
+
+### Por qué importa
+
+`MEM-4` dice que las variables de un módulo las escriben y leen **sus propias
+funciones, y sólo ellas**. Lo que hace que eso sea un entorno cerrado en vez de
+una variable global es precisamente que una variable no se pueda exportar. En dos
+de los tres motores ese cerrojo no existe en ejecución: basta declararla en el
+`#>` y el estado queda legible desde fuera.
+
+### Cómo se coló
+
+Está anotado porque es el método lo que falló, no la atención. El 2026-09-12
+verifiqué MEM-4 y escribí *«holds, and the fence is enforced: `#> { n }` where
+`n` is a variable is E005»*. Lo comprobé **con `zymbol check`** y no ejecutando.
+Es literalmente el error que `DM-05` cometió —comprobar el diagnóstico en vez de
+la consecuencia— y que está escrito en
+`zymbol-design/HOW_TO_CHANGE_ZYMBOL.md` § 2 como la salida número 3.
+
+Un aviso estático que dos motores no respetan en ejecución no es un cerrojo: es
+un aviso.
+
+### Arreglo propuesto
+
+Que la construcción de la tabla de exportación rechace una ligadura mutable en
+el mismo sitio donde ya lo hace el análisis estático, en la VM y en `zyjs`. La
+pregunta previa —¿debe `E.n` ser error, o debe `#>` rechazar la declaración?— la
+responde el análisis de Rust: rechaza la **declaración**, en el módulo, que es
+donde está el defecto.
+
+**Es propuesta, no decisión.**
+
+### Qué lo sujeta
+
+`modularity/module-state-is-not-exportable`, roja. Y a su lado
+`modularity/module-functions-own-the-state`, verde, que sujeta la mitad
+legítima: el estado persiste entre llamadas y lo llevan las funciones del módulo.
