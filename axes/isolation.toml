@@ -352,3 +352,80 @@ base = 10
 f(n) { <~ (n$> (x -> x + base)) }
 >> f([1, 2]) ¶
 """
+
+# ── The halves that nothing was asking, 2026-09-13 ──────────────────────────
+#
+# Found by reading the premises against the cells rather than by a failure. Each
+# one is the OTHER half of a rule that was already covered on one side:
+# MEM-1 had a cell for reading a constant and none for the part that makes it a
+# constant; MEM-2 had eleven cells and all eleven were reads, while the premise
+# says «vistas o modificadas»; MEM-6 names `_name` as the strictest scope in the
+# language and no cell asked about it.
+
+[[cell]]
+id      = "const-cannot-be-reassigned"
+premise = "MEM-1"
+what    = "a constant refuses a second value — the half that makes it one"
+src     = """
+PI := 3.14
+PI = 3
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-reaches-a-lambda"
+premise = "MEM-1"
+expect  = "ok"
+what    = "a constant is global, so a lambda reads it like anything else does"
+src     = """
+LIM := 9
+f = () -> { <~ LIM }
+>> f() ¶
+"""
+
+[[cell]]
+id      = "write-inside-a-function-does-not-escape"
+premise = "MEM-2"
+expect  = "ok"
+what    = "MEM-2's other half: a write inside a function stays inside it"
+# The premise says a variable is visible OR MODIFIABLE only in its own scope,
+# and its eleven other cells all ask about reading. This is what the write side
+# looks like when the value crossed as a parameter, which is the only way it
+# crosses at all.
+src     = """
+base = 10
+f(b) { b = 999
+<~ b }
+>> f(base) " " base ¶
+"""
+
+[[cell]]
+id      = "underscore-is-invisible-outside"
+premise = "MEM-6"
+what    = "`_name` cannot be read from the scope that contains its block"
+src     = """
+? #1 { _t = 1 }
+>> _t ¶
+"""
+
+[[cell]]
+id      = "underscore-is-invisible-inside"
+premise = "MEM-6"
+what    = "`_name` cannot be read from a block nested inside its own"
+# The direction that makes `_` stricter than everything else here: a light
+# environment normally lets an inner block read what the outer one holds, and
+# this is the one name that does not.
+src     = """
+? #1 { _t = 1
+    ? #1 { >> _t ¶ } }
+"""
+
+[[cell]]
+id      = "underscore-siblings-are-independent"
+premise = "MEM-6"
+expect  = "ok"
+what    = "two sibling blocks may each hold the same `_name`"
+src     = """
+? #1 { _t = 1   >> _t ¶ }
+? #1 { _t = 2   >> _t ¶ }
+"""
