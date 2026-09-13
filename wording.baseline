@@ -4,8 +4,11 @@
 # own. A line appearing here that was not written on purpose is a new
 # one-sided message, which is the thing zyquality/messages/ counts
 # statically and this counts as it is actually emitted.
+isolation/const-cannot-be-reassigned
 isolation/output-mark-without-an-output-parameter
 isolation/output-parameter-unmarked-at-call
+isolation/underscore-is-invisible-inside
+isolation/underscore-is-invisible-outside
 refusal/arity-inside-a-collection-operand
 refusal/arity-inside-a-lambda-block
 refusal/output-mark-missing-inside-a-lambda-block
@@ -36,7 +39,6 @@ refusal/output-mark-missing-inside-a-lambda-block
 # comentarios. El bloque de arriba se perdió al regenerar el 2026-09-12 y se
 # repuso a mano. Hasta que el runner los preserve, copiar los comentarios antes
 # de regenerar es parte del procedimiento.
-
 # refusal/arity-inside-a-lambda-block — anotadas el 2026-09-12.
 # refusal/output-mark-missing-inside-a-lambda-block
 #
@@ -45,3 +47,13 @@ refusal/output-mark-missing-inside-a-lambda-block
 # escritas ahí dentro eran silencio. Los tres motores las rechazan ya; el reparto
 # es el de siempre — los dos de Rust añaden la línea `= help:` y zyjs no, misma
 # familia que `refusal/arity-inside-a-collection-operand`.
+
+# isolation/const-cannot-be-reassigned — anotadas el 2026-09-13.
+# isolation/underscore-is-invisible-outside
+# isolation/underscore-is-invisible-inside
+#
+# Las tres mitades que faltaban de MEM-1 y MEM-6. Los tres motores rechazan y
+# dicen la misma frase; el reparto es el de siempre — los dos de Rust añaden la
+# línea `= help:` y zyjs no. Misma familia que el resto de este fichero, y la
+# misma razón para no cerrarla barata: el `help` no es redacción, es una guía que
+# cada motor decide si sabe dar.
