@@ -1,0 +1,79 @@
+# The lifetime axis — MEM-8, the two ways a value stops existing.
+#
+# ── Why it needed an axis of its own ────────────────────────────────────────
+#
+# Automatic release is required to be INVISIBLE, so no cell can observe it: a
+# correct program prints the same thing either way, which is exactly what makes
+# a differential blind to it. That half is measured by `zyquality/cost/`, as a
+# ratio of peak memory against a control — a claim about cost, which is not
+# something a cell can make.
+#
+# What a cell CAN ask is the other half. `\ x` is the exception the premise
+# declares: it is observable on purpose, and using the name afterwards is an
+# error. That is a category, and a category is what `expect` asserts.
+#
+# ── What was found the moment it was asked ──────────────────────────────────
+#
+# The corpus has two files that use `\`, and both destroy a name and never touch
+# it again. Nobody had written the case the premise is about, so no consensus
+# run had ever compared it — and the three engines do not agree:
+#
+#   zytw, zyvm   runtime, after half the output is written, saying
+#                `use after destruction: variable 'x' was destroyed …`
+#   zyjs         before running, saying `undefined variable 'x'` — which does
+#                not say a destruction happened at all
+#
+# Each engine has a different half right: the browser one refuses at the better
+# moment, the Rust ones say the better thing. Recorded as GLB-008.
+
+id      = "lifetime"
+what    = "how a value stops existing, and what may be said about it afterwards"
+engines = ["zytw", "zyvm", "zyjs"]
+premise = "MEM-8"
+
+[[cell]]
+id   = "use-after-destruction"
+what = "a name used after `\\` destroys it"
+# expect = error only: WHICH error, and when, is exactly what diverges, and
+# asserting either would be picking a winner before the author has.
+src  = """
+x = "dato"
+>> x ¶
+\\ x
+>> x ¶
+"""
+
+[[cell]]
+id     = "destroy-then-reassign"
+expect = "ok"
+what   = "a destroyed name comes back when it is assigned again"
+# `\` ends a life, it does not burn the name. Without this cell the rule above
+# could be met by refusing the name forever, which would be a different language.
+src    = """
+x = 1
+\\ x
+x = 2
+>> x ¶
+"""
+
+[[cell]]
+id     = "destroy-what-is-finished-with"
+expect = "ok"
+what   = "destroying a name that is never touched again is the ordinary case"
+src    = """
+x = 1
+>> x ¶
+\\ x
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "destroy-inside-a-function"
+expect = "ok"
+what   = "a function may destroy its own local"
+src    = """
+f() { x = 1
+\\ x
+<~ "hecho" }
+>> f() ¶
+"""

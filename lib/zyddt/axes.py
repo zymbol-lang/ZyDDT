@@ -32,6 +32,7 @@ silently means something else.  `«…»` appears nowhere in the language.
 from __future__ import annotations
 
 import itertools
+import shutil
 import re
 import tomllib
 from dataclasses import dataclass
@@ -59,9 +60,17 @@ class Cell:
     oracle: tuple[str, str] | None = None   # (oracle id, source)
     expect: str | None = None    # overrides the axis's, for one cell
     oracle_literal_ok: str | None = None   # why the answer may appear in the src
+    # Sibling files, written beside the cell. A module IS a file, so four
+    # premises — MEM-3, MEM-4, AGT-1, AGT-2 — could not be asked at all while a
+    # cell was one file. A cell that declares these lives in a DIRECTORY of its
+    # own so that `<# ./m/est => E` inside `src` resolves the way it would in a
+    # real project, with no rewriting of paths.
+    files: dict[str, str] | None = None
 
     @property
     def path(self) -> Path:
+        if self.files:
+            return GEN_DIR / self.axis / self.id / "main.zy"
         return GEN_DIR / self.axis / f"{self.id}.zy"
 
     def oracle_path(self, ext: str) -> Path:
@@ -219,6 +228,7 @@ def _matrix_cells(d: dict, stem: str, path: Path) -> list[Cell]:
             oracle,
             m.get("expect"),
             m.get("oracle_literal_ok"),
+            {k: expand(v, coords, where) for k, v in m.get("files", {}).items()} or None,
         ))
     return cells
 
@@ -261,7 +271,8 @@ def load_all_from(where: Path, only: list[str] | None = None) -> list[Axis]:
         axis_id = d.get("id", path.stem)
         cells = [Cell(path.stem, c["id"], c.get("what", ""),
                       c["src"], c.get("skip"), _oracle_of(c, path),
-                      c.get("expect"), c.get("oracle_literal_ok"))
+                      c.get("expect"), c.get("oracle_literal_ok"),
+                      _files_of(c, path))
                  for c in d.get("cell", [])]
         if "matrix" in d:
             cells += _matrix_cells(d, path.stem, path)
@@ -286,6 +297,24 @@ def load_all_from(where: Path, only: list[str] | None = None) -> list[Axis]:
             cells=cells,
         ))
     return out
+
+
+def _files_of(cell: dict, path: Path) -> dict[str, str] | None:
+    """`[cell.files]` — sibling sources written beside the cell.
+
+    A path is relative and may not climb: a cell that wrote outside its own
+    directory could overwrite another cell's file, and the two would then be one
+    test that reports as two.
+    """
+    files = cell.get("files")
+    if not files:
+        return None
+    for name in files:
+        p = Path(name)
+        if p.is_absolute() or ".." in p.parts:
+            raise SystemExit(f"zyddt: {path.name}: cell '{cell['id']}' declares "
+                             f"file {name!r}, which leaves the cell's directory")
+    return dict(files)
 
 
 def _oracle_of(cell: dict, path: Path) -> tuple[str, str] | None:
@@ -348,9 +377,15 @@ def generate(axes: list[Axis], oracles: dict | None = None) -> list[Cell]:
     written: list[Cell] = []
     for axis in axes:
         d = GEN_DIR / axis.cells[0].axis if axis.cells else None
-        keep = set()
+        keep, keep_dirs = set(), set()
         for cell in axis.cells:
             cell.path.parent.mkdir(parents=True, exist_ok=True)
+            if cell.files:
+                keep_dirs.add(cell.id)
+                for name, body in cell.files.items():
+                    sib = cell.path.parent / name
+                    sib.parent.mkdir(parents=True, exist_ok=True)
+                    sib.write_text(body.lstrip("\n"), encoding="utf-8")
             banner = BANNER.format(axis=cell.axis, axis_what=axis.what,
                                    cell_id=cell.id, cell_what=cell.what)
             cell.path.write_text(banner + cell.src.lstrip("\n"), encoding="utf-8")
@@ -369,4 +404,10 @@ def generate(axes: list[Axis], oracles: dict | None = None) -> list[Cell]:
             for stale in list(d.glob("*.zy")) + list(d.glob("*.oracle.*")):
                 if stale.name not in keep:
                     stale.unlink()
+            # A multi-file cell is a directory, and a directory the declaration
+            # no longer produces is the same defect as a stale file: a test
+            # nobody can trace to an axis.
+            for sub in [x for x in d.iterdir() if x.is_dir()]:
+                if sub.name not in keep_dirs:
+                    shutil.rmtree(sub)
     return written
