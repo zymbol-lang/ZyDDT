@@ -7,7 +7,8 @@
 isolation/output-mark-without-an-output-parameter
 isolation/output-parameter-unmarked-at-call
 refusal/arity-inside-a-collection-operand
-
+refusal/arity-inside-a-lambda-block
+refusal/output-mark-missing-inside-a-lambda-block
 # refusal/arity-inside-a-collection-operand — anotada el 2026-08-30.
 #
 # Los tres rechazan y dicen lo mismo; los dos motores Rust añaden además
@@ -22,7 +23,6 @@ refusal/arity-inside-a-collection-operand
 #
 # Lo que sí se arregló en el mismo commit: a zyjs le faltaba la LÍNEA en este
 # diagnóstico —los nodos `Call` y `CallExpr` no llevaban `line`— y ya la lleva.
-
 # isolation/output-parameter-unmarked-at-call — anotadas el 2026-09-12.
 # isolation/output-mark-without-an-output-parameter
 #
@@ -36,3 +36,12 @@ refusal/arity-inside-a-collection-operand
 # comentarios. El bloque de arriba se perdió al regenerar el 2026-09-12 y se
 # repuso a mano. Hasta que el runner los preserve, copiar los comentarios antes
 # de regenerar es parte del procedimiento.
+
+# refusal/arity-inside-a-lambda-block — anotadas el 2026-09-12.
+# refusal/output-mark-missing-inside-a-lambda-block
+#
+# Las dos mitades del hueco que ZYTW-001 destapó: hasta ese día el analizador no
+# entraba en un `-> { … }`, así que una aridad mal y una marca `<~` ausente
+# escritas ahí dentro eran silencio. Los tres motores las rechazan ya; el reparto
+# es el de siempre — los dos de Rust añaden la línea `= help:` y zyjs no, misma
+# familia que `refusal/arity-inside-a-collection-operand`.
