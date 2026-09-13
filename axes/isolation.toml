@@ -111,7 +111,12 @@ values = [
   { id = "direct",   head = "lee() { >> ",         tail = " ¶ }",                          invoke = "lee()" },
   { id = "as-value", head = "lee() { >> ",         tail = " ¶ }",                          invoke = "f = lee\n    f()" },
   { id = "nested",   head = "lee() { >> ",         tail = " ¶ }\nmedio() { lee() }",       invoke = "medio()" },
-  { id = "lambda",   head = "lee = () -> { >> ",   tail = " ¶ }",                          invoke = "lee()" },
+  # The lambda left this dimension on 2026-09-13. It is a LIGHT environment
+  # (MEM-6), so at file level it reads the file because it IS that scope — the
+  # same answer a `?` block gets — and the matrix's `expect = "error"` is wrong
+  # for it. What the rule does forbid is a lambda INSIDE a function reaching the
+  # file, and that is its own cell below: the boundary it crosses there belongs
+  # to the function, not to the lambda.
 ]
 
 [matrix]
@@ -305,4 +310,45 @@ src     = """
 f() { <~ 1 }
 f() { <~ 2 }
 >> f() ¶
+"""
+
+
+# ── The lambda, after MEM-6 was settled on 2026-09-13 ───────────────────────
+#
+# A lambda is light: it opens no boundary of its own, so the isolation it has is
+# the one it INHERITS from whatever strong environment it is written in. That is
+# what makes the rule need no exception — and it is also why these two cells sit
+# beside each other rather than in the matrix, which can only assert one
+# category per row.
+
+[[cell]]
+id      = "lambda-at-file-level-reads-the-file"
+premise = "MEM-6"
+expect  = "ok"
+what    = "a lambda written at file level reads the file — it is that scope"
+src     = """
+factor = 3
+n = [1, 2]
+>> (n$> (x -> x * factor)) ¶
+"""
+
+[[cell]]
+id      = "lambda-sees-its-enclosing-function"
+premise = "MEM-6"
+expect  = "ok"
+what    = "a lambda reads the function it is written in — this is what a factory is"
+src     = """
+fabrica(f) { <~ x -> x * f }
+dob = fabrica(2)
+>> dob(5) ¶
+"""
+
+[[cell]]
+id      = "lambda-inside-a-function-cannot-reach-the-file"
+premise = "MEM-2"
+what    = "a lambda inherits its function's isolation: the file is out of reach"
+src     = """
+base = 10
+f(n) { <~ (n$> (x -> x + base)) }
+>> f([1, 2]) ¶
 """
