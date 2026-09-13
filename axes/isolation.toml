@@ -40,7 +40,21 @@
 # rather than enforced. Whatever is decided now, the four readers must answer
 # ALIKE, and a matrix is the only form that keeps asking.
 #
-# ── The state of the `file-var` row, 2026-09-12 ─────────────────────────────
+# ── The state of the `file-var` row, 2026-09-13 ─────────────────────────────
+#
+# Three of the four are GREEN: MEM-2 was implemented on 2026-09-13 and a named
+# function reading a file variable is a static error in all three engines. It
+# cost nothing to restore — four corpus files, all of them tests of this rule,
+# and none of the nine applications.
+#
+# `file-var-lambda` stays RED on purpose. A lambda reaching out is a WARNING
+# while that half is decided, and this cell asserts `error`. It is declared debt
+# and not a defect: PREMISES.md § 2 (MEM-6) states the open question and the
+# argument on both sides. The day the lambda is decided this cell either goes
+# green or its `expect` changes — and if neither happens, the red is the
+# reminder that a question was left open.
+#
+# ── The state as it was on 2026-09-12, kept ────────────────────────────────
 #
 # Those four cells fail today, in all three engines, and the failure is the
 # open question rather than a regression: the isolation was removed deliberately
