@@ -1134,3 +1134,31 @@ dónde se rechaza un rango suelto. A, B, E y F no necesitan decisión: los dos R
 `axes/runtime-loops-ranges.toml`: 11 pares (12 diagnósticos: `@~ -1` da uno por
 motor Rust). Tres `-met` esperan `warn`: el aviso de dirección de rango con un
 límite variable es cierto y no es lo que preguntan.
+
+---
+
+## GLB-015 — Llamadas y funciones de orden superior con algo que no es lo que necesitan: kinds `##_` contra `##Type`, y un `$<` con lambda de un parámetro que la VM y `zyjs` aceptan
+
+**Estado:** abierto — la parte del kind **necesita la decisión de `GLB-011`**
+**Encontrado por:** `axes/runtime-functions-hof.toml`, paso C7 del plan de cobertura de diagnósticos, 2026-09-14
+
+### Qué se observa
+
+12 diagnósticos provocados.
+
+**A. `$<` con una lambda de un solo parámetro:** `[1, 2]$< (0, x -> x)` — el TW
+da error («reduce lambda requires 2 parameters»), la VM y `zyjs` responden `0`.
+
+**B. `zyjs` acepta un pipe hacia un número:** `5 |> v` con `v = 5` responde `5`.
+
+**C. El kind:** en 9 de los 12 el TW dice `##_` y la VM `##Type` (`map`/`filter`/
+`reduce`/`sort` sobre algo que no es array ni lambda, llamar a algo que no es
+función). En «lambda expects N arguments» y «member function calls» los tres
+dicen `##_`.
+
+**D. Textos distintos entre TW y VM en 8** (la VM dice `this needs Function and
+got Int` donde el TW nombra la operación).
+
+### Qué lo sujeta
+
+`axes/runtime-functions-hof.toml`: 12 pares. 2 verdes, 22 rojas.
