@@ -972,3 +972,47 @@ suprime ahora siempre (`tail-call-inside-try-is-caught`).
 dicen por qué no lo llevan) y las cuatro de `runtime-errors`:
 `unmatched-catch-propagates-div`, `unmatched-catch-propagates-index`,
 `a-native-type-error-knows-its-kind` y `type-is-catchable`.
+
+---
+
+## GLB-011 — Los operadores `$` con un operando del tipo equivocado: el TW rechaza, la VM y `zyjs` a veces contestan, y los tres dan kinds distintos
+
+**Estado:** abierto — **necesita decisión del autor** (qué es correcto) antes de arreglar nada
+**Encontrado por:** `axes/runtime-collection-ops.toml`, paso C3 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** media-alta: el mismo programa falla en un motor y contesta un valor en otro
+
+### Qué se observa
+
+50 diagnósticos de ejecución de los operadores `$`, provocados cada uno con el
+operando equivocado entrando por un parámetro (así no los para el analizador).
+El tree-walker da error en los 50. Los otros dos no siempre:
+
+**A. La VM contesta en 11**, donde el TW da error. Ejemplos: `"ab"$+ 5` → `ab5`;
+`5 $++ "a"` → `5a`; `[1, 2, 3]$-[3..1]` → `[1, 2, 3]`; `[1, 2]$[1..9]` → `[1, 2]`;
+`"aa"$~~["a":"b":-1]` → `bb`; `"ab"$? 5` → `#0`.
+
+**B. `zyjs` contesta en 30.** Además de los de la VM: índices fuera de rango de
+`$+[i]` que insertan igualmente, `$*` con cuenta no entera o negativa,
+`$~~`/`$/`/`$??` con patrón o delimitador que no es cadena, `$-[..]` con
+límites que no son enteros.
+
+**C. El kind con que se captura no coincide.** De los 50 `-met`, sólo 2 dan el
+mismo kind en los tres. El reparto más común: TW `##_`, VM `##Type` (27 casos).
+El TW clasifica por palabras del mensaje (`zymbol_common::errkind`) y estos
+mensajes no dicen «type»; la VM los lanza como `VmError::TypeError`.
+
+**D. Texto distinto entre TW y VM en 37** de los que fallan en los dos.
+
+### Qué hay que decidir
+
+1. ¿Estas operaciones con un tipo equivocado **son error** (lo que hace el TW)
+   o tienen significado (`"ab"$+ 5` → `ab5`, lo que hacen VM y `zyjs`)?
+2. ¿De qué **familia** es un operando de tipo equivocado en una operación `$`:
+   `##Type` (VM) o `##_` (TW)?
+
+Sin esas dos respuestas, arreglar sería elegir por el autor.
+
+### Qué lo sujeta
+
+`axes/runtime-collection-ops.toml`: 50 celdas `expect = "error"` y 50 `-met`.
+3 verdes, 97 rojas.
