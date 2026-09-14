@@ -170,3 +170,68 @@ E::sube()
     lee() { <~ n }
 }
 """
+
+# ── AGT-3: the reachable program is knowable before running it ──────────────
+#
+# Four facts make one guarantee, and three of them can be asked. The fourth —
+# that there is no `eval` — cannot: no program demonstrates the ABSENCE of a
+# feature, and a cell that tried would only be testing whichever spelling its
+# author happened to guess. AGT-3 says so in its own entry, which is the honest
+# form of that gap.
+
+[[cell]]
+id      = "import-path-is-a-literal"
+premise = "AGT-3"
+what    = "a `<#` path may not be computed — a variable there is refused"
+src     = """
+ruta = "./m/est"
+<# ruta => Z
+>> Z::lee() ¶
+"""
+[cell.files]
+"m/est.zy" = """
+# est {
+    #> { lee }
+    n = 0
+    lee() { <~ n }
+}
+"""
+
+[[cell]]
+id      = "imports-come-first"
+premise = "AGT-3"
+what    = "an import after a statement is refused, so the graph is known from the top of the file"
+src     = """
+>> "antes" ¶
+<# ./m/est => Z
+>> Z::lee() ¶
+"""
+[cell.files]
+"m/est.zy" = """
+# est {
+    #> { lee }
+    n = 0
+    lee() { <~ n }
+}
+"""
+
+[[cell]]
+id      = "subscript-path-is-taken-literally"
+premise = "AGT-3"
+what    = "`</ p />` runs the file named `p`, it does not read the variable `p`"
+# Refused because no file is called `p`. Which of the two it tried is the point:
+# a path that could be computed would put a whole program outside what a reader
+# is able to enumerate.
+src     = """
+p = "./m/est.zy"
+out = </ p />
+>> out ¶
+"""
+[cell.files]
+"m/est.zy" = """
+# est {
+    #> { lee }
+    n = 0
+    lee() { <~ n }
+}
+"""
