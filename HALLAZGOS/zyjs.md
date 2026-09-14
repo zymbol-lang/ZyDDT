@@ -23,8 +23,9 @@
 | [`ZYJS-016`](#zyjs-016--elementos-argumentos-y-llamadas-de--se-evalúan-a-la-vez-y-sus-efectos-se-entrelazan) | **corregido 2026-09-14** | elementos, argumentos y llamadas de `$>` se evalúan a la vez: `12a a 12b b` |
 | [`ZYJS-017`](#zyjs-017--un--dentro-de--n--termina-el-programa-en-silencio) | **corregido 2026-09-14** | un `@>` dentro de `@ N` termina el programa, con estado 0 |
 | [`ZYJS-018`](#zyjs-018--el-analizador-no-cuenta-como-uso-lo-escrito-en-los-límites-de-un-corte-ni-en-un-) | **corregido 2026-09-14** | `a$[n..2]` y `"" $++ m` avisan `unused variable` |
+| [`ZYJS-019`](#zyjs-019--termwidth-rechaza-con-otro-texto) | **abierto** | `term::width` con un número rechaza con otro texto |
 
-**Uno abierto: `ZYJS-014`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Dos abiertos: `ZYJS-014` y `ZYJS-019`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -1083,4 +1084,22 @@ las partes del `$++`.
 ### Qué lo sujeta
 
 `evaluation-order/slice-bounds` y `evaluation-order/build`.
+
+---
+
+## ZYJS-019 — `term::width` rechaza con otro texto
+
+**Estado:** abierto
+**Encontrado por:** `runtime-std/term-width-expected-a-string-or-char`, paso C10 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** baja: rechaza lo mismo, con otras palabras
+
+`term::width(5)`: los dos Rust dicen
+`term::width: expected a String or Char, got ###`; `zyjs` dice
+
+```
+Runtime error: term::width: expected a String or Char
+```
+
+Las otras 20 funciones de `std/` del mismo paso coinciden palabra por palabra en
+los tres motores, y también en el kind.
 
