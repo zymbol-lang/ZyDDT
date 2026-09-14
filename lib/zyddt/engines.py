@@ -59,6 +59,11 @@ class Normalise:
     strip_ansi: bool = True
     drop_source_excerpt: bool = True
     keep_location: str = "line"
+    # A path inside the TEXT of a message, as opposed to the `-->` line that
+    # `keep_location` already handles. Same reason, different place: the Rust
+    # engines print it absolute and zyjs relative, so a cell comparing them was
+    # comparing where the repository is installed.
+    normalise_paths: bool = True
     compare_column: bool = False
 
 
