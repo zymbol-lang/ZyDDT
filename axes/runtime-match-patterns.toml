@@ -1,0 +1,111 @@
+# The runtime-match-patterns axis — Phase C, family C8 of the diagnostics plan.
+#
+# `??` and the destructuring patterns: the runtime diagnostics no program
+# provoked on 2026-09-14. `<id>` raises it, `<id>-met` catches it and prints the
+# family.
+#
+# One of them is not an error: the tree-walker warns AT RUN TIME when a `??`
+# whose arms produce values is used as a statement. It gets one cell, expecting
+# `warn`, and no `-met` — there is nothing to catch. Its second line
+# (`--> consider assigning to a variable`) is provoked by the same cell.
+#
+# Two of this family have no cell because nothing reaches them; the reasons
+# are in the queue.
+
+id      = "runtime-match-patterns"
+what    = "the runtime diagnostics of `??` and destructuring patterns: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "match-with-values-used-as-a-statement"
+expect = "warn"
+what   = "a `??` whose arms give values, used as a statement, is worth a warning"
+src    = """
+t(v) {
+    ?? v { 1 => "uno" _ => "otro" }
+    <~ 1
+}
+>> t(2) ¶
+"""
+
+[[cell]]
+id     = "array-pattern-requires-an-array"
+expect = "error"
+what   = "array pattern '[ … ]' requires an array, got {}"
+src    = """
+t(v) {
+    [a, b] = v
+    <~ a + b
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "array-pattern-requires-an-array-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    [a, b] = v
+    <~ a + b
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "no-pattern-matched-in-match-expression"
+expect = "error"
+what   = "no pattern matched in match expression"
+src    = """
+t(v) {
+    <~ ?? v { 1 => "uno" }
+}
+>> t(2) ¶
+"""
+
+[[cell]]
+id     = "no-pattern-matched-in-match-expression-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ?? v { 1 => "uno" }
+}
+!? {
+    >> t(2) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tuple-pattern-requires-a-tuple"
+expect = "error"
+what   = "tuple pattern '( … )' requires a tuple, got {}"
+src    = """
+t(v) {
+    (a, b) = v
+    <~ a + b
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "tuple-pattern-requires-a-tuple-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    (a, b) = v
+    <~ a + b
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
