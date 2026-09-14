@@ -654,7 +654,9 @@ terminando.
 
 ## GLB-008 — Usar un nombre tras `\` se rechaza en los tres, en momentos distintos y diciendo cosas distintas
 
-**Estado:** abierto
+**Estado:** **corregido el 2026-09-13.** Los tres rechazan, en ejecución y con la
+misma frase. Y el arreglo acabó siendo **el contrario del que esta ficha
+proponía** — ver «Lo que la medición cambió»
 **Encontrado por:** `lifetime/use-after-destruction`, la primera vez que se preguntó
 **Familia:** `AGENTIC.md` G4, que lo tenía anotado como «solo en ejecución» sin saber que zyjs ya lo hacía antes
 
@@ -692,26 +694,57 @@ Es el argumento de la capa de celdas en una línea: la pregunta no estaba
 esperando a que alguien tropezara con ella, estaba esperando a que alguien la
 hiciera.
 
-### Arreglo propuesto
+### Lo que la medición cambió
 
-Las dos mitades son compatibles: la comprobación va a `zymbol-semantic`, donde
-`check` la ejecuta, **con el texto de los motores Rust**. `zyjs` conserva el
-momento y gana el mensaje; `zytw` y `zyvm` conservan el mensaje y ganan el
-momento. Nadie cede nada.
+La propuesta era llevar la comprobación a `zymbol-semantic`, porque «un motor ya
+lo hace antes». Al escribir la celda que faltaba apareció por qué ningún motor
+Rust lo hacía:
 
-Hay una decisión detrás y es del autor: hoy `\` es un error de **ejecución** en
-Rust, y hacerlo estático es lo que `AGENTIC.md` G4 pide sin haberlo decidido.
-Lo que este hallazgo añade es que ya no es una mejora hipotética — un motor lo
-hace.
+```zymbol
+x = 1
+? #0 { \ x }      // la rama NO se ejecuta
+>> x ¶            // zytw: 1   ·   zyjs: error
+```
 
-**Es propuesta, no decisión.**
+**zyjs rechazaba un programa correcto.** Una comprobación estática sin análisis
+de flujo no puede distinguir una destrucción que **ocurrió** de una que sólo está
+**escrita**, así que la respuesta en ejecución no es la tardía: es la única
+correcta. La propuesta iba al revés y habría convertido el falso positivo de un
+motor en el comportamiento de los tres.
+
+Es `lifetime/destroy-in-a-branch-not-taken`, y se escribió después de que el
+arreglo propuesto empezara a parecer obvio.
+
+### Qué se arregló, y dónde
+
+**El navegador** — el `Checker` borraba el nombre del marco al ver `\`, así que
+cualquier uso posterior era `undefined variable`, mirara o no el flujo. Ya no lo
+borra. La comprobación vive donde los motores Rust la tienen: en ejecución, en
+`Env`, que sabe lo que de verdad pasó. Y `Env` recuerda ahora **qué** nombre se
+destruyó, para poder decirlo — antes contestaba `'x' is undefined — did you mean
+'x°'`, que manda a buscar una definición que estaba ahí y sugiere un mecanismo de
+ámbito de bucle que no tiene nada que ver.
+
+**La VM** — y aquí había un tercer defecto que esta ficha no vio, porque la
+primera medición miró sólo la primera línea de la salida: **`\` no hacía nada**
+sobre una variable de archivo. El compilador quitaba la ligadura del registro,
+pero una variable de archivo vive también en `global_vars`, así que la siguiente
+lectura la encontraba allí y `>> x` volvía a imprimir el valor. Instrucción nueva
+`DestroyGlobal(gvar, nombre)`: termina la ranura y guarda el nombre para el
+mensaje; `StoreGlobal` la revive, porque `\` acaba una vida y no quema el nombre.
+
+### Lo que queda
+
+En la VM, destruir un **local de función** da todavía `'y' is undefined — did you
+mean 'y°'` en vez de la frase de destrucción. El mecanismo de arriba no llega
+ahí: un registro no lleva nombre en ejecución. Es el mismo defecto de redacción
+que se acaba de cerrar para el archivo, en el otro sitio.
 
 ### Qué lo sujeta
 
-`lifetime/use-after-destruction`, roja hasta que los tres coincidan. Las otras
-tres celdas del eje sujetan lo que ya funciona: que `\` no queme el nombre
-(reasignar lo revive), que destruir lo terminado sea lo corriente, y que una
-función pueda destruir su propio local.
+El eje `lifetime` entero, **5 de 5 en verde**: el uso tras destruir, la rama que
+no se ejecuta, que reasignar revive el nombre, que destruir lo terminado sea lo
+corriente y que una función pueda destruir su propio local.
 
 ---
 
