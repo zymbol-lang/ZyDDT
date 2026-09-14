@@ -3,11 +3,11 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Uno abierto.** Lo encontró el primer eje que le preguntó por el alcance
-(`axes/isolation.toml`, 2026-09-12). Hasta ese día este fichero decía «ninguno
-todavía», y decía la verdad por la razón equivocada: nadie le había preguntado
-casi nada. La cifra que importa es la tabla de `zyddt axis`, no la longitud de
-este fichero.
+**Uno abierto: `ZYTW-002`.** `ZYTW-001` lo encontró el primer eje que le preguntó por el
+alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
+fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
+le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
+no la longitud de este fichero.
 
 ---
 
@@ -134,3 +134,75 @@ Para referencia, el sondeo de `Divergente_ES` le atribuyó cuatro: `DM-01`,
 `DM-15`, `DM-19` y `DM-26`. Ninguna está sujeta por una celda de ZyDDT — pasarlas
 a chincheta es trabajo pendiente y es la parte arqueológica de
 [`../MIGRATION.md`](../MIGRATION.md) § 3, paso 3.
+
+---
+
+## ZYTW-002 — Un `:!` que falla se salta el `:>`, y el error que cruza un `:>` se localiza en el `:>`
+
+**Estado:** abierto
+**Encontrado por:** `error-flow/error-in-catch-still-runs-finally` y `error-flow/error-through-finally-keeps-its-line`, 2026-09-14 — el eje se escribió para la VM (`GLB-010`) y el tree-walker era el de referencia
+**Gravedad:** media. Un `:>` es donde se cierra lo que se abrió, y es justamente el caso en que algo ya ha ido mal
+
+### Qué se observa
+
+```zymbol
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Div {
+        a = [1]
+        >> a[9] ¶                   // el catch falla
+    } :> {
+        >> "limpieza" ¶
+    }
+} :! ##Index {
+    >> "exterior" ¶
+}
+```
+
+| | salida |
+|---|---|
+| `zytw` | `exterior` |
+| `zyjs` | `limpieza` · `exterior` |
+| Python, mismo flujo | `limpieza` · `exterior` |
+
+`REFERENCE.md`: *«`:> { }` — finally block (always executes, regardless of
+error)»*.
+
+Y la segunda mitad, en el mismo sitio: un error que atraviesa un `:>` sale
+localizado **en la última línea del `:>`**, no donde ocurrió.
+
+```zymbol
+!? {
+    >> "a" ¶
+    >> 10 / 0 ¶        // línea 3
+} :> {
+    >> "limpieza" ¶    // línea 5
+}
+```
+
+`zytw` dice `--> main.zy:5`; `zyjs` dice `:3`.
+
+### Causa
+
+`crates/zymbol-interpreter/src/lib.rs`, `execute_try`:
+
+```rust
+self.execute_catch_block(catch_clause, err_val.clone())?;
+```
+
+El `?` devuelve antes de llegar al bloque del `:>`. Y la línea: el error del
+cuerpo se guarda sin localizar en `try_result`, el `:>` ejecuta sus sentencias
+—que actualizan la línea en curso— y el error se localiza al salir, con la
+línea que dejó el `:>`.
+
+### Arreglo
+
+Guardar el resultado del catch en vez de propagarlo, ejecutar el `:>` y
+propagar después, con la misma precedencia que ya tiene el cuerpo: un error del
+`:>` gana. Y localizar el error del cuerpo (y el del catch) **antes** de
+ejecutar el `:>`.
+
+### Qué lo sujeta
+
+`error-flow/error-in-catch-still-runs-finally` y
+`error-flow/error-through-finally-keeps-its-line`.
+

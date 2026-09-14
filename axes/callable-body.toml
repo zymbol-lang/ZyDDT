@@ -1,0 +1,76 @@
+# The callable-body axis — a function called by `$>`, `$|` or `$<` runs the whole language.
+#
+# ZYVM-004, found 2026-09-14. The register VM ran a function handed to a
+# higher-order operator through a SECOND, smaller interpreter loop
+# (`call_function`), and that loop knew 96 of the instruction set. The other 49
+# fell into `_ => {}` — "for unsupported instructions in HOF mini-VM, skip" — so
+# they did not fail: they did nothing, and the register they should have written
+# stayed `##_`.
+#
+#     >> ["a,b", "c"]$> (s -> s$/ ',') ¶       zytw  [[a, b], [c]]
+#                                               zyvm  [(), ()]
+#
+# Splitting, slicing, formatting, removing, inserting, replacing, `??` over a
+# range or a string, `$!`, a `!?` — each one answered nothing, in a lambda or in
+# a named function alike, and the consensus gate stood at 660 agreeing and 0
+# diverging throughout: no corpus file uses one of those inside a callback AND
+# prints what came back.
+#
+# The dimension that matters is `op`: the body is the thing the second loop could
+# not run. `hof` is crossed with it because the callers are separate call sites,
+# and a fix that routes one of them to the real loop and forgets another would
+# otherwise pass. `match-int` is here as the control: the second loop did know
+# that one, and it has to stay green before and after.
+
+id      = "callable-body"
+what    = "every operation, inside a function called by `$>`, `$|` and `$<`"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "ok"
+
+[[dimension]]
+name = "hof"
+values = [
+  { id = "map-lambda",  what = "a lambda `$>` maps",           head = 'f = x -> {',        ret = '#1',      call = '>> (xs$> f)$# ¶' },
+  { id = "map-named",   what = "a named function `$>` maps",   head = 'f(x) {',            ret = '#1',      call = '>> (xs$> f)$# ¶' },
+  { id = "filter",      what = "a lambda `$|` filters with",   head = 'f = x -> {',        ret = '#1',      call = '>> (xs$| f)$# ¶' },
+  { id = "reduce",      what = "a lambda `$<` folds with",     head = 'f = (acc, x) -> {', ret = 'acc + 1', call = '>> xs$< (0, f) ¶' },
+]
+
+[[dimension]]
+name = "op"
+values = [
+  { id = "split",              what = "splits a string with `$/`",             stmt = "r = x$/ ','" },
+  { id = "slice",              what = "slices a string with `$[..]`",          stmt = 'r = x$[1..2]' },
+  { id = "fmt-thousands",      what = "formats with `#,||`",                   stmt = 'r = #,|x$# * 100000|' },
+  { id = "fmt-scientific",     what = "formats with `#^||`",                   stmt = 'r = #^|x$# * 100000|' },
+  { id = "base",               what = "converts base with `0x||`",             stmt = 'r = 0x|x$# * 30|' },
+  { id = "array-remove",       what = "removes a value with `$-`",             stmt = "r = (x$/ ',')$- \"a\"" },
+  { id = "array-remove-all",   what = "removes every value with `$--`",        stmt = "r = (x$/ ',')$-- \"a\"" },
+  { id = "array-remove-index", what = "removes a position with `$-[i]`",       stmt = "r = (x$/ ',')$-[1]" },
+  { id = "array-insert",       what = "inserts with `$+[i]`",                  stmt = "r = (x$/ ',')$+[1] \"z\"" },
+  { id = "array-slice",        what = "slices an array with `$[..]`",          stmt = "r = (x$/ ',')$[1..1]" },
+  { id = "str-insert",         what = "inserts into a string with `$+[i]`",    stmt = 'r = x$+[1] "Z"' },
+  { id = "str-remove",         what = "removes from a string with `$-[i]`",    stmt = 'r = x$-[1]' },
+  { id = "str-replace",        what = "replaces with `$~~`",                   stmt = 'r = x$~~["c":"C"]' },
+  { id = "str-replace-n",      what = "replaces the first N with `$~~`",       stmt = 'r = x$~~["c":"C":1]' },
+  { id = "find-all",           what = "finds every position with `$??`",       stmt = "r = x$?? 'c'" },
+  { id = "match-int",          what = "matches an integer with `??` (control)", stmt = 'r = ?? x$# { 3 => "tres" _ => "otro" }' },
+  { id = "match-range",        what = "matches a range with `??`",             stmt = 'r = ?? x$# { 1..3 => "corto" _ => "largo" }' },
+  { id = "match-str",          what = "matches a string with `??`",            stmt = 'r = ?? x { "cde" => "es cde" _ => "no" }' },
+  { id = "is-error",           what = "asks `$!`",                             stmt = 'r = (x$#)$!' },
+  { id = "try-catch",          what = "catches inside itself with `!?`",       stmt = "r = 0\n    !? { r = 10 / (x$# - 3) } :! ##Div { r = -1 }" },
+  { id = "destructure-rest",    what = "destructures with a rest name",         stmt = "[p, *q] = x$/ ','\n    r = (p, q)" },
+]
+
+[matrix]
+id   = "«hof.id»-«op.id»"
+what = "«hof.what», whose body «op.what»"
+src  = """
+xs = ["a,b", "cde"]
+«hof.head»
+    «op.stmt»
+    >> r ¶
+    <~ «hof.ret»
+}
+«hof.call»
+"""
