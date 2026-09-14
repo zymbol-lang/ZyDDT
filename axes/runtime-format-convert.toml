@@ -1,0 +1,352 @@
+# The runtime-format-convert axis — Phase C, family C5 of the diagnostics plan.
+#
+# Casts (`###`, `##!`), base conversion (`0x|x|`) and the format expressions
+# (`#.n|x|`, `#!n|x|`, `#,|x|`): the runtime diagnostics no program provoked on
+# 2026-09-14. `<id>` raises it, `<id>-met` catches it and prints the family. The
+# wrong value arrives through a parameter so the analyzer lets the program run.
+#
+# `0x|"zz"|` is one program with two diagnostics, one per Rust engine:
+# `failed to parse 'zz' as hexadecimal number` in the tree-walker and
+# `failed to parse 'zz' as base-16 number` in the VM. One cell holds both.
+
+id      = "runtime-format-convert"
+what    = "the runtime diagnostics of casts, base conversion and format expressions: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "trunc-cast-requires-a-numeric-value-or"
+expect = "error"
+what   = "##! requires a numeric value or Char, got {}"
+src    = """
+t(v) {
+    <~ ##!v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "trunc-cast-requires-a-numeric-value-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ##!v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "int-cast-requires-a-numeric-value-got"
+expect = "error"
+what   = "### requires a numeric value, got {}"
+src    = """
+t(v) {
+    <~ ###v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "int-cast-requires-a-numeric-value-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ###v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "base-conversion-expressions-work-with-char-int"
+expect = "error"
+what   = "base conversion expressions work with char, int, or string, got {:?}"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "base-conversion-expressions-work-with-char-int-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-rounding"
+expect = "error"
+what   = "cannot convert string '{}' to number for rounding"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+>> t("abc") ¶
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-rounding-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+!? {
+    >> t("abc") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-truncation"
+expect = "error"
+what   = "cannot convert string '{}' to number for truncation"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+>> t("abc") ¶
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-truncation-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+!? {
+    >> t("abc") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "decimal-count-must-be-a-whole-number"
+expect = "error"
+what   = "decimal count must be a whole number, got {}"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "decimal-count-must-be-a-whole-number-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "decimal-count-must-not-be-negative-got"
+expect = "error"
+what   = "decimal count must not be negative, got {}"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "decimal-count-must-not-be-negative-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-number"
+expect = "error"
+what   = "failed to parse '{}' as {} number"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-number-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t("zz") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "format-expressions-only-work-with-numbers-got"
+expect = "error"
+what   = "format expressions only work with numbers, got {:?}"
+src    = """
+t(v) {
+    <~ #,|v|
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "format-expressions-only-work-with-numbers-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #,|v|
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "integer-overflow-cannot-represent-this-float"
+expect = "error"
+what   = "integer overflow: {} cannot represent this float"
+src    = """
+t(v) {
+    <~ ###v
+}
+>> t(1.0e300) ¶
+"""
+
+[[cell]]
+id     = "integer-overflow-cannot-represent-this-float-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ###v
+}
+!? {
+    >> t(1.0e300) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "invalid-unicode-character-code"
+expect = "error"
+what   = "invalid Unicode character code: {}"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t("D800") ¶
+"""
+
+[[cell]]
+id     = "invalid-unicode-character-code-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t("D800") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "round-expressions-only-work-with-numbers-or"
+expect = "error"
+what   = "round expressions only work with numbers or numeric strings, got {:?}"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+>> t(#1) ¶
+"""
+
+[[cell]]
+id     = "round-expressions-only-work-with-numbers-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+!? {
+    >> t(#1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "truncate-expressions-only-work-with-numbers-or"
+expect = "error"
+what   = "truncate expressions only work with numbers or numeric strings, got {:?}"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+>> t(#1) ¶
+"""
+
+[[cell]]
+id     = "truncate-expressions-only-work-with-numbers-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+!? {
+    >> t(#1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
