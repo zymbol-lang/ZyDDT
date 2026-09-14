@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Uno abierto: `ZYTW-002`.** `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Ninguno abierto.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -139,7 +139,7 @@ a chincheta es trabajo pendiente y es la parte arqueológica de
 
 ## ZYTW-002 — Un `:!` que falla se salta el `:>`, y el error que cruza un `:>` se localiza en el `:>`
 
-**Estado:** abierto
+**Estado:** **corregido 2026-09-14**
 **Encontrado por:** `error-flow/error-in-catch-still-runs-finally` y `error-flow/error-through-finally-keeps-its-line`, 2026-09-14 — el eje se escribió para la VM (`GLB-010`) y el tree-walker era el de referencia
 **Gravedad:** media. Un `:>` es donde se cierra lo que se abrió, y es justamente el caso en que algo ya ha ido mal
 
@@ -201,8 +201,63 @@ propagar después, con la misma precedencia que ya tiene el cuerpo: un error del
 `:>` gana. Y localizar el error del cuerpo (y el del catch) **antes** de
 ejecutar el `:>`.
 
+### Una tercera mitad, que salió al arreglar las dos
+
+Un `:>` que falla mientras lleva un `<~` pendiente restauraba ese retorno
+**antes** de propagar su error, y el retorno seguía viajando con él: cortaba el
+`>> f() ¶` del llamador después del valor y antes del `¶`, y llegaba al nivel
+superior como estado de salida del programa — `1`. La vio
+`error-flow/return-runs-finally-outside-its-own-catch`, que comparaba la salida
+y además el código.
+
 ### Qué lo sujeta
 
-`error-flow/error-in-catch-still-runs-finally` y
-`error-flow/error-through-finally-keeps-its-line`.
+`error-flow/error-in-catch-still-runs-finally`,
+`error-flow/error-through-finally-keeps-its-line` y
+`error-flow/return-runs-finally-outside-its-own-catch`.
+
+---
+
+## ZYTW-003 — Cada error capturado deja abiertos los ámbitos donde se lanzó
+
+**Estado:** **corregido 2026-09-14**
+**Encontrado por:** leyendo `execute_block` al corregir `ZYTW-002`, y confirmado midiendo antes de tocarlo
+**Gravedad:** media: no cambia ninguna salida, pero un bucle que captura errores se vuelve cuadrático
+
+### Qué se observa
+
+```zymbol
+c = 0
+@ _i:1..80000 {
+    !? { >> 10 / 0 ¶ } :! { c += 1 }
+}
+```
+
+| capturas | `zytw` | `zyvm` |
+|---:|---:|---:|
+| 20 000 | 0,61 s · 33 MB | 0,02 s |
+| 80 000 | **11,9 s · 110 MB** | 0,03 s |
+
+Cuatro veces las capturas, **19,5 veces** el tiempo.
+
+### Causa
+
+`execute_block` hace `push_scope`, recorre las sentencias con `?` y hace
+`pop_scope` sólo si ninguna falla. Un error que sale de tres bloques deja tres
+ámbitos abiertos, y el `!?` que lo captura sigue ejecutando encima de ellos:
+cada búsqueda de un nombre recorre todos los que dejó cada captura anterior. Lo
+mismo con los bucles (`push_loop_scope`) y con el bloque del `:!`.
+
+### Arreglo
+
+El `!?` es el único sitio donde un error deja de viajar, así que es el único que
+tiene que devolver la pila: guarda la profundidad al entrar y la restaura al
+capturar, al fallar el catch y al fallar el `:>` (`unwind_scopes_to`). Una función
+ya lo hacía con `restore_call_state`.
+
+### Qué lo sujeta
+
+`zyquality/cost/`, caso `growth/caught-errors`: el mismo programa a N y a 4N, con
+el límite entre lineal (4,0) y cuadrático (16,0). Tras el arreglo, `zytw` 3,75,
+`zyvm` 3,93, `zyjs` 3,04.
 

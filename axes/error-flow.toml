@@ -36,6 +36,14 @@
 #
 # So those cells carry no oracle, and say why. Every other cell does, written as
 # the same control flow and not as the answer.
+#
+# And every oracle here prints words that are also in the Zymbol source, which is
+# what `suggestive` exists to catch: an answer typed into the program it is meant
+# to check. It is not that here. The answer to a question about control flow is
+# WHICH of the labels written in the program get printed, and in what order — a
+# cell has two or more labels and a wrong engine prints a different subset of
+# them. Both sides compute the path; the labels are only how a path is seen. So
+# each oracle cell says `oracle_literal_ok`, pointing here.
 
 id      = "error-flow"
 what    = "where a raised error goes: nested `!?`, filters that do not match, `:>` and the jumps that cross it"
@@ -46,6 +54,7 @@ expect  = "ok"
 
 [[cell]]
 id   = "inner-done-then-outer-error"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "an inner `!?` that finished cleanly does not catch what fails after it"
 src  = """
 !? {
@@ -68,6 +77,7 @@ except ZeroDivisionError:
 
 [[cell]]
 id   = "inner-caught-then-outer-error"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "an inner `!?` that caught its error is spent: the next one goes outside"
 src  = """
 !? {
@@ -92,6 +102,7 @@ except IndexError:
 
 [[cell]]
 id   = "error-in-catch-reaches-outer"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "an error raised inside `:!` belongs to the `!?` outside"
 src  = """
 !? {
@@ -116,6 +127,7 @@ except IndexError:
 
 [[cell]]
 id   = "unmatched-inner-reaches-outer"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a filter that does not match hands the error to the `!?` around it"
 src  = """
 !? {
@@ -138,6 +150,7 @@ except ZeroDivisionError:
 
 [[cell]]
 id   = "unmatched-in-function-reaches-caller"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "and across a call: the caller's `:!` meets what the callee's filter let through"
 src  = """
 h(x) {
@@ -175,6 +188,7 @@ src  = """
 
 [[cell]]
 id   = "finally-without-catch-propagates"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `!?` with only `:>` runs the cleanup and lets the error through"
 src  = """
 !? {
@@ -197,6 +211,7 @@ except ZeroDivisionError:
 
 [[cell]]
 id   = "unmatched-catch-runs-finally-then-propagates"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a filter that does not match: the cleanup runs, then the error leaves"
 src  = """
 !? {
@@ -221,6 +236,7 @@ except ZeroDivisionError:
 
 [[cell]]
 id   = "error-in-catch-still-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `:!` that fails itself still owes its `:>` — REFERENCE: always executes"
 src  = """
 !? {
@@ -249,6 +265,7 @@ except IndexError:
 
 [[cell]]
 id   = "error-in-finally-replaces-the-pending-one"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `:>` that fails while an error is pending: the new error is the one that leaves"
 src  = """
 !? {
@@ -277,6 +294,7 @@ except IndexError:
 
 [[cell]]
 id   = "caught-inside-finally-keeps-the-pending-one"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `!?` that catches INSIDE a `:>` does not consume the error the `:>` is carrying"
 src  = """
 !? {
@@ -312,6 +330,7 @@ except ZeroDivisionError:
 
 [[cell]]
 id   = "break-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "`@!` out of a `!?` body runs its `:>`"
 src  = """
 @ {
@@ -330,6 +349,7 @@ print("después")
 
 [[cell]]
 id   = "continue-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "`@>` out of a `!?` body runs its `:>`, once per turn"
 src  = """
 n = 0
@@ -350,6 +370,7 @@ while n < 2:
 
 [[cell]]
 id   = "break-in-catch-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "`@!` out of a `:!` runs the `:>` too"
 src  = """
 @ {
@@ -371,6 +392,7 @@ print("después")
 
 [[cell]]
 id   = "break-disarms-the-catch"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `!?` left by `@!` does not catch what fails after the loop"
 # A counted loop and a caller on purpose: with a handler left armed, an infinite
 # loop would re-enter itself forever, and an uncaught error would give the cell
@@ -402,6 +424,7 @@ except IndexError:
 
 [[cell]]
 id   = "continue-disarms-the-catch"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "and the same for `@>`"
 src  = """
 f() {
@@ -446,6 +469,7 @@ src  = """
 
 [[cell]]
 id   = "return-runs-finally-outside-its-own-catch"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `:>` reached through `<~` is not inside its own `:!`"
 src  = """
 f() {
@@ -485,6 +509,7 @@ f() {
 
 [[cell]]
 id   = "lambda-inside-try-does-not-run-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `<~` inside a lambda written in a `!?` returns from the lambda, not through the `:>`"
 src  = """
 !? {
@@ -505,6 +530,7 @@ finally:
 
 [[cell]]
 id   = "lambda-inside-finally-returns"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a lambda written inside `:>` is a function, and its `<~` returns"
 src  = """
 !? { >> "cuerpo" ¶ } :> {
@@ -523,6 +549,7 @@ finally:
 
 [[cell]]
 id   = "try-inside-a-mapped-lambda"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "a `!?` inside a lambda that `$>` calls catches for that element"
 src  = """
 g = x -> {
@@ -542,6 +569,7 @@ print([g(x) for x in [1, 0, 2]])
 
 [[cell]]
 id   = "error-in-a-mapped-lambda-is-catchable"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
 what = "an error inside the lambda `$>` calls reaches the `!?` around the `$>`"
 src  = """
 !? {
@@ -582,4 +610,71 @@ src    = """
 } :> {
     >> "limpieza" ¶
 }
+"""
+
+# ── Found while fixing the rest (2026-09-14) ────────────────────────────────
+
+[[cell]]
+id   = "propagate-runs-finally"
+what = "`$!!` leaves the function like `<~`, and owes the `:>` it crosses like `<~`"
+# No oracle: `$!!` is Zymbol's own. The VM emitted a bare `Return` for it and
+# skipped the cleanup; the tree-walker and the browser engine ran it.
+src  = """
+<# std/json => j
+f() {
+    !? {
+        v = j::decode("\\{")$!!
+        <~ v
+    } :> {
+        >> "limpieza" ¶
+    }
+    <~ 0
+}
+r = f()
+>> (r$!) ¶
+"""
+
+[[cell]]
+id   = "tail-call-inside-try-is-caught"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `<~ f(…)` inside `!?` is still inside it: the callee's error is caught there"
+# The VM turns `<~ f(n - 1)` into a tail call, which REPLACES the frame — and a
+# frame replaced is a `!?` gone. It is suppressed inside any `!?` now; it used to
+# be suppressed only when there was a `:>`. This cell was never seen red: the old
+# VM answered -1 by accident, because the replaced frame kept the handler the
+# `!?` had left armed. It holds the suppression, which nothing else would.
+src  = """
+f(n) {
+    ? n == 0 { <~ 10 / n }
+    !? { <~ f(n - 1) } :! ##Div { <~ -1 }
+    <~ 99
+}
+>> f(3) ¶
+"""
+oracle.py = """
+def f(n):
+    if n == 0:
+        return 10 // n
+    try:
+        return f(n - 1)
+    except ZeroDivisionError:
+        return -1
+    return 99
+print(f(3))
+"""
+
+[[cell]]
+id   = "input-eof-is-catchable"
+what = "running out of input inside `!?` is an error the `:!` meets"
+# No oracle. The VM raised it from inside its read-and-retry loop, where the jump
+# to the handler continued the READ loop instead: it read end-of-input again with
+# the handler already spent, and the error left uncaught.
+src  = """
+!? {
+    << n
+    >> n ¶
+} :! {
+    >> "sin entrada" ¶
+}
+>> "sigue" ¶
 """

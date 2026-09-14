@@ -20,11 +20,11 @@
 | [`ZYJS-013`](#zyjs-013--los-pasos-del-navegador-no-cuentan-como-uso-de-una-variable) | **corregido 2026-09-07** | `m[i>j]` avisa `unused variable 'i'` |
 | [`ZYJS-014`](#zyjs-014---es-on-en-el-motor-del-navegador) | abierto | `$+` es O(n²) |
 | [`ZYJS-015`](#zyjs-015--outer-se-aceptaba-y-se-ejecutaba-como-outer) | **corregido 2026-09-13** | `@!outer` se aceptaba como `@:outer!` |
-| [`ZYJS-016`](#zyjs-016--elementos-argumentos-y-llamadas-de--se-evalúan-a-la-vez-y-sus-efectos-se-entrelazan) | **abierto** | elementos, argumentos y llamadas de `$>` se evalúan a la vez: `12a a 12b b` |
-| [`ZYJS-017`](#zyjs-017--un--dentro-de--n--termina-el-programa-en-silencio) | **abierto** | un `@>` dentro de `@ N` termina el programa, con estado 0 |
-| [`ZYJS-018`](#zyjs-018--el-analizador-no-cuenta-como-uso-lo-escrito-en-los-límites-de-un-corte-ni-en-un-) | **abierto** | `a$[n..2]` y `"" $++ m` avisan `unused variable` |
+| [`ZYJS-016`](#zyjs-016--elementos-argumentos-y-llamadas-de--se-evalúan-a-la-vez-y-sus-efectos-se-entrelazan) | **corregido 2026-09-14** | elementos, argumentos y llamadas de `$>` se evalúan a la vez: `12a a 12b b` |
+| [`ZYJS-017`](#zyjs-017--un--dentro-de--n--termina-el-programa-en-silencio) | **corregido 2026-09-14** | un `@>` dentro de `@ N` termina el programa, con estado 0 |
+| [`ZYJS-018`](#zyjs-018--el-analizador-no-cuenta-como-uso-lo-escrito-en-los-límites-de-un-corte-ni-en-un-) | **corregido 2026-09-14** | `a$[n..2]` y `"" $++ m` avisan `unused variable` |
 
-**Cuatro abiertos: `ZYJS-014`, `ZYJS-016`, `ZYJS-017` y `ZYJS-018`.** Los tres últimos salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron.
+**Uno abierto: `ZYJS-014`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -961,7 +961,7 @@ este motor. La celda queda en `DIVERGE` por eso, no por el comportamiento.
 
 ## ZYJS-016 — Elementos, argumentos y llamadas de `$>` se evalúan a la vez, y sus efectos se entrelazan
 
-**Estado:** abierto
+**Estado:** **corregido 2026-09-14**
 **Encontrado por:** `callable-body/map-lambda-match-str`, 2026-09-14 — imprimía las dos líneas de un `$>` en orden inverso; medido después por `axes/evaluation-order.toml`
 **Gravedad:** alta para el playground: la salida de un programa correcto sale revuelta
 
@@ -1017,7 +1017,7 @@ paralelismo real que perder: el motor corre en un solo hilo.
 
 ## ZYJS-017 — Un `@>` dentro de `@ N` termina el programa en silencio
 
-**Estado:** abierto
+**Estado:** **corregido 2026-09-14**
 **Encontrado por:** `error-flow/continue-disarms-the-catch`, 2026-09-14, por accidente —la celda preguntaba por la VM— y medido después por `axes/loop-jump.toml`
 **Gravedad:** **alta**: el resto del programa no se ejecuta, no hay mensaje y el estado de salida es 0
 
@@ -1059,7 +1059,7 @@ función = 24 celdas. Rojas exactamente las dos de `@>` en `@ N`.
 
 ## ZYJS-018 — El analizador no cuenta como uso lo escrito en los límites de un corte ni en un `$++`
 
-**Estado:** abierto
+**Estado:** **corregido 2026-09-14**
 **Encontrado por:** `evaluation-order/slice-bounds` y `evaluation-order/build`, 2026-09-14
 **Gravedad:** baja: un aviso falso, en `stderr`. Pero es la misma familia que `ZYJS-013` y que `GLB-001`: un brazo que no desciende apaga todas las comprobaciones de lo que hay debajo
 
