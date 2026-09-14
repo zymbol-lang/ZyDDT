@@ -892,36 +892,70 @@ juntos convierten un `!? … :! ##Type` en un tragaerrores silencioso.
 `zyjs` tiene el tercer comportamiento: no captura por tipo y deja salir el error,
 que es incorrecto de otra manera pero al menos es ruidoso.
 
+### No era un caso: era el mecanismo
+
+Siguiendo el defecto aparecieron **veintitrés** programas más en los que la VM
+no hace lo que hacen los otros dos motores, y todos tienen la misma forma: un
+error que viaja por un `!?` y llega a un sitio que no es el suyo. Están
+declarados en `axes/error-flow.toml` (25 celdas) y las agrupo por lo que falla:
+
+| la VM… | ejemplo |
+|---|---|
+| **no anida**: un `!?` interior que ya terminó sigue armado | `!? { !? {…} :! {…}  >> 10/0 } :! ##Div {…}` entra en el catch **interior** |
+| **no relanza**: un filtro que no coincide, un `:>` sin catch | `!? { >> 10/0 } :> { >> "f" }` imprime `f` y **sigue** |
+| **no respeta al de fuera**: un error dentro de `:!` o `:>` no llega al `!?` exterior | aborta el programa aunque haya un `:! ##Index` esperándolo |
+| **no desarma al salir por un salto** | `@ { !? { @! } :! {…} }` y después del bucle cualquier error entra en ese catch — con `@ {}` es un **bucle infinito** |
+| **no ejecuta `:>` al salir por `@!`/`@>`** | `@ { !? { @! } :> { >> "f" } }` no imprime `f` |
+| **confunde el `<~` de una lambda con el de su `!?`** | una lambda escrita dentro de un `!?` con `:>` ejecuta ese `:>` al retornar; una escrita dentro de `:>` no retorna |
+| **mete el `:>` alcanzado por `<~` dentro de su propio `:!`** | `!? { <~ 1 } :! {…} :> { >> 10/0 }` lo captura su propio catch |
+| **no ve un `!?` dentro de una función de `$>`** | ni el de dentro de la lambda ni el de fuera del `$>` — ver `ZYVM-004` |
+
+El tree-walker y `zyjs` coinciden en 23 de las 25. Las otras dos no son de la
+VM y tienen ficha propia: en una se equivoca `zyjs` —un `@>` dentro de `@ N`
+termina el programa, `ZYJS-017`— y en la otra el tree-walker, que se salta el
+`:>` cuando el `:!` falla, contra Python y contra `REFERENCE.md` («`:>` always
+executes»): `ZYTW-002`.
+
 ### Causa
 
-`crates/zymbol-compiler/src/lib.rs`, en el despacho tipado del `!?` (la rama
-`has_typed`). El bucle recorre las cláusulas: cada una compara el kind y salta a
-la siguiente si no coincide. **Cuando ninguna coincide y no hay cláusula
-genérica, el flujo cae en `catch_end` y sigue.** Falta el único caso que hace
-que un filtro sea un filtro: si nadie atendió el error, relanzarlo.
+Tres, y la tercera es la que las junta:
 
-`Instruction::RaiseError(StrIdx)` existe pero levanta un error **nuevo** desde el
-pool de cadenas; lo que hace falta es re-lanzar el que ya hay, que la VM tiene en
-`frame.error` (`FrameError { error_val, error_kind }`, `lib.rs:481`).
+1. **Un solo manejador por marco.** `FrameInfo` tiene un `catch_ip` y un
+   `try_depth`. `TryBegin` sobrescribe el `catch_ip` sin guardar el de fuera, y
+   `TryEnd` sólo lo borra cuando la profundidad llega a cero. Al entrar en el
+   catch, `raise!` pone la profundidad a **cero** —la de todos los `!?` del
+   marco, no la de uno—.
+2. **Ninguna noción de «error pendiente».** El compilador
+   (`compile_try`, `zymbol-compiler/src/lib.rs`) cae al final del despacho tipado
+   cuando no coincide nada, y un `:>` sin catch usa la etiqueta del `:>` como
+   destino del error: se ejecuta la limpieza y **no queda nada que relanzar**.
+3. **Los saltos no saben que cruzan un `!?`.** `@!`, `@>` y `<~` emiten un
+   `Jump` o un `Return` sin desarmar el manejador ni ejecutar el `:>`. El único
+   rastro de esto era `pending_finally`, que vive en el `Compiler` y no en el
+   contexto de la función, así que **se hereda dentro de una lambda**.
 
-### Arreglo propuesto
+La mitad del kind es independiente: la VM clasifica por variante de `VmError`,
+y un error nativo llega como `Generic` con un mensaje; el tree-walker lo
+clasifica por el texto. Mismo mensaje, dos clasificaciones.
 
-Dos piezas, y la primera es la urgente:
+### Arreglo
 
-1. **Instrucción nueva** —`RethrowError`, sin operandos— emitida tras el bucle de
-   cláusulas cuando ninguna es genérica. Toma `frame.error` y lo levanta. El
-   tree-walker ya hace justamente esto, así que la forma correcta no hay que
-   diseñarla, sólo portarla.
-2. **Que el kind viaje**: un error nativo debe llegar a `frame.error` con su
-   `error_type` (`ErrorValue`, `zymbol-interpreter/src/lib.rs:177`) y no con `_`.
-   Mientras no lo haga, `:! ##Type` no puede funcionar aunque (1) esté resuelto.
-
-**Es propuesta, no decisión.**
+1. **Pila de manejadores**, sin asignaciones en el camino sin error: `TryBegin`
+   guarda el manejador de fuera en un registro que el compilador reserva, y lo
+   restauran `TryEnd` y la entrada al catch.
+2. **Errores pendientes por marco**, etiquetados por el `!?` que los recibió:
+   la entrada al catch guarda el error; una cláusula que coincide lo **consume**;
+   al final de `:>` —o de la cadena de cláusulas si no hay `:>`— una instrucción
+   lo **relanza** si sigue ahí, restaurando la posición donde nació.
+3. **El compilador lleva la pila de `!?` en el contexto de la función**, y cada
+   `@!`, `@>` y `<~` que la cruza desarma, ejecuta el `:>` que le toca o relanza
+   el error que ese `:>` llevaba.
+4. **Un solo clasificador de kind por texto**, usado por los dos motores Rust
+   para los errores que no traen variante propia, y portado a `zyjs`.
 
 ### Qué lo sujeta
 
-`runtime-errors/unmatched-catch-propagates-div`,
-`runtime-errors/unmatched-catch-propagates-index`,
-`runtime-errors/a-native-type-error-knows-its-kind` y
-`runtime-errors/type-is-catchable`. Las cuatro rojas hasta que las dos piezas
-estén.
+`axes/error-flow.toml` (25 celdas; las 23 con oráculo en Python salvo las que
+dicen por qué no lo llevan) y las cuatro de `runtime-errors`:
+`unmatched-catch-propagates-div`, `unmatched-catch-propagates-index`,
+`a-native-type-error-knows-its-kind` y `type-is-catchable`.

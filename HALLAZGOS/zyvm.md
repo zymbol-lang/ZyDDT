@@ -8,8 +8,9 @@
 | [`ZYVM-001`](#zyvm-001--la-vm-ejecuta-lo-que-el-tree-walker-rechaza-40-celdas) | **corregido 2026-08-30** | ejecutaba y contestaba donde `zytw` rechaza — 40 celdas |
 | [`ZYVM-002`](#zyvm-002--el-diagnóstico-de---nombra-al-operador--10-celdas) | **corregido 2026-08-30** | el rechazo de `-` citaba al operador `+` |
 | [`ZYVM-003`](#zyvm-003--acumular-en-el-estado-de-un-módulo-es-on-en-la-vm-y-on-en-el-tree-walker) | **abierto** | acumular en el estado de un módulo es cuadrático: 3,3 s donde el TW tarda 0,013 s |
+| [`ZYVM-004`](#zyvm-004--una-función-llamada-por----o--corre-en-un-segundo-intérprete-que-se-salta-49-instrucciones) | **abierto** | una función llamada por `$>`, `$|` o `$<` corre en un segundo intérprete que se salta 49 instrucciones |
 
-**Uno abierto: `ZYVM-003`.**
+**Dos abiertos: `ZYVM-003` y `ZYVM-004`.**
 
 Las chinchetas que los sujetan:
 
@@ -293,3 +294,76 @@ con el límite entre lineal (4,0) y cuadrático (16,0). Marcado
 `open_finding = { zyvm = "ZYVM-003" }`, así que se reporta **KNOWN** en cada
 corrida con su ratio y no enrojece el gate: la deuda escrita no es una
 regresión. El día que baje de 6,0 el runner pide cerrar la ficha.
+
+---
+
+## ZYVM-004 — Una función llamada por `$>`, `$|` o `$<` corre en un segundo intérprete que se salta 49 instrucciones
+
+**Estado:** abierto
+**Encontrado por:** `error-flow/try-inside-a-mapped-lambda` el 2026-09-14 — un `!?` dentro de la lambda de un `$>` no capturaba nada — y medido después por `axes/callable-body.toml`
+**Gravedad:** **alta.** No falla: contesta `##_`. Y la VM es el futuro motor por defecto
+
+### Qué se observa
+
+```zymbol
+>> ["a,b", "c"]$> (s -> s$/ ',') ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `[[a, b], [c]]` |
+| `zyjs` | `[[a, b], [c]]` |
+| `zyvm` | **`[(), ()]`** |
+
+Lo mismo con una **función con nombre** (`xs$> partir`), con `$|` y con `$<`,
+y con veinte operaciones: partir, cortar, formatear (`#,||`, `#^||`), cambiar de
+base, quitar, insertar, reemplazar, buscar todas las posiciones, `??` sobre un
+rango o una cadena, `$!`, `!?` y la desestructuración con resto. El mismo cuerpo
+fuera de un `$>` —o dentro de un `@`— funciona.
+
+### Causa
+
+`crates/zymbol-vm/src/lib.rs`, `call_function`: las funciones que llaman los
+operadores de orden superior (`call_callable`) no se ejecutan en el bucle de la
+VM sino en un **segundo bucle** escrito aparte, que atiende 96 de las
+instrucciones y termina en
+
+```rust
+_ => {
+    // For unsupported instructions in HOF mini-VM, skip
+}
+```
+
+Las 49 que no conoce no fallan: no hacen nada, y el registro que tenían que
+escribir se queda en `##_`. Tampoco llevan manejadores de error, así que un
+`!?` dentro de esa función no existe, y un error que sale de ella lo devuelve
+con `?` en vez de con `raise!`, así que **tampoco lo captura un `!?` alrededor
+del `$>`**.
+
+Es el mismo patrón que `ZYVM-003` señaló en `LoadGlobal`: dos copias del
+intérprete, y cada arreglo aterriza en una.
+
+### Por qué no lo veía nada
+
+`zyq consensus` estaba en 660 de acuerdo y 0 divergiendo. Ningún fichero del
+corpus usa una de esas operaciones dentro de una función de orden superior **y**
+imprime lo que devolvió. El gate compara salidas; el programa que no se escribió
+no tiene salida.
+
+### Arreglo
+
+Borrar el segundo intérprete, no completarlo: completarlo deja dos copias que
+vuelven a separarse con la instrucción número 163. El bucle principal sólo
+depende de `ip`, `base` y `chunk_idx`, que salen del marco de arriba, así que
+puede ejecutarse **reentrante**: el operador empuja el marco de la función y
+corre el mismo bucle hasta que ese marco retorna. Un error que no encuentra
+manejador por encima de ese suelo vuelve al operador, que lo levanta con
+`raise!` en el bucle de fuera.
+
+### Qué lo sujeta
+
+`axes/callable-body.toml`: 21 operaciones × 4 llamadores = 84 celdas. `match-int`
+es el control —el segundo bucle sí la conocía— y está verde las cuatro veces;
+las otras 80 están rojas. Y `error-flow/try-inside-a-mapped-lambda` y
+`error-flow/error-in-a-mapped-lambda-is-catchable`.
+

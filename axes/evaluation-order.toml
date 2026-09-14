@@ -1,0 +1,58 @@
+# The evaluation-order axis — left to right, one at a time, in every position.
+#
+# ZYJS-016, found 2026-09-14. The browser engine is `async` from end to end, and
+# it evaluated the elements of an array literal with
+#
+#     await Promise.all(expr.items.map(i => this.eval(i, env)))
+#
+# which does not evaluate them in order: it STARTS every one of them, and each
+# runs until its first `await` before the next one gets a turn. For a pure
+# expression that is invisible. For a call that prints twice it is not:
+#
+#     p(x) { >> x "a" ¶  >> x "b" ¶  <~ x }
+#     >> [p(1), p(2)] ¶         zytw, zyvm   1a 1b 2a 2b [1, 2]
+#                               zyjs         12a a 12b b [1, 2]
+#
+# The value is right and the output is scrambled. Any effect with an order —
+# output, input, a `<~` parameter written by one element and read by the next —
+# is exposed the same way.
+#
+# Six positions did it and several look just like them and did not, so all of
+# them are asked: a position that evaluates in order today is one refactor away
+# from `Promise.all`, and the ones that were right are the evidence of what the
+# rule is.
+
+id      = "evaluation-order"
+what    = "sub-expressions with effects run left to right and one at a time, wherever they appear"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "ok"
+
+[[dimension]]
+name = "position"
+values = [
+  { id = "array-literal",     what = "the elements of an array literal",      stmt = '>> [p(1), p(2)] ¶' },
+  { id = "tuple-literal",     what = "the elements of a tuple literal",       stmt = '>> (p(1), p(2)) ¶' },
+  { id = "dictionary",        what = "the values of a dictionary literal",    stmt = '>> #(a: p(1), b: p(2)) ¶' },
+  { id = "call-arguments",    what = "the arguments of a call",               stmt = "s(a, b) { <~ a + b }\n>> s(p(1), p(2)) ¶" },
+  { id = "build",             what = "the parts of a `$++` build",            stmt = '>> "" $++ p(1) p(2) ¶' },
+  { id = "map",               what = "the calls `$>` makes",                  stmt = '>> [1, 2]$> p ¶' },
+  { id = "filter",            what = "the calls `$|` makes",                  stmt = "q(x) { <~ p(x) > 0 }\n>> [1, 2]$| q ¶" },
+  { id = "reduce",            what = "the calls `$<` makes",                  stmt = '>> [1, 2]$< (0, (acc, x) -> acc + p(x)) ¶' },
+  { id = "sort-comparator",   what = "the calls a `$^` comparator makes",     stmt = '>> [2, 1]$^ (a, b -> p(a) < p(b)) ¶' },
+  { id = "binary",            what = "the operands of `+`",                   stmt = '>> p(1) + p(2) ¶' },
+  { id = "output-juxtaposed", what = "the items of one `>>`",                 stmt = '>> p(1) " " p(2) ¶' },
+  { id = "slice-bounds",      what = "the bounds of a slice",                 stmt = "a = [10, 20, 30]\n>> a$[p(1)..p(2)] ¶" },
+  { id = "navigator-steps",   what = "the steps of a navigator",              stmt = "m = [[1, 2], [3, 4]]\n>> m[(p(1))>(p(2))] ¶" },
+]
+
+[matrix]
+id   = "«position.id»"
+what = "«position.what» are evaluated in order"
+src  = """
+p(x) {
+    >> x "a" ¶
+    >> x "b" ¶
+    <~ x
+}
+«position.stmt»
+"""
