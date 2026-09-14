@@ -840,3 +840,88 @@ el programa— a **DIVERGE** por el momento. La diferencia entre esos dos
 veredictos es exactamente lo que se arregló. A su lado
 `modularity/module-functions-own-the-state`, verde, sujeta la mitad legítima: el
 estado persiste entre llamadas y lo llevan las funciones del módulo.
+
+---
+
+## GLB-010 — En la VM, un `:!` tipado que no coincide hace desaparecer el error
+
+**Estado:** abierto
+**Encontrado por:** `runtime-errors/type-is-catchable`, la primera celda que preguntó por `##Type`
+**Gravedad:** **alta.** Es la forma más cara que puede tomar un fallo: sin salida, sin código de salida, sin rastro — y **`zyvm` es el futuro motor por defecto**
+
+### Qué se observa
+
+```zymbol
+!? {
+    >> (1 / 0) ¶
+} :! ##Index {          // no coincide: esto es un ##Div
+    >> "index" ¶
+}
+>> "sigue" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `Runtime error: division by zero` — el error no fue atendido y sale |
+| `zyvm` | **imprime `sigue`** |
+
+Un `:!` tipado **filtra**; un error que no pasa el filtro no ha sido atendido y
+tiene que salir del `!?` exactamente como si no se hubiera escrito ningún catch.
+En la VM desaparece, y el programa continúa con el estado que dejó el fallo.
+
+Se comprobó en las dos direcciones —un `##Div` contra `:! ##Index` y un
+`##Index` contra `:! ##Div`— porque una sola dirección la cumpliría un motor que
+sencillamente no case nunca.
+
+### Y una segunda mitad, que es la que lo destapó
+
+```zymbol
+<# std/math => m
+!? { >> m::sqrt("a") ¶ } :! { >> (_err#?)[1] ¶ }
+```
+
+| motor | kind |
+|---|---|
+| `zytw` | `##Type` |
+| `zyvm` | **`##_`** |
+
+La VM no lleva el tipo de un error nativo, así que `:! ##Type` no podía casar
+nunca — y al no casar, por el defecto de arriba, el error se perdía. Los dos
+juntos convierten un `!? … :! ##Type` en un tragaerrores silencioso.
+
+`zyjs` tiene el tercer comportamiento: no captura por tipo y deja salir el error,
+que es incorrecto de otra manera pero al menos es ruidoso.
+
+### Causa
+
+`crates/zymbol-compiler/src/lib.rs`, en el despacho tipado del `!?` (la rama
+`has_typed`). El bucle recorre las cláusulas: cada una compara el kind y salta a
+la siguiente si no coincide. **Cuando ninguna coincide y no hay cláusula
+genérica, el flujo cae en `catch_end` y sigue.** Falta el único caso que hace
+que un filtro sea un filtro: si nadie atendió el error, relanzarlo.
+
+`Instruction::RaiseError(StrIdx)` existe pero levanta un error **nuevo** desde el
+pool de cadenas; lo que hace falta es re-lanzar el que ya hay, que la VM tiene en
+`frame.error` (`FrameError { error_val, error_kind }`, `lib.rs:481`).
+
+### Arreglo propuesto
+
+Dos piezas, y la primera es la urgente:
+
+1. **Instrucción nueva** —`RethrowError`, sin operandos— emitida tras el bucle de
+   cláusulas cuando ninguna es genérica. Toma `frame.error` y lo levanta. El
+   tree-walker ya hace justamente esto, así que la forma correcta no hay que
+   diseñarla, sólo portarla.
+2. **Que el kind viaje**: un error nativo debe llegar a `frame.error` con su
+   `error_type` (`ErrorValue`, `zymbol-interpreter/src/lib.rs:177`) y no con `_`.
+   Mientras no lo haga, `:! ##Type` no puede funcionar aunque (1) esté resuelto.
+
+**Es propuesta, no decisión.**
+
+### Qué lo sujeta
+
+`runtime-errors/unmatched-catch-propagates-div`,
+`runtime-errors/unmatched-catch-propagates-index`,
+`runtime-errors/a-native-type-error-knows-its-kind` y
+`runtime-errors/type-is-catchable`. Las cuatro rojas hasta que las dos piezas
+estén.

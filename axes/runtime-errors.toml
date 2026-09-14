@@ -1,0 +1,143 @@
+# The runtime-errors axis — every kind of failure, and how it is met.
+#
+# ── Two shapes, and using the wrong one tests nothing ───────────────────────
+#
+# Zymbol's failures are not one family. `LLM.md` § 9 states the rule and the
+# measurement on 2026-09-14 confirms it:
+#
+#   RAISED    ##Type, ##Div, ##Index, ##Range, ##Key — a mistake in the program.
+#             Met with `!? { … } :! ##Kind { … }`.
+#   SOFT      ##Parse, ##DB, ##Time, ##IO, ##Network — the world did not
+#             cooperate. They come back AS A VALUE: `$!` answers `#1` and `#?`
+#             names the kind. A `:!` never sees them, because nothing was thrown.
+#
+# So a cell that wraps `t::of(2026, 13, 45)` in a try/catch proves nothing at
+# all: it passes whether or not the error exists, because the catch is never
+# entered either way. That is why each kind below is asked in its own shape.
+#
+# ── Why these four first ────────────────────────────────────────────────────
+#
+# Of the ten kinds, six had at least one test of being met (##Div 7 files,
+# ##Index 4, ##Range 2, ##IO 2, ##Network 1, ##Key 1) and FOUR had none:
+# ##Type, ##Parse, ##DB, ##Time. A kind nothing meets is one where a regression
+# passes whole and silent.
+
+id      = "runtime-errors"
+what    = "each kind of failure: that it happens, and that it can be met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+# ── ##Type — raised ─────────────────────────────────────────────────────────
+
+[[cell]]
+id   = "type-is-raised"
+what = "a native called with the wrong type raises, rather than answering something"
+src  = """
+<# std/math => m
+>> m::sqrt("a") ¶
+"""
+
+[[cell]]
+id     = "type-is-catchable"
+expect = "ok"
+what   = "and `:! ##Type` meets it — the half that makes the kind usable"
+src    = """
+<# std/math => m
+!? {
+    >> m::sqrt("a") ¶
+} :! ##Type {
+    >> "type capturado" ¶
+}
+"""
+
+# ── ##Parse — soft ──────────────────────────────────────────────────────────
+
+[[cell]]
+id     = "parse-comes-back-as-a-value"
+expect = "ok"
+what   = "malformed JSON is a VALUE, testable with `$!`, not something thrown"
+# `\{` escapes the brace: an unescaped `{` opens string interpolation, and the
+# first draft of this cell measured that instead of the decoder.
+src    = """
+<# std/json => j
+r = j::decode("\\{roto")
+>> (r$!) " " (r#?)[1] ¶
+"""
+
+# ── ##Time — soft ───────────────────────────────────────────────────────────
+
+[[cell]]
+id     = "time-comes-back-as-a-value"
+expect = "ok"
+what   = "a date that does not exist is a soft ##Time, not a crash"
+src    = """
+<# std/time => t
+d = t::of(2026, 13, 45)
+>> (d$!) " " (d#?)[1] ¶
+"""
+
+# ── ##DB — soft, and not everywhere ─────────────────────────────────────────
+
+[[cell]]
+id     = "db-comes-back-as-a-value"
+expect = "ok"
+what   = "a connection that cannot be made is a value, so a program can carry on"
+# Excluded for zyjs in exclusions.toml: a browser has no ODBC. Same shape as
+# BASH_EXEC and SUBSCRIPT — the case stays here and is graded where it can run.
+src    = """
+<# std/db => d
+c = d::connect("odbc", "DSN=no-existe-este")
+>> (c$!) " " (c#?)[1] ¶
+"""
+
+# ── A catch that does not match must not swallow ────────────────────────────
+#
+# GLB-010, found by the cell above on 2026-09-14. `:! ##Kind` filters, and an
+# error that does not match the filter has not been handled — it has to carry on
+# out of the `!?` exactly as if no catch had been written. Under `zyvm` it
+# disappears instead, and the program continues with whatever state the failure
+# left behind. That is the most expensive shape a defect can take: no output, no
+# exit code, no trace.
+#
+# Two kinds, crossed the other way round, because one of them alone could be met
+# by an engine that simply never matches anything.
+
+[[cell]]
+id   = "unmatched-catch-propagates-div"
+what = "a `##Div` meeting a `:! ##Index` is not handled, and must reach the top"
+src  = """
+!? {
+    >> (1 / 0) ¶
+} :! ##Index {
+    >> "index" ¶
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "unmatched-catch-propagates-index"
+what = "and the reverse pairing, so this cannot pass by never matching at all"
+src  = """
+!? {
+    a = [1, 2]
+    >> a[99] ¶
+} :! ##Div {
+    >> "div" ¶
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "a-native-type-error-knows-its-kind"
+expect = "ok"
+what   = "`_err#?` names ##Type for a native called with the wrong type"
+# The second half of GLB-010: zyvm answers ##_ here, which is why `:! ##Type`
+# never matched in the first place. A kind that is not carried is a kind nobody
+# can filter on.
+src    = """
+<# std/math => m
+!? {
+    >> m::sqrt("a") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
