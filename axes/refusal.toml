@@ -222,3 +222,19 @@ y = 1
 f = () -> { sube(y) }
 f()
 """
+
+# ── SYM-8: la modalidad va al final ────────────────────────────────────────
+
+[[cell]]
+id      = "modality-before-its-label"
+premise = "SYM-8"
+what    = "`@!outer` — a modal `!` with an argument after it"
+# SYM-8 of zymbol-design/PREMISES.md: a modal `?` or `!` is the rightmost mark
+# of an operator, which is why labelled break is `@:outer!`. The form is refused,
+# though not by a message that says so: the parser reads `@!` as a bare break and
+# `outer` as an expression, so what comes out is `undefined variable 'outer'`.
+# Recorded here because the cell asserts the refusal and not the wording — the
+# same asymmetry SYM-4 shows, where `!=` explains itself and a keyword does not.
+src     = """
+@:outer _i:1..3 { @!outer }
+"""

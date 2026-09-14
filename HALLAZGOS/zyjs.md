@@ -910,3 +910,44 @@ escala en que se nota.
 `n_by_engine = { zyjs = 5000 }` porque a la escala de los motores Rust este
 motor necesita minutos. Marcado `open_finding = { zyjs = "ZYJS-014" }`: se
 reporta KNOWN con su ratio en cada corrida y no enrojece el gate.
+
+---
+
+## ZYJS-015 — `@!outer` se aceptaba y se ejecutaba como `@:outer!`
+
+**Estado:** **corregido 2026-09-13**; queda un aviso de más
+**Encontrado por:** `refusal/modality-before-its-label`, la primera celda de SYM-8
+**Familia:** `ZYJS-001` — el parser aceptando lo que los dos motores Rust rechazan
+
+### Qué se observaba
+
+```zymbol
+@:outer _i:1..3 { >> "vuelta" ¶
+  @!outer }
+>> "fin" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `error: undefined variable 'outer'` |
+| `zyjs` | **imprime `vuelta` y `fin`** — exactamente lo mismo que la forma correcta |
+
+No es que lo tolerase: lo **ejecutaba como si fuera `@:outer!`**, que es la forma
+que SYM-8 existe para distinguir.
+
+### Causa
+
+`parseStatement`, en la rama `BREAK`: tras `@!` tomaba un `IDENT` como etiqueta
+si lo había. La ruptura etiquetada es `AT_BREAK`, dos líneas más abajo, y se
+parsea entera desde el token `@:outer!`.
+
+SYM-8 dice que un `?` o `!` modal es la marca **más a la derecha** del operador y
+que nunca le sigue un argumento ni una etiqueta. Aceptar un identificador ahí era
+admitir un segundo orden para lo mismo.
+
+### Lo que queda
+
+Ya rechaza, y con el mismo texto: `undefined variable 'outer'`. Antes emite un
+aviso que los motores Rust no dan — `this statement does nothing: 'outer' is read
+and discarded` — que es cierto y es de la familia de diagnósticos que sobran en
+este motor. La celda queda en `DIVERGE` por eso, no por el comportamiento.
