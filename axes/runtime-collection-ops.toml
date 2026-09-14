@@ -1,0 +1,1329 @@
+# The runtime-collection-ops axis — Phase C, family C3 of the diagnostics plan.
+#
+# Every diagnostic below is one the engines define and, on 2026-09-14, no
+# program anywhere provoked (`zyquality/messages/reach.py --list ejecución`).
+# Each gets the two cells the plan asks for:
+#
+#   <id>        expect = "error"  the program that raises it
+#   <id>-met    expect = "ok"     the same failure inside `!?`, printing the
+#                                  `##` family the catch received
+#
+# The operand that is wrong arrives through a parameter on purpose: written as
+# a literal, the analyzer refuses most of these before anything runs, and the
+# runtime diagnostic is never reached — which is how they came to be unprovoked.
+#
+# The `-met` cells print the kind rather than filtering on one: which family
+# these belong to is not decided (the tree-walker answers `##_`, the VM
+# `##Type`), and a cell that filtered on a guess would encode the guess.
+#
+# Three diagnostics of this family have no cell because nothing can reach them;
+# their reasons are in zyquality/messages/queue/runtime.tsv:
+#   · cannot update {:?} during deep update
+#   · deep update ($~) does not support ranges in the path
+#   · update operator ($~) requires a place to write like …
+
+id      = "runtime-collection-ops"
+what    = "the runtime diagnostics of the `$` collection operators: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "repeat-repetition-count-must-be-an-integer"
+expect = "error"
+what   = "$* repetition count must be an integer, got {}"
+src    = """
+t(v) {
+    <~ "ab" $* v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "repeat-repetition-count-must-be-an-integer-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab" $* v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "repeat-repetition-count-must-be-non-negative"
+expect = "error"
+what   = "$* repetition count must be non-negative, got {}"
+src    = """
+t(v) {
+    <~ "ab" $* v
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "repeat-repetition-count-must-be-non-negative-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab" $* v
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "append-is-not-supported-on-named-tuples"
+expect = "error"
+what   = "$+ is not supported on named tuples — no field name available"
+src    = """
+t(v) {
+    <~ v$+ 5
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "append-is-not-supported-on-named-tuples-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$+ 5
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "append-on-string-requires-char-or-string"
+expect = "error"
+what   = "$+ on string requires char or string element, got {:?}"
+src    = """
+t(v) {
+    <~ "ab"$+ v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "append-on-string-requires-char-or-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$+ v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "build-requires-a-string-or-array-as"
+expect = "error"
+what   = "$++ requires a string or array as base, got {:?}"
+src    = """
+t(v) {
+    <~ v $++ "a"
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "build-requires-a-string-or-array-as-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v $++ "a"
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "insert-index-must-be-an-integer-got"
+expect = "error"
+what   = "$+[i] index must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2]$+[v] 9
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "insert-index-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$+[v] 9
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "insert-index-must-be-positive-1-based"
+expect = "error"
+what   = "$+[i] index must be positive (1-based, use 1 to insert at the beginning), got {}"
+src    = """
+t(v) {
+    <~ [1, 2]$+[v] 9
+}
+>> t(0) ¶
+"""
+
+[[cell]]
+id     = "insert-index-must-be-positive-1-based-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$+[v] 9
+}
+!? {
+    >> t(0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "insert-is-not-supported-on-named-tuples"
+expect = "error"
+what   = "$+[i] is not supported on named tuples — no field name available"
+src    = """
+t(v) {
+    <~ v$+[1] 2
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "insert-is-not-supported-on-named-tuples-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$+[1] 2
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "insert-on-string-requires-char-or-string"
+expect = "error"
+what   = "$+[i] on string requires char or string element, got {:?}"
+src    = """
+t(v) {
+    <~ "ab"$+[1] v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "insert-on-string-requires-char-or-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$+[1] v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "insert-requires-an-array-tuple-or-string"
+expect = "error"
+what   = "$+[i] requires an array, tuple, or string, got {:?}"
+src    = """
+t(v) {
+    <~ v$+[1] 2
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "insert-requires-an-array-tuple-or-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$+[1] 2
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "append-index-out-of-bounds-for-array"
+expect = "error"
+what   = "$+[{}] index out of bounds for array of length {}"
+src    = """
+t(v) {
+    <~ [1]$+[v] 2
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "append-index-out-of-bounds-for-array-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1]$+[v] 2
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "append-index-out-of-bounds-for-string"
+expect = "error"
+what   = "$+[{}] index out of bounds for string of length {}"
+src    = """
+t(v) {
+    <~ "ab"$+[v] "c"
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "append-index-out-of-bounds-for-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$+[v] "c"
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "append-index-out-of-bounds-for-tuple"
+expect = "error"
+what   = "$+[{}] index out of bounds for tuple of length {}"
+src    = """
+t(v) {
+    <~ (1, 2)$+[v] 3
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "append-index-out-of-bounds-for-tuple-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ (1, 2)$+[v] 3
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-on-string-requires-char-or-string"
+expect = "error"
+what   = "$- on string requires char or string value, got {:?}"
+src    = """
+t(v) {
+    <~ "ab"$- v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "remove-on-string-requires-char-or-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$- v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-requires-an-array-tuple-or-string"
+expect = "error"
+what   = "$- requires an array, tuple, or string, got {:?}"
+src    = """
+t(v) {
+    <~ v$- 1
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "remove-requires-an-array-tuple-or-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$- 1
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-all-on-string-requires-char-or"
+expect = "error"
+what   = "$-- on string requires char or string value, got {:?}"
+src    = """
+t(v) {
+    <~ "ab"$-- v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "remove-all-on-string-requires-char-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$-- v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-all-requires-an-array-tuple-or"
+expect = "error"
+what   = "$-- requires an array, tuple, or string, got {:?}"
+src    = """
+t(v) {
+    <~ v$-- 1
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "remove-all-requires-an-array-tuple-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$-- 1
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-count-must-be-non-negative"
+expect = "error"
+what   = "$-[..] count must be non-negative, got {}"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[1:v]
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "remove-range-count-must-be-non-negative-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[1:v]
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-end-must-be-an-integer"
+expect = "error"
+what   = "$-[..] end must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[1..v]
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "remove-range-end-must-be-an-integer-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[1..v]
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-requires-an-array-tuple-or"
+expect = "error"
+what   = "$-[..] requires an array, tuple, or string, got {:?}"
+src    = """
+t(v) {
+    <~ v$-[1..2]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "remove-range-requires-an-array-tuple-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$-[1..2]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-start-must-be-an-integer"
+expect = "error"
+what   = "$-[..] start must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v..2]
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "remove-range-start-must-be-an-integer-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v..2]
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-end-end-must-be-positive"
+expect = "error"
+what   = "$-[..end] end must be positive (1-based), got {}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[1..v]
+}
+>> t(0) ¶
+"""
+
+[[cell]]
+id     = "remove-range-end-end-must-be-positive-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[1..v]
+}
+!? {
+    >> t(0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-start-start-must-be-positive"
+expect = "error"
+what   = "$-[start..] start must be positive (1-based), got {}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v..2]
+}
+>> t(0) ¶
+"""
+
+[[cell]]
+id     = "remove-range-start-start-must-be-positive-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v..2]
+}
+!? {
+    >> t(0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-start-cannot-be-greater-than"
+expect = "error"
+what   = "$-[start..end]: start ({}) cannot be greater than end ({})"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[v..1]
+}
+>> t(3) ¶
+"""
+
+[[cell]]
+id     = "remove-range-start-cannot-be-greater-than-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[v..1]
+}
+!? {
+    >> t(3) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-range-out-of-bounds-for-collection"
+expect = "error"
+what   = "$-[{}..{}] out of bounds for collection of length {}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[1..v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "remove-range-out-of-bounds-for-collection-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[1..v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "split-delimiter-must-be-a-char-or"
+expect = "error"
+what   = "$/ delimiter must be a char or string, got {:?}"
+src    = """
+t(v) {
+    <~ "a,b"$/ v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "split-delimiter-must-be-a-char-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "a,b"$/ v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "split-requires-a-string-on-the-left"
+expect = "error"
+what   = "$/ requires a string on the left, got {:?}"
+src    = """
+t(v) {
+    <~ v$/ ','
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "split-requires-a-string-on-the-left-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$/ ','
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "find-all-on-string-requires-char-or"
+expect = "error"
+what   = "$?? on string requires char or string value, got {:?}"
+src    = """
+t(v) {
+    <~ "ab"$?? v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "find-all-on-string-requires-char-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$?? v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "find-all-requires-an-array-tuple-or"
+expect = "error"
+what   = "$?? requires an array, tuple, or string, got {:?}"
+src    = """
+t(v) {
+    <~ v$?? 1
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "find-all-requires-an-array-tuple-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$?? 1
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "update-writes-into-a-collection-and-this"
+expect = "error"
+what   = "$~ writes into a collection, and this is {}"
+src    = """
+t(v) {
+    <~ v[1]$~ 9
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "update-writes-into-a-collection-and-this-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1]$~ 9
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "replace-count-must-be-an-integer-got"
+expect = "error"
+what   = "$~~ count must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ "abc"$~~["a":"b":v]
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "replace-count-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "abc"$~~["a":"b":v]
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "replace-pattern-must-be-a-string-or"
+expect = "error"
+what   = "$~~ pattern must be a string or char, got {:?}"
+src    = """
+t(v) {
+    <~ "abc"$~~[v:"b"]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "replace-pattern-must-be-a-string-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "abc"$~~[v:"b"]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "replace-replacement-must-be-a-string-got"
+expect = "error"
+what   = "$~~ replacement must be a string, got {:?}"
+src    = """
+t(v) {
+    <~ "abc"$~~["a":v]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "replace-replacement-must-be-a-string-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "abc"$~~["a":v]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "array-update-index-must-be-an-integer"
+expect = "error"
+what   = "array update index must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2][v]$~ 9
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "array-update-index-must-be-an-integer-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2][v]$~ 9
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-append-to-only-arrays-tuples-and"
+expect = "error"
+what   = "cannot append to {:?} - only arrays, tuples, and strings support $+"
+src    = """
+t(v) {
+    <~ v$+ 1
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-append-to-only-arrays-tuples-and-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$+ 1
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-get-length-of-only-arrays-tuples"
+expect = "error"
+what   = "cannot get length of {:?} - only arrays, tuples, and strings have length"
+src    = """
+t(v) {
+    <~ v$#
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-get-length-of-only-arrays-tuples-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$#
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-index-into-during-deep-update"
+expect = "error"
+what   = "cannot index into {:?} during deep update"
+src    = """
+t(v) {
+    <~ v[1>1]$~ 9
+}
+>> t([1, 2]) ¶
+"""
+
+[[cell]]
+id     = "cannot-index-into-during-deep-update-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>1]$~ 9
+}
+!? {
+    >> t([1, 2]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-modify-tuple-tuples-are-immutable"
+expect = "error"
+what   = "cannot modify tuple '{}': tuples are immutable"
+src    = """
+t(v) {
+    v$+ 3
+    <~ v
+}
+>> t((1, 2)) ¶
+"""
+
+[[cell]]
+id     = "cannot-modify-tuple-tuples-are-immutable-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    v$+ 3
+    <~ v
+}
+!? {
+    >> t((1, 2)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-remove-from-only-arrays-tuples-and"
+expect = "error"
+what   = "cannot remove from {:?} - only arrays, tuples, and strings support $-[i]"
+src    = """
+t(v) {
+    <~ v$-[1]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-remove-from-only-arrays-tuples-and-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$-[1]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-search-only-arrays-tuples-and-strings"
+expect = "error"
+what   = "cannot search {:?} - only arrays, tuples, and strings support contains"
+src    = """
+t(v) {
+    <~ v$? 1
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-search-only-arrays-tuples-and-strings-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$? 1
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-slice-only-arrays-tuples-named-tuples"
+expect = "error"
+what   = "cannot slice {:?} - only arrays, tuples, named tuples, and strings support slice"
+src    = """
+t(v) {
+    <~ v$[1..2]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-slice-only-arrays-tuples-named-tuples-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$[1..2]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "named-tuple-update-index-must-be-an"
+expect = "error"
+what   = "named tuple update index must be an integer or field name (string), got {:?}"
+src    = """
+t(v) {
+    <~ v[1.5]$~ 2
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "named-tuple-update-index-must-be-an-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1.5]$~ 2
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-index-must-be-an-integer-got"
+expect = "error"
+what   = "remove index must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v]
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "remove-index-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v]
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "replacement-count-must-be-non-negative-got"
+expect = "error"
+what   = "replacement count must be non-negative, got {}"
+src    = """
+t(v) {
+    <~ "aa"$~~["a":"b":v]
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "replacement-count-must-be-non-negative-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "aa"$~~["a":"b":v]
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "slice-end-must-be-an-integer-got"
+expect = "error"
+what   = "slice end must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2]$[1..v]
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "slice-end-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$[1..v]
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "slice-indices-out-of-bounds-for-collection"
+expect = "error"
+what   = "slice indices out of bounds: [{}..{}] for collection of length {}"
+src    = """
+t(v) {
+    <~ [1, 2]$[1..v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "slice-indices-out-of-bounds-for-collection-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$[1..v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "slice-start-cannot-be-greater-than-end"
+expect = "error"
+what   = "slice start ({}) cannot be greater than end ({})"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$[v..1]
+}
+>> t(3) ¶
+"""
+
+[[cell]]
+id     = "slice-start-cannot-be-greater-than-end-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$[v..1]
+}
+!? {
+    >> t(3) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "slice-start-must-be-an-integer-got"
+expect = "error"
+what   = "slice start must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2]$[v..2]
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "slice-start-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$[v..2]
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "string-contains-only-supports-char-or-string"
+expect = "error"
+what   = "string contains only supports char or string search, got {:?}"
+src    = """
+t(v) {
+    <~ "ab"$? v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "string-contains-only-supports-char-or-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$? v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tuple-update-index-must-be-an-integer"
+expect = "error"
+what   = "tuple update index must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ (1, 2)[v]$~ 9
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "tuple-update-index-must-be-an-integer-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ (1, 2)[v]$~ 9
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
