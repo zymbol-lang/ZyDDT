@@ -1196,3 +1196,42 @@ dos no dicen nada. Un aviso de ese tipo es del analizador, no de un motor.
 `runtime-match-patterns/no-pattern-matched-in-match-expression` (+ `-met`) y
 `runtime-match-patterns/match-with-values-used-as-a-statement`. Los dos patrones
 de desestructuración del mismo paso coinciden en los tres motores.
+
+---
+
+## GLB-017 — Módulos, subscripts y shell: la VM pasa una función al shell, el TW enseña un `Located { … }` de Rust, y cada motor cuenta distinto un módulo que no compila
+
+**Estado:** abierto
+**Encontrado por:** `axes/runtime-modules-scripts.toml`, paso C9 del plan de cobertura de diagnósticos, 2026-09-14
+
+### Qué se observa
+
+**A. La VM manda una función al shell.** `<\ "echo " g \>` con `g` una lambda:
+el TW rechaza (`cannot use function in bash command interpolation`); la VM
+convierte la función en texto y ejecuta el comando, que falla en `sh` —
+`sh: 1: Syntax error` por stderr— con **estado 0**.
+
+**B. El TW enseña la estructura de Rust** cuando falla un subscript:
+`error executing falla.zy: Located { message: "division by zero", file:
+"falla.zy", line: 1, column: 0 }`. La VM dice `Runtime error: division by zero`.
+
+**C. Un subscript que no compila:** el TW resume (`1 lexer errors in lexico.zy`,
+`1 parser errors in sintaxis.zy`) y la VM reenvía el diagnóstico completo del
+subscript.
+
+**D. Un módulo que no compila** se cuenta distinto: con una cadena sin cerrar,
+el TW informa `1 lexer error(s)`, la VM `2 parse error(s)` y `zyjs` sólo el
+primer error, sin la cabecera.
+
+**E. Texto de «función no exportada» como valor de `_err`:** TW
+`function 'priv' not exported from module 'o'`, VM y `zyjs`
+`module 'o' does not export function 'priv'`.
+
+**F. `v.f(1)` sobre un número:** TW `undefined module alias: 'v'`; VM y `zyjs`
+`the dot reaches a dictionary key, and this is ###`.
+
+### Qué lo sujeta
+
+`axes/runtime-modules-scripts.toml`: 14 celdas, 4 verdes, 10 rojas. Los errores
+de carga de módulo no tienen `-met`: una importación va antes de cualquier
+sentencia y no hay `!?` que la rodee.
