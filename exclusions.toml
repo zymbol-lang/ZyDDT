@@ -86,3 +86,14 @@ match   = "modularity/subscript-path-is-taken-literally"
 engines = ["zyjs"]
 tag     = "SUBSCRIPT"
 reason  = "`</ file />` runs another file as a process; a browser has neither"
+
+# ── `std/db` ─────────────────────────────────────────────────────────────────
+# ODBC is a native driver stack. The browser engine has no connection to fail to
+# open, so the case says nothing there — while the two Rust engines answer the
+# question it is asking.
+
+[[rule]]
+match   = "runtime-errors/db-*"
+engines = ["zyjs"]
+tag     = "STD_DB"
+reason  = "ODBC is a native driver stack; a browser has no connection to open"

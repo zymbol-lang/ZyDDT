@@ -30,7 +30,7 @@ delante — la más cara, `GLB-005`, resultó valer **un fichero de 84**.
 | [`zytw.md`](zytw.md) | 0 | **1** |
 | [`zyvm.md`](zyvm.md) | **1** | 2 |
 | [`zyjs.md`](zyjs.md) | **1** | **13** |
-| [`GLOBAL.md`](GLOBAL.md) | **1** | **9** |
+| [`GLOBAL.md`](GLOBAL.md) | **2** | **9** |
 | [`highlight.md`](highlight.md) | 0 | 1 |
 | [`tmgrammar.md`](tmgrammar.md) | 0 | 1 |
 
