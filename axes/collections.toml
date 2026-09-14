@@ -1,0 +1,150 @@
+# The collections axis — COL-1…COL-6 of zymbol-design/PREMISES.md.
+#
+# COL-7 (nesting is navigated with `>`) already had 61 cells before it had an id:
+# `chained-index` and `addressing`, declared 2026-09-07 as "the two halves of one
+# rule". The other six had none, and they are the ones a program touches every
+# time it holds more than one value.
+#
+# Each rule is asked on both sides where it has two. `COLLECTIONS.md` says of
+# itself that it exists so the rules «do not have to be re-argued from the code»;
+# an id and a cell are what make that true of the engines as well as of readers.
+
+id      = "collections"
+what    = "the three collections: the rule of the result, the shapes, and value semantics"
+engines = ["zytw", "zyvm", "zyjs"]
+
+# ── COL-1: the rule of the result ───────────────────────────────────────────
+
+[[cell]]
+id      = "result-used-builds"
+premise = "COL-1"
+expect  = "ok"
+what    = "a `$` edit whose result is USED builds, and leaves the original alone"
+src     = """
+a = [1, 2, 3]
+b = a[2]$~ 99
+>> b " " a ¶
+"""
+
+[[cell]]
+id      = "result-discarded-modifies"
+premise = "COL-1"
+expect  = "ok"
+what    = "a `$` edit whose result is DISCARDED modifies in place"
+# The two halves of one rule, and they have to be asked together: either alone
+# is met by an engine that always builds, or always modifies.
+src     = """
+a = [1, 2, 3]
+a[2]$~ 99
+>> a ¶
+"""
+
+# ── COL-2: `=` never writes into a collection ───────────────────────────────
+
+[[cell]]
+id      = "indexed-assignment-does-not-exist"
+premise = "COL-2"
+what    = "`arr[i] = v` is not a form of Zymbol"
+src     = """
+a = [1, 2]
+a[1] = 9
+>> a ¶
+"""
+
+[[cell]]
+id      = "indexed-assignment-on-a-dictionary"
+premise = "COL-2"
+what    = "and neither is `d[\"k\"] = v` — the rule is about `=`, not about arrays"
+src     = """
+d = #(x: 1)
+d["x"] = 9
+>> d ¶
+"""
+
+# ── COL-3: `[…]` is homogeneous, `#[…]` declares the mix ────────────────────
+
+[[cell]]
+id      = "array-is-checked"
+premise = "COL-3"
+what    = "`[…]` is checked element by element against the first"
+src     = """
+a = [1, "dos"]
+>> a$# ¶
+"""
+
+[[cell]]
+id      = "declared-mix-is-not"
+premise = "COL-3"
+expect  = "ok"
+what    = "`#[…]` declares the mix, and is not checked"
+src     = """
+a = #[1, "dos", #1]
+>> a$# ¶
+"""
+
+# ── COL-4: the tuple is positional, immutable, unordered ────────────────────
+
+[[cell]]
+id      = "tuple-is-immutable"
+premise = "COL-4"
+what    = "a tuple refuses `$~`, and the check is on the receiver"
+src     = """
+t = (1, 2)
+t[1]$~ 9
+>> t ¶
+"""
+
+[[cell]]
+id      = "tuple-has-no-ordering"
+premise = "COL-4"
+what    = "`<` on two tuples: equality does not need an ordering, and a positional heterogeneous value cannot have one"
+src     = """
+>> ((1, 2) < (3, 4)) ¶
+"""
+
+[[cell]]
+id      = "tuple-compares-equal"
+premise = "COL-4"
+expect  = "ok"
+what    = "equality does hold, element by element — the half the refusal above must not take away"
+src     = """
+>> ((1, 2) == (1, 2)) ¶
+"""
+
+# ── COL-5: a dictionary is addressed by key, and only by key ────────────────
+
+[[cell]]
+id      = "dictionary-refuses-a-position"
+premise = "COL-5"
+what    = "`d[2]` — adding a key changes what sits at each position, so no program may depend on one"
+src     = """
+d = #(x: 1, y: 2)
+>> d[2] ¶
+"""
+
+[[cell]]
+id      = "absent-key-is-an-error"
+premise = "COL-5"
+what    = "an absent key raises, rather than answering an empty value"
+# Python's KeyError and not JavaScript's undefined. The whole class of failures
+# where a typo propagates as a silent nothing is closed by this one decision.
+src     = """
+d = #(x: 1)
+>> d["z"] ¶
+"""
+
+# ── COL-6: assignment copies ────────────────────────────────────────────────
+
+[[cell]]
+id      = "assignment-copies"
+premise = "COL-6"
+expect  = "ok"
+what    = "binding a collection to a second name gives a value, not a view"
+# How the copy is paid for is not part of the semantics: `Rc` and copy-on-write
+# are invisible by requirement, and `zyquality/cost/` is where that is measured.
+src     = """
+e = [1, 2, 3]
+f = e
+e[1]$~ 99
+>> f " " e ¶
+"""
