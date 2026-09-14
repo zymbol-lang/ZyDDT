@@ -1016,3 +1016,41 @@ Sin esas dos respuestas, arreglar sería elegir por el autor.
 
 `axes/runtime-collection-ops.toml`: 50 celdas `expect = "error"` y 50 `-met`.
 3 verdes, 97 rojas.
+
+---
+
+## GLB-012 — Índices y navegación con un valor inválido: `zyjs` contesta donde los Rust fallan, y el kind se reparte entre `##_`, `##Index` y `##Type`
+
+**Estado:** abierto — **necesita decisión del autor** sobre el kind; lo de `zyjs` es divergencia sin decisión pendiente
+**Encontrado por:** `axes/runtime-index-nav.toml`, paso C4 del plan de cobertura de diagnósticos, 2026-09-14
+**Familia:** `GLB-011` (la misma pregunta de kind, en otra familia de operaciones)
+
+### Qué se observa
+
+22 diagnósticos de indexación, navegación y direccionamiento de diccionario,
+provocados con el valor inválido entrando por un parámetro.
+
+**A. `zyjs` no da error en 8** donde los dos Rust fallan: `$-[9]` sobre array,
+cadena y tupla devuelve el valor intacto; `v[1>"a"]` sobre un array devuelve
+vacío; `[1, 2][1.5]` devuelve vacío; `#(a: 1)$? 5` responde `#0`; un rango de
+navegación invertido `v[1>3..1]` y uno con límite decimal devuelven `[]`.
+
+**B. La VM no da error en 1**: `v[1>3..1]` → `[]`, donde el TW rechaza el
+rango invertido.
+
+**C. El kind no coincide en 11.** El TW dice `##Index` para «cannot index» e
+«index must be an integer», y la VM `##Type` para los mismos; «a navigation step
+is a position (Int) or a key» es `##_` en el TW y `##Type` en la VM; «range
+indices in nav path must be positive» es `##_` en el TW y `##Index` en los otros
+dos.
+
+### Qué hay que decidir
+
+Lo mismo que en `GLB-011`: la familia de un valor del **tipo** equivocado
+usado como índice o paso — `##Type` o `##Index`. Y si un rango de navegación
+invertido es error (TW) o vacío (VM, `zyjs`).
+
+### Qué lo sujeta
+
+`axes/runtime-index-nav.toml`: 22 celdas `expect = "error"` y 22 `-met`. 18
+verdes, 26 rojas.

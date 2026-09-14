@@ -1,0 +1,589 @@
+# The runtime-index-nav axis — Phase C, family C4 of the diagnostics plan.
+#
+# Indexing, navigation (`>`), dictionary addressing and the destructuring
+# pattern: the runtime diagnostics no program provoked on 2026-09-14. Same shape
+# as runtime-collection-ops: `<id>` raises it, `<id>-met` catches it and prints
+# the family. The wrong value arrives through a parameter so the analyzer lets
+# the program run; a navigation step with a float is passed as a VARIABLE,
+# because `v[1>1.5]` is refused by the parser and `v[1.5>1]` reads as `1.5 > 1`.
+#
+# Four diagnostics of this family have no cell because nothing reaches them;
+# the reasons are in zyquality/messages/queue/runtime.tsv.
+
+id      = "runtime-index-nav"
+what    = "the runtime diagnostics of indexing, navigation and dictionary addressing: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "a-string-navigation-step-addresses-a-dictionary"
+expect = "error"
+what   = "a String navigation step addresses a dictionary key, and this is {}"
+src    = """
+t(v) {
+    <~ v[1>"a"]
+}
+>> t([[1, 2]]) ¶
+"""
+
+[[cell]]
+id     = "a-string-navigation-step-addresses-a-dictionary-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>"a"]
+}
+!? {
+    >> t([[1, 2]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not"
+expect = "error"
+what   = "a dictionary is addressed by key, not by position: `{}` has no meaning here"
+src    = """
+t(v) {
+    <~ v$-[1]
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$-[1]
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not-2"
+expect = "error"
+what   = "a dictionary is addressed by key, not by position"
+src    = """
+t(v) {
+    <~ v[1]
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not-2-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1]
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-dictionary-is-asked-about-a-key"
+expect = "error"
+what   = "a dictionary is asked about a key, so `$?` needs a String, got {:?}"
+src    = """
+t(v) {
+    <~ v$? 5
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "a-dictionary-is-asked-about-a-key-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$? 5
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-navigation-step-is-a-position-int"
+expect = "error"
+what   = "a navigation step is a position (Int) or a dictionary key (String), got {:?}"
+src    = """
+t(v, s) {
+    <~ v[(s)>1]$~ 9
+}
+>> t([[1, 2]], 1.5) ¶
+"""
+
+[[cell]]
+id     = "a-navigation-step-is-a-position-int-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v, s) {
+    <~ v[(s)>1]$~ 9
+}
+!? {
+    >> t([[1, 2]], 1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-positional-tuple-is-addressed-by-position"
+expect = "error"
+what   = "a positional tuple is addressed by position, not by name: '{}'"
+src    = """
+t(v) {
+    <~ v.a
+}
+>> t((1, 2)) ¶
+"""
+
+[[cell]]
+id     = "a-positional-tuple-is-addressed-by-position-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v.a
+}
+!? {
+    >> t((1, 2)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-index-into-expected-array-tuple-or"
+expect = "error"
+what   = "cannot index into {:?} — expected array, tuple, or string"
+src    = """
+t(v) {
+    <~ v[1>1]
+}
+>> t([5]) ¶
+"""
+
+[[cell]]
+id     = "cannot-index-into-expected-array-tuple-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>1]
+}
+!? {
+    >> t([5]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-index-only-arrays-tuples-and-strings"
+expect = "error"
+what   = "cannot index {:?} - only arrays, tuples, and strings are indexable"
+src    = """
+t(v) {
+    <~ v[1]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-index-only-arrays-tuples-and-strings-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-0-is-invalid-zymbol-uses-1"
+expect = "error"
+what   = "index 0 is invalid — Zymbol uses 1-based indexing"
+src    = """
+t(v) {
+    <~ v[1>0]$~ 9
+}
+>> t([[1, 2]]) ¶
+"""
+
+[[cell]]
+id     = "index-0-is-invalid-zymbol-uses-1-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>0]$~ 9
+}
+!? {
+    >> t([[1, 2]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-must-be-an-integer-got"
+expect = "error"
+what   = "index must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2][v]
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "index-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2][v]
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-array"
+expect = "error"
+what   = "index out of bounds: index {} for array of length {}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-array-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-string"
+expect = "error"
+what   = "index out of bounds: index {} for string of length {}"
+src    = """
+t(v) {
+    <~ "ab"$-[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$-[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-tuple"
+expect = "error"
+what   = "index out of bounds: index {} for tuple of length {}"
+src    = """
+t(v) {
+    <~ (1, 2)$-[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-tuple-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ (1, 2)$-[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-for-collection-of"
+expect = "error"
+what   = "index out of bounds: {} for collection of length {}"
+src    = """
+t(v) {
+    <~ [[1, 2]][1>v]$~ 9
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-for-collection-of-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [[1, 2]][1>v]$~ 9
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "invalid-nav-range-indices-are-1-based"
+expect = "error"
+what   = "invalid nav range {}..{} — indices are 1-based and start must be ≤ end"
+src    = """
+t(v) {
+    <~ v[1>3..1]
+}
+>> t([[1, 2, 3]]) ¶
+"""
+
+[[cell]]
+id     = "invalid-nav-range-indices-are-1-based-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>3..1]
+}
+!? {
+    >> t([[1, 2, 3]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "navigation-index-must-be-an-integer-got"
+expect = "error"
+what   = "navigation index must be an integer, got {:?}"
+src    = """
+t(v, s) {
+    <~ v[1>s..2]
+}
+>> t([[1, 2, 3]], 1.5) ¶
+"""
+
+[[cell]]
+id     = "navigation-index-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v, s) {
+    <~ v[1>s..2]
+}
+!? {
+    >> t([[1, 2, 3]], 1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "no-key-in-dictionary-it-is-empty"
+expect = "error"
+what   = "no key '{}' in dictionary — it is empty"
+src    = """
+t(v) {
+    <~ v["x"]
+}
+>> t(#()) ¶
+"""
+
+[[cell]]
+id     = "no-key-in-dictionary-it-is-empty-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v["x"]
+}
+!? {
+    >> t(#()) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "range-indices-in-nav-path-must-be"
+expect = "error"
+what   = "range indices in nav path must be positive integers"
+src    = """
+t(v) {
+    <~ v[1>-1..2]
+}
+>> t([[1, 2, 3]]) ¶
+"""
+
+[[cell]]
+id     = "range-indices-in-nav-path-must-be-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>-1..2]
+}
+!? {
+    >> t([[1, 2, 3]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "string-index-out-of-bounds-index-for"
+expect = "error"
+what   = "string index out of bounds: index {} for string of length {}"
+src    = """
+t(v) {
+    <~ "ab"[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "string-index-out-of-bounds-index-for-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "the-dot-reaches-a-dictionary-key-and"
+expect = "error"
+what   = "the dot reaches a dictionary key, and this is {}"
+src    = """
+t(v) {
+    <~ v.a
+}
+>> t([1, 2]) ¶
+"""
+
+[[cell]]
+id     = "the-dot-reaches-a-dictionary-key-and-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v.a
+}
+!? {
+    >> t([1, 2]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "the-pattern-dict-requires-a-dictionary-got"
+expect = "error"
+what   = "the pattern #(…) requires a dictionary, got {}"
+src    = """
+t(v) {
+    #(a: x) = v
+    <~ x
+}
+>> t([1, 2]) ¶
+"""
+
+[[cell]]
+id     = "the-pattern-dict-requires-a-dictionary-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    #(a: x) = v
+    <~ x
+}
+!? {
+    >> t([1, 2]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tuple-index-out-of-bounds-index-for"
+expect = "error"
+what   = "tuple index out of bounds: index {} for tuple of length {}"
+src    = """
+t(v) {
+    <~ (1, 2)[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "tuple-index-out-of-bounds-index-for-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ (1, 2)[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
