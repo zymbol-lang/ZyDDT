@@ -71,3 +71,18 @@ reason  = "`<\\ shell \\>` has no browser equivalent"
 # (`--without STD_DB`): they have std/db only when built with the feature and an
 # ODBC driver present, and a release package has neither.  That is what
 # ZyQuality's VM_COMPARE_EXCLUDE existed for.
+
+# ── `</ sub.zy />` ───────────────────────────────────────────────────────────
+# Same shape as BASH_EXEC: a sub-script runs another FILE as a process, and the
+# browser engine has no file system and no process to run it in. It does not
+# merely fail — it does not parse the form at all (`expected expression, found
+# Lt`), which is the honest answer for a construct it cannot have.
+#
+# The cell stays where it is and is still graded on the two engines that can run
+# it, which is the whole reason this table exists rather than a folder.
+
+[[rule]]
+match   = "modularity/subscript-path-is-taken-literally"
+engines = ["zyjs"]
+tag     = "SUBSCRIPT"
+reason  = "`</ file />` runs another file as a process; a browser has neither"
