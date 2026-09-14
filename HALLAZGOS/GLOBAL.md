@@ -1162,3 +1162,37 @@ got Int` donde el TW nombra la operación).
 ### Qué lo sujeta
 
 `axes/runtime-functions-hof.toml`: 12 pares. 2 verdes, 22 rojas.
+
+---
+
+## GLB-016 — Un `??` sin brazo que case: el TW aborta, la VM y `zyjs` devuelven `##_` en silencio
+
+**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*
+**Encontrado por:** `axes/runtime-match-patterns.toml`, paso C8 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** **alta**: un valor que nadie calculó sigue su camino por el programa, sin error ni aviso
+
+### Qué se observa
+
+```zymbol
+t(v) {
+    <~ ?? v { 1 => "uno" }
+}
+>> t(2) ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `Runtime error: no pattern matched in match expression` |
+| `zyvm` | una línea vacía — el `??` vale `##_` |
+| `zyjs` | una línea vacía |
+
+Y la segunda mitad, en el mismo paso: un `??` cuyos brazos dan valores, usado
+como sentencia, lo avisa el tree-walker **en ejecución**
+(`warning: match expression returns values but result is unused`) y los otros
+dos no dicen nada. Un aviso de ese tipo es del analizador, no de un motor.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/no-pattern-matched-in-match-expression` (+ `-met`) y
+`runtime-match-patterns/match-with-values-used-as-a-statement`. Los dos patrones
+de desestructuración del mismo paso coinciden en los tres motores.
