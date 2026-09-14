@@ -688,6 +688,12 @@ def _premises_of(text: str) -> dict[str, dict]:
             # inventory, and no execution can ask it. Reporting those as holes
             # would file a property of the domain as debt.
             "by_review": held_line.strip().startswith("**Held by** — review"),
+            # A fourth state. Some claims are not about what a program prints:
+            # a ratio of peak memory, or the shape of an archive. Those are held
+            # by a suite outside this layer, and reporting them as missing cells
+            # would file a working guarantee as debt. Marked by starting the
+            # line with "elsewhere:" so it cannot be confused with prose.
+            "elsewhere": held_line.strip().startswith("**Held by** — elsewhere:"),
         }
     return out
 
@@ -740,7 +746,7 @@ def cmd_premises(args, cfg) -> int:
     premises = _premises_of(doc.read_text(encoding="utf-8"))
     declared = _declared_premises()
     known = {f"{ax.id}/{c.id}" for ax in A.load_all() for c in ax.cells}
-    rc, holes, reviewed = GREEN, 0, 0
+    rc, holes, reviewed, elsewhere = GREEN, 0, 0, 0
 
     # cell → premise: a cell may not claim an id the source does not declare.
     for cell, pids in sorted(declared.items()):
@@ -755,6 +761,10 @@ def cmd_premises(args, cfg) -> int:
         if p["by_review"]:
             print(f"  {R.dim(pid)}  {R.dim('by review')}  " + R.dim(p["what"]))
             reviewed += 1
+            continue
+        if p["elsewhere"]:
+            print(f"  {R.dim(pid)}  {R.dim('held elsewhere')}  " + R.dim(p["what"]))
+            elsewhere += 1
             continue
         if p["stated_empty"]:
             print(R.yellow(f"  {pid}  no cell — ") + R.dim(p["what"]))
@@ -789,7 +799,9 @@ def cmd_premises(args, cfg) -> int:
     print(f"  {len(premises)} premise(s) declared in {doc.name}, "
           f"{holes} with no cell yet"
           + (f", {reviewed} checked by review rather than by execution"
-             if reviewed else ""))
+             if reviewed else "")
+          + (f", {elsewhere} held by a suite outside this layer"
+             if elsewhere else ""))
     if holes:
         print(R.dim("    a premise with no cell is a hole that names itself; "
                     "it is not a pass and not a failure"))
