@@ -11,6 +11,7 @@
 | | | |
 |---|---|---|
 | [`TM-001`](#tm-001--dos-escrituras-de-unicode-150-que-oniguruma-no-conoce-como-dígitos) | **corregido 2026-08-30** | Kawi y Nag Mundari no casaban `\p{Nd}` |
+| [`TM-002`](#tm-002--la-gramática-de-vs-code-no-marcaba-0xn-la-regla-de-enteros-unicode-se-comía-el-0) | **corregido 2026-09-14** | `0x\|n\|` sin marcar: `\p{Nd}+` se comía el `0` |
 
 ---
 
@@ -76,3 +77,30 @@ cubre en este motor, que es información y hay que escribirla.
 Las 69 celdas del eje `numerals`, que `zyddt surfaces` recorre. Y la forma en
 que se encontró es el argumento de la matriz: nadie habría escrito a mano un
 fichero de prueba en Kawi.
+
+---
+
+## TM-002 — La gramática de VS Code no marcaba `0x|n|`: la regla de enteros Unicode se comía el `0`
+
+**Estado:** **corregido 2026-09-14**
+**Encontrado por:** `callable-body/*-base`, la primera celda de ZyDDT que escribió una conversión de base
+
+### Qué se observa
+
+En `r = 0x|x$# * 30|` las dos barras quedaban sin ámbito. Y en `0x|255|` también:
+no dependía de lo que hubiera dentro. El corpus escribe `0x|255|` desde hace
+versiones, pero la superficie sólo barre las celdas de ZyDDT, y ninguna tenía una
+conversión.
+
+### Causa
+
+`syntaxes/zymbol.tmGrammar.json`: las cuatro reglas `0b|` `0o|` `0d|` `0x|` vivían
+en `#format-expressions`, incluido después de `#numbers`. Y `#numbers` tiene la
+regla de enteros Unicode `\p{Nd}+`, **sin límite de palabra**, que toma el `0` de
+`0x|`: `x` queda como identificador y las barras, sueltas. `#base-literals` ya
+estaba delante de `#numbers` por la misma razón, escrita en su comentario.
+
+### Arreglo
+
+Un grupo propio, `#base-conversions`, incluido antes de `#base-literals`.
+

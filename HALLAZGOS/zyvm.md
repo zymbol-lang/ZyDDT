@@ -8,9 +8,9 @@
 | [`ZYVM-001`](#zyvm-001--la-vm-ejecuta-lo-que-el-tree-walker-rechaza-40-celdas) | **corregido 2026-08-30** | ejecutaba y contestaba donde `zytw` rechaza — 40 celdas |
 | [`ZYVM-002`](#zyvm-002--el-diagnóstico-de---nombra-al-operador--10-celdas) | **corregido 2026-08-30** | el rechazo de `-` citaba al operador `+` |
 | [`ZYVM-003`](#zyvm-003--acumular-en-el-estado-de-un-módulo-es-on-en-la-vm-y-on-en-el-tree-walker) | **abierto** | acumular en el estado de un módulo es cuadrático: 3,3 s donde el TW tarda 0,013 s |
-| [`ZYVM-004`](#zyvm-004--una-función-llamada-por----o--corre-en-un-segundo-intérprete-que-se-salta-49-instrucciones) | **abierto** | una función llamada por `$>`, `$|` o `$<` corre en un segundo intérprete que se salta 49 instrucciones |
+| [`ZYVM-004`](#zyvm-004--una-función-llamada-por----o--corre-en-un-segundo-intérprete-que-se-salta-49-instrucciones) | **corregido 2026-09-14** | una función llamada por `$>`, `$|` o `$<` corría en un segundo intérprete que se saltaba 49 instrucciones |
 
-**Dos abiertos: `ZYVM-003` y `ZYVM-004`.**
+**Uno abierto: `ZYVM-003`.**
 
 Las chinchetas que los sujetan:
 
@@ -299,7 +299,7 @@ regresión. El día que baje de 6,0 el runner pide cerrar la ficha.
 
 ## ZYVM-004 — Una función llamada por `$>`, `$|` o `$<` corre en un segundo intérprete que se salta 49 instrucciones
 
-**Estado:** abierto
+**Estado:** **corregido 2026-09-14** — el segundo intérprete se borró; el bucle de despacho es reentrante (`exec(program, floor)`)
 **Encontrado por:** `error-flow/try-inside-a-mapped-lambda` el 2026-09-14 — un `!?` dentro de la lambda de un `$>` no capturaba nada — y medido después por `axes/callable-body.toml`
 **Gravedad:** **alta.** No falla: contesta `##_`. Y la VM es el futuro motor por defecto
 
@@ -359,6 +359,17 @@ puede ejecutarse **reentrante**: el operador empuja el marco de la función y
 corre el mismo bucle hasta que ese marco retorna. Un error que no encuentra
 manejador por encima de ese suelo vuelve al operador, que lo levanta con
 `raise!` en el bucle de fuera.
+
+### El coste que tuvo, y cómo se pagó
+
+Cada llamada de un operador de orden superior vuelve a entrar en el bucle, y el
+marco de Rust de ese bucle es grande: unos 14 KB. Con los 8 MiB del hilo
+principal, la recursión **a través de `$>`** bajó de más de 1 000 niveles a 593
+—menos que los 899 del tree-walker—. El CLI ejecuta ahora el programa en un hilo
+de 64 MiB (`PROGRAM_STACK`, reservados y no comprometidos): 4 764 niveles en la
+VM, y el tree-walker pasa de 899 a 7 212 a través de `$>` y de 1 099 a 8 828 en
+recursión simple. En tiempo, un map/filter/reduce de 300 000 elementos pasó de
+0,077 s a 0,085 s.
 
 ### Qué lo sujeta
 

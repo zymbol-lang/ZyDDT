@@ -845,7 +845,7 @@ estado persiste entre llamadas y lo llevan las funciones del módulo.
 
 ## GLB-010 — En la VM, un `:!` tipado que no coincide hace desaparecer el error
 
-**Estado:** abierto
+**Estado:** **corregido 2026-09-14** — pila de manejadores, errores pendientes y salidas por salto en la VM; el clasificador de kind compartido por los tres motores
 **Encontrado por:** `runtime-errors/type-is-catchable`, la primera celda que preguntó por `##Type`
 **Gravedad:** **alta.** Es la forma más cara que puede tomar un fallo: sin salida, sin código de salida, sin rastro — y **`zyvm` es el futuro motor por defecto**
 
@@ -953,9 +953,22 @@ clasifica por el texto. Mismo mensaje, dos clasificaciones.
 4. **Un solo clasificador de kind por texto**, usado por los dos motores Rust
    para los errores que no traen variante propia, y portado a `zyjs`.
 
+### Verificación
+
+`error-flow` 28/28 (21 contra Python), `runtime-errors` 8/8, `callable-body`
+84/84; `zyq consensus` 660 de acuerdo y 0 divergiendo; `cargo test` 1038 sin
+fallos. Los benchmarks de la VM, medidos antes y después en la misma máquina,
+entre −9 % y +3 %.
+
+Tres cosas salieron al arreglarlo y tienen celda: `$!!` también se saltaba el
+`:>` (`propagate-runs-finally`); un fin de entrada dentro de `!?` no se capturaba,
+porque `raise!` estaba dentro del bucle de lectura y su `continue` continuaba
+ESE bucle (`input-eof-is-catchable`); y la llamada de cola dentro de `!?` se
+suprime ahora siempre (`tail-call-inside-try-is-caught`).
+
 ### Qué lo sujeta
 
-`axes/error-flow.toml` (25 celdas; las 23 con oráculo en Python salvo las que
+`axes/error-flow.toml` (28 celdas; las 23 con oráculo en Python salvo las que
 dicen por qué no lo llevan) y las cuatro de `runtime-errors`:
 `unmatched-catch-propagates-div`, `unmatched-catch-propagates-index`,
 `a-native-type-error-knows-its-kind` y `type-is-catchable`.
