@@ -77,3 +77,20 @@ f() { x = 1
 <~ "hecho" }
 >> f() ¶
 """
+
+[[cell]]
+id     = "destroy-in-a-branch-not-taken"
+expect = "ok"
+what   = "a `\\` that never runs destroys nothing"
+# The cell that decides HOW the rule may be enforced, and it was written after
+# GLB-008's proposed fix turned out to be backwards. Moving the check into the
+# analyser sounded like the obvious repair — one engine already did it — until
+# this case was asked: `zytw` prints 1 because the branch never ran, and `zyjs`
+# refuses the program. A static check with no flow analysis cannot tell a
+# destruction that happened from one that was merely written down, so the
+# run-time answer is not the late one, it is the only correct one.
+src    = """
+x = 1
+? #0 { \\ x }
+>> x ¶
+"""
