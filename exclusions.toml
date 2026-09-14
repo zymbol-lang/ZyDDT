@@ -97,3 +97,15 @@ match   = "runtime-errors/db-*"
 engines = ["zyjs"]
 tag     = "STD_DB"
 reason  = "ODBC is a native driver stack; a browser has no connection to open"
+
+[[rule]]
+match   = "runtime-modules-scripts/bash-*"
+engines = ["zyjs"]
+tag     = "BASH_EXEC"
+reason  = "`<\\ shell \\>` has no browser equivalent"
+
+[[rule]]
+match   = "runtime-modules-scripts/subscript-*"
+engines = ["zyjs"]
+tag     = "SUBSCRIPT"
+reason  = "`</ file />` runs another file as a process; a browser has neither"

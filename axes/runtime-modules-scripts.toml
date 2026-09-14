@@ -1,0 +1,239 @@
+# The runtime-modules-scripts axis — Phase C, family C9 of the diagnostics plan.
+#
+# Loading a module that does not compile, a sub-script that fails, a shell
+# command given a function, an unexported function reached as a value: the
+# runtime diagnostics no program provoked on 2026-09-14. `<id>` raises it,
+# `<id>-met` catches it and prints the family.
+#
+# The three module-load failures have NO `-met` cell, and cannot: an import must
+# come before any statement (E013), so there is no `!?` to put it in.
+#
+# `</ file />` and `<\ shell \>` are excluded for zyjs in exclusions.toml with
+# the tags that already existed, SUBSCRIPT and BASH_EXEC.
+#
+# Five of this family have no cell (reasons in the queue): `Module '{}' not
+# loaded` (an alias is only registered after its module loads), both texts of
+# `ConstantNotExported` and `circular dependency detected` (variants declared
+# and never constructed), and `failed to run` (a shell that was found and then
+# could not start). A sixth, `lexer errors: {0}`, belongs to `zymbol fmt`.
+
+id      = "runtime-modules-scripts"
+what    = "the runtime diagnostics of modules, sub-scripts and shell commands: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "bash-function-interpolation"
+expect = "error"
+what   = "cannot use function in bash command interpolation"
+src    = """
+g = x -> x
+>> <\\ "echo " g \\> ¶
+"""
+
+[[cell]]
+id     = "bash-function-interpolation-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+g = x -> x
+!? {
+    >> <\\ "echo " g \\> ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "subscript-runtime-error"
+expect = "error"
+what   = "error executing {}: {:?}"
+src    = """
+x = </ ./sub/falla.zy />
+>> x ¶
+"""
+[cell.files]
+"sub/falla.zy" = """
+>> 1 / 0 ¶
+"""
+
+[[cell]]
+id     = "subscript-runtime-error-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    x = </ ./sub/falla.zy />
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+[cell.files]
+"sub/falla.zy" = """
+>> 1 / 0 ¶
+"""
+
+[[cell]]
+id     = "subscript-lexer-errors"
+expect = "error"
+what   = "{} lexer errors in {}"
+src    = """
+x = </ ./sub/lexico.zy />
+>> x ¶
+"""
+[cell.files]
+"sub/lexico.zy" = """
+>> "abc ¶
+"""
+
+[[cell]]
+id     = "subscript-lexer-errors-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    x = </ ./sub/lexico.zy />
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+[cell.files]
+"sub/lexico.zy" = """
+>> "abc ¶
+"""
+
+[[cell]]
+id     = "subscript-parser-errors"
+expect = "error"
+what   = "{} parser errors in {}"
+src    = """
+x = </ ./sub/sintaxis.zy />
+>> x ¶
+"""
+[cell.files]
+"sub/sintaxis.zy" = """
+>> ( ¶
+"""
+
+[[cell]]
+id     = "subscript-parser-errors-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    x = </ ./sub/sintaxis.zy />
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+[cell.files]
+"sub/sintaxis.zy" = """
+>> ( ¶
+"""
+
+[[cell]]
+id     = "unexported-function-as-an-error-value"
+expect = "ok"
+what   = "function '{}' not exported from module '{}' — the text `_err` carries when the call is caught"
+src    = """
+<# ./m/ok => o
+!? {
+    >> o::priv() ¶
+} :! {
+    >> _err ¶
+}
+"""
+[cell.files]
+"m/ok.zy" = """
+# ok {
+    #> { f }
+    f() {
+        <~ 1
+    }
+    priv() {
+        <~ 2
+    }
+}
+"""
+
+[[cell]]
+id     = "undefined-module-alias"
+expect = "error"
+what   = "undefined module alias: '{}'"
+src    = """
+t(v) {
+    <~ v.f(1)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "undefined-module-alias-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v.f(1)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "module-with-lexer-errors"
+expect = "error"
+what   = "{} lexer error(s) in '{}'"
+src    = """
+<# ./m/lexico => b
+>> b::f() ¶
+"""
+[cell.files]
+"m/lexico.zy" = """
+# lexico {
+    #> { f }
+    f() {
+        <~ "abc
+    }
+}
+"""
+
+[[cell]]
+id     = "module-with-parse-errors"
+expect = "error"
+what   = "{} parse error(s) in '{}'"
+src    = """
+<# ./m/sintaxis => b
+>> b::f() ¶
+"""
+[cell.files]
+"m/sintaxis.zy" = """
+# sintaxis {
+    #> { f }
+    f() {
+        <~ (
+    }
+}
+"""
+
+[[cell]]
+id     = "module-with-semantic-errors"
+expect = "error"
+what   = "{} semantic error(s) in '{}'"
+src    = """
+<# ./m/semantica => b
+>> b::f() ¶
+"""
+[cell.files]
+"m/semantica.zy" = """
+# semantica {
+    #> { f }
+    f() {
+        <~ nada_definido
+    }
+}
+"""
