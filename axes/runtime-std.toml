@@ -1,0 +1,606 @@
+# The runtime-std axis — Phase C, family C10 of the diagnostics plan.
+#
+# The HARD errors of std/io, std/json, std/math, std/net, std/random, std/term
+# and std/time: a native called with an argument of the wrong type or outside
+# its domain, which raises rather than coming back as a soft error value. The
+# runtime diagnostics no program provoked on 2026-09-14. `<id>` raises it,
+# `<id>-met` catches it and prints the family.
+#
+# `time::of` has both kinds and they are easy to confuse: `tm::of("x")` is a
+# SOFT ##Time (a trailing String is the zone, and no numbers is a bad date), and
+# `tm::of(1.5, 1, 1)` is the HARD refusal this cell asks for.
+#
+# `unknown builtin id` has no cell: the compiler assigns builtin ids from the
+# same table the VM dispatches on.
+
+id      = "runtime-std"
+what    = "the hard errors of the std modules: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "io-delete-expected-string-path"
+expect = "error"
+what   = "io::delete: expected String path"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::delete(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "io-delete-expected-string-path-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::delete(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "io-exists-expected-string-path"
+expect = "error"
+what   = "io::exists: expected String path"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::exists(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "io-exists-expected-string-path-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::exists(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "io-list-expected-string-path"
+expect = "error"
+what   = "io::list: expected String path"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::list(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "io-list-expected-string-path-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::list(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "io-mkdir-expected-string-path"
+expect = "error"
+what   = "io::mkdir: expected String path"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::mkdir(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "io-mkdir-expected-string-path-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::mkdir(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "io-read-expected-string-path"
+expect = "error"
+what   = "io::read: expected String path"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::read(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "io-read-expected-string-path-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::read(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "json-decode-expected-string"
+expect = "error"
+what   = "json::decode: expected String"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "json-decode-expected-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "json-decode-map-expected-string-as-the"
+expect = "error"
+what   = "json::decode_map: expected String as the first argument"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode_map(v, #(a: "b"))
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "json-decode-map-expected-string-as-the-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode_map(v, #(a: "b"))
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "json-decode-map-expected-a-namedtuple-map"
+expect = "error"
+what   = "json::decode_map: expected a NamedTuple map as the second argument"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode_map("1", v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "json-decode-map-expected-a-namedtuple-map-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode_map("1", v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "json-decode-map-map-value-for-must"
+expect = "error"
+what   = "json::decode_map: map value for '{}' must be a String (the new name)"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode_map("1", v)
+}
+>> t(#(a: 5)) ¶
+"""
+
+[[cell]]
+id     = "json-decode-map-map-value-for-must-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => json
+t(v) {
+    <~ json::decode_map("1", v)
+}
+!? {
+    >> t(#(a: 5)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "mat-acos-argument-must-be-in-1"
+expect = "error"
+what   = "mat::acos: argument must be in [-1, 1]"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::acos(v)
+}
+>> t(2.0) ¶
+"""
+
+[[cell]]
+id     = "mat-acos-argument-must-be-in-1-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::acos(v)
+}
+!? {
+    >> t(2.0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "mat-asin-argument-must-be-in-1"
+expect = "error"
+what   = "mat::asin: argument must be in [-1, 1]"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::asin(v)
+}
+>> t(2.0) ¶
+"""
+
+[[cell]]
+id     = "mat-asin-argument-must-be-in-1-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::asin(v)
+}
+!? {
+    >> t(2.0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "mat-ln-argument-must-be-positive"
+expect = "error"
+what   = "mat::ln: argument must be positive"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::ln(v)
+}
+>> t(-1.0) ¶
+"""
+
+[[cell]]
+id     = "mat-ln-argument-must-be-positive-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::ln(v)
+}
+!? {
+    >> t(-1.0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "mat-log-x-and-base-must-be"
+expect = "error"
+what   = "mat::log: x and base must be positive; base ≠ 1"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::log(v, 10.0)
+}
+>> t(-1.0) ¶
+"""
+
+[[cell]]
+id     = "mat-log-x-and-base-must-be-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/math => mat
+t(v) {
+    <~ mat::log(v, 10.0)
+}
+!? {
+    >> t(-1.0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "net-get-expected-string-url"
+expect = "error"
+what   = "net::get: expected String url"
+src    = """
+<# std/net => net
+t(v) {
+    <~ net::get(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "net-get-expected-string-url-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/net => net
+t(v) {
+    <~ net::get(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "net-head-expected-string-url"
+expect = "error"
+what   = "net::head: expected String url"
+src    = """
+<# std/net => net
+t(v) {
+    <~ net::head(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "net-head-expected-string-url-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/net => net
+t(v) {
+    <~ net::head(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "random-entero-expected-int-cast-int-cast"
+expect = "error"
+what   = "random::entero: expected (###, ###) with max >= min"
+src    = """
+<# std/random => rnd
+t(v) {
+    <~ rnd::entero(v, 1)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "random-entero-expected-int-cast-int-cast-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/random => rnd
+t(v) {
+    <~ rnd::entero(v, 1)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "random-rango-expected-positive-int-cast"
+expect = "error"
+what   = "random::rango: expected positive ###"
+src    = """
+<# std/random => rnd
+t(v) {
+    <~ rnd::rango(v)
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "random-rango-expected-positive-int-cast-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/random => rnd
+t(v) {
+    <~ rnd::rango(v)
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "term-width-expected-a-string-or-char"
+expect = "error"
+what   = "term::width: expected a String or Char, got {got}"
+src    = """
+<# std/term => term
+t(v) {
+    <~ term::width(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "term-width-expected-a-string-or-char-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/term => term
+t(v) {
+    <~ term::width(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "time-of-expected-year-month-day-or"
+expect = "error"
+what   = "time::of: expected (year, month, day) or (year, month, day, hour, minute, second), each ###, plus an optional zone"
+src    = """
+<# std/time => tm
+t(v) {
+    <~ tm::of(v, 1, 1)
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "time-of-expected-year-month-day-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/time => tm
+t(v) {
+    <~ tm::of(v, 1, 1)
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "time-today-expected-an-optional-zone-string"
+expect = "error"
+what   = "time::today: expected an optional zone String"
+src    = """
+<# std/time => tm
+t(v) {
+    <~ tm::today(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "time-today-expected-an-optional-zone-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/time => tm
+t(v) {
+    <~ tm::today(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "headers-must-be-an-array-of-string"
+expect = "error"
+what   = "{}: headers must be an Array of (String, String) tuples"
+src    = """
+<# std/net => net
+t(v) {
+    <~ net::get("http://127.0.0.1:9/", v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "headers-must-be-an-array-of-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/net => net
+t(v) {
+    <~ net::get("http://127.0.0.1:9/", v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
