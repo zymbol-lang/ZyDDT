@@ -1085,3 +1085,52 @@ respuesta que ningún motor debería dar.
 ### Qué lo sujeta
 
 `axes/runtime-format-convert.toml`: 13 pares. 7 verdes, 19 rojas.
+
+---
+
+## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
+
+**Estado:** abierto — mezcla de defectos sin decisión pendiente y de una pregunta de kind (`GLB-011`)
+**Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
+
+### Qué se observa
+
+**A. La VM entra en bucle infinito con paso 0.** `@ i:1..9:v` con `v = 0`
+imprime `1` sin fin; el TW y `zyjs` dan error. En ZyDDT la celda
+`step-must-be-positive-got-met` queda sin veredicto por timeout (30 s por
+corrida, dos veces).
+
+**B. La VM acepta límites y pasos decimales:** `@ i:1.5..3` imprime `1.5 2.5`;
+`@ i:1..9:1.5` imprime `1 2.5`. `zyjs` los trunca: `1 2`. El TW da error.
+
+**C. El bucle que desestructura un rango sólo existe en el tree-walker.**
+`@ (a, b):1..v { }`: la VM responde `unsupported construct: range outside loop`
+al compilar y `zyjs` `Expected LBRACE, got '..'` al parsear.
+
+**D. Un rango suelto (`v..3` fuera de un bucle)** falla en tres momentos: en
+ejecución en el TW, al compilar en la VM, al parsear en `zyjs`. Misma familia
+que `GLB-008`: un rechazo que debería ser uno solo y estático.
+
+**E. `zyjs` no valida `@~`:** `@~ "x"` y `@~ -1` no dan error, y además avisa
+`unused variable 'v'` porque el analizador no cuenta el operando de `@~` como
+uso (familia `ZYJS-018`).
+
+**F. `zyjs` no valida los códigos de carácter:** `0x|"110000"|` → `0x1ADB0`
+donde los dos Rust fallan. **Y un patrón de rango de `??` sobre una cadena** da
+`b` en `zyjs` (cae al comodín) donde los Rust fallan.
+
+**G. Kinds y textos:** TW `##_` contra VM `##Type` en `@~`, iteración y patrón de
+rango; textos distintos en `@~ -1` (`duration` / `ms`) y en paso 0.
+
+### Qué hay que decidir
+
+C y D sí: si `@ (a, b):rango` es forma del lenguaje (sólo la ejecuta el TW) y
+dónde se rechaza un rango suelto. A, B, E y F no necesitan decisión: los dos Rust
+—o el TW— rechazan.
+
+### Qué lo sujeta
+
+`axes/runtime-loops-ranges.toml`: 11 pares (12 diagnósticos: `@~ -1` da uno por
+motor Rust). Tres `-met` esperan `warn`: el aviso de dirección de rango con un
+límite variable es cierto y no es lo que preguntan.

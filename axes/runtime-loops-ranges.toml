@@ -1,0 +1,344 @@
+# The runtime-loops-ranges axis — Phase C, family C6 of the diagnostics plan.
+#
+# Ranges, steps, the sleep `@~`, and what a loop may iterate: the runtime
+# diagnostics no program provoked on 2026-09-14. `<id>` raises it, `<id>-met`
+# catches it and prints the family. Two diagnostics of the tree-walker's range
+# evaluation are only reached through a DESTRUCTURING loop, `@ (a, b):1..v`:
+# the plain `@ i:a..b` has a fast path of its own (loops.rs) with its own text.
+#
+# Three `-met` cells expect `warn`, not `ok`: a bound that arrives through a
+# variable makes the analyzer say "range direction is decided at runtime", which
+# is true and is not what these cells ask about. Written as `ok` they would be
+# red in every engine forever — a defect of the harness, not of an engine.
+#
+# `@~ -1` is one program with two diagnostics, one per Rust engine.
+
+id      = "runtime-loops-ranges"
+what    = "the runtime diagnostics of ranges, steps, sleep and iteration: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "requires-integer-milliseconds-got"
+expect = "error"
+what   = "@~ requires integer milliseconds, got {}"
+src    = """
+t(v) {
+    @~ v
+    <~ 1
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "requires-integer-milliseconds-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @~ v
+    <~ 1
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "requires-non-negative-duration-got"
+expect = "error"
+what   = "@~ requires non-negative duration, got {}"
+src    = """
+t(v) {
+    @~ v
+    <~ 1
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "requires-non-negative-duration-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @~ v
+    <~ 1
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "can-only-iterate-over-ranges-arrays-strings"
+expect = "error"
+what   = "can only iterate over ranges, arrays, strings, tuples and dictionaries, got {:?}"
+src    = """
+t(v) {
+    @ (a, b):v {
+        >> a b ¶
+    }
+    <~ 1
+}
+>> t(#1) ¶
+"""
+
+[[cell]]
+id     = "can-only-iterate-over-ranges-arrays-strings-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @ (a, b):v {
+        >> a b ¶
+    }
+    <~ 1
+}
+!? {
+    >> t(#1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "character-code-must-be-in-range-0"
+expect = "error"
+what   = "character code must be in range 0..0x10FFFF, got {}"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t("110000") ¶
+"""
+
+[[cell]]
+id     = "character-code-must-be-in-range-0-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t("110000") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "range-bounds-must-be-integers-got-and"
+expect = "error"
+what   = "range bounds must be integers, got {:?} and {:?}"
+src    = """
+t(v) {
+    @ i:v..3 {
+        >> i ¶
+    }
+    <~ 1
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "range-bounds-must-be-integers-got-and-met"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @ i:v..3 {
+        >> i ¶
+    }
+    <~ 1
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "range-end-must-be-an-integer-got"
+expect = "error"
+what   = "range end must be an integer, got {:?}"
+src    = """
+t(v) {
+    @ (a, b):1..v {
+        >> a b ¶
+    }
+    <~ 1
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "range-end-must-be-an-integer-got-met"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @ (a, b):1..v {
+        >> a b ¶
+    }
+    <~ 1
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "range-pattern-type-mismatch"
+expect = "error"
+what   = "range pattern type mismatch"
+src    = """
+t(v) {
+    <~ ?? v { 1..3 => "a" _ => "b" }
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "range-pattern-type-mismatch-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ?? v { 1..3 => "a" _ => "b" }
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "range-start-must-be-an-integer-got"
+expect = "error"
+what   = "range start must be an integer, got {:?}"
+src    = """
+t(v) {
+    @ (a, b):v..3 {
+        >> a b ¶
+    }
+    <~ 1
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "range-start-must-be-an-integer-got-met"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @ (a, b):v..3 {
+        >> a b ¶
+    }
+    <~ 1
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "ranges-can-only-be-used-in-for"
+expect = "error"
+what   = "ranges can only be used in for-each loops"
+src    = """
+t(v) {
+    <~ v..3
+}
+>> t(1) ¶
+"""
+
+[[cell]]
+id     = "ranges-can-only-be-used-in-for-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v..3
+}
+!? {
+    >> t(1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "step-must-be-an-integer-got"
+expect = "error"
+what   = "step must be an integer, got {:?}"
+src    = """
+t(v) {
+    @ i:1..9:v {
+        >> i ¶
+    }
+    <~ 1
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "step-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @ i:1..9:v {
+        >> i ¶
+    }
+    <~ 1
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "step-must-be-positive-got"
+expect = "error"
+what   = "step must be positive, got {}"
+src    = """
+t(v) {
+    @ i:1..9:v {
+        >> i ¶
+    }
+    <~ 1
+}
+>> t(0) ¶
+"""
+
+[[cell]]
+id     = "step-must-be-positive-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    @ i:1..9:v {
+        >> i ¶
+    }
+    <~ 1
+}
+!? {
+    >> t(0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
