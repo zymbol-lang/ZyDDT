@@ -1054,3 +1054,34 @@ invertido es error (TW) o vacío (VM, `zyjs`).
 
 `axes/runtime-index-nav.toml`: 22 celdas `expect = "error"` y 22 `-met`. 18
 verdes, 26 rojas.
+
+---
+
+## GLB-013 — Conversiones y formatos con un valor inválido: `zyjs` inventa un número, y el kind vuelve a ser `##_` contra `##Type`
+
+**Estado:** abierto — la parte del kind **necesita la misma decisión que `GLB-011`**
+**Encontrado por:** `axes/runtime-format-convert.toml`, paso C5 del plan de cobertura de diagnósticos, 2026-09-14
+
+### Qué se observa
+
+13 programas (14 diagnósticos: `0x|"zz"|` da uno por motor Rust).
+
+**A. `zyjs` no da error en 6** y contesta un valor que nadie calculó:
+`0x|1.5|` → `0x0001`; `0x|"zz"|` → `0x0000`; `0x|"D800"|` (un sustituto, no un
+carácter) → `0x0000`; `#,|"x"|` → `0`; `#.2|#1|` → `0`; `#!2|#1|` → `0`.
+
+**B. El kind no coincide en 8:** `###`, `##!`, `0x||` con un Float, `#.n||` con
+una cuenta decimal inválida, `#,||`, `#.2||` y `#!2||` con un Bool — el TW dice
+`##_`, la VM `##Type`.
+
+Donde los tres coinciden: `### 1.0e300` es `##Range` y `0x|"zz"|` es `##Parse`.
+
+### Qué hay que decidir
+
+La familia de un valor del tipo equivocado — la pregunta de `GLB-011`. Lo de
+`zyjs` no tiene decisión pendiente: los dos Rust fallan, y un `0` inventado es la
+respuesta que ningún motor debería dar.
+
+### Qué lo sujeta
+
+`axes/runtime-format-convert.toml`: 13 pares. 7 verdes, 19 rojas.
