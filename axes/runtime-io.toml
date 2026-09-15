@@ -93,8 +93,8 @@ src    = """
 
 [[cell]]
 id     = "undefined-variable-in-input-prompt-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "error"
+what   = "and inside `!?` it is still refused: since 2026-09-15 (GLB-018 A) an undefined `{name}` is a static error, which no catch can meet — this cell asked for the family the catch received, and that question stopped having an answer"
 src    = """
 !? {
     << "Nombre {nadie}: " n
@@ -116,4 +116,13 @@ x = "Ana"
 } :! {
     >> "fin" ¶
 }
+"""
+
+[[cell]]
+id     = "named-function-in-interpolation"
+expect = "ok"
+what   = "a named function inside `{…}` becomes the same text in every engine — the Rust engines printed `{f}` as written, zyjs `<funct/1>`, while a lambda and juxtaposition give `<…/1>` in all three (found in step 1.6, 2026-09-15)"
+src    = """
+f(p) { <~ p }
+>> "f={f}" ¶
 """

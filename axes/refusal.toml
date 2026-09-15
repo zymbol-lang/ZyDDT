@@ -238,3 +238,17 @@ what    = "`@!outer` — a modal `!` with an argument after it"
 src     = """
 @:outer _i:1..3 { @!outer }
 """
+
+[[cell]]
+id   = "undefined-name-in-string-interpolation"
+what = "`{name}` of a name that is nothing — not a variable, a function or a module alias — at file level and inside a function"
+# Decided 2026-09-15 (GLB-018 A): a static error. Until then all three engines
+# printed `{nadie}` as text, silently, and `zymbol check` said nothing; only the
+# tree-walker's `<<` prompt failed, at run time. The corpus file
+# modules_scope/interp_global_const.zy asserted the literal form, and lost those
+# two lines the same day.
+src  = """
+>> "a {nadie} b" ¶
+f(v) { <~ "{v} {tampoco}" }
+>> f(1) ¶
+"""
