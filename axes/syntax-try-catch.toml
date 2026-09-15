@@ -1,0 +1,35 @@
+# The syntax-try-catch axis — Phase B, family B7 of the diagnostics plan.
+#
+# A catch filter written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line.
+#
+# Seven lines of this family have no cell (reasons in the queue): each parser of
+# `!?`, `:!`, `:>` and `##Type` checks that its first token is the one it was
+# called for, and every caller has already checked the same token.
+
+id      = "syntax-try-catch"
+what    = "the parser diagnostics of try, catch and finally: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "error-type-with-one-hash"
+what = "expected '##' for error type (missing second #) — with its help"
+src  = """
+!? {
+    >> 1 / 0 ¶
+} :! #Div {
+    >> "c" ¶
+}
+"""
+
+[[cell]]
+id   = "error-type-without-a-name"
+what = "expected error type name after '##' — with its help"
+src  = """
+!? {
+    >> 1 / 0 ¶
+} :! ## {
+    >> "c" ¶
+}
+"""
