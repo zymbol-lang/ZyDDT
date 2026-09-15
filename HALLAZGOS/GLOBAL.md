@@ -1526,7 +1526,7 @@ rojas.
 
 ## GLB-019 — Operadores con un operando inválido: la VM responde `!5` → `#0` y `+"a"` → `a`, y dos motores redeclaran una constante
 
-**Estado:** abierto — **A corregido el 2026-09-15** (paso 1.8); B y C pendientes (B decidido: el `+` unario es forma)
+**Estado:** abierto — **A y la parte VM de B corregidos el 2026-09-15** (pasos 1.8 y 1.9); falta que `zyjs` implemente el `+` unario (decidido: es forma), y C va con D5 (F5)
 **Encontrado por:** `axes/runtime-operators.toml`, paso C13 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1562,6 +1562,18 @@ El compilador sólo emite `Not` para el `!` unario. Barrido con `5`, `0`, `""`,
 `[]`, `null` y `1.5` sacados de `json::decode`, más `#1`, `#0` y `!(1 == 2)`, en
 expresión y como condición de `?`: los tres motores dan exactamente la misma
 salida. Las dos celdas pasan a `AGREE`.
+
+### Corregido B en la VM — 2026-09-15
+
+`compile_unary` compilaba `+x` como una copia del registro. Ahora sólo copia
+cuando el tipo estático del operando es Int o Float; si no, emite la instrucción
+nueva `Pos(dst, src)`, que deja pasar un Int o un Float y rechaza lo demás con
+`unary plus requires numeric operand, got {tipo}`. En el mismo paso, el texto del
+TW para **este** diagnóstico dejó de volcar el `Debug` de Rust (`got String("a")`)
+y usa `type_ident()`, como su hermano `negation requires numeric operand`. Barrido
+TW contra VM, idéntico: String, Bool, array y `null` rechazados; `5`, `1.5`,
+`+x` con `x = 3` y `+x + 1` pasan. La celda base queda en `DIVERGE` y la `-met` en
+`WRONG`, las dos sólo por `zyjs`, que no parsea `+`.
 
 ### Qué lo sujeta
 
