@@ -1639,7 +1639,7 @@ rojas.
 
 ## GLB-019 — Operadores con un operando inválido: la VM responde `!5` → `#0` y `+"a"` → `a`, y dos motores redeclaran una constante
 
-**Estado:** abierto — **A y la parte VM de B corregidos el 2026-09-15** (pasos 1.8 y 1.9); falta que `zyjs` implemente el `+` unario (decidido: es forma), y C va con D5 (F5)
+**Estado:** abierto — **A y B corregidos el 2026-09-15** (pasos 1.8, 1.9 y 2.12); C va con D5 (F5)
 **Encontrado por:** `axes/runtime-operators.toml`, paso C13 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1687,6 +1687,14 @@ y usa `type_ident()`, como su hermano `negation requires numeric operand`. Barri
 TW contra VM, idéntico: String, Bool, array y `null` rechazados; `5`, `1.5`,
 `+x` con `x = 3` y `+x + 1` pasan. La celda base queda en `DIVERGE` y la `-met` en
 `WRONG`, las dos sólo por `zyjs`, que no parsea `+`.
+
+### Corregido B en `zyjs` — 2026-09-15 (paso 2.12)
+
+`parseUnary` lee `+` como lee `-`, y la evaluación deja pasar un Int o un Float y
+rechaza lo demás con `unary plus requires numeric operand, got String`. El checker
+ya contemplaba el `+` en su aviso de tipo. `GUIDE.md` lo documenta junto a `-a`.
+Barrido idéntico en los tres motores. `runtime-operators`: 12 de 14 en `AGREE`;
+las dos que quedan son la constante redeclarada (C, F5).
 
 ### Qué lo sujeta
 
