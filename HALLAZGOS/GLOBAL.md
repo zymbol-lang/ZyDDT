@@ -1311,7 +1311,7 @@ límite variable es cierto y no es lo que preguntan.
 
 ## GLB-015 — Llamadas y funciones de orden superior con algo que no es lo que necesitan: kinds `##_` contra `##Type`, y un `$<` con lambda de un parámetro que la VM y `zyjs` aceptan
 
-**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`); **A corregido en la VM el 2026-09-15** (paso 1.10), queda `zyjs`
+**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`); **A y B corregidos el 2026-09-15** (pasos 1.10 y 2.10); el kind, pendiente en 4.1
 **Encontrado por:** `axes/runtime-functions-hof.toml`, paso C7 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1346,6 +1346,18 @@ es 2 lanzan `reduce lambda requires 2 parameters (accumulator, element), got {n}
 La aridad de una `Closure` no cuenta sus capturas. Barrido TW contra VM,
 idéntico: lambda y función con nombre de 1, 2, 3 y 0 parámetros, array vacío y
 una lambda con captura (`R 23`). `zyjs` devuelve todavía `0` o `1`.
+
+### Corregido A y B en `zyjs` — 2026-09-15 (paso 2.10)
+
+- **A:** `$<` evalúa el valor inicial y después la lambda, en el orden del TW, y
+  una lambda escrita en Zymbol cuya aridad no es 2 lanza `reduce lambda requires 2
+  parameters (accumulator, element), got 1`. Las nativas no declaran parámetros y
+  no se comprueban. `evaluation-order` sigue en 13 de 13.
+- **B:** un pipe cuyo destino no es una llamada escrita en su sitio (`f(_, 1)`)
+  tiene que dar una función; si no, `pipe operator requires a callable function or
+  lambda`. `5 |> v` con `v = 5` respondía `5`.
+
+`runtime-functions-hof` pasa de 3 `WRONG` a 1, la del comparador (`GLB-024`, paso 2.13).
 
 **C (D1):** los 9 son `##Type` en los tres motores: algo que no es array ni
 lambda, o llamar a algo que no es función.
