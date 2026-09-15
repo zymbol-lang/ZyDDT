@@ -1145,7 +1145,7 @@ respuesta que ningún motor debería dar.
 
 ## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
 
-**Estado:** abierto — **A corregido el 2026-09-15** (paso 1.3); C, D y G **decididos el 2026-09-15** (error estático; `##Type`); B, E, F y H sin decisión pendiente
+**Estado:** abierto — **A y B corregidos en la VM el 2026-09-15** (pasos 1.3 y 1.4); C, D y G **decididos el 2026-09-15** (error estático; `##Type`); E, F, H y la parte `zyjs` de B sin decisión pendiente
 **Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
 
@@ -1219,6 +1219,31 @@ cuando el paso es un literal entero positivo. La celda base pasa de «sin
 veredicto» a `WORDING` (sólo difiere la frase de `zyjs`) y la `-met` a `AGREE`.
 `zyq consensus` sigue en 660 de acuerdo y 0 divergiendo.
 
+### Decidido B y corregido en la VM — 2026-09-15
+
+**Decisión del autor:** un límite o un paso decimal es **error `##Type`**. Un
+bucle no es una colección, así que la tolerancia de `GLB-011` no lo alcanza, y
+`zyjs` deja de truncar.
+
+`LoopStepCheck` rechaza también un paso que no es Int, y la instrucción nueva
+`LoopBoundsCheck(inicio, fin)` rechaza unos límites que no son los dos Int. Se
+comprueba en el orden del TW, primero el paso y luego los límites, y la
+comprobación de límites no se emite cuando los dos se saben Int al compilar.
+Barrido de tipos, los tres motores dentro de `!?`:
+
+| caso | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| inicio `1.5` | error `##_` | error `##Type` | `1 2` |
+| fin `3.5` | error `##_` | error `##Type` | `1 2 3` |
+| paso `1.5` | error `##_` | error `##Type` | `1 2 4 5 7 8` |
+| paso `0.0` | error `##_` | error `##Type` (antes, sin fin) | `Loop step cannot be zero` |
+| inicio `1.5`, paso `-2.5` | error `##_` | error `##Type` (antes, sin fin) | `1 4 6 9` |
+| inicio `"a"` | error `##_` | error `##Type` | ninguna vuelta, sin error |
+
+La VM toma ya la rama del TW en los seis. Quedan el kind del TW (paso 4.1), los
+textos (el TW enseña `Float(1.5)`, familia de `ZYTW-004`) y `zyjs` (F2). Las
+siete aplicaciones LDV mantienen sus goldens.
+
 ### Qué lo sujeta
 
 `axes/runtime-loops-ranges.toml`: 11 pares (12 diagnósticos: `@~ -1` da uno por
@@ -1250,6 +1275,10 @@ dicen `##_`.
 got Int` donde el TW nombra la operación).
 
 ### Decidido — 2026-09-15
+
+**A:** un `$<` con una lambda de un solo parámetro es un **error de aridad**, no
+un borde de la colección, así que no entra en la tabla de tolerancias de
+`GLB-011`. Se corrige en la VM en el paso 1.10 y en `zyjs` en la F2.
 
 **C (D1):** los 9 son `##Type` en los tres motores: algo que no es array ni
 lambda, o llamar a algo que no es función.
@@ -1401,6 +1430,10 @@ operand`); la VM responde **`#0`**.
 **B. `(+v)` con `v = "a"`:** el TW rechaza (`unary plus requires numeric
 operand`); la VM responde **`a`**; `zyjs` no parsea el `+` unario
 (`expected expression, found Plus`).
+
+*Decidido el 2026-09-15:* el `+` unario **es forma del lenguaje**. `zyjs` lo
+implementa (`+5` → `5`, `+"a"` → error) y se documenta en `GUIDE.md` junto a
+`-x`.
 
 **C. `C := 1` y luego `C := 2`:** el TW rechaza (`constant 'C' already
 declared`); la VM y `zyjs` imprimen **`2`**. Dentro de un `!?`, la VM vuelve a
