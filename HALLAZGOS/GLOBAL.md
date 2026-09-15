@@ -1333,3 +1333,24 @@ Si `<< C` y `@ C:…` sobre una constante son un error estático (como `C = 2`) 
 si el iterador puede sombrear la constante dentro del bucle sin cambiarla fuera.
 Una celda ahora tendría que elegir por el autor cuál es su verde, y un rojo sin
 verde posible es un defecto del arnés.
+
+---
+
+## GLB-021 — La ayuda de `#.|x|` enseña `#..2|value|`, con dos puntos
+
+**Estado:** abierto — sin decisión pendiente
+**Encontrado por:** `syntax-format-convert/round-expects-a-decimal-count`, paso B6, 2026-09-14
+**Gravedad:** baja, pero es una ayuda que enseña una forma que no existe
+
+`x = #.|5|` en los dos motores Rust:
+
+```
+error: expected a decimal count after '#.'
+  = help: write the count or the name of a variable holding it: #..2|value| or #..n|value|
+```
+
+`parse_format_precision(prefix_str)` (`zymbol-parser/src/data_ops.rs`) compone
+`{prefix}.2|value|`, y para el redondeo el prefijo que recibe es `"#."`, que ya
+termina en punto. Para `#,` sale bien (`#,.2|value|`). `zyjs` no llega a este
+mensaje (`ZYJS-021`).
+

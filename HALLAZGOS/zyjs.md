@@ -1175,8 +1175,16 @@ el mismo texto. `zyjs`: `[1, 2` → `expected expression, found Output`;
 the dictionary` (el mensaje de otra forma); `#(1: 2)` → el mismo diagnóstico con
 la guía dentro del mensaje en vez de en `help:`.
 
+### Y en formato y conversión (paso B6)
+
+9 formas rotas. Seis como las anteriores (`Expected VBAR, got '>>'`). Tres son
+peores: `#.2 5` y `#.|5|` se rechazan **una línea más abajo**, en el `>>`
+siguiente (`expected expression, found Output`); y **`#!2 5` se lee como un `!`
+lógico** aplicado a `2`, que falla en ejecución con `logical NOT requires boolean
+operand` en vez de rechazarse al parsear.
+
 ### Qué lo sujeta
 
-`axes/syntax-collection-ops.toml` (16 celdas) y `axes/syntax-literals.toml` (5),
-todas en `WORDING`.
+`axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5) y
+`axes/syntax-format-convert.toml` (9).
 
