@@ -44,6 +44,19 @@ g = x -> x
 """
 
 [[cell]]
+id     = "bash-collection-interpolation"
+expect = "ok"
+what   = "a collection joined into a shell command becomes the same text in every engine — the tree-walker joins elements with spaces, the VM wrote `[1, 2]` and `(3, x)`, and `#(…)`, which the shell reads as a comment (found in step 1.5, 2026-09-15; no document says which is right)"
+src    = """
+a = [1, 2]
+t = (3, "x")
+d = #(k: 1, j: "z")
+>> <\\ "echo A " a \\> ¶
+>> <\\ "echo T " t \\> ¶
+>> <\\ "echo D " d \\> ¶
+"""
+
+[[cell]]
 id     = "subscript-runtime-error"
 expect = "error"
 what   = "error executing {}: {:?}"

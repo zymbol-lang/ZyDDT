@@ -1346,7 +1346,7 @@ de desestructuración del mismo paso coinciden en los tres motores.
 
 ## GLB-017 — Módulos, subscripts y shell: la VM pasa una función al shell, el TW enseña un `Located { … }` de Rust, y cada motor cuenta distinto un módulo que no compila
 
-**Estado:** abierto
+**Estado:** abierto — **A corregido el 2026-09-15** (paso 1.5); G, observado en ese paso, **necesita decisión**
 **Encontrado por:** `axes/runtime-modules-scripts.toml`, paso C9 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1375,9 +1375,33 @@ primer error, sin la cabecera.
 **F. `v.f(1)` sobre un número:** TW `undefined module alias: 'v'`; VM y `zyjs`
 `the dot reaches a dictionary key, and this is ###`.
 
+**G. Una colección dentro de `<\ \>`** (medido el 2026-09-15, paso 1.5). El TW
+une los elementos con espacios; la VM escribía su representación:
+
+| valor | `zytw` | `zyvm` |
+|---|---|---|
+| `[1, 2]` | `1 2` | `[1, 2]` |
+| `(3, "x")` | `3 x` | `(3, x)`, y `sh` falla: `Syntax error: "(" unexpected` |
+| `#(k: 1, j: "z")` | `1 z` | nada: `sh` lee `#(…` como comentario |
+
+**Ningún documento dice cuál es la forma correcta**, así que no se toca sin
+decisión. La celda `runtime-modules-scripts/bash-collection-interpolation`
+pregunta sólo que coincidan (`expect = "ok"`), y su verde no elige entre las dos.
+
+### Corregido A en la VM — 2026-09-15
+
+`BashExec` convertía cada valor con `to_string_repr()` y mandaba `<lambd/1>` al
+shell. Ahora, antes de construir el comando, rechaza con
+`cannot use function in bash command interpolation`, el texto y el kind (`##_`)
+del TW, un valor que sea o contenga una función o una lambda a cualquier
+profundidad (`[g]`, `(1, k)`, `#(f: g)`), igual que el `value_to_bash_str`
+recursivo del TW. Las dos celdas pasan a `AGREE [2/3]` (`zyjs` excluido por
+`BASH_EXEC`).
+
 ### Qué lo sujeta
 
-`axes/runtime-modules-scripts.toml`: 14 celdas, 4 verdes, 10 rojas. Los errores
+`axes/runtime-modules-scripts.toml`: 14 celdas, 4 verdes, 10 rojas, más
+`bash-collection-interpolation` (G), añadida el 2026-09-15. Los errores
 de carga de módulo no tienen `-met`: una importación va antes de cualquier
 sentencia y no hay `!?` que la rodee.
 
