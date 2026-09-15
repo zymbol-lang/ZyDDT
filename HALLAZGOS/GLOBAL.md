@@ -1301,7 +1301,7 @@ lambda, o llamar a algo que no es función.
 
 ## GLB-016 — Un `??` sin brazo que case: el TW aborta, la VM y `zyjs` devuelven `##_` en silencio
 
-**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*. **La VM y el aviso en los dos Rust, corregidos el 2026-09-15** (pasos 1.1 y 1.2); queda `zyjs` (paso 2.6)
+**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*. **corregido el 2026-09-15** en los tres motores (pasos 1.1, 1.2 y 2.6)
 **Encontrado por:** `axes/runtime-match-patterns.toml`, paso C8 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** **alta**: un valor que nadie calculó sigue su camino por el programa, sin error ni aviso
 
@@ -1338,6 +1338,14 @@ emite `RaiseError("no pattern matched in match expression")` detrás del último
 brazo: el mismo texto que el TW, y el mismo kind (`##_`) en la celda `-met`. La
 forma de sentencia pasa por el mismo camino, igual que en el TW, donde también
 aborta. `zyq consensus` sigue en 660 de acuerdo y 0 divergiendo.
+
+### Corregido en `zyjs` — 2026-09-15 (paso 2.6)
+
+El `Match` sin brazo que case devolvía `mkUnit()`; ahora lanza `no pattern matched
+in match expression`, y el nodo lleva su línea. El `Checker` da el aviso de un
+`??` usado como sentencia con algún brazo `=> valor`, con el texto y la ayuda del
+analizador Rust, bajo el código `W_UNUSED_MATCH`, traducido en los catálogos
+inglés y español. `runtime-match-patterns`: 7 de 7 en `AGREE`.
 
 ### Corregido el aviso en los dos Rust — 2026-09-15
 
