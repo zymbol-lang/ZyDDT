@@ -1225,6 +1225,19 @@ y `x°[1] 5` (una forma indexada sin operador después de un nombre caliente). L
 formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
 `Expected COLON, got 'y'`.
 
+### Dos más, medidas el 2026-09-15 (paso 1.10)
+
+- **`a$^ f` con `f` una lambda en una variable.** Los Rust exigen el comparador
+  escrito en línea (`expected comparator lambda after '$^'`), y `zyjs` ordena con
+  él. La celda que había, `sort-expects-comparator-lambda`, usaba una `x` sin
+  definir, y `zyjs` la rechazaba por eso (`undefined variable 'x'`) y no por la
+  forma. Celda nueva `syntax-collection-ops/sort-comparator-from-a-variable`,
+  roja.
+- **Parámetros de lambda sin usar.** `(a, b -> 1)` avisa `unused variable 'a'` y
+  `'b'` en `zyjs`, y en los Rust no. Nada dice cuál es lo correcto; salió al
+  escribir la celda de `GLB-024`, donde ese aviso tapaba la pregunta. Sin celda
+  todavía.
+
 ### Qué lo sujeta
 
 `axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),

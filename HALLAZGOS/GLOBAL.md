@@ -1712,3 +1712,49 @@ an Expr, so we skip analyzing it»*. Ahora cuenta como uso cada
 variable que se lee, porque el prompt se imprime antes de leer. Control negativo
 en el mismo fichero: una variable de verdad sin usar sigue avisándose. La celda
 pasa a `AGREE`.
+
+---
+
+## GLB-024 — Un comparador de `$^` que no devuelve un Bool: nadie da error y cada motor ordena distinto
+
+**Estado:** abierto — **necesita decisión** (ver abajo)
+**Encontrado por:** leyendo `ArraySort` de la VM en el paso 1.10, 2026-09-15
+**Gravedad:** media-alta: un programa mal escrito ordena, sin aviso, de una forma que depende del motor
+**Familia:** las reglas de la v0.0.9 sin truthiness (`GUIDE.md`: *«There is no truthiness in Zymbol»*)
+
+```zymbol
+v = [3, 1, 2]
+>> (v$^ (a, b -> a - b)) ¶
+>> (v$^ (a, b -> a * 0 + b * 0)) ¶
+>> (v$^ (a, b -> "{a}{b}")) ¶
+```
+
+| comparador | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `a < b` (Bool) | `[1, 2, 3]` | `[1, 2, 3]` | `[1, 2, 3]` |
+| `a - b` (Int) | `[2, 1, 3]` | `[3, 1, 2]` | `[3, 1, 2]` |
+| `a * 0 + b * 0` (siempre 0) | `[2, 1, 3]` | `[2, 1, 3]` | `[2, 1, 3]` |
+| `"{a}{b}"` (String) | `[2, 1, 3]` | `[3, 1, 2]` | `[3, 1, 2]` |
+
+Los comparadores usan sus parámetros a propósito: con `(a, b -> 1)`, `zyjs` avisa
+`unused variable 'a'` y `'b'` —los Rust no avisan de parámetros de lambda sin
+usar— y ese aviso tapaba la pregunta.
+
+El TW trata como falso todo lo que no es `#1`; la VM (`keep.is_truthy()`) y `zyjs`
+aplican truthiness. **Nadie da error.** Sin truthiness en el lenguaje, lo
+coherente parece que un comparador que no contesta un Bool sea un error, pero
+ningún documento lo dice para `$^`. Por eso la celda
+`runtime-functions-hof/sort-comparator-that-is-not-a-bool` pregunta sólo que los
+motores coincidan (`expect = "ok"`), y su verde no elige.
+
+### Qué hay que decidir
+
+¿Un comparador que no devuelve un Bool es error, y de qué familia (`##Type`, por
+D1)? ¿O tiene un significado, y cuál?
+
+### Qué lo sujeta
+
+`runtime-functions-hof/sort-comparator-that-is-not-a-bool`, roja. Vecina, por el
+mismo camino: `syntax-collection-ops/sort-comparator-from-a-variable`. Los Rust
+rechazan `a$^ f` con `f` una lambda en una variable (el comparador tiene que ir
+escrito en línea), y `zyjs` ordena con ella (`ZYJS-021`).

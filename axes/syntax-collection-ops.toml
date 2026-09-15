@@ -132,6 +132,16 @@ b = a$^ x
 """
 
 [[cell]]
+id   = "sort-comparator-from-a-variable"
+what = "expected comparator lambda after '$^' — with a variable that exists, so an undefined name cannot refuse it for another reason (found in step 1.10, 2026-09-15: zyjs sorts with it)"
+src  = """
+a = [2, 1]
+f = (x, y) -> x < y
+b = a$^ f
+>> b ¶
+"""
+
+[[cell]]
 id   = "slice-by-count-expects-close-bracket"
 what = "expected ']' after count — with the count-based slice help"
 src  = """
