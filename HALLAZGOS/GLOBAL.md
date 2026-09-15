@@ -1872,6 +1872,13 @@ palabras en devanagari y otras escrituras índicas, y `zyjs` los admite a
 propósito dentro de un nombre. Se medirá su uso en las aplicaciones LDV y se
 preguntará antes de tocarlos.
 
+**Un ejemplo del playground que no carga** (medido el 2026-09-15, paso 2.5):
+`web/examples/graphics/mandelbrot/emoji.zy` escribe `<<| _🔑`. Tras un `_`, el
+lexer de `zyjs` sólo sigue leyendo el nombre si viene letra, uso privado, cifra o
+`_` (`[\p{L}\p{Co}0-9_]`), y un emoji es `\p{So}`; el `_` se queda solo y el
+parser falla. Rust lo lee como un nombre. El ejemplo lleva `@skip-parity`, y por
+eso nada lo ejecutaba en `zyjs`. Entra en el paso 2.17.
+
 ---
 
 ## GLB-027 — La ayuda de Rust para `x°[1] 5` enseña `arr[i] = val`, una forma que no existe
