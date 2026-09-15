@@ -287,3 +287,12 @@ C3 (`got Int(5)`, `got String("x")`), aquí con un valor cuyo `Debug` es enorme.
 
 `runtime-std-db/cannot-bind-a-function` (NEW WORDING hasta que el texto sea uno).
 
+### Otro caso, medido el 2026-09-15 (paso 1.5)
+
+Indexar una cadena con una lambda, `"echo "[g]` con `g = x -> x`, vuelca lo
+mismo en el `_err`: `##Index(index must be an integer, got Function(FunctionValue
+{ params: ["x"], body: Expr(Identifier(IdentifierExpr { … span: Span { … } … })`.
+La VM dice `##Type(this needs Int and got Function)`. Además del texto, el kind:
+un índice del tipo equivocado es `##Type` (decisión D1 del 2026-09-15, `GLB-012`).
+Sin celda propia: es el `{:?}` de este mismo hallazgo.
+
