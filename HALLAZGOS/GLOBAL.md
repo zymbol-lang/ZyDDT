@@ -1423,7 +1423,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); B y C sin decisión pendiente; H, observado en el paso 1.6, necesita decisión
+**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B corregido en la VM el 2026-09-15** (paso 1.7), queda `zyjs`; C sin decisión pendiente; H, observado en el paso 1.6, necesita decisión
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1459,6 +1459,20 @@ familia `ZYJS-018`).
 
 **C. `>>|` sin terminal:** el TW y la VM fallan (`failed to enable raw mode`),
 como dice `LLM.md` (*«errors without a tty»*); `zyjs` entra y sale del bloque.
+
+### Corregido B en la VM — 2026-09-15
+
+La VM metía los huecos en una tupla y los leía con `vm_extract_pos`, que
+convierte en «sin tocar» todo lo que no es Int, así que `>>~ ("a", 1) > "x"`
+imprimía `x1`. Instrucción nueva `OutputSlotCheck(reg, admite_tupla)`, emitida
+detrás de cada hueco escrito en cuanto se evalúa, en el orden del TW. Rechaza con
+`>>~ slot expects Int, got …`, el texto y el kind (`##_`) del TW, y sólo un hueco
+solitario puede llevar la tupla densa (`>>~ p > …`), que sigue ignorando lo que no
+es Int, igual que el TW. Barrido TW contra VM, idéntico byte a byte con las
+secuencias ANSI: String, Float, Bool, array y `##_` rechazados en el primer y en
+el cuarto hueco, la tupla densa con un String dentro y la forma dispersa
+`(,,,196)`. Pasan `tui` (3 de 3 por pty) y las siete aplicaciones. Las dos celdas
+quedan rojas sólo por `zyjs`.
 
 ### Decidido A y corregido — 2026-09-15
 
