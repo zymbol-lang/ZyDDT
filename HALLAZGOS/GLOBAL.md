@@ -1145,7 +1145,7 @@ respuesta que ningún motor debería dar.
 
 ## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
 
-**Estado:** abierto — C, D y G **decididos el 2026-09-15** (error estático; `##Type`); A, B, E y F sin decisión pendiente
+**Estado:** abierto — **A corregido el 2026-09-15** (paso 1.3); C, D y G **decididos el 2026-09-15** (error estático; `##Type`); B, E, F y H sin decisión pendiente
 **Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
 
@@ -1157,7 +1157,9 @@ imprime `1` sin fin; el TW y `zyjs` dan error. En ZyDDT la celda
 corrida, dos veces).
 
 **B. La VM acepta límites y pasos decimales:** `@ i:1.5..3` imprime `1.5 2.5`;
-`@ i:1..9:1.5` imprime `1 2.5`. `zyjs` los trunca: `1 2`. El TW da error.
+`@ i:1..9:1.5` imprime `1 2.5`. `zyjs` los trunca: `1 2`. El TW da error. Medido el 2026-09-15: con un paso
+decimal `0.0` o negativo (`-2.5`) la VM **tampoco termina**; eso se cierra con B,
+porque depende de qué se haga con un paso decimal.
 
 **C. El bucle que desestructura un rango sólo existe en el tree-walker.**
 `@ (a, b):1..v { }`: la VM responde `unsupported construct: range outside loop`
@@ -1177,6 +1179,12 @@ donde los dos Rust fallan. **Y un patrón de rango de `??` sobre una cadena** da
 
 **G. Kinds y textos:** TW `##_` contra VM `##Type` en `@~`, iteración y patrón de
 rango; textos distintos en `@~ -1` (`duration` / `ms`) y en paso 0.
+
+**H. `zyjs` acepta un paso negativo** (medido el 2026-09-15, paso 1.3). `@ i:1..3:v`
+con `v = -1` imprime `1 2 3`, y con `-2.5` imprime `1`; los dos Rust rechazan
+(`step must be positive, got -1`) y `LLM.md` dice *«a negative step is a runtime
+error»*. Con 0 rechaza, pero con otra frase: `Loop step cannot be zero`. Celda
+nueva `runtime-loops-ranges/step-must-be-positive-got-negative`, roja por `zyjs`.
 
 ### Qué hay que decidir
 
@@ -1198,6 +1206,18 @@ dónde se rechaza un rango suelto. A, B, E y F no necesitan decisión: los dos R
    un Int, así que esa forma nunca puede salir bien en ningún motor.
 2. **G (D1):** los kinds de `@~`, de la iteración y del patrón de rango con un
    valor del tipo equivocado son `##Type`.
+
+### Corregido A en la VM — 2026-09-15
+
+`compile_range_loop` copiaba el paso a su registro y sumaba su magnitud en la
+dirección del rango sin mirarlo. Con 0 no avanzaba nunca, y con un paso
+**negativo** —también escrito como literal, `@ i:1..3:-1`, algo que la ficha no
+había medido— se alejaba del final para siempre. Instrucción nueva
+`LoopStepCheck(reg)`: si el paso es un Int menor o igual que 0, lanza
+`step must be positive, got {n}`, el texto y el kind (`##_`) del TW. No se emite
+cuando el paso es un literal entero positivo. La celda base pasa de «sin
+veredicto» a `WORDING` (sólo difiere la frase de `zyjs`) y la `-met` a `AGREE`.
+`zyq consensus` sigue en 660 de acuerdo y 0 divergiendo.
 
 ### Qué lo sujeta
 
