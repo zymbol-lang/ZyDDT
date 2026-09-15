@@ -1092,7 +1092,7 @@ las partes del `$++`.
 
 ## ZYJS-019 — `term::width` rechaza con otro texto
 
-**Estado:** abierto
+**Estado:** **corregido el 2026-09-15** (paso 2.14): el mensaje añade `, got ###`, el símbolo de tipo del argumento, como en Rust. `runtime-std` queda en 42 de 42 en `AGREE`
 **Encontrado por:** `runtime-std/term-width-expected-a-string-or-char`, paso C10 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** baja: rechaza lo mismo, con otras palabras
 
