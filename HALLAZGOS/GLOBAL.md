@@ -1526,7 +1526,7 @@ rojas.
 
 ## GLB-019 — Operadores con un operando inválido: la VM responde `!5` → `#0` y `+"a"` → `a`, y dos motores redeclaran una constante
 
-**Estado:** abierto — sin decisión pendiente: el tree-walker rechaza en los tres casos
+**Estado:** abierto — **A corregido el 2026-09-15** (paso 1.8); B y C pendientes (B decidido: el `+` unario es forma)
 **Encontrado por:** `axes/runtime-operators.toml`, paso C13 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1551,6 +1551,17 @@ declararla y `zyjs` la trata como un nombre nuevo del bloque.
 
 Lo que coincide en los tres: comparar un Float con una String, negar una String y
 `5 % 0`.
+
+### Corregido A en la VM — 2026-09-15
+
+`Instruction::Not` calculaba `!is_truthy()`: truthiness, que la v0.0.9 retiró
+(`GUIDE.md`: *«`!7` and `-"a"` are refused, not coerced»*). Ahora sólo acepta un
+Bool y, con cualquier otra cosa, lanza `logical NOT requires boolean operand, got
+{tipo}`, con el mismo texto y el mismo nombre de tipo que el TW (`Int`, `String`…).
+El compilador sólo emite `Not` para el `!` unario. Barrido con `5`, `0`, `""`,
+`[]`, `null` y `1.5` sacados de `json::decode`, más `#1`, `#0` y `!(1 == 2)`, en
+expresión y como condición de `?`: los tres motores dan exactamente la misma
+salida. Las dos celdas pasan a `AGREE`.
 
 ### Qué lo sujeta
 
