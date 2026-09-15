@@ -1728,7 +1728,7 @@ pasa a `AGREE`.
 
 ## GLB-024 — Un comparador de `$^` que no devuelve un Bool: nadie da error y cada motor ordena distinto
 
-**Estado:** abierto — **decidido el 2026-09-15**: error `##Type` en los tres motores
+**Estado:** abierto — **decidido el 2026-09-15**: error `##Type` en los tres motores. **Corregido en los dos Rust el 2026-09-15** (paso 1.12); quedan `zyjs` (F2) y el kind (4.1)
 **Encontrado por:** leyendo `ArraySort` de la VM en el paso 1.10, 2026-09-15
 **Gravedad:** media-alta: un programa mal escrito ordena, sin aviso, de una forma que depende del motor
 **Familia:** las reglas de la v0.0.9 sin truthiness (`GUIDE.md`: *«There is no truthiness in Zymbol»*)
@@ -1766,6 +1766,17 @@ D1)? ¿O tiene un significado, y cuál?
 *Decidido el 2026-09-15:* **error `##Type`**, coherente con «sin truthiness» y
 con D1. Los Rust en el paso 1.12 y `zyjs` en la F2. La celda pasa a
 `expect = "error"`.
+
+### Corregido en los dos Rust — 2026-09-15
+
+El TW leía como falso todo lo que no era `#1`, y la VM llamaba a
+`keep.is_truthy()`. Los dos lanzan ahora `sort comparator must return a Bool, got
+{tipo}` con el mismo texto; en la VM sale del doble bucle con `break 'calls`, no
+con `raise!`. Barrido TW contra VM, idéntico: `a < b` y `a > b` ordenan, `a - b`
+(Int) y `"{a}{b}"` (String) se rechazan, y `[7]$^ …` no llama al comparador y no
+tiene nada que rechazar. El kind sale `##_` en los dos, porque el TW clasifica por
+palabras. Llegar a `##Type` es el paso 4.1. `GUIDE.md` lo documenta junto al
+comparador. Las siete aplicaciones mantienen sus goldens.
 
 ### Qué lo sujeta
 
