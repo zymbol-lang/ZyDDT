@@ -1457,7 +1457,7 @@ los ejemplos del playground siguen en verde.
 
 ## ZYJS-023 — El panel de problemas del playground enseña la clave en bruto de 19 de los 28 diagnósticos del checker
 
-**Estado:** abierto — sin decisión pendiente
+**Estado:** **corregido el 2026-09-15** (paso 2.15d)
 **Encontrado por:** paso 2.6, 2026-09-15, al añadir el aviso `W_UNUSED_MATCH`
 **Gravedad:** media en el playground: el lector ve `chk.W_NO_EFFECT` donde debería leer una frase
 
@@ -1475,3 +1475,19 @@ los ejemplos del playground siguen en verde.
 mismas claves, pero no que estén las que el motor emite. Sin celda: ZyDDT no ve
 el panel. Lo que lo sujetaría es un test en `web/tests/` que cruce los códigos
 de `zymbol.js` con el catálogo.
+
+### Corregido — 2026-09-15 (paso 2.15d)
+
+- **Reserva:** `messageOf` muestra el mensaje inglés del motor cuando el catálogo no
+  tiene la clave, como ya pasaba con `E_PARSE`, y `hintOf` muestra entonces la ayuda
+  del motor.
+- **Traducciones:** entradas en inglés y español para los 13 códigos de un solo
+  mensaje (`E014`–`E019`, `E_HOT_AMBIG`, `E_HOT_OUTPUT`, `W_ARITH_TYPE`,
+  `W_COND_TYPE`, `W_LOGIC_TYPE`, `W_RANGE_DIR`, `W_TYPE_CHANGE`).
+- **Test:** `tests/test_i18n_playground.mjs` cruza cada código que emite el checker
+  con el catálogo. Los seis que emiten varias frases con un solo código
+  (`E_ARRAY_MIX`, `E_NAME`, `W_NO_EFFECT`, `W_UNARY_TYPE`, `W_DESTRUCT_SHAPE`,
+  `W_MIX_UNNEEDED`) van en una lista con su razón, y el test falla si uno de ellos
+  gana una entrada o deja de emitirse. Comprobado quitando a propósito la clave de
+  `E016`. La prueba DOM del playground sigue en 32 de 32.
+
