@@ -1045,7 +1045,7 @@ Sin esas dos respuestas, arreglar sería elegir por el autor.
 
 ## GLB-012 — Índices y navegación con un valor inválido: `zyjs` contesta donde los Rust fallan, y el kind se reparte entre `##_`, `##Index` y `##Type`
 
-**Estado:** abierto — **decidido el 2026-09-15** (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente)
+**Estado:** abierto — **decidido el 2026-09-15** (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente). **La parte de A que no es `$`, corregida en `zyjs` el 2026-09-15** (paso 2.9)
 **Encontrado por:** `axes/runtime-index-nav.toml`, paso C4 del plan de cobertura de diagnósticos, 2026-09-14
 **Familia:** `GLB-011` (la misma pregunta de kind, en otra familia de operaciones)
 
@@ -1100,6 +1100,23 @@ hoy de tres maneras: el TW dice `range indices in nav path must be positive
 integers`, la VM `index 0 is invalid` y `zyjs` `Expected RBRACKET, got '..'`.
 `$-[9]` y `#(a: 1)$? 5` de la parte A son operaciones `$`, así que entran en la
 tabla de tolerancias de `GLB-011`.
+
+### Corregido en `zyjs` lo que no es `$` — 2026-09-15 (paso 2.9)
+
+`navGetAt` recibía el valor JavaScript ya sin tipo, y `v[0.5]` o `v["a" - 1]` eran
+`undefined`, que se imprimía como una línea vacía. Ahora el tipo se mira donde aún
+se tiene, con los textos del TW:
+- índice simple: `index must be an integer, got Float`;
+- paso de ruta: `a navigation step is a position (Int) or a dictionary key
+  (String), got Float`;
+- clave sobre algo que no es diccionario: `a String navigation step addresses a
+  dictionary key, and this is ##[]`, con el nombre de tipo antiguo del TW
+  (`twTypeName`), que el paso 3.5 unificará;
+- límite de rango: `navigation index must be an integer, got Float`.
+
+`runtime-index-nav` pasa de 8 `WRONG` a 5. Las que quedan son `$-[9]` sobre array,
+cadena y tupla, y `$?` con una clave Int (tabla de `GLB-011`), y el rango invertido
+(D3, paso 4.4).
 
 ### Qué lo sujeta
 
