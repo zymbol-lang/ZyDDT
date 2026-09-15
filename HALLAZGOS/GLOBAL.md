@@ -1999,6 +1999,13 @@ palabras en devanagari y otras escrituras índicas, y `zyjs` los admite a
 propósito dentro de un nombre. Se medirá su uso en las aplicaciones LDV y se
 preguntará antes de tocarlos.
 
+*Medido y decidido el 2026-09-15.* ZWNJ aparece 44 veces en nombres de la capa
+persa de Chaturanga y de ejemplos en kannada, telugu y persa, y ZWJ 12 veces en el
+ejemplo en cingalés. U+200B y el BOM no aparecen en ningún fichero, y las 2567
+comillas invertidas del workspace están en comentarios. **ZWJ y ZWNJ se permiten
+dentro de un nombre, nunca al principio**; los demás invisibles y la comilla
+invertida son error en los tres motores (paso 2.17).
+
 **Un ejemplo del playground que no carga** (medido el 2026-09-15, paso 2.5):
 `web/examples/graphics/mandelbrot/emoji.zy` escribe `<<| _🔑`. Tras un `_`, el
 lexer de `zyjs` sólo sigue leyendo el nombre si viene letra, uso privado, cifra o
@@ -2054,7 +2061,7 @@ patrones de rango de `syntax-control-flow`, `syntax-lexer/unterminated-string-in
 
 ## GLB-029 — Formatear una cadena que parece un número: el TW la rechaza y la VM la formatea
 
-**Estado:** abierto — **necesita decisión**
+**Estado:** abierto — **decidido el 2026-09-15**: se acepta en todos (paso 2.15e)
 **Encontrado por:** paso 2.8, 2026-09-15, al portar a `zyjs` las comprobaciones de los formatos
 
 | forma, con `v = "12.5"` | `zytw` | `zyvm` | `zyjs` |
@@ -2072,6 +2079,9 @@ motores desde el paso 2.8.
 
 ¿Los operadores de formato (`#,`, `#^` y sus variantes) aceptan una cadena que se
 lee como número, como ya hacen `#.` y `#!`? ¿O ninguno la acepta?
+
+*Decidido el 2026-09-15:* **se acepta en todos los motores**, como ya hacen `#.` y
+`#!`. Cambia el TW (paso 2.15e).
 
 ### Qué lo sujeta
 
