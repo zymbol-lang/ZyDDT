@@ -1242,7 +1242,7 @@ lambda, o llamar a algo que no es función.
 
 ## GLB-016 — Un `??` sin brazo que case: el TW aborta, la VM y `zyjs` devuelven `##_` en silencio
 
-**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*
+**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*. **La VM, corregida el 2026-09-15** (paso 1.1); quedan `zyjs` (paso 2.6) y el aviso (paso 1.2)
 **Encontrado por:** `axes/runtime-match-patterns.toml`, paso C8 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** **alta**: un valor que nadie calculó sigue su camino por el programa, sin error ni aviso
 
@@ -1269,7 +1269,16 @@ dos no dicen nada. Un aviso de ese tipo es del analizador, no de un motor.
 ### Qué lo sujeta
 
 `runtime-match-patterns/no-pattern-matched-in-match-expression` (+ `-met`) y
-`runtime-match-patterns/match-with-values-used-as-a-statement`. Los dos patrones
+`runtime-match-patterns/match-with-values-used-as-a-statement`.
+
+### Corregido en la VM — 2026-09-15
+
+`compile_match_expr` (`zymbol-compiler`) cargaba `##_` en el destino y, si
+ningún brazo casaba, caía al final. Ahora, cuando el `??` no tiene comodín,
+emite `RaiseError("no pattern matched in match expression")` detrás del último
+brazo: el mismo texto que el TW, y el mismo kind (`##_`) en la celda `-met`. La
+forma de sentencia pasa por el mismo camino, igual que en el TW, donde también
+aborta. `zyq consensus` sigue en 660 de acuerdo y 0 divergiendo. Los dos patrones
 de desestructuración del mismo paso coinciden en los tres motores.
 
 ---
