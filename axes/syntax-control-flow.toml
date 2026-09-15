@@ -1,0 +1,78 @@
+# The syntax-control-flow axis — Phase B, family B10 of the diagnostics plan.
+#
+# `??` arms and patterns written wrong, and a `_?` with no condition: the
+# parser diagnostics no program provoked on 2026-09-14. Every cell expects
+# `error` and provokes its `help:` line.
+#
+# Three lines have no cell (reasons in the queue): the for-each `:` check and
+# its help, because a loop is only parsed as for-each once `name:` has been
+# seen; and a `.expect()` message on a list that is never empty.
+
+id      = "syntax-control-flow"
+what    = "the parser diagnostics of `??` and `_?`: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "match-arm-without-arrow"
+what = "expected '=>' after pattern"
+src  = """
+v = 2
+r = ?? v { 1 "uno" _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id   = "match-list-pattern-left-open"
+what = "expected ']' to close list pattern"
+src  = """
+v = [1, 2]
+r = ?? v { [1, 2 => "a" _ => "b" }
+>> r ¶
+"""
+
+[[cell]]
+id   = "match-without-brace"
+what = "expected '{' after match expression"
+src  = """
+v = 2
+r = ?? v 1 => "uno"
+>> r ¶
+"""
+
+[[cell]]
+id   = "match-left-open"
+what = "expected '}' to close match expression — with its help"
+src  = """
+v = 2
+r = ?? v { 1 => "uno"
+"""
+
+[[cell]]
+id   = "char-range-pattern-ends-in-a-number"
+what = "expected char after '..' in range pattern"
+src  = """
+c = 'b'
+r = ?? c { 'a'..5 => "x" _ => "y" }
+>> r ¶
+"""
+
+[[cell]]
+id   = "int-range-pattern-ends-in-a-char"
+what = "expected integer after '..' in range pattern"
+src  = """
+n = 2
+r = ?? n { 1..'z' => "x" _ => "y" }
+>> r ¶
+"""
+
+[[cell]]
+id   = "else-if-without-a-condition"
+what = "'_?' requires a condition — with its help"
+src  = """
+? #1 {
+    >> "a" ¶
+} _? {
+    >> "b" ¶
+}
+"""

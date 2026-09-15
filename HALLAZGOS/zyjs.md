@@ -1204,9 +1204,16 @@ La mayoría como las anteriores (`Expected RPAREN, got '>>'`). Dos más:
 export function 'f'`; y `°x` suelto como sentencia es `undefined variable 'x'`
 en vez de `'°name' is only valid as an assignment target`.
 
+### Y en `??` y `_?` (paso B10)
+
+**Acepta** un patrón de rango con los extremos de tipos distintos —`'a'..5` y
+`1..'z'`— y cae al comodín (`y`). Un brazo sin `=>` vuelve a decir
+`Expected FAT_ARROW, got '[object Object]'`.
+
 ### Qué lo sujeta
 
 `axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
 `axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2),
-`axes/syntax-functions-lambdas.toml` (6) y `axes/syntax-expressions.toml` (15).
+`axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15) y
+`axes/syntax-control-flow.toml` (7).
 
