@@ -1354,3 +1354,24 @@ error: expected a decimal count after '#.'
 termina en punto. Para `#,` sale bien (`#,.2|value|`). `zyjs` no llega a este
 mensaje (`ZYJS-021`).
 
+---
+
+## GLB-022 — La ayuda de los tipos de error lista siete de once
+
+**Estado:** abierto — sin decisión pendiente
+**Encontrado por:** `syntax-try-catch/error-type-without-a-name`, paso B7, 2026-09-14
+**Gravedad:** baja en efecto; alta como documento: es lo que lee quien no sabe qué tipos hay
+
+`:! ## { }` en los dos motores Rust:
+
+```
+error: expected error type name after '##'
+  = help: valid error types: ##IO, ##Network, ##Parse, ##Index, ##Type, ##Div, ##_
+```
+
+Faltan `##Range`, `##Key`, `##DB` y `##Time`, que existen y se capturan
+(`runtime-errors`, `LLM.md` § 9). La ayuda de `expected '##' for error type
+(missing second #)` enumera todavía menos: `##IO, ##Network, ##Parse`.
+
+Y `zyjs` acepta `:! ## { }` sin nombre y ejecuta el `!?` (añadido a `ZYJS-021`).
+

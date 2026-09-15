@@ -1183,8 +1183,13 @@ siguiente (`expected expression, found Output`); y **`#!2 5` se lee como un `!`
 lógico** aplicado a `2`, que falla en ejecución con `logical NOT requires boolean
 operand` en vez de rechazarse al parsear.
 
+### Y en los filtros de `:!` (paso B7)
+
+`:! #Div { }` → `Expected LBRACE, got '#'`. Y **`:! ## { }` se acepta**: el `!?`
+corre, el filtro sin nombre no casa y el error sale sin capturar.
+
 ### Qué lo sujeta
 
-`axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5) y
-`axes/syntax-format-convert.toml` (9).
+`axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
+`axes/syntax-format-convert.toml` (9) y `axes/syntax-try-catch.toml` (2).
 
