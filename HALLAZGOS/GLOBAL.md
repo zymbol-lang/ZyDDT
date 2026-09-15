@@ -1773,3 +1773,41 @@ con D1. Los Rust en el paso 1.12 y `zyjs` en la F2. La celda pasa a
 mismo camino: `syntax-collection-ops/sort-comparator-from-a-variable`. Los Rust
 rechazan `a$^ f` con `f` una lambda en una variable (el comparador tiene que ir
 escrito en línea), y `zyjs` ordena con ella (`ZYJS-021`).
+
+---
+
+## GLB-025 — Una variable destruida con `\` se lee en `{…}` sin error: los tres imprimen `{x}`
+
+**Estado:** abierto — sin decisión pendiente, pero **se pregunta** (ver abajo)
+**Encontrado por:** leyendo `interpolate_string` del TW en el paso 1.11, 2026-09-15
+**Gravedad:** media: el silencio que cerró `GLB-018` A, entrando por la destrucción
+**Familia:** `GLB-008` (uso tras destruir), `GLB-018` A
+
+```zymbol
+x = "dato"
+>> x ¶
+\ x
+>> "leo {x}" ¶
+```
+
+| forma | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `>> x ¶` tras `\ x` | `use after destruction` | `use after destruction` | `use after destruction` |
+| `>> "leo {x}" ¶` tras `\ x` | `leo {x}` | `leo {x}` | `leo {x}` |
+
+`eval_identifier` llama a `check_variable_alive` antes de leer; `interpolate_string`
+no, y un nombre destruido cae a la rama del texto literal. El analizador no puede
+rechazarlo (lo que enseñó `GLB-008`: una destrucción escrita en una rama que no se
+ejecuta no ha ocurrido), así que el rechazo tiene que ser en ejecución, como el del
+identificador.
+
+### Por qué se pregunta aunque parece no necesitar decisión
+
+`GUIDE.md` dice desde el paso 1.6 que `{name}` se lee como `name`, y `GLB-008`
+decidió que leer un nombre destruido es error en ejecución. Juntas dan la
+respuesta, pero ninguna de las dos lo dice de la interpolación.
+
+### Qué lo sujeta
+
+`runtime-io/destroyed-name-in-interpolation`, `expect = "error"`, roja en los
+tres.
