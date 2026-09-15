@@ -1,0 +1,87 @@
+# The syntax-format-convert axis — Phase B, family B6 of the diagnostics plan.
+#
+# `#|x|`, `#,|x|`, `#.n|x|`, `#!n|x|` and `0x|x|` with a bar or a count
+# missing: the parser diagnostics no program provoked on 2026-09-14. Every cell
+# expects `error` and provokes the `help:` line of its diagnostic.
+#
+# Two have no cell (reasons in the queue): the parser's `expected '|' after base
+# prefix`, because the lexer only emits a base-prefix token when a `|` follows
+# it; and `precision must be a non-negative integer`, because `-` is its own
+# token and a precision never arrives as a negative integer.
+
+id      = "syntax-format-convert"
+what    = "the parser diagnostics of format, round, truncate, numeric evaluation and base conversion: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "format-expects-bar-after-operator"
+what = "expected '|' after format operator — with its help"
+src  = """
+x = #, 5
+>> x ¶
+"""
+
+[[cell]]
+id   = "round-expects-bar-after-count"
+what = "expected '|' after precision — with the round help"
+src  = """
+x = #.2 5
+>> x ¶
+"""
+
+[[cell]]
+id   = "truncate-expects-bar-after-count"
+what = "expected '|' after precision — with the truncate help"
+src  = """
+x = #!2 5
+>> x ¶
+"""
+
+[[cell]]
+id   = "base-conversion-left-open"
+what = "expected '|' to close base conversion expression — with its help"
+src  = """
+x = 0x|5
+>> x ¶
+"""
+
+[[cell]]
+id   = "format-left-open"
+what = "expected '|' to close format expression"
+src  = """
+x = #,|5
+>> x ¶
+"""
+
+[[cell]]
+id   = "numeric-evaluation-left-open"
+what = "expected '|' to close numeric evaluation — with its help"
+src  = """
+x = #|5
+>> x ¶
+"""
+
+[[cell]]
+id   = "round-left-open"
+what = "expected '|' to close round expression"
+src  = """
+x = #.2|5
+>> x ¶
+"""
+
+[[cell]]
+id   = "truncate-left-open"
+what = "expected '|' to close truncate expression"
+src  = """
+x = #!2|5
+>> x ¶
+"""
+
+[[cell]]
+id   = "round-expects-a-decimal-count"
+what = "expected a decimal count after '#.' — with its help"
+src  = """
+x = #.|5|
+>> x ¶
+"""
