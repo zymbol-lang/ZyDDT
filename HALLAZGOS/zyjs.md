@@ -1188,8 +1188,17 @@ operand` en vez de rechazarse al parsear.
 `:! #Div { }` → `Expected LBRACE, got '#'`. Y **`:! ## { }` se acepta**: el `!?`
 corre, el filtro sin nombre no casa y el error sale sin capturar.
 
+### Y en funciones y lambdas (paso B8)
+
+**Acepta** `f(a b) { }` —lo lee como dos parámetros y luego la llamada con uno
+falla por aridad— y `a$^ (x y -> #1)`. El comparador sin flecha, `a$^ (v)`, lo
+deja pasar al parsear y falla **en ejecución** (`Expected a function for
+collection operator`). `f(1) + 2` como sentencia: `expected expression, found
+Plus`.
+
 ### Qué lo sujeta
 
 `axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
-`axes/syntax-format-convert.toml` (9) y `axes/syntax-try-catch.toml` (2).
+`axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2) y
+`axes/syntax-functions-lambdas.toml` (6).
 

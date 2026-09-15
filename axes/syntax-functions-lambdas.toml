@@ -1,0 +1,76 @@
+# The syntax-functions-lambdas axis — Phase B, family B8 of the diagnostics plan.
+#
+# A function declaration or a lambda written wrong, and an expression used as a
+# statement: the parser diagnostics no program provoked on 2026-09-14. Every
+# cell expects `error` and provokes its `help:` line.
+#
+# Three lambda cells go through a `$^` comparator on purpose: it is the one
+# caller that hands `parse_lambda` a `(` without first checking that a lambda
+# follows, so it is where a malformed parameter list reaches the lambda's own
+# diagnostics instead of being read as a tuple.
+#
+# Two lines have no cell (reasons in the queue): `expected '(' after function
+# name`, and the single-parameter lambda's help.
+
+id      = "syntax-functions-lambdas"
+what    = "the parser diagnostics of functions and lambdas: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "function-parameter-not-a-name"
+what = "expected parameter name — with its help"
+src  = """
+f(1) {
+    <~ 1
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "function-parameters-left-open"
+what = "expected ')' after parameters — with the function syntax help"
+src  = """
+f(a b) {
+    <~ a
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "expression-used-as-a-statement"
+what = "expected function call — with its help"
+src  = """
+f(x) {
+    <~ x
+}
+f(1) + 2
+"""
+
+[[cell]]
+id   = "lambda-parameter-not-a-name"
+what = "expected parameter name in lambda — with its help"
+src  = """
+a = [2, 1]
+b = a$^ (1, 2 -> #1)
+>> b ¶
+"""
+
+[[cell]]
+id   = "lambda-parameters-left-open"
+what = "expected ')' after lambda parameters — with its help"
+src  = """
+a = [2, 1]
+b = a$^ (x y -> #1)
+>> b ¶
+"""
+
+[[cell]]
+id   = "lambda-without-arrow"
+what = "expected '->' in lambda expression — with its help"
+src  = """
+a = [2, 1]
+v = 1
+b = a$^ (v)
+>> b ¶
+"""
