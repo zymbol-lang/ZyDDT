@@ -382,7 +382,7 @@ las otras 80 están rojas. Y `error-flow/try-inside-a-mapped-lambda` y
 
 ## ZYVM-005 — Un local destruido en una rama que no se ejecuta deja de poder leerse
 
-**Estado:** abierto — sin decisión pendiente
+**Estado:** **corregido el 2026-09-15** (paso 2.15c)
 **Encontrado por:** paso 2.15, 2026-09-15 (`GLB-025`)
 **Familia:** `GLB-008` («Lo que queda»: la destrucción de un local de función en la VM)
 
@@ -411,3 +411,24 @@ del identificador.
 ### Qué lo sujeta
 
 `runtime-functions-hof/local-destroyed-in-a-branch-not-taken`, roja por la VM.
+
+### Corregido — 2026-09-15 (paso 2.15c)
+
+La destrucción de un local pasa a ser de ejecución, como la de una variable de
+archivo desde `GLB-008`, y sólo para los nombres que algún `\` del cuerpo nombra
+(`destroyed_names`, calculado antes de compilar el cuerpo, porque en un bucle la
+lectura puede ir antes del `\` en el texto):
+- `\ y` emite `DestroyLocal(reg, nombre)`: marca el hueco absoluto de la pila y lo
+  vacía, sin quitar la ligadura del registro;
+- cada lectura de `y` (identificador o `{y}`) emite antes `CheckAlive`, que lanza
+  `use after destruction: variable 'y' was destroyed after its last use`;
+- cada asignación a `y` emite después `Revive`, que quita la marca, porque
+  reasignar revive el nombre, y lo hace tras calcular el valor para que `y = y + 1`
+  siga fallando.
+
+TW y VM dan exactamente la misma salida, texto incluido, en seis casos dentro de
+una función: rama no ejecutada, rama ejecutada, reasignación, bucle con la
+lectura antes del `\`, `y = y + 1` e interpolación. Eso cierra también **el resto
+de `GLB-008`** en la VM (un local destruido decía `'y' is undefined`). `zyjs` sigue
+diciendo `'y' is undefined` para un local: es el mismo resto, en su motor. `lifetime`
+queda en 5 de 5, y el gate de coste en verde.
