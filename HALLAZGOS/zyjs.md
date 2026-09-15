@@ -1199,7 +1199,7 @@ Cada forma, con el texto y la ayuda de los Rust, en `web/src/zymbol/zymbol.js`:
 
 ## ZYJS-021 — Los errores de sintaxis de los operadores `$` nombran tokens, y dos dicen `[object Object]`
 
-**Estado:** abierto — **lo que aceptaba y las lecturas erróneas, corregidos el 2026-09-15** (pasos 2.3 y 2.4); quedan los textos (2.5)
+**Estado:** **corregido el 2026-09-15** (pasos 2.3, 2.4 y 2.5). Quedan cinco celdas en `WORDING` que no son de `zyjs` (ver «Textos»)
 **Encontrado por:** `axes/syntax-collection-ops.toml`, paso B4 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media: rechaza lo que debe, con un texto que no ayuda
 **Familia:** `ZYJS-006` (`[object Object]` en el diagnóstico, cerrado el 2026-08-30 en otro sitio)
@@ -1338,6 +1338,44 @@ ningún fichero deja de parsear. Las 10 `WRONG` de los ejes `syntax-*` son 0.
 
 El barrido de parseo sobre los 1189 ficheros sigue en los mismos 9 errores.
 `syntax-format-convert` pasa de 3 `DIVERGE` a 0 y `syntax-index-nav` de 1 a 0.
+
+### Corregido: los textos — 2026-09-15 (paso 2.5)
+
+De las 64 celdas `WORDING` de los ejes `syntax-*`, **59 dan ya en `zyjs` el
+mensaje y la ayuda de Rust, carácter a carácter**. La primera lista sólo tenía 52:
+estaba construida con la salida resumida de `zyddt axis`, que no imprime la línea
+`WORDING` de las celdas que pasan de su límite de detalle. El barrido completo
+enseñó las otras 12, y se sacaron con `--detail 200`. `eat(tipo, mensaje, ayuda)`
+lleva el texto de Rust en cada sitio, y la variante de reserva ya no enseña
+`[object Object]` cuando el token es una cadena. Donde Rust dice cosas distintas
+según el contexto, `zyjs` distingue lo mismo:
+- la `)` de una llamada por nombre, de módulo, sobre una expresión, sobre un
+  paréntesis o en el destino de `|>`;
+- un grupo (`to close grouped expression`) frente a una tupla (`to close tuple`);
+- el `]` de un índice, de una extracción plana, de una estructurada o de un grupo
+  de extracción.
+
+Además, siguiendo la gramática de Rust: una lista de argumentos o de elementos de
+array termina en la primera coma que falta; una sentencia que empieza por una
+llamada es sólo la llamada (`f(1) + 2`: `expected function call`); `$--[` es la
+forma retirada; y una edición sin destino tiene dos titulares, como en Rust:
+`modifying requires a destination with a name` si lo editado es lo que devolvió
+una llamada, y `this edit has nothing to write into` si es otra expresión
+(`x$+ 1 $+ 2`).
+
+Las cinco que quedan no son de `zyjs`:
+- `round-expects-a-decimal-count`, `error-type-with-one-hash` y
+  `hot-index-without-operator`: la ayuda de Rust enseña algo que no es
+  (`GLB-021`, `GLB-022`, `GLB-027`), y `zyjs` da el mensaje sin ella. Se igualan
+  en la F3.
+- `execute-without-a-path` y `unterminated-execute-expression`: `zyjs` no
+  implementa `</ ruta />`.
+
+Barrido de parseo sobre los 1189 ficheros: los mismos 9 errores, dos con el texto
+nuevo. El inventario de mensajes cierra 150. En el barrido completo de ZyDDT los
+rojos bajan de 378 a 289, sin ninguna regresión. Sólo tuvo que ajustarse la forma de
+tres plantillas, para que coincidiera con la de Rust (`'{}'` con el prefijo, no
+`'#,'` escrito).
 
 Registrado por el camino: `x[1] 5` —sin `°`— ejecuta el `5` suelto en `zyjs`
 (celda `refusal/stray-literal-statement`), y los Rust añaden errores en cascada
