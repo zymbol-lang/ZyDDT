@@ -1,0 +1,235 @@
+# The runtime-std-db axis — Phase C, family C11 of the diagnostics plan.
+#
+# std/db has both shapes of failure, and each is asked in its own:
+#
+#   RAISED  a call whose ARGUMENTS are wrong — a name that is not text, params
+#           that are not a tuple, a statement list that is not an array. Raised
+#           before any connection is touched. `<id>` + `<id>-met`.
+#   SOFT    the database did not cooperate — no such connection, no rows, a
+#           transaction already open, a savepoint name that is not an
+#           identifier. A ##DB VALUE, tested with `$!`; there is nothing to catch,
+#           so there is no `-met`.
+#
+# The soft messages are never printed as a diagnostic line — they are values —
+# so reach.py cannot count them even though these cells produce them.
+#
+# The cells that need a live connection open SQLite in memory through ODBC
+# (`Driver=SQLite3;Database=:memory:;`). zyjs is excluded with STD_DB, as
+# runtime-errors already is: a browser has no ODBC.
+
+id      = "runtime-std-db"
+what    = "the failures of std/db: raised for wrong arguments, soft for a database that did not cooperate"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "cannot-bind-a-function"
+expect = "error"
+what   = "db: cannot bind {:?} as a parameter"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::exec("c", "select ?", (v,))
+}
+>> t(x -> x) ¶
+"""
+
+[[cell]]
+id     = "cannot-bind-a-function-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::exec("c", "select ?", (v,))
+}
+!? {
+    >> t(x -> x) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "name-must-be-a-string"
+expect = "error"
+what   = "db: expected String {}"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::exec(v, "select 1")
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "name-must-be-a-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::exec(v, "select 1")
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "params-must-be-a-tuple-array-or-scalar"
+expect = "error"
+what   = "db: params must be a Tuple, Array, or scalar"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::exec("c", "select 1", v)
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "params-must-be-a-tuple-array-or-scalar-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::exec("c", "select 1", v)
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tx-statement-is-sql-and-params"
+expect = "error"
+what   = "db::tx: each statement is (String sql, Array params)"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::tx("c", [(v, [])])
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "tx-statement-is-sql-and-params-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::tx("c", [(v, [])])
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tx-statement-must-be-a-tuple"
+expect = "error"
+what   = "db::tx: each statement must be a (sql, params) tuple"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::tx("c", [v])
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "tx-statement-must-be-a-tuple-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::tx("c", [v])
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tx-statements-must-be-an-array"
+expect = "error"
+what   = "db::tx: statements must be an Array"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::tx("c", v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "tx-statements-must-be-an-array-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/db => d
+t(v) {
+    <~ d::tx("c", v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "invalid-savepoint-name-is-soft"
+expect = "ok"
+what   = "invalid savepoint name '{}' — a ##DB value"
+src    = """
+<# std/db => d
+s = d::savepoint("c", "1mal")
+>> (s$!) " " s ¶
+"""
+
+[[cell]]
+id     = "query-one-no-rows-is-soft"
+expect = "ok"
+what   = "query_one matched no rows — a ##DB value"
+src    = """
+<# std/db => d
+r = d::connect("c", "Driver=SQLite3;Database=:memory:;")
+>> (r$!) ¶
+q = d::query_one("c", "select 1 where 1 = 0")
+>> (q$!) " " q ¶
+"""
+
+[[cell]]
+id     = "transaction-already-active-is-soft"
+expect = "ok"
+what   = "transaction already active (use savepoints to nest) — a ##DB value"
+src    = """
+<# std/db => d
+r = d::connect("c", "Driver=SQLite3;Database=:memory:;")
+>> (r$!) ¶
+d::begin("c")
+b = d::begin("c")
+>> (b$!) " " b ¶
+"""
+
+[[cell]]
+id     = "unknown-connection-is-soft"
+expect = "ok"
+what   = "unknown connection '{}' — a ##DB value"
+src    = """
+<# std/db => d
+u = d::exec("nadie", "select 1")
+>> (u$!) " " u ¶
+"""

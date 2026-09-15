@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Ninguno abierto.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Uno abierto: `ZYTW-004`.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -260,4 +260,30 @@ ya lo hacía con `restore_call_state`.
 `zyquality/cost/`, caso `growth/caught-errors`: el mismo programa a N y a 4N, con
 el límite entre lineal (4,0) y cuadrático (16,0). Tras el arreglo, `zytw` 3,75,
 `zyvm` 3,93, `zyjs` 3,04.
+
+---
+
+## ZYTW-004 — `db: cannot bind` imprime la estructura interna de la lambda, con sus spans
+
+**Estado:** abierto
+**Encontrado por:** `runtime-std-db/cannot-bind-a-function`, paso C11 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** baja en efecto, alta en lo que enseña: el mensaje expone el `Debug` de Rust
+**Familia:** `GLB-017` B (`error executing … Located { … }`)
+
+`d::exec("c", "select ?", (v,))` con `v` una lambda:
+
+| motor | |
+|---|---|
+| `zytw` | `db: cannot bind Function(FunctionValue { params: ["x"], body: Expr(Identifier(IdentifierExpr { name: "x", span: Span { start: Position { line: 5, column: 11, byte_offset: 72 }, … module_aliases: {"d": "__stdlib__/std/db"} }) as a parameter` |
+| `zyvm` | `db: cannot bind ##fn as a parameter` |
+
+### Causa
+
+`crates/zymbol-interpreter/src/stdlib/db.rs`, `bind_params`: formatea el valor
+con `{:?}`. Es el mismo patrón que muchos diagnósticos del tree-walker del paso
+C3 (`got Int(5)`, `got String("x")`), aquí con un valor cuyo `Debug` es enorme.
+
+### Qué lo sujeta
+
+`runtime-std-db/cannot-bind-a-function` (NEW WORDING hasta que el texto sea uno).
 
