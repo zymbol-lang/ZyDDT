@@ -326,3 +326,14 @@ t(v) {
     >> (_err#?)[1] ¶
 }
 """
+
+[[cell]]
+id     = "sort-comparator-that-is-not-a-bool"
+expect = "ok"
+what   = "a `$^` comparator that answers something other than a Bool gives the same order in every engine — the tree-walker read an Int, 0 and a String all as false, the VM and zyjs as truthy; the comparators use their parameters, or zyjs warns them unused and hides the question (found in step 1.10, 2026-09-15; GLB-024)"
+src    = """
+v = [3, 1, 2]
+>> (v$^ (a, b -> a - b)) ¶
+>> (v$^ (a, b -> a * 0 + b * 0)) ¶
+>> (v$^ (a, b -> "{a}{b}")) ¶
+"""
