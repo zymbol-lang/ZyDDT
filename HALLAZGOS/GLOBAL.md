@@ -977,7 +977,7 @@ dicen por qué no lo llevan) y las cuatro de `runtime-errors`:
 
 ## GLB-011 — Los operadores `$` con un operando del tipo equivocado: el TW rechaza, la VM y `zyjs` a veces contestan, y los tres dan kinds distintos
 
-**Estado:** abierto — **necesita decisión del autor** (qué es correcto) antes de arreglar nada
+**Estado:** abierto — **decidido el 2026-09-15** (familia `##Type`; colecciones tolerantes). Falta que el autor valide la tabla de tolerancias antes de tocar un motor
 **Encontrado por:** `axes/runtime-collection-ops.toml`, paso C3 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media-alta: el mismo programa falla en un motor y contesta un valor en otro
 
@@ -1012,6 +1012,30 @@ mensajes no dicen «type»; la VM los lanza como `VmError::TypeError`.
 
 Sin esas dos respuestas, arreglar sería elegir por el autor.
 
+### Decidido — 2026-09-15
+
+1. **Familia (D1):** un operando del **tipo** equivocado es `##Type`, en los
+   tres motores. El TW deja de clasificar estos casos por las palabras del
+   mensaje.
+2. **¿Error o significado? (D2):** las colecciones son **tolerantes**. En
+   palabras del autor:
+
+   > «Creo que las colecciones deben de ser mas flexibles, si a cada borde nos da
+   > un error seran inutilizables en el tiempo ya que son sistemas dinamicos, que
+   > creceran y seatortaran con el paso de las repeticiones y si son tan
+   > extrictos no tendran sentido para muchas casuisticas. Asi que me parece
+   > correcto que se deban controlar por validas estos retornos realizando los
+   > cambios de tipos y permitiendo las tolerancias del espacio acotado a los
+   > valores que tengamos. asi como permitir busquedas de valores en texto.»
+
+   Es un **principio, no todavía una tabla.** Antes de tocar un motor se
+   escribe, forma por forma, qué devuelve cada una de las 50 (conversión de
+   tipo, recorte al espacio acotado, búsqueda en texto, o error donde ninguna
+   tolerancia tiene sentido, por ejemplo donde chocaría con `COL-3`), y el autor
+   la valida. Las celdas `expect = "error"` de este eje cambian su verde con esa
+   tabla, no antes. Y `LLM.md` § 9 («type/arity mistakes raise») deja de ser
+   cierto para estas formas: se corrige cuando la tabla esté validada.
+
 ### Qué lo sujeta
 
 `axes/runtime-collection-ops.toml`: 50 celdas `expect = "error"` y 50 `-met`.
@@ -1021,7 +1045,7 @@ Sin esas dos respuestas, arreglar sería elegir por el autor.
 
 ## GLB-012 — Índices y navegación con un valor inválido: `zyjs` contesta donde los Rust fallan, y el kind se reparte entre `##_`, `##Index` y `##Type`
 
-**Estado:** abierto — **necesita decisión del autor** sobre el kind; lo de `zyjs` es divergencia sin decisión pendiente
+**Estado:** abierto — **decidido el 2026-09-15** (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente)
 **Encontrado por:** `axes/runtime-index-nav.toml`, paso C4 del plan de cobertura de diagnósticos, 2026-09-14
 **Familia:** `GLB-011` (la misma pregunta de kind, en otra familia de operaciones)
 
@@ -1050,6 +1074,33 @@ Lo mismo que en `GLB-011`: la familia de un valor del **tipo** equivocado
 usado como índice o paso — `##Type` o `##Index`. Y si un rango de navegación
 invertido es error (TW) o vacío (VM, `zyjs`).
 
+### Decidido — 2026-09-15
+
+1. **Familia (D1):** la da **qué** está mal, no **dónde** aparece. Un índice o
+   paso del tipo equivocado (`[1, 2][1.5]`, `v[1>"a"]`, indexar un Int, «a
+   navigation step is a position (Int) or a key») es `##Type`. Un valor
+   inválido del tipo correcto (una posición 0, negativa o fuera de límites,
+   «range indices in nav path must be positive») es `##Index`.
+2. **Rango invertido (D3): ni error ni vacío, sino selección descendente.** Es
+   una forma **nueva**, que hoy no implementa ningún motor:
+   - `[10, 20, 30, 40]$[3..1]` → `[30, 20, 10]`, y `v[1>3..1]` invierte igual,
+     dando un array. El ejemplo del autor: `"hola mundo"$[-1..1]` →
+     `odnum aloh`.
+   - **Construye**: el slice sigue en la mitad «Consulta» de `COLLECTIONS.md`
+     § 1, y `COL-1` no cambia. Guardar el resultado es `valor = valor$[-1..1]`.
+   - **Borde:** sólo invierte un inicio que está **dentro** de los límites. Un
+     inicio más allá del final da vacío, así que el modismo «el resto»
+     `s$[p+1..-1]` sigue dando `""` cuando `p` es la última posición
+     (`corpus/gaps/gap001_slice_arith_bounds.zy`).
+
+Medido al preguntar: `$[3..1]` tiene el mismo reparto que `v[1>3..1]`. El TW
+dice `slice start (2) cannot be greater than end (1)`, un texto que filtra el
+índice interno que empieza en 0, y la VM y `zyjs` dan `[]`. `valor[-1..1]` falla
+hoy de tres maneras: el TW dice `range indices in nav path must be positive
+integers`, la VM `index 0 is invalid` y `zyjs` `Expected RBRACKET, got '..'`.
+`$-[9]` y `#(a: 1)$? 5` de la parte A son operaciones `$`, así que entran en la
+tabla de tolerancias de `GLB-011`.
+
 ### Qué lo sujeta
 
 `axes/runtime-index-nav.toml`: 22 celdas `expect = "error"` y 22 `-met`. 18
@@ -1059,7 +1110,7 @@ verdes, 26 rojas.
 
 ## GLB-013 — Conversiones y formatos con un valor inválido: `zyjs` inventa un número, y el kind vuelve a ser `##_` contra `##Type`
 
-**Estado:** abierto — la parte del kind **necesita la misma decisión que `GLB-011`**
+**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`)
 **Encontrado por:** `axes/runtime-format-convert.toml`, paso C5 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1082,6 +1133,10 @@ La familia de un valor del tipo equivocado — la pregunta de `GLB-011`. Lo de
 `zyjs` no tiene decisión pendiente: los dos Rust fallan, y un `0` inventado es la
 respuesta que ningún motor debería dar.
 
+### Decidido — 2026-09-15
+
+**Familia (D1):** los 8 de la parte B son `##Type` en los tres motores.
+
 ### Qué lo sujeta
 
 `axes/runtime-format-convert.toml`: 13 pares. 7 verdes, 19 rojas.
@@ -1090,7 +1145,7 @@ respuesta que ningún motor debería dar.
 
 ## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
 
-**Estado:** abierto — mezcla de defectos sin decisión pendiente y de una pregunta de kind (`GLB-011`)
+**Estado:** abierto — C, D y G **decididos el 2026-09-15** (error estático; `##Type`); A, B, E y F sin decisión pendiente
 **Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
 
@@ -1129,6 +1184,21 @@ C y D sí: si `@ (a, b):rango` es forma del lenguaje (sólo la ejecuta el TW) y
 dónde se rechaza un rango suelto. A, B, E y F no necesitan decisión: los dos Rust
 —o el TW— rechazan.
 
+### Decidido — 2026-09-15
+
+1. **C y D (D4): error estático, los dos**, en el analizador, en los tres
+   motores y con el mismo texto, de modo que `zymbol check` lo ve. Un patrón en
+   un bucle sobre un rango y un rango fuera de un bucle, slice, navegación o
+   patrón son sintácticos, así que el rechazo no depende del flujo y no tiene el
+   falso positivo de `GLB-008`.
+
+   La medición del 2026-09-15 corrige la parte C: el TW **tampoco** ejecuta
+   `@ (a, b):1..v`. Lo parsea y falla en el primer elemento con
+   `tuple pattern '( … )' requires a tuple, got ###`. Ningún patrón desestructura
+   un Int, así que esa forma nunca puede salir bien en ningún motor.
+2. **G (D1):** los kinds de `@~`, de la iteración y del patrón de rango con un
+   valor del tipo equivocado son `##Type`.
+
 ### Qué lo sujeta
 
 `axes/runtime-loops-ranges.toml`: 11 pares (12 diagnósticos: `@~ -1` da uno por
@@ -1139,7 +1209,7 @@ límite variable es cierto y no es lo que preguntan.
 
 ## GLB-015 — Llamadas y funciones de orden superior con algo que no es lo que necesitan: kinds `##_` contra `##Type`, y un `$<` con lambda de un parámetro que la VM y `zyjs` aceptan
 
-**Estado:** abierto — la parte del kind **necesita la decisión de `GLB-011`**
+**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`)
 **Encontrado por:** `axes/runtime-functions-hof.toml`, paso C7 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1158,6 +1228,11 @@ dicen `##_`.
 
 **D. Textos distintos entre TW y VM en 8** (la VM dice `this needs Function and
 got Int` donde el TW nombra la operación).
+
+### Decidido — 2026-09-15
+
+**C (D1):** los 9 son `##Type` en los tres motores: algo que no es array ni
+lambda, o llamar a algo que no es función.
 
 ### Qué lo sujeta
 
@@ -1301,7 +1376,7 @@ Lo que coincide en los tres: comparar un Float con una String, negar una String 
 
 ## GLB-020 — Una constante varía: `<< C` y `@ C:1..2` la sobrescriben en el TW y en la VM
 
-**Estado:** abierto — **necesita decisión del autor** (cómo se rechaza), y por eso **sin celda**
+**Estado:** abierto — **decidido el 2026-09-15** (error estático); sin celda todavía
 **Encontrado por:** buscando cómo alcanzar `cannot reassign constant '{}' (declared with :=)` en tiempo de ejecución, paso C13, 2026-09-14
 **Gravedad:** **alta**: incumple `MEM-1`, *las constantes son globales pero nunca varían*
 
@@ -1333,6 +1408,15 @@ Si `<< C` y `@ C:…` sobre una constante son un error estático (como `C = 2`) 
 si el iterador puede sombrear la constante dentro del bucle sin cambiarla fuera.
 Una celda ahora tendría que elegir por el autor cuál es su verde, y un rojo sin
 verde posible es un defecto del arnés.
+
+### Decidido — 2026-09-15
+
+**D5: error estático, los dos.** `<< C` y `@ C:…` sobre una constante se
+rechazan en el analizador de los tres motores, igual que `C = 2`. Es lo que
+exigen `MEM-1` («reassignment is a static error») y `MEM-7` (un entorno ligero
+no puede tener otra cosa bajo un nombre que su entorno fuerte ya usa), así que
+no cambia ninguna premisa. La celda ya tiene un verde posible y se puede
+escribir.
 
 ---
 
