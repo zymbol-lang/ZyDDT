@@ -1895,7 +1895,7 @@ escrito en línea), y `zyjs` ordena con ella (`ZYJS-021`).
 
 ## GLB-025 — Una variable destruida con `\` se lee en `{…}` sin error: los tres imprimen `{x}`
 
-**Estado:** abierto — **decidido el 2026-09-15**: el mismo error en ejecución que el identificador, en los tres motores (paso 2.15)
+**Estado:** **corregido el 2026-09-15** en los tres motores (paso 2.15)
 **Encontrado por:** leyendo `interpolate_string` del TW en el paso 1.11, 2026-09-15
 **Gravedad:** media: el silencio que cerró `GLB-018` A, entrando por la destrucción
 **Familia:** `GLB-008` (uso tras destruir), `GLB-018` A
@@ -1928,6 +1928,27 @@ respuesta, pero ninguna de las dos lo dice de la interpolación.
 
 `runtime-io/destroyed-name-in-interpolation`, `expect = "error"`, roja en los
 tres.
+
+### Corregido — 2026-09-15 (paso 2.15)
+
+Cada motor hace ahora con `{x}` lo mismo que con `x`:
+- **TW:** `interpolate_string` consulta `dead_variables` y lanza `use after
+  destruction`.
+- **VM:** la interpolación tenía la cadena de resolución del identificador sin la
+  rama de las variables de archivo (`file_var_map` → `LoadGlobal`, que es lo que
+  rechaza una destruida), y en un cuerpo de función terminaba en texto literal
+  donde el identificador lanza `'y' is undefined`.
+- **`zyjs`:** `evalStr` atrapaba cualquier error de una parte `{…}` y escribía el
+  nombre, así que también se tragaba la destrucción. Ahora deja pasar ese error y
+  el de «indefinido».
+
+La celda pasa a `AGREE`. Por el camino salieron tres defectos que el `catch` y el
+literal escondían: las capturas de lambda de `zyjs` no veían los nombres de una
+interpolación (arreglado aquí, porque sin eso divergía un fichero del corpus); el
+TW tiene el mismo defecto (`ZYTW-005`); y la VM rechaza leer un local destruido en
+una rama que no se ejecuta (`ZYVM-005`). Dentro de una función, la VM y `zyjs`
+dicen `'y' is undefined` donde el TW dice `use after destruction`, igual que con el
+identificador: es el resto de `GLB-008`.
 
 ---
 

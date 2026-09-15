@@ -337,3 +337,26 @@ v = [3, 1, 2]
 >> (v$^ (a, b -> a * 0 + b * 0)) ¶
 >> (v$^ (a, b -> "{a}{b}")) ¶
 """
+
+[[cell]]
+id     = "lambda-captures-a-name-read-in-a-string"
+expect = "ok"
+what   = "a lambda captures a name it reads only inside an interpolation — the tree-walker's capture walk skipped string parts, so `{log}` stayed as text there while the VM and zyjs read it (found in step 2.15, 2026-09-15; ZYTW-005)"
+src    = """
+log = ""
+tag = (s -> { log = "{log}{s}"  <~ log })
+>> tag("A") " " tag("B") ¶
+"""
+
+[[cell]]
+id     = "local-destroyed-in-a-branch-not-taken"
+expect = "ok"
+what   = "a function-local destroyed only in a branch that does not run is still readable afterwards, as at file level — the VM refuses the read (found in step 2.15, 2026-09-15; ZYVM-005)"
+src    = """
+f() {
+    y = 2
+    ? #0 { \\ y }
+    <~ y
+}
+>> f() ¶
+"""

@@ -296,3 +296,34 @@ La VM dice `##Type(this needs Int and got Function)`. Además del texto, el kind
 un índice del tipo equivocado es `##Type` (decisión D1 del 2026-09-15, `GLB-012`).
 Sin celda propia: es el `{:?}` de este mismo hallazgo.
 
+---
+
+## ZYTW-005 — Una lambda no captura un nombre que sólo lee dentro de una interpolación
+
+**Estado:** abierto — sin decisión pendiente
+**Encontrado por:** paso 2.15, 2026-09-15, al arreglar el mismo defecto en `zyjs`
+**Gravedad:** media: un valor que nadie calculó, invisible si el programa no lo imprime
+
+```zymbol
+log = ""
+tag = (s -> { log = "{log}{s}"  <~ log })
+>> tag("A") " " tag("B") ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `{log}A {log}B` |
+| `zyvm`, `zyjs` | `A B` |
+
+La lambda no captura `log`, porque su análisis de capturas no entra en las partes
+de una cadena. En la llamada, `{log}` no se resuelve y la interpolación deja el
+texto literal. `zyjs` tenía el mismo defecto (`collectIdentNames`), escondido
+porque el `catch` de su evaluación de cadenas escribía el nombre tal cual; se
+arregló en el paso 2.15, porque sin eso `corpus/lambdas/28_eval_order_and_capture.zy`
+divergía. En el TW sigue: `zyq consensus` no lo ve porque ese fichero no imprime
+`log`. Desde el paso 1.6 (`GLB-018` A), una interpolación de algo que no existe
+debería ser error y no texto.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/lambda-captures-a-name-read-in-a-string`, roja por el TW.
