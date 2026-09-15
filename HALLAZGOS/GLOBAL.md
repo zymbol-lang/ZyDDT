@@ -1423,7 +1423,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — B y C sin decisión pendiente; **A necesita decisión** (medición del 2026-09-15)
+**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); B y C sin decisión pendiente; H, observado en el paso 1.6, necesita decisión
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1445,6 +1445,13 @@ que sí existe, esos dos motores tampoco la sustituirían.
 > A **necesita decisión**: ¿error estático, error en ejecución o texto literal,
 > en toda cadena y en todo prompt?
 
+**H. Una función con nombre dentro de `{…}`** (medido el 2026-09-15, paso 1.6).
+`f(p) { <~ p }` y `>> "f={f}" ¶`: los dos Rust imprimen **`f={f}`** tal como está
+escrito, y `zyjs` `f=<funct/1>`. Una lambda (`"{g}"`) y la yuxtaposición
+(`>> f`) dan `<…/1>` en los tres. El nombre existe, así que la regla de A no lo
+alcanza. Celda `runtime-io/named-function-in-interpolation`, que pregunta sólo
+que coincidan.
+
 **B. `>>~` con un hueco que no es entero:** `>>~ ("a", 1) > "x"` — el TW rechaza;
 la VM imprime `x1` como salida normal; `zyjs` no da error y además avisa
 `unused variable 'v'` (su analizador no cuenta los huecos de `>>~` como uso,
@@ -1452,6 +1459,45 @@ familia `ZYJS-018`).
 
 **C. `>>|` sin terminal:** el TW y la VM fallan (`failed to enable raw mode`),
 como dice `LLM.md` (*«errors without a tty»*); `zyjs` entra y sale del bloque.
+
+### Decidido A y corregido — 2026-09-15
+
+**Decisión del autor:** `{nombre}` de un nombre que no es nada (ni variable, ni
+función, ni alias de módulo) es **error estático**, en toda cadena y en todo
+prompt, en los tres motores.
+
+- **Rust** (`zymbol-semantic`): `check_interpolated_name` en `type_check.rs`, para
+  `Literal::InterpolatedString` y para `InputPrompt::Interpolated`. Un nombre que
+  sí existe se lee como un identificador, también para MEM-2: `"{k}"` con `k` de
+  archivo dentro de una función es `'k' is read from outside this function`,
+  igual que `k` suelto. Antes seguía imprimiendo `{k}`. El escáner de nombres es
+  uno solo (`interpolation.rs`), compartido con `variable_analysis`, con la regla
+  de identificador del lexer.
+- **`zyjs`** (hecho en el mismo paso, no en la F2): el `Checker` da
+  `E_VAR_INTERP` con el mismo texto y la misma ayuda, y los catálogos inglés y
+  español del playground lo traducen. Los nodos `Literal` de cadena llevan ya su
+  línea, que antes no tenían. Si se hubiera dejado para la F2, el inventario de
+  mensajes habría fallado con dos textos nuevos de un solo lado, y la forma de
+  `reject/` no se habría podido añadir.
+
+**Impacto medido antes de dar el paso por hecho.** `zymbol check` sobre 1380
+`.zy` del workspace dio **un** fichero: `corpus/modules_scope/interp_global_const.zy`,
+cuyas dos últimas líneas afirmaban a propósito la forma literal. Salen del
+corpus, con la razón escrita, y la forma pasa a `reject/variables/02_interpolate_undefined.zy`
+y a `refusal/undefined-name-in-string-interpolation`. El barrido no veía los
+ejemplos de los documentos. El verificador de `GUIDE.md` encontró dos cadenas
+ODBC, `"Driver={SQLite3};…"`, que funcionaban gracias al silencio; el
+proyecto ya tenía escrito que eso era suerte (`corpus/stdlib/README-odbc.md`,
+`WINDOWS_V009.md`), y ZyBank, SPRE y `DESIGN_STD_DB.md` usan `\{…\}`. Se
+migraron esas dos y el snippet `dbconnect` de `vscode/`, que además cortaba su
+placeholder en la primera `}`. Los manuales (66), el skill publicado y los
+ejemplos del playground siguen en verde.
+
+El mensaje de ejecución `undefined variable in input prompt` del TW queda como
+red de seguridad inalcanzable (`messages/queue/runtime.tsv`). Las celdas
+`runtime-io/undefined-variable-in-input-prompt` y su `-met` —que ahora afirma el
+rechazo, porque un error estático no lo atrapa ningún `!?`— pasan a `AGREE`.
+`GUIDE.md` § String interpolation documenta la regla.
 
 Dos más se reprodujeron a mano, sin celda posible (ZyDDT no da stdin ni cierra
 stdout): un stdin con UTF-8 inválido es `input read error` en el TW y **fin de
