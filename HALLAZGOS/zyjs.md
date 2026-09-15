@@ -1167,7 +1167,16 @@ parser y el que encontró:
 El `[object Object]` aparece cuando el token encontrado es una cadena: el mensaje
 interpola el objeto del token en vez de su texto.
 
+### Y en los literales (paso B5)
+
+Las 5 formas rotas de array, tupla y diccionario: los tres rechazan, los Rust con
+el mismo texto. `zyjs`: `[1, 2` → `expected expression, found Output`;
+`#(a: 2` y `(1, 2` → `Expected RPAREN, got '>>'`; `#(a 2)` → `expected a key in
+the dictionary` (el mensaje de otra forma); `#(1: 2)` → el mismo diagnóstico con
+la guía dentro del mensaje en vez de en `help:`.
+
 ### Qué lo sujeta
 
-`axes/syntax-collection-ops.toml`: 16 celdas, las 16 en `WORDING`.
+`axes/syntax-collection-ops.toml` (16 celdas) y `axes/syntax-literals.toml` (5),
+todas en `WORDING`.
 
