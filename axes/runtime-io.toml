@@ -126,3 +126,14 @@ src    = """
 f(p) { <~ p }
 >> "f={f}" ¶
 """
+
+[[cell]]
+id     = "destroyed-name-in-interpolation"
+expect = "error"
+what   = "a name read in `{…}` after `\\ name` is a use after destruction, as `>> name` is — all three printed `{x}` silently (found in step 1.11, 2026-09-15; GLB-025)"
+src    = """
+x = "dato"
+>> x ¶
+\\ x
+>> "leo {x}" ¶
+"""
