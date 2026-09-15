@@ -1346,7 +1346,7 @@ de desestructuración del mismo paso coinciden en los tres motores.
 
 ## GLB-017 — Módulos, subscripts y shell: la VM pasa una función al shell, el TW enseña un `Located { … }` de Rust, y cada motor cuenta distinto un módulo que no compila
 
-**Estado:** abierto — **A corregido el 2026-09-15** (paso 1.5); G, observado en ese paso, **necesita decisión**
+**Estado:** abierto — **A y G corregidos el 2026-09-15** (pasos 1.5 y 1.5b); B–F abiertos
 **Encontrado por:** `axes/runtime-modules-scripts.toml`, paso C9 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1388,6 +1388,9 @@ une los elementos con espacios; la VM escribía su representación:
 decisión. La celda `runtime-modules-scripts/bash-collection-interpolation`
 pregunta sólo que coincidan (`expect = "ok"`), y su verde no elige entre las dos.
 
+*Decidido el 2026-09-15:* **se une con espacios**, lo del TW. Un argumento de
+shell son palabras, y la representación de Zymbol rompe `sh`.
+
 ### Corregido A en la VM — 2026-09-15
 
 `BashExec` convertía cada valor con `to_string_repr()` y mandaba `<lambd/1>` al
@@ -1397,6 +1400,17 @@ del TW, un valor que sea o contenga una función o una lambda a cualquier
 profundidad (`[g]`, `(1, k)`, `#(f: g)`), igual que el `value_to_bash_str`
 recursivo del TW. Las dos celdas pasan a `AGREE [2/3]` (`zyjs` excluido por
 `BASH_EXEC`).
+
+### Corregido G en la VM — 2026-09-15
+
+`BashExec` usa ahora `shell_text`, el `value_to_bash_str` del TW portado: un
+array, una tupla o un diccionario son sus elementos unidos con espacios a
+cualquier profundidad, y el resto conserva su texto de siempre. Barrido TW contra
+VM, idéntico en todo: Bool `#1`, Float `3.0` → `3`, `1.0e20`, Char, Unit vacío,
+`[[1, 2], [3]]` → `1 2 3`, `(1, (2.0, "a b"))` → `1 2 a b`, un diccionario con
+colecciones dentro, un error como valor (`##Div(division by zero)`) y el modo de
+cifras `#०९#`, que en el shell sigue en ASCII. `GUIDE.md` § BashExec lo documenta.
+La celda pasa a `AGREE [2/3]`.
 
 ### Qué lo sujeta
 
