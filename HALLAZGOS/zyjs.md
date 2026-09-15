@@ -1303,7 +1303,7 @@ formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
 
 ## ZYJS-022 — Un módulo importado con el bloque de exportación mal escrito se carga sin error
 
-**Estado:** abierto
+**Estado:** **corregido el 2026-09-15** (paso 2.2): los 12 módulos rotos se rechazan. Las 12 celdas siguen en `DIVERGE` por dos cosas que no son este hallazgo (ver «Lo que queda»)
 **Encontrado por:** `axes/syntax-modules.toml`, paso B13 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media-alta: el módulo roto no se nota hasta que alguien use lo que exporta
 
@@ -1324,4 +1324,36 @@ exportación no valida los elementos.
 ### Qué lo sujeta
 
 `axes/syntax-modules.toml`: 12 celdas, 6 `WRONG` (las aceptadas) y 6 `DIVERGE`.
+
+### Corregido — 2026-09-15
+
+- **El bloque `#>`** se parsea con la gramática y los rechazos de
+  `parse_export_block` de `zymbol-parser/src/modules.rs`: identificador o error
+  (`expected identifier in export item`, con su ayuda), `::`/`.` seguidos de un
+  nombre, `=>` seguido de un nombre (`expected new name after '=>'`, `expected
+  public name after '=>'`), el separador antiguo `:` o `<=` (`legacy export rename
+  separator`) y `expected '}' to close export block`. El bucle viejo saltaba todo
+  token que no esperaba y rellenaba el nombre que faltaba con uno por defecto.
+- **Un solo `#>` por módulo**: `duplicate export block in module`, con su ayuda.
+- **Un módulo que no se lee** se informa como en Rust:
+  `failed to parse module: 1 parse error(s) in '<fichero>'` (o `lexer error(s)`)
+  y el error debajo con su línea y su ayuda. Antes salía el error del parser del
+  módulo sin cabecera, como si fuera del fichero principal (`GLB-017` D). Se
+  construye con las mismas tres piezas que `modules.rs`, y el inventario de
+  mensajes pasó de 16 a 28 mensajes cerrados.
+
+Consensus 660/0, las siete aplicaciones (casi todas con módulos), `test_zyp` y
+los ejemplos del playground siguen en verde.
+
+### Lo que queda (las 12 celdas en `DIVERGE`)
+
+1. **La columna.** El detalle de Rust es `fichero:3:5:` y el de `zyjs`
+   `fichero:3:0:`: los tokens de `zyjs` no llevan columna. ZyDDT compara esas
+   líneas al pie de la letra.
+2. **Un aviso que sólo da `zyjs`:** `unused variable 'md'` para un alias de
+   módulo importado y no usado, también con un módulo correcto. Los Rust no
+   avisan, y un alias no es una variable. Necesita decisión.
+3. `zyjs` añade `--> main.zy:4` detrás del error de carga; los Rust no.
+4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
+   porque lo detecta su checker, y como `1 parse error(s)` en Rust. Paso 2.5.
 
