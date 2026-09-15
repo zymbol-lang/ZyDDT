@@ -1409,7 +1409,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — sin decisión pendiente: el tree-walker hace lo documentado en las tres
+**Estado:** abierto — B y C sin decisión pendiente; **A necesita decisión** (medición del 2026-09-15)
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1418,6 +1418,18 @@ sentencia y no hay `!?` que la rodee.
 `<< "Nombre {nadie}: " n` — el TW interpola el prompt y falla porque `nadie` no
 existe; la VM y `zyjs` imprimen **`Nombre {nadie}: `** literal. Con una variable
 que sí existe, esos dos motores tampoco la sustituirían.
+
+> **Medición del 2026-09-15 (paso 1.6), que corrige lo de arriba.** Con una
+> variable que existe, global o local de función, la VM y `zyjs` **sí**
+> interpolan el prompt (`Hola Ana: `, `Local 7: `). Sólo divergen con un nombre
+> que **no existe**. Y en una cadena normal los tres motores hacen lo que hacen
+> la VM y `zyjs` en el prompt: `>> "x {nadie}" ¶`, `s = "y {nadie}"` y
+> `<~ "z {nadie} {v}"` imprimen `{nadie}` literal, sin error y sin aviso, y
+> `zymbol check` no dice nada. **Ningún documento dice qué pasa con un nombre
+> que no existe dentro de `{…}`** (`GUIDE.md` § String interpolation). El error
+> del TW en el prompt no es «lo documentado», sino la única excepción, así que
+> A **necesita decisión**: ¿error estático, error en ejecución o texto literal,
+> en toda cadena y en todo prompt?
 
 **B. `>>~` con un hueco que no es entero:** `>>~ ("a", 1) > "x"` — el TW rechaza;
 la VM imprime `x1` como salida normal; `zyjs` no da error y además avisa
@@ -1557,3 +1569,30 @@ Faltan `##Range`, `##Key`, `##DB` y `##Time`, que existen y se capturan
 
 Y `zyjs` acepta `:! ## { }` sin nombre y ejecuta el `!?` (añadido a `ZYJS-021`).
 
+---
+
+## GLB-023 — Una variable leída sólo en el prompt de `<<` se avisa como no usada en los dos motores Rust
+
+**Estado:** abierto — sin decisión pendiente
+**Encontrado por:** medición del paso 1.6 (`GLB-018` A), 2026-09-15
+**Gravedad:** media: un aviso falso invita a borrar una variable que el programa usa
+**Familia:** zonas ciegas del analizador (`ZYJS-013`, `ZYJS-018`), aquí en el analizador compartido de Rust
+
+```zymbol
+x = "Ana"
+<< "Hola {x}: " n
+>> n ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: unused variable 'x'`, y luego imprimen `Hola Ana: ` |
+| `zyjs` | sin aviso |
+
+El analizador de `zymbol-semantic` no visita las partes de `InputPrompt::Interpolated`,
+así que ni cuenta sus nombres como uso ni puede ver uno que no existe. `zymbol
+check` y el LSP heredan los dos defectos.
+
+### Qué lo sujeta
+
+`runtime-io/input-prompt-interpolation-is-a-use`, roja por `zytw` y `zyvm`.
