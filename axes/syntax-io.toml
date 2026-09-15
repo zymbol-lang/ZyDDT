@@ -1,0 +1,103 @@
+# The syntax-io axis — Phase B, family B12 of the diagnostics plan.
+#
+# Input, key input, CLI arguments, positioned output, the TUI block, a
+# sub-script and a shell command, written wrong: the parser diagnostics no
+# program provoked on 2026-09-14. Every cell expects `error` and provokes its
+# `help:` line. None of them runs: a refusal happens before input is read or a
+# terminal is touched, which is why they can be cells at all.
+#
+# Two lines have no cell: `unreachable!()` messages in parse_execute_expr and
+# parse_bash_exec_expr, whose callers dispatch on the very token they check.
+
+id      = "syntax-io"
+what    = "the parser diagnostics of input, output, the TUI block, sub-scripts and shell commands: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "position-with-six-slots"
+what = ">>~ position tuple has at most 5 slots"
+src  = """
+>>~ (1, 2, 3, 4, 5, 6) > "x"
+"""
+
+[[cell]]
+id   = "position-without-a-tuple-or-a-name"
+what = "expected '(' or variable after >>~"
+src  = """
+>>~ 5 > "x"
+"""
+
+[[cell]]
+id   = "input-size-list-left-open"
+what = "expected ')' to close the size argument list"
+src  = """
+<< ###(4 "n: " n
+>> n ¶
+"""
+
+[[cell]]
+id   = "decimal-input-sizes-without-comma"
+what = "expected ',' between the two size arguments — with its help"
+src  = """
+<< ##.(5 2) "n: " n
+>> n ¶
+"""
+
+[[cell]]
+id   = "legacy-numeric-input-left-open"
+what = "expected '|' to close #|variable| — with its help"
+src  = """
+<< #|n
+>> n ¶
+"""
+
+[[cell]]
+id   = "input-size-is-not-an-integer"
+what = "expected a non-negative integer size argument — with its help"
+src  = """
+<< ###(x) n
+>> n ¶
+"""
+
+[[cell]]
+id   = "execute-without-a-path"
+what = "expected file path after </"
+src  = """
+x = </ />
+>> x ¶
+"""
+
+[[cell]]
+id   = "cli-args-capture-without-a-name"
+what = "expected variable name after >< — with its help"
+src  = """
+>< 5
+"""
+
+[[cell]]
+id   = "key-input-without-a-name"
+what = "expected variable name after key input operator"
+src  = """
+<<| 5
+"""
+
+[[cell]]
+id   = "input-without-a-name"
+what = "expected variable name in input statement"
+src  = """
+<< 5
+"""
+
+[[cell]]
+id   = "bash-execute-left-open"
+what = "unterminated bash execute expression — with its help"
+src  = """
+x = <\\ "echo" """
+
+[[cell]]
+id   = "tui-block-without-brace"
+what = "expected '{' after >>| — with the TUI block help"
+src  = """
+>>| >> 1 ¶
+"""

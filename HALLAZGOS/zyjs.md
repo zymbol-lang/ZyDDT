@@ -1210,10 +1210,18 @@ en vez de `'°name' is only valid as an assignment target`.
 `1..'z'`— y cae al comodín (`y`). Un brazo sin `=>` vuelve a decir
 `Expected FAT_ARROW, got '[object Object]'`.
 
+### Y en navegación y E/S (pasos B11 y B12)
+
+En navegación, `m[(a 1)>1]` se lee como la yuxtaposición `11` y falla en
+ejecución. En E/S **acepta** un `<\ "echo"` sin cerrar (sólo avisa de la variable
+sin usar) y un `<< #|n` sin cerrar, que se pone a leer la entrada; y
+`<< ###(4 "n: " n` vuelve a decir `[object Object]`.
+
 ### Qué lo sujeta
 
 `axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
 `axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2),
-`axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15) y
-`axes/syntax-control-flow.toml` (7).
+`axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15),
+`axes/syntax-control-flow.toml` (7), `axes/syntax-index-nav.toml` (8) y
+`axes/syntax-io.toml` (12).
 
