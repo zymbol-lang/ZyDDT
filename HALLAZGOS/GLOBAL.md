@@ -1110,7 +1110,7 @@ verdes, 26 rojas.
 
 ## GLB-013 — Conversiones y formatos con un valor inválido: `zyjs` inventa un número, y el kind vuelve a ser `##_` contra `##Type`
 
-**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`)
+**Estado:** abierto — **A corregido en `zyjs` el 2026-09-15** (paso 2.8); la parte del kind decidida (`##Type`), pendiente en 4.1
 **Encontrado por:** `axes/runtime-format-convert.toml`, paso C5 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1137,6 +1137,24 @@ respuesta que ningún motor debería dar.
 
 **Familia (D1):** los 8 de la parte B son `##Type` en los tres motores.
 
+### Corregido A en `zyjs` — 2026-09-15 (paso 2.8)
+
+La medición destapó más de lo que decía la ficha: **`0x|"41"|` significaba otra
+cosa en `zyjs`**. Los dos Rust leen la cadena como un código escrito en la base del
+operador y devuelven el carácter (`A`); `zyjs` la leía como un número decimal e
+imprimía su hexadecimal (`0x0029`), y convertía en 0 lo que no podía leer. Ahora
+sigue `data_ops.rs`: quita los prefijos, lee los dígitos en su base
+(`failed to parse 'zz' as hexadecimal number`, que es `##Parse`), rechaza un valor
+fuera de rango (`character code must be in range 0..0x10FFFF, got 1114112`, el
+caso F de `GLB-014`) y un sustituto (`invalid Unicode character code: 55296`), y
+rechaza un Float o un Bool con el texto del TW. En los formatos, una cadena que no
+es un número o un Bool son error con las palabras de cada operador del TW (`format
+expressions only work with numbers`, `cannot convert string 'x' to number for
+rounding`, `round/truncate expressions only work with numbers or numeric
+strings`). La cadena numérica queda como está, porque el TW y la VM no coinciden
+(`GLB-029`). `runtime-format-convert` pasa de 6 `WRONG` a 0. Ningún documento ni
+ejemplo usaba `0x|"…"|`.
+
 ### Qué lo sujeta
 
 `axes/runtime-format-convert.toml`: 13 pares. 7 verdes, 19 rojas.
@@ -1145,7 +1163,7 @@ respuesta que ningún motor debería dar.
 
 ## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
 
-**Estado:** abierto — **A, B, E, H y el patrón de F corregidos el 2026-09-15** (pasos 1.3, 1.4 y 2.7); el código de carácter de F va en el paso 2.8; C, D y G **decididos** (error estático; `##Type`), pendientes en F4/F5
+**Estado:** abierto — **A, B, E, F y H corregidos el 2026-09-15** (pasos 1.3, 1.4, 2.7 y 2.8); C, D y G **decididos** (error estático; `##Type`), pendientes en F4/F5
 **Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
 
@@ -1952,3 +1970,30 @@ Tras el error real, los dos Rust siguen leyendo e informan de algo que no está 
 el mismo en los tres y quedan en `DIVERGE` sólo por esa línea de más: los dos
 patrones de rango de `syntax-control-flow`, `syntax-lexer/unterminated-string-interpolation`,
 `syntax-try-catch/error-type-without-a-name`.
+
+---
+
+## GLB-029 — Formatear una cadena que parece un número: el TW la rechaza y la VM la formatea
+
+**Estado:** abierto — **necesita decisión**
+**Encontrado por:** paso 2.8, 2026-09-15, al portar a `zyjs` las comprobaciones de los formatos
+
+| forma, con `v = "12.5"` | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `#,\|v\|` | error: `format expressions only work with numbers, got String("12.5")` | `12.5` | `12.5` |
+| `#.2\|v\|` | `12.5` | `12.5` | `12.5` |
+| `#!2\|v\|` | `12.5` | `12.5` | `12.5` |
+
+El TW acepta una cadena numérica al redondear y al truncar (su texto dice «numbers
+or numeric strings») y la rechaza al dar formato con separadores; la VM la acepta
+en los tres. Una cadena que no es un número (`"x"`) y un Bool son error en los tres
+motores desde el paso 2.8.
+
+### Qué hay que decidir
+
+¿Los operadores de formato (`#,`, `#^` y sus variantes) aceptan una cadena que se
+lee como número, como ya hacen `#.` y `#!`? ¿O ninguno la acepta?
+
+### Qué lo sujeta
+
+`runtime-format-convert/format-a-numeric-string`, que sólo pide que coincidan.

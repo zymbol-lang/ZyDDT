@@ -350,3 +350,14 @@ t(v) {
     >> (_err#?)[1] ¶
 }
 """
+
+[[cell]]
+id     = "format-a-numeric-string"
+expect = "ok"
+what   = "`#,|v|` with v a string that reads as a number gives the same answer in every engine — the tree-walker refuses it, the VM and zyjs format it, and `#.2|v|` takes it in all three (found in step 2.8, 2026-09-15; GLB-029)"
+src    = """
+t(v) {
+    <~ #,|v|
+}
+>> t("1234.5") ¶
+"""
