@@ -1242,7 +1242,7 @@ lambda, o llamar a algo que no es función.
 
 ## GLB-016 — Un `??` sin brazo que case: el TW aborta, la VM y `zyjs` devuelven `##_` en silencio
 
-**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*. **La VM, corregida el 2026-09-15** (paso 1.1); quedan `zyjs` (paso 2.6) y el aviso (paso 1.2)
+**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*. **La VM y el aviso en los dos Rust, corregidos el 2026-09-15** (pasos 1.1 y 1.2); queda `zyjs` (paso 2.6)
 **Encontrado por:** `axes/runtime-match-patterns.toml`, paso C8 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** **alta**: un valor que nadie calculó sigue su camino por el programa, sin error ni aviso
 
@@ -1278,7 +1278,19 @@ ningún brazo casaba, caía al final. Ahora, cuando el `??` no tiene comodín,
 emite `RaiseError("no pattern matched in match expression")` detrás del último
 brazo: el mismo texto que el TW, y el mismo kind (`##_`) en la celda `-met`. La
 forma de sentencia pasa por el mismo camino, igual que en el TW, donde también
-aborta. `zyq consensus` sigue en 660 de acuerdo y 0 divergiendo. Los dos patrones
+aborta. `zyq consensus` sigue en 660 de acuerdo y 0 divergiendo.
+
+### Corregido el aviso en los dos Rust — 2026-09-15
+
+El aviso lo imprimía el TW con `eprintln!` al **ejecutar** la sentencia, y sólo
+si esa línea llegaba a correr. Ahora lo da el analizador
+(`zymbol-semantic`, `Statement::Match`) para cualquier `??` sentencia con algún
+brazo `=> valor`: el TW, la VM, `zymbol check` y el LSP lo ven antes de
+ejecutar, con `help:` y posición. Se comprobó dentro de una función, de una
+lambda de bloque y de un bucle, y que un `??` con brazos de bloque no lo dispara.
+Ningún fichero de las aplicaciones LDV ni de `web/examples` lo dispara. El
+inventario de mensajes cambia una línea por otra: el mismo texto, ya sin el
+prefijo `warning:` dentro de la plantilla. Los dos patrones
 de desestructuración del mismo paso coinciden en los tres motores.
 
 ---
