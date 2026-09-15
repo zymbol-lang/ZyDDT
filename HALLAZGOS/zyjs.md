@@ -1196,9 +1196,17 @@ deja pasar al parsear y falla **en ejecución** (`Expected a function for
 collection operator`). `f(1) + 2` como sentencia: `expected expression, found
 Plus`.
 
+### Y en el núcleo de expresiones (paso B9)
+
+La mayoría como las anteriores (`Expected RPAREN, got '>>'`). Dos más:
+**un módulo con una sentencia detrás de su bloque** (`# extra { … }` y luego
+`x = 1`) se carga sin error, y lo que falla después es `module 'e' does not
+export function 'f'`; y `°x` suelto como sentencia es `undefined variable 'x'`
+en vez de `'°name' is only valid as an assignment target`.
+
 ### Qué lo sujeta
 
 `axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
-`axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2) y
-`axes/syntax-functions-lambdas.toml` (6).
+`axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2),
+`axes/syntax-functions-lambdas.toml` (6) y `axes/syntax-expressions.toml` (15).
 

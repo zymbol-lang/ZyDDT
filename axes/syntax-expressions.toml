@@ -1,0 +1,159 @@
+# The syntax-expressions axis — Phase B, family B9 of the diagnostics plan.
+#
+# The parser's core: calls, the pipe, member access, blocks, statements that are
+# not statements. The diagnostics no program provoked on 2026-09-14. Every cell
+# expects `error` and provokes its `help:` line.
+#
+# Four cells write their broken form as the TARGET of a pipe (`x = 5 |> …`):
+# the pipe parses its callable without calls, through a postfix parser of its
+# own, and that parser has its own diagnostics. Inside `>>` a pipe needs
+# parentheses, so these are assignments.
+#
+# `unexpected end of file` has no cell: parse_statement is only called from two
+# loops that stop at the end of the file first.
+
+id      = "syntax-expressions"
+what    = "the parser diagnostics of calls, the pipe, member access, blocks and statements: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "hot-name-outside-an-assignment"
+what = "'°name' is only valid as an assignment target — with its help"
+src  = """
+°x
+"""
+
+[[cell]]
+id   = "module-call-without-parenthesis"
+what = "expected '(' for module function call"
+src  = """
+<# std/math => m
+>> m::sqrt 4 ¶
+"""
+
+[[cell]]
+id   = "call-on-a-group-left-open"
+what = "expected ')' after arguments"
+src  = """
+f(x) {
+    <~ x
+}
+>> (f)(1 ¶
+"""
+
+[[cell]]
+id   = "pipe-target-group-left-open"
+what = "expected ')' after expression — a pipe target"
+src  = """
+f(x) {
+    <~ x
+}
+x = 5 |> (f
+>> x ¶
+"""
+
+[[cell]]
+id   = "call-on-an-expression-left-open"
+what = "expected ')' after function arguments — with the expr(…) help"
+src  = """
+f(x) {
+    <~ 5
+}
+fs = [f]
+x = fs[1](1
+>> x ¶
+"""
+
+[[cell]]
+id   = "call-by-name-left-open"
+what = "expected ')' after function arguments — with the name(…) help"
+src  = """
+f(x) {
+    <~ x
+}
+>> f(1 ¶
+"""
+
+[[cell]]
+id   = "pipe-arguments-left-open"
+what = "expected ')' after pipe arguments — with its help"
+src  = """
+f(a, b) {
+    <~ a + b
+}
+x = 5 |> f(_, 1
+>> x ¶
+"""
+
+[[cell]]
+id   = "pipe-target-index-left-open"
+what = "expected ']' after index — a pipe target, with its help"
+src  = """
+fs = [1]
+x = 5 |> fs[1
+>> x ¶
+"""
+
+[[cell]]
+id   = "block-without-brace"
+what = "expected '{' to start block"
+src  = """
+@ 3 >> 1 ¶
+"""
+
+[[cell]]
+id   = "expression-missing-at-end-of-file"
+what = "expected expression, found end of file"
+src  = """
+x = """
+
+[[cell]]
+id   = "pipe-target-member-without-field"
+what = "expected field name after '.' — a pipe target, with its help"
+src  = """
+d = #(a: 1)
+x = 5 |> d.
+>> x ¶
+"""
+
+[[cell]]
+id   = "module-call-without-function-name"
+what = "expected function name after '::'"
+src  = """
+<# std/math => m
+>> m:: ¶
+"""
+
+[[cell]]
+id   = "edit-of-an-edit"
+what = "this edit has nothing to write into"
+src  = """
+x = [1]
+x$+ 1 $+ 2
+"""
+
+[[cell]]
+id   = "dictionary-literal-as-a-statement"
+what = "unexpected '#(' at statement level — with its help"
+src  = """
+#(a: 1)
+"""
+
+[[cell]]
+id   = "module-with-a-statement-after-its-block"
+what = "unexpected token after module block — with its help"
+src  = """
+<# ./m/extra => e
+>> e::f() ¶
+"""
+[cell.files]
+"m/extra.zy" = """
+# extra {
+    #> { f }
+    f() {
+        <~ 1
+    }
+}
+x = 1
+"""
