@@ -1,0 +1,105 @@
+# The runtime-io axis — Phase C, family C12 of the diagnostics plan.
+#
+# Input, the positioned output `>>~` and the alternate screen `>>|`: the
+# runtime diagnostics no program provoked on 2026-09-14. `<id>` raises it,
+# `<id>-met` catches it and prints the family.
+#
+# A cell runs with an EMPTY stdin that is not a terminal, and that decides what
+# can be asked here:
+#
+#   · end of input — yes: the empty stdin is exactly that. Its catch is already
+#     held by error-flow/input-eof-is-catchable, so it has no `-met` here.
+#   · `>>|` without a terminal — yes: raw mode cannot be enabled on a pipe.
+#   · a stdin that is not UTF-8, and a stdout closed under the program — no: a
+#     cell cannot give stdin or close stdout. Both were reproduced by hand; the
+#     commands are in zyquality/messages/queue/runtime.tsv.
+#   · raw mode or the alternate screen failing half way — no: that needs a
+#     terminal that breaks while in use.
+
+id      = "runtime-io"
+what    = "the runtime diagnostics of input, positioned output and the alternate screen: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "positioned-output-slot-must-be-int"
+expect = "error"
+what   = ">>~ slot expects Int, got {}"
+src    = """
+t(v) {
+    >>~ (v, 1) > "x"
+    <~ 1
+}
+>> t("a") ¶
+"""
+
+[[cell]]
+id     = "positioned-output-slot-must-be-int-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    >>~ (v, 1) > "x"
+    <~ 1
+}
+!? {
+    >> t("a") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "end-of-input"
+expect = "error"
+what   = "end of input while waiting for {}"
+src    = """
+<< n
+>> n ¶
+"""
+
+[[cell]]
+id     = "alternate-screen-without-a-terminal"
+expect = "error"
+what   = "failed to enable raw mode: {}"
+src    = """
+>>| {
+    >> "dentro" ¶
+}
+>> "fuera" ¶
+"""
+
+[[cell]]
+id     = "alternate-screen-without-a-terminal-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    >>| {
+        >> "dentro" ¶
+    }
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "undefined-variable-in-input-prompt"
+expect = "error"
+what   = "undefined variable in input prompt: '{}'"
+src    = """
+<< "Nombre {nadie}: " n
+>> n ¶
+"""
+
+[[cell]]
+id     = "undefined-variable-in-input-prompt-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    << "Nombre {nadie}: " n
+    >> n ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""

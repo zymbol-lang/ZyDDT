@@ -1235,3 +1235,34 @@ primer error, sin la cabecera.
 `axes/runtime-modules-scripts.toml`: 14 celdas, 4 verdes, 10 rojas. Los errores
 de carga de módulo no tienen `-met`: una importación va antes de cualquier
 sentencia y no hay `!?` que la rodee.
+
+---
+
+## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
+
+**Estado:** abierto — sin decisión pendiente: el tree-walker hace lo documentado en las tres
+**Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
+
+### Qué se observa
+
+**A. El prompt de `<<` no se interpola en la VM ni en `zyjs`.**
+`<< "Nombre {nadie}: " n` — el TW interpola el prompt y falla porque `nadie` no
+existe; la VM y `zyjs` imprimen **`Nombre {nadie}: `** literal. Con una variable
+que sí existe, esos dos motores tampoco la sustituirían.
+
+**B. `>>~` con un hueco que no es entero:** `>>~ ("a", 1) > "x"` — el TW rechaza;
+la VM imprime `x1` como salida normal; `zyjs` no da error y además avisa
+`unused variable 'v'` (su analizador no cuenta los huecos de `>>~` como uso,
+familia `ZYJS-018`).
+
+**C. `>>|` sin terminal:** el TW y la VM fallan (`failed to enable raw mode`),
+como dice `LLM.md` (*«errors without a tty»*); `zyjs` entra y sale del bloque.
+
+Dos más se reprodujeron a mano, sin celda posible (ZyDDT no da stdin ni cierra
+stdout): un stdin con UTF-8 inválido es `input read error` en el TW y **fin de
+entrada** en la VM; un stdout cerrado es `io error: Broken pipe` en el TW.
+
+### Qué lo sujeta
+
+`axes/runtime-io.toml`: 7 celdas, 1 verde (fin de entrada, igual en los tres), 6
+rojas.
