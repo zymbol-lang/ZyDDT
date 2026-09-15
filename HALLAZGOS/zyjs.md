@@ -1199,7 +1199,7 @@ Cada forma, con el texto y la ayuda de los Rust, en `web/src/zymbol/zymbol.js`:
 
 ## ZYJS-021 — Los errores de sintaxis de los operadores `$` nombran tokens, y dos dicen `[object Object]`
 
-**Estado:** abierto — **la parte «acepta lo que debe rechazar» corregida el 2026-09-15** (paso 2.3); quedan las lecturas erróneas (2.4) y los textos (2.5)
+**Estado:** abierto — **lo que aceptaba y las lecturas erróneas, corregidos el 2026-09-15** (pasos 2.3 y 2.4); quedan los textos (2.5)
 **Encontrado por:** `axes/syntax-collection-ops.toml`, paso B4 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media: rechaza lo que debe, con un texto que no ayuda
 **Familia:** `ZYJS-006` (`[object Object]` en el diagnóstico, cerrado el 2026-08-30 en otro sitio)
@@ -1319,6 +1319,25 @@ gramática estricta de `parse_nav_atom`: entero, `-`entero, nombre, cadena o
 la admite. **Barrido de parseo** con el `zyjs` anterior y el nuevo sobre los 1189
 `.zy` de los ejemplos, las aplicaciones LDV y el corpus: los mismos 9 errores, y
 ningún fichero deja de parsear. Las 10 `WRONG` de los ejes `syntax-*` son 0.
+
+### Corregido: lo que leía como otra cosa — 2026-09-15 (paso 2.4)
+
+- **`#.2 5`, `#.|5|`**: un `#.` incompleto caía a la rama de las cabeceras
+  antiguas, que se tragaba el resto de la línea, y el error salía una línea más
+  abajo. **`#!2 5`**: el `#` se descartaba y quedaba un NOT lógico, que fallaba
+  en ejecución. Ahora `#.` y `#!` son siempre los operadores de redondeo y
+  truncado, como en el lexer de Rust: `expected '|' after precision`, con la
+  ayuda de cada uno, o `expected a decimal count after '#.'` / `'#!'` **sin
+  ayuda**, porque la de Rust enseña `#..2|value|` y `#!.2|value|` (`GLB-021`).
+  De paso deja de aceptarse `#.nombre {` sin espacio como módulo, que Rust
+  rechaza (el corpus escribe `# .nombre {`).
+- **`m[(a 1)>1]`**: el primer paso entre paréntesis se leía como la
+  yuxtaposición `11`. Si el `)` que lo cierra va seguido de `>` es un paso
+  calculado, como decide `is_nav_index` en Rust, y lleva una expresión y su `)`:
+  `expected ')' after computed index`.
+
+El barrido de parseo sobre los 1189 ficheros sigue en los mismos 9 errores.
+`syntax-format-convert` pasa de 3 `DIVERGE` a 0 y `syntax-index-nav` de 1 a 0.
 
 Registrado por el camino: `x[1] 5` —sin `°`— ejecuta el `5` suelto en `zyjs`
 (celda `refusal/stray-literal-statement`), y los Rust añaden errores en cascada
