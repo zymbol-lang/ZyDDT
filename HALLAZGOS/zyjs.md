@@ -1449,3 +1449,25 @@ los ejemplos del playground siguen en verde.
 4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
    porque lo detecta su checker, y como `1 parse error(s)` en Rust. Paso 2.5.
 
+---
+
+## ZYJS-023 — El panel de problemas del playground enseña la clave en bruto de 19 de los 28 diagnósticos del checker
+
+**Estado:** abierto — sin decisión pendiente
+**Encontrado por:** paso 2.6, 2026-09-15, al añadir el aviso `W_UNUSED_MATCH`
+**Gravedad:** media en el playground: el lector ve `chk.W_NO_EFFECT` donde debería leer una frase
+
+`src/playground/problems.js` escribe cada diagnóstico con `t(\`chk.${d.code}\`)`, y
+`t` devuelve la clave cuando el catálogo no la tiene; no hay reserva al
+`d.message` inglés. De los 28 códigos que el `Checker` de `zymbol.js` emite con
+`this.warn`/`this.error`, **19 no están** en `data/i18n/playground/english.json`:
+
+`E014`, `E015`, `E016`, `E017`, `E018`, `E019`, `E_ARRAY_MIX`, `E_HOT_AMBIG`,
+`E_HOT_OUTPUT`, `E_NAME`, `W_ARITH_TYPE`, `W_COND_TYPE`, `W_DESTRUCT_SHAPE`,
+`W_LOGIC_TYPE`, `W_MIX_UNNEEDED`, `W_NO_EFFECT`, `W_RANGE_DIR`, `W_TYPE_CHANGE`,
+`W_UNARY_TYPE`.
+
+`tests/test_i18n_playground.mjs` comprueba que los dos catálogos tienen las
+mismas claves, pero no que estén las que el motor emite. Sin celda: ZyDDT no ve
+el panel. Lo que lo sujetaría es un test en `web/tests/` que cruce los códigos
+de `zymbol.js` con el catálogo.
