@@ -1,0 +1,192 @@
+# The runtime-operators axis — Phase C, family C13 of the diagnostics plan.
+#
+# Comparison, logical NOT, negation, unary plus, modulo, and redeclaring a
+# constant: the runtime diagnostics no program provoked on 2026-09-14. `<id>`
+# raises it, `<id>-met` catches it and prints the family.
+#
+# The wrong value comes out of `json::decode`, not through a parameter: the
+# analyzer infers a parameter's type from how the body uses it (`v < "a"` makes
+# `v` a String), and refuses the call before anything runs. A decoded value has
+# no type the analyzer can know.
+#
+# Six of this family have no cell (reasons in the queue): the compiler's
+# undefined-name backstop and the tree-walker's reassign check (the analyzer
+# refuses both first), the binary operator fallback (the parser never builds
+# the operators it catches), the VM's `unknown error` (TryLand is only reached
+# through raise!), and three internal assertions.
+
+id      = "runtime-operators"
+what    = "the runtime diagnostics of operators and constant declarations: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "cannot-compare-float-with-string"
+expect = "error"
+what   = "cannot compare float {} with string '{}' using operator '{:?}'"
+src    = """
+<# std/json => j
+v = j::decode("1.5")
+>> (v < "a") ¶
+"""
+
+[[cell]]
+id     = "cannot-compare-float-with-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => j
+v = j::decode("1.5")
+!? {
+    >> (v < "a") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-compare-string-with-float"
+expect = "error"
+what   = "cannot compare string '{}' with float {} using operator '{:?}'"
+src    = """
+<# std/json => j
+v = j::decode("1.5")
+>> ("a" < v) ¶
+"""
+
+[[cell]]
+id     = "cannot-compare-string-with-float-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => j
+v = j::decode("1.5")
+!? {
+    >> ("a" < v) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "logical-not-requires-a-boolean"
+expect = "error"
+what   = "logical NOT requires boolean operand, got {}"
+src    = """
+<# std/json => j
+v = j::decode("5")
+>> !v ¶
+"""
+
+[[cell]]
+id     = "logical-not-requires-a-boolean-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => j
+v = j::decode("5")
+!? {
+    >> !v ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "modulo-by-zero"
+expect = "error"
+what   = "modulo by zero"
+src    = """
+t(v) {
+    <~ 5 % v
+}
+>> t(0) ¶
+"""
+
+[[cell]]
+id     = "modulo-by-zero-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 5 % v
+}
+!? {
+    >> t(0) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "negation-requires-a-number"
+expect = "error"
+what   = "negation requires numeric operand, got {}"
+src    = """
+<# std/json => j
+v = j::decode("\\"a\\"")
+>> -v ¶
+"""
+
+[[cell]]
+id     = "negation-requires-a-number-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => j
+v = j::decode("\\"a\\"")
+!? {
+    >> -v ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "unary-plus-requires-a-number"
+expect = "error"
+what   = "unary plus requires numeric operand, got {:?}"
+src    = """
+<# std/json => j
+v = j::decode("\\"a\\"")
+x = (+v)
+>> x ¶
+"""
+
+[[cell]]
+id     = "unary-plus-requires-a-number-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/json => j
+v = j::decode("\\"a\\"")
+!? {
+    x = (+v)
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "constant-already-declared"
+expect = "error"
+what   = "constant '{}' already declared"
+src    = """
+C := 1
+C := 2
+>> C ¶
+"""
+
+[[cell]]
+id     = "constant-already-declared-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+C := 1
+!? {
+    C := 2
+} :! {
+    >> (_err#?)[1] ¶
+}
+>> C ¶
+"""

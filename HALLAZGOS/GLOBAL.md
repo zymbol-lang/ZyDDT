@@ -1266,3 +1266,70 @@ entrada** en la VM; un stdout cerrado es `io error: Broken pipe` en el TW.
 
 `axes/runtime-io.toml`: 7 celdas, 1 verde (fin de entrada, igual en los tres), 6
 rojas.
+
+---
+
+## GLB-019 — Operadores con un operando inválido: la VM responde `!5` → `#0` y `+"a"` → `a`, y dos motores redeclaran una constante
+
+**Estado:** abierto — sin decisión pendiente: el tree-walker rechaza en los tres casos
+**Encontrado por:** `axes/runtime-operators.toml`, paso C13 del plan de cobertura de diagnósticos, 2026-09-14
+
+### Qué se observa
+
+El valor inválido sale de `json::decode`, porque por parámetro el analizador lo
+rechaza antes (infiere el tipo del parámetro por su uso).
+
+**A. `!v` con `v = 5`:** TW y `zyjs` rechazan (`logical NOT requires boolean
+operand`); la VM responde **`#0`**.
+
+**B. `(+v)` con `v = "a"`:** el TW rechaza (`unary plus requires numeric
+operand`); la VM responde **`a`**; `zyjs` no parsea el `+` unario
+(`expected expression, found Plus`).
+
+**C. `C := 1` y luego `C := 2`:** el TW rechaza (`constant 'C' already
+declared`); la VM y `zyjs` imprimen **`2`**. Dentro de un `!?`, la VM vuelve a
+declararla y `zyjs` la trata como un nombre nuevo del bloque.
+
+Lo que coincide en los tres: comparar un Float con una String, negar una String y
+`5 % 0`.
+
+### Qué lo sujeta
+
+`axes/runtime-operators.toml`: 7 pares. 8 verdes, 6 rojas.
+
+---
+
+## GLB-020 — Una constante varía: `<< C` y `@ C:1..2` la sobrescriben en el TW y en la VM
+
+**Estado:** abierto — **necesita decisión del autor** (cómo se rechaza), y por eso **sin celda**
+**Encontrado por:** buscando cómo alcanzar `cannot reassign constant '{}' (declared with :=)` en tiempo de ejecución, paso C13, 2026-09-14
+**Gravedad:** **alta**: incumple `MEM-1`, *las constantes son globales pero nunca varían*
+
+### Qué se observa
+
+La reasignación directa está bien cerrada: `C = 2` y `(C, d) = (5, 6)` los
+rechaza el analizador en los tres motores. Pero hay otras dos formas de
+escribir un nombre, y ninguna mira si es una constante:
+
+```zymbol
+C := 1
+<< C              // con 7 en la entrada
+>> C ¶            // zytw 7 · zyvm 7 · zyjs: Runtime error: Cannot reassign constant 'C'
+```
+
+```zymbol
+C := 1
+@ C:1..2 {
+    >> C ¶
+}
+>> C ¶            // zytw 2 · zyvm 2 · zyjs 1
+```
+
+En los dos, el TW y la VM dejan la constante con otro valor **después**.
+
+### Qué hay que decidir
+
+Si `<< C` y `@ C:…` sobre una constante son un error estático (como `C = 2`) o
+si el iterador puede sombrear la constante dentro del bucle sin cambiarla fuera.
+Una celda ahora tendría que elegir por el autor cuál es su verde, y un rojo sin
+verde posible es un defecto del arnés.
