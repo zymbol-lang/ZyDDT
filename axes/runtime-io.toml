@@ -103,3 +103,17 @@ src    = """
     >> (_err#?)[1] ¶
 }
 """
+
+[[cell]]
+id     = "input-prompt-interpolation-is-a-use"
+expect = "ok"
+what   = "a variable read only inside a `<<` prompt is used: no `unused variable` warning (found in step 1.6, 2026-09-15)"
+src    = """
+x = "Ana"
+!? {
+    << "Hola {x}: " n
+    >> n ¶
+} :! {
+    >> "fin" ¶
+}
+"""
