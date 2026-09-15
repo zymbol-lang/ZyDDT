@@ -1510,7 +1510,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B corregido en la VM el 2026-09-15** (paso 1.7), queda `zyjs`; C sin decisión pendiente; **H decidido y corregido el 2026-09-15** (paso 1.11)
+**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B y C corregidos el 2026-09-15** (pasos 1.7 y 2.11); **H decidido y corregido el 2026-09-15** (paso 1.11)
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1557,6 +1557,21 @@ familia `ZYJS-018`).
 
 **C. `>>|` sin terminal:** el TW y la VM fallan (`failed to enable raw mode`),
 como dice `LLM.md` (*«errors without a tty»*); `zyjs` entra y sale del bloque.
+
+### Corregido B y C en `zyjs` — 2026-09-15 (paso 2.11)
+
+- **B:** un hueco escrito de `>>~` tiene que ser Int, comprobado al evaluarlo, con
+  el texto del TW (`>>~ slot expects Int, got a`); un hueco solitario que no es una
+  tupla se trata como hueco escrito. El checker cuenta los huecos como uso y deja
+  de avisar `unused variable 'v'`.
+- **C:** sin pantalla no hay `>>|`. El motor lanza `failed to enable raw mode: …`
+  cuando no tiene contexto de terminal, o cuando el contexto no puede tomar la
+  pantalla. El adaptador de pruebas `web/tests/run_one.mjs` le daba a `zyjs` una
+  TUI de imitación (secuencias ANSI, como la CLI) cuyo `enter()` no hacía nada;
+  ahora falla cuando stdin o stdout no son una terminal, que es lo que le pasa a la
+  CLI por una tubería. El playground tiene su TUI real y no cambia. La celda queda
+  en `WORDING` sólo por el detalle del sistema operativo (`No such device or
+  address (os error 6)` frente a `not a terminal`), y su `-met` en `AGREE`.
 
 ### Corregido B en la VM — 2026-09-15
 
