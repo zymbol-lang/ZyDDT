@@ -1292,8 +1292,8 @@ formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
   los parámetros que la operación le da, los use o no. **Corregido el 2026-09-15
   (paso 2.13)**, y lo mismo para un alias de módulo sin usar (`ZYJS-022`).
   Medido en el mismo paso: los Rust **tampoco** avisan de un parámetro sin usar
-  de una **función con nombre** (`f(a, b) { <~ a }`), y `zyjs` sí lo hace. Como no
-  estaba en la decisión, `zyjs` sigue avisando en ese caso hasta que el autor diga.
+  de una **función con nombre** (`f(a, b) { <~ a }`), y `zyjs` sí lo hace.
+  *Decidido el 2026-09-15:* **tampoco se avisa** (paso 2.15f).
 
 ### Corregido: lo que aceptaba — 2026-09-15 (paso 2.3)
 
