@@ -378,3 +378,36 @@ es el control —el segundo bucle sí la conocía— y está verde las cuatro ve
 las otras 80 están rojas. Y `error-flow/try-inside-a-mapped-lambda` y
 `error-flow/error-in-a-mapped-lambda-is-catchable`.
 
+---
+
+## ZYVM-005 — Un local destruido en una rama que no se ejecuta deja de poder leerse
+
+**Estado:** abierto — sin decisión pendiente
+**Encontrado por:** paso 2.15, 2026-09-15 (`GLB-025`)
+**Familia:** `GLB-008` («Lo que queda»: la destrucción de un local de función en la VM)
+
+```zymbol
+f() {
+    y = 2
+    ? #0 { \ y }
+    <~ y
+}
+>> f() ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyjs` | `2` |
+| `zyvm` | `Runtime error: 'y' is undefined — did you mean 'y°' (hot definition)?` |
+
+El compilador quita la ligadura del registro al compilar `\ y`, esté o no en una
+rama que se vaya a ejecutar, así que la lectura de después ya no encuentra el
+nombre y emite el error de «indefinido». A nivel de archivo no pasa: allí la
+variable vive en `global_vars` y `DestroyGlobal` sólo actúa si se ejecuta. Es el
+falso positivo que enseñó `GLB-008`, en el sitio que esa ficha dejó pendiente. La
+interpolación (`"{y}"`) hace lo mismo desde el paso 2.15, porque sigue el camino
+del identificador.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/local-destroyed-in-a-branch-not-taken`, roja por la VM.
