@@ -1218,13 +1218,20 @@ ejecución. En E/S **acepta** un `<\ "echo"` sin cerrar (sólo avisa de la varia
 sin usar) y un `<< #|n` sin cerrar, que se pone a leer la entrada; y
 `<< ###(4 "n: " n` vuelve a decir `[object Object]`.
 
+### Y en variables y desestructuración (paso B14)
+
+**Acepta** `\ 5` (destruir algo que no es un nombre; sólo avisa de `x` sin usar)
+y `x°[1] 5` (una forma indexada sin operador después de un nombre caliente). Las
+formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
+`Expected COLON, got 'y'`.
+
 ### Qué lo sujeta
 
 `axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
 `axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2),
 `axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15),
-`axes/syntax-control-flow.toml` (7), `axes/syntax-index-nav.toml` (8) y
-`axes/syntax-io.toml` (12).
+`axes/syntax-control-flow.toml` (7), `axes/syntax-index-nav.toml` (8),
+`axes/syntax-io.toml` (12) y `axes/syntax-variables.toml` (8).
 
 ---
 

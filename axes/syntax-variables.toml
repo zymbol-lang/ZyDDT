@@ -1,0 +1,85 @@
+# The syntax-variables axis — Phase B, family B14 of the diagnostics plan.
+#
+# Destructuring patterns, `\\ name`, and the indexed form after a hot name
+# (`x°[…]`), written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line.
+#
+# The indexed-assignment diagnostics are reached only after a HOT name: for a
+# plain name the dispatch looks ahead for a complete `name[…] op` before it ever
+# calls parse_assignment, and for `x°` it routes on the `[` alone.
+#
+# Six lines have no cell (reasons in the queue): each is a check that a token is
+# what the dispatch already confirmed it is.
+
+id      = "syntax-variables"
+what    = "the parser diagnostics of destructuring, `\\`, and indexed forms after a hot name: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "named-destructure-field-without-colon"
+what = "expected ':' after field name in named tuple destructure"
+src  = """
+d = #(a: 1, b: 2)
+#(a: x, b y) = d
+>> x ¶
+"""
+
+[[cell]]
+id   = "named-destructure-without-variable"
+what = "expected variable name after ':' in named tuple destructure"
+src  = """
+d = #(a: 1)
+#(a: 5) = d
+"""
+
+[[cell]]
+id   = "array-destructure-item-not-a-name"
+what = "expected identifier, '*rest', or '_' in array destructure"
+src  = """
+v = [1, 2]
+[a, 5] = v
+>> a ¶
+"""
+
+[[cell]]
+id   = "rest-without-a-name"
+what = "expected identifier after '*' in destructure"
+src  = """
+v = [1, 2]
+[a, *5] = v
+>> a ¶
+"""
+
+[[cell]]
+id   = "tuple-destructure-item-not-a-name"
+what = "unexpected token in tuple destructure pattern"
+src  = """
+t = (1, 2)
+(a, 5) = t
+>> a ¶
+"""
+
+[[cell]]
+id   = "destroy-without-a-name"
+what = "expected variable name after \\ — with its help"
+src  = """
+x = 1
+\\ 5
+"""
+
+[[cell]]
+id   = "hot-index-left-open"
+what = "expected ']' after index expression — after a hot name"
+src  = """
+x = [1, 2]
+x°[1 = 2
+"""
+
+[[cell]]
+id   = "hot-index-without-operator"
+what = "expected '=' after index expression — after a hot name, with its help"
+src  = """
+x = [1, 2]
+x°[1] 5
+"""
