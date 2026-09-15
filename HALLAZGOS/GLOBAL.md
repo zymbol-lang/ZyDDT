@@ -2061,7 +2061,7 @@ patrones de rango de `syntax-control-flow`, `syntax-lexer/unterminated-string-in
 
 ## GLB-029 — Formatear una cadena que parece un número: el TW la rechaza y la VM la formatea
 
-**Estado:** abierto — **decidido el 2026-09-15**: se acepta en todos (paso 2.15e)
+**Estado:** **corregido el 2026-09-15** (paso 2.15e): se acepta en los tres motores
 **Encontrado por:** paso 2.8, 2026-09-15, al portar a `zyjs` las comprobaciones de los formatos
 
 | forma, con `v = "12.5"` | `zytw` | `zyvm` | `zyjs` |
@@ -2082,6 +2082,13 @@ lee como número, como ya hacen `#.` y `#!`? ¿O ninguno la acepta?
 
 *Decidido el 2026-09-15:* **se acepta en todos los motores**, como ya hacen `#.` y
 `#!`. Cambia el TW (paso 2.15e).
+
+*Corregido el 2026-09-15 (paso 2.15e).* `eval_format` del TW acepta una cadena que
+se lee como número, con la misma lectura que el redondeo: recortada y con cifras de
+cualquier escritura. Los tres motores dan la misma salida con `"1234.5"`, `"1234"`,
+`" 42 "`, `"१२३४"` y `"1e3"` en `#,`, `#,.2`, `#^` y `#.1`. Una cadena que no es un
+número sigue siendo error en los tres, con texto y kind pendientes de 3.5 y 4.1. La
+celda pasa a `AGREE`.
 
 ### Qué lo sujeta
 
