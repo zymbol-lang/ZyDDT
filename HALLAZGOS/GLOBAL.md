@@ -1433,7 +1433,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B corregido en la VM el 2026-09-15** (paso 1.7), queda `zyjs`; C sin decisión pendiente; H decidido el 2026-09-15 (se interpola), pendiente en los Rust
+**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B corregido en la VM el 2026-09-15** (paso 1.7), queda `zyjs`; C sin decisión pendiente; **H decidido y corregido el 2026-09-15** (paso 1.11)
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1464,6 +1464,14 @@ que coincidan.
 
 *Decidido el 2026-09-15:* **se interpola** (`f=<funct/1>`), como la lambda, la
 yuxtaposición y `zyjs`: `{f}` se lee como `f`. Cambian los dos Rust (paso 1.11).
+
+*Corregido el 2026-09-15 (paso 1.11).* El TW busca, tras las variables, la
+función con nombre, igual que `eval_identifier`. La VM compila el nombre por el
+camino del identificador (`compile_expr`), el que ya resuelve capturas y
+funciones hermanas de un módulo (BUG-ZYB-005), en vez de caer a la rama del texto
+literal. Los tres motores coinciden en `{f}` a nivel de archivo, dentro de una
+función, dentro de una lambda y con una función privada hermana dentro de un
+módulo. La celda pasa a `AGREE`.
 
 **B. `>>~` con un hueco que no es entero:** `>>~ ("a", 1) > "x"` — el TW rechaza;
 la VM imprime `x1` como salida normal; `zyjs` no da error y además avisa
