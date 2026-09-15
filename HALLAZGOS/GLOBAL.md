@@ -1587,7 +1587,7 @@ Y `zyjs` acepta `:! ## { }` sin nombre y ejecuta el `!?` (añadido a `ZYJS-021`)
 
 ## GLB-023 — Una variable leída sólo en el prompt de `<<` se avisa como no usada en los dos motores Rust
 
-**Estado:** abierto — sin decisión pendiente
+**Estado:** **corregido el 2026-09-15** (paso 1.6b)
 **Encontrado por:** medición del paso 1.6 (`GLB-018` A), 2026-09-15
 **Gravedad:** media: un aviso falso invita a borrar una variable que el programa usa
 **Familia:** zonas ciegas del analizador (`ZYJS-013`, `ZYJS-018`), aquí en el analizador compartido de Rust
@@ -1610,3 +1610,12 @@ check` y el LSP heredan los dos defectos.
 ### Qué lo sujeta
 
 `runtime-io/input-prompt-interpolation-is-a-use`, roja por `zytw` y `zyvm`.
+
+### Corregido — 2026-09-15
+
+`variable_analysis.rs` se saltaba el prompt con el comentario *«InputPrompt is not
+an Expr, so we skip analyzing it»*. Ahora cuenta como uso cada
+`StringPart::Variable` de `InputPrompt::Interpolated`, antes de declarar la
+variable que se lee, porque el prompt se imprime antes de leer. Control negativo
+en el mismo fichero: una variable de verdad sin usar sigue avisándose. La celda
+pasa a `AGREE`.
