@@ -1822,3 +1822,44 @@ respuesta, pero ninguna de las dos lo dice de la interpolación.
 
 `runtime-io/destroyed-name-in-interpolation`, `expect = "error"`, roja en los
 tres.
+
+---
+
+## GLB-026 — Un fichero con BOM no corre en Rust, y los caracteres raros son identificador en Rust y ruido en `zyjs`
+
+**Estado:** abierto — A sin decisión pendiente; **B necesita decisión**
+**Encontrado por:** midiendo el paso 2.1 (`ZYJS-020`), 2026-09-15
+
+### A. La marca de orden de bytes (BOM)
+
+Un `.zy` guardado con BOM, como hacen algunos editores de Windows:
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: unused variable '\ufeffx'` y `error: undefined variable 'x'`: el lexer pega la marca al primer identificador |
+| `zyjs` | `1` |
+
+`is_whitespace('\u{FEFF}')` es falso en Rust, y `is_ident_start` acepta todo lo
+que no es espacio, cifra ni operador. Celda `syntax-lexer/byte-order-mark`,
+`expect = "ok"`, roja por los dos Rust.
+
+### B. Caracteres que ningún documento clasifica
+
+| carácter | Rust | `zyjs` |
+|---|---|---|
+| `` ` `` (`` >> `x ``) | parte del identificador: `` undefined variable '`x' `` | lo descarta: imprime `1` |
+| U+200B, espacio de ancho cero (`x = 1\u200b`) | identificador: `undefined variable '\u200b'` | lo descarta |
+| `€` (`€ = 5`) | identificador: imprime `5` | `expected expression, found Assign` |
+
+Rust sigue su regla (`is_ident_start`: todo lo que no es espacio, cifra ni
+carácter de operador) y `zyjs` la suya (`\p{L}\p{M}\p{So}\p{Co}` para empezar,
+y lo demás cae al `consume()` final). `GUIDE.md` § String interpolation dice que
+un identificador es «any Unicode letter, `_`, and any non-operator symbol», que
+es la regla de Rust para `€`, pero no dice nada de la comilla invertida ni de
+un carácter de formato invisible.
+
+### Qué hay que decidir
+
+¿Un carácter de formato invisible (U+200B) o la comilla invertida pueden formar
+parte de un nombre, o son un error? Hasta decidirlo no hay celda: cualquier verde
+elegiría por el autor.
