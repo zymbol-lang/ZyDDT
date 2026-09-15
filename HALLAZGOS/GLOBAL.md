@@ -1433,7 +1433,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B corregido en la VM el 2026-09-15** (paso 1.7), queda `zyjs`; C sin decisión pendiente; H, observado en el paso 1.6, necesita decisión
+**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B corregido en la VM el 2026-09-15** (paso 1.7), queda `zyjs`; C sin decisión pendiente; H decidido el 2026-09-15 (se interpola), pendiente en los Rust
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1461,6 +1461,9 @@ escrito, y `zyjs` `f=<funct/1>`. Una lambda (`"{g}"`) y la yuxtaposición
 (`>> f`) dan `<…/1>` en los tres. El nombre existe, así que la regla de A no lo
 alcanza. Celda `runtime-io/named-function-in-interpolation`, que pregunta sólo
 que coincidan.
+
+*Decidido el 2026-09-15:* **se interpola** (`f=<funct/1>`), como la lambda, la
+yuxtaposición y `zyjs`: `{f}` se lee como `f`. Cambian los dos Rust (paso 1.11).
 
 **B. `>>~` con un hueco que no es entero:** `>>~ ("a", 1) > "x"` — el TW rechaza;
 la VM imprime `x1` como salida normal; `zyjs` no da error y además avisa
@@ -1717,7 +1720,7 @@ pasa a `AGREE`.
 
 ## GLB-024 — Un comparador de `$^` que no devuelve un Bool: nadie da error y cada motor ordena distinto
 
-**Estado:** abierto — **necesita decisión** (ver abajo)
+**Estado:** abierto — **decidido el 2026-09-15**: error `##Type` en los tres motores
 **Encontrado por:** leyendo `ArraySort` de la VM en el paso 1.10, 2026-09-15
 **Gravedad:** media-alta: un programa mal escrito ordena, sin aviso, de una forma que depende del motor
 **Familia:** las reglas de la v0.0.9 sin truthiness (`GUIDE.md`: *«There is no truthiness in Zymbol»*)
@@ -1751,6 +1754,10 @@ motores coincidan (`expect = "ok"`), y su verde no elige.
 
 ¿Un comparador que no devuelve un Bool es error, y de qué familia (`##Type`, por
 D1)? ¿O tiene un significado, y cuál?
+
+*Decidido el 2026-09-15:* **error `##Type`**, coherente con «sin truthiness» y
+con D1. Los Rust en el paso 1.12 y `zyjs` en la F2. La celda pasa a
+`expect = "error"`.
 
 ### Qué lo sujeta
 

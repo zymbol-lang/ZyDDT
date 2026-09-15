@@ -1235,8 +1235,9 @@ formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
   roja.
 - **Parámetros de lambda sin usar.** `(a, b -> 1)` avisa `unused variable 'a'` y
   `'b'` en `zyjs`, y en los Rust no. Nada dice cuál es lo correcto; salió al
-  escribir la celda de `GLB-024`, donde ese aviso tapaba la pregunta. Sin celda
-  todavía.
+  escribir la celda de `GLB-024`, donde ese aviso tapaba la pregunta.
+  *Decidido el 2026-09-15:* **no se avisa**, como en los Rust: una lambda recibe
+  los parámetros que la operación le da, los use o no. Se corrige en la F2.
 
 ### Qué lo sujeta
 
