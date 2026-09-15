@@ -1,0 +1,148 @@
+# The syntax-collection-ops axis — Phase B, family B4 of the diagnostics plan.
+#
+# The parser's diagnostics for the `$` operators — a bracket, a colon, a comma,
+# a lambda missing — that no program provoked on 2026-09-14. Every cell expects
+# `error`, and each also provokes the `help:` line its diagnostic carries; the
+# `what` says which one when a diagnostic has two.
+
+id      = "syntax-collection-ops"
+what    = "the parser's diagnostics for the `$` operators: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "retired-remove-all-by-count"
+what = "$--[position:count] is retired"
+src  = """
+a = [1, 2, 3]
+b = a$--[1:2]
+>> b ¶
+"""
+
+[[cell]]
+id   = "update-needs-a-place"
+what = "collection update ($~) requires a place to write"
+src  = """
+>> 5$~ 9 ¶
+"""
+
+[[cell]]
+id   = "reduce-expects-close-paren-after-lambda"
+what = "expected ')' after lambda — with the reduce help"
+src  = """
+a = [1, 2]
+f = (s, x) -> s + x
+r = a$< (0, f
+>> r ¶
+"""
+
+[[cell]]
+id   = "reduce-expects-comma-after-initial"
+what = "expected ',' after initial value — with the reduce help"
+src  = """
+a = [1, 2]
+r = a$< (0 (s, x) -> s + x)
+>> r ¶
+"""
+
+[[cell]]
+id   = "slice-expects-range-or-count"
+what = "expected '..', or ':' in slice — with the slice help"
+src  = """
+a = [1, 2]
+>> a$[1] ¶
+"""
+
+[[cell]]
+id   = "replace-expects-colon-after-pattern"
+what = "expected ':' after pattern"
+src  = """
+s = "abc"
+>> s$~~["a" "b"] ¶
+"""
+
+[[cell]]
+id   = "remove-by-count-expects-close-bracket"
+what = "expected ']' after count — with the count-based range help"
+src  = """
+a = [1, 2, 3]
+b = a$-[1:2
+>> b ¶
+"""
+
+[[cell]]
+id   = "insert-expects-close-bracket"
+what = "expected ']' after index in $+[index] — with the insert help"
+src  = """
+a = [1, 2]
+b = a$+[1 5
+>> b ¶
+"""
+
+[[cell]]
+id   = "remove-range-to-end-expects-close-bracket"
+what = "expected ']' after range — with the $-[..end] help"
+src  = """
+a = [1, 2, 3]
+b = a$-[..2
+>> b ¶
+"""
+
+[[cell]]
+id   = "remove-range-expects-close-bracket"
+what = "expected ']' after range — with the $-[start..end] help"
+src  = """
+a = [1, 2, 3]
+b = a$-[1..2
+>> b ¶
+"""
+
+[[cell]]
+id   = "replace-expects-close-bracket"
+what = "expected ']' after replacement or count"
+src  = """
+s = "abc"
+>> s$~~["a":"b" ¶
+"""
+
+[[cell]]
+id   = "slice-range-expects-close-bracket"
+what = "expected ']' after slice range"
+src  = """
+a = [1, 2, 3]
+>> a$[1..2 ¶
+"""
+
+[[cell]]
+id   = "remove-expects-bracket-range-or-count"
+what = "expected ']', '..', or ':' after index — with the remove help"
+src  = """
+a = [1, 2, 3]
+b = a$-[1 2]
+>> b ¶
+"""
+
+[[cell]]
+id   = "sort-expects-comparator-lambda"
+what = "expected comparator lambda after '$^'"
+src  = """
+a = [2, 1]
+b = a$^ x
+>> b ¶
+"""
+
+[[cell]]
+id   = "slice-by-count-expects-close-bracket"
+what = "expected ']' after count — with the count-based slice help"
+src  = """
+a = [1, 2, 3]
+>> a$[1:2 ¶
+"""
+
+[[cell]]
+id   = "replace-expects-open-bracket"
+what = "expected '[' after $~~ — with the replace syntax help"
+src  = """
+s = "abc"
+>> s$~~ "a" ¶
+"""

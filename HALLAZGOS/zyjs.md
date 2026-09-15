@@ -25,8 +25,9 @@
 | [`ZYJS-018`](#zyjs-018--el-analizador-no-cuenta-como-uso-lo-escrito-en-los-límites-de-un-corte-ni-en-un-) | **corregido 2026-09-14** | `a$[n..2]` y `"" $++ m` avisan `unused variable` |
 | [`ZYJS-019`](#zyjs-019--termwidth-rechaza-con-otro-texto) | **abierto** | `term::width` con un número rechaza con otro texto |
 | [`ZYJS-020`](#zyjs-020--el-lexer-acepta-siete-formas-que-los-dos-rust-rechazan) | **abierto** | el lexer acepta 7 formas que los Rust rechazan, y otras 5 las rechaza el parser con otro mensaje |
+| [`ZYJS-021`](#zyjs-021--los-errores-de-sintaxis-de-los-operadores--nombran-tokens-y-dos-dicen-object-object) | **abierto** | los errores de sintaxis de `$` nombran tokens internos, y dos dicen `[object Object]` |
 
-**Tres abiertos: `ZYJS-014`, `ZYJS-019` y `ZYJS-020`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Cuatro abiertos: `ZYJS-014`, `ZYJS-019`, `ZYJS-020` y `ZYJS-021`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -1140,4 +1141,33 @@ Sólo `"a{}b"` coincide en los tres.
 ### Qué lo sujeta
 
 `axes/syntax-lexer.toml`: 13 celdas, 1 verde.
+
+---
+
+## ZYJS-021 — Los errores de sintaxis de los operadores `$` nombran tokens, y dos dicen `[object Object]`
+
+**Estado:** abierto
+**Encontrado por:** `axes/syntax-collection-ops.toml`, paso B4 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** media: rechaza lo que debe, con un texto que no ayuda
+**Familia:** `ZYJS-006` (`[object Object]` en el diagnóstico, cerrado el 2026-08-30 en otro sitio)
+
+Las 16 formas rotas de los operadores `$` las rechazan los tres motores; los dos
+Rust con el mismo texto y su `help:`. `zyjs` nombra el token que esperaba su
+parser y el que encontró:
+
+| forma | Rust | `zyjs` |
+|---|---|---|
+| `a$-[1:2` | `expected ']' after count` + help | `Expected RBRACKET, got '>>'` |
+| `a$< (0 (s, x) -> s + x)` | `expected ',' after initial value` + help | `Expected COMMA, got '('` |
+| `s$~~["a" "b"]` | `expected ':' after pattern` + help | **`Expected COLON, got '[object Object]'`** |
+| `s$~~ "a"` | `expected '[' after $~~` + help | **`Expected LBRACKET, got '[object Object]'`** |
+| `5$~ 9` | `collection update ($~) requires a place to write` | `expected expression, found DUPDATE` |
+| `a$^ x` | `expected comparator lambda after '$^'` | `undefined variable 'x'` |
+
+El `[object Object]` aparece cuando el token encontrado es una cadena: el mensaje
+interpola el objeto del token en vez de su texto.
+
+### Qué lo sujeta
+
+`axes/syntax-collection-ops.toml`: 16 celdas, las 16 en `WORDING`.
 
