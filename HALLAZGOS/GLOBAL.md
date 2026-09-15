@@ -1871,3 +1871,47 @@ U+200C y U+200D (ZWNJ/ZWJ) son invisibles, pero hacen falta para escribir bien
 palabras en devanagari y otras escrituras índicas, y `zyjs` los admite a
 propósito dentro de un nombre. Se medirá su uso en las aplicaciones LDV y se
 preguntará antes de tocarlos.
+
+---
+
+## GLB-027 — La ayuda de Rust para `x°[1] 5` enseña `arr[i] = val`, una forma que no existe
+
+**Estado:** abierto — sin decisión pendiente (F3)
+**Encontrado por:** paso 2.3, 2026-09-15, al portar el rechazo a `zyjs`
+**Familia:** `GLB-021`, `GLB-022` (ayudas que enseñan lo que no es)
+
+`x = [1, 2]` y luego `x°[1] 5`, o `x°[1]$~ 5`, en los dos motores Rust:
+
+```
+error: expected '=' after index expression for indexed assignment
+  = help: syntax: arr[i] = val  or  arr[i] += val
+```
+
+`COL-2` dice que `arr[i] = v` no existe, y el propio parser rechaza `arr[i] = v`
+dos líneas antes con `indexed assignment does not exist`. La ayuda enseña
+justo la forma retirada. `zyjs` rechaza igual desde el paso 2.3, **sin** esa
+ayuda. Sujeta la celda `syntax-variables/hot-index-without-operator`, en
+`WORDING` por esa línea.
+
+---
+
+## GLB-028 — Los parsers Rust añaden errores falsos en cascada y enseñan sus tokens internos
+
+**Estado:** abierto — sin decisión pendiente (F3)
+**Encontrado por:** pasos 2.1 y 2.3, 2026-09-15
+**Gravedad:** media: el lector recibe dos errores donde hay uno, y el segundo nombra el lexer por dentro
+
+Tras el error real, los dos Rust siguen leyendo e informan de algo que no está mal:
+
+| forma | error real | lo que añaden |
+|---|---|---|
+| `?? c { 'a'..5 => "x" _ => "y" }` | `expected char after '..' in range pattern` | `unexpected token: RBrace` |
+| `:! ## { … }` | `expected error type name after '##'` | `unexpected token: RBrace` |
+| `>> "a{b" ¶` | `unterminated string interpolation` | `unterminated string literal` (vuelven a leer la comilla de cierre como apertura) |
+| `b = #2` | `invalid boolean literal: digit 2 …` | `expected expression, found Error("invalid boolean literal")` |
+| `x[1] 5` | — | `unexpected token: Integer(5)`, el nombre de la variante de Rust |
+
+`zyjs` para en el primer error. En varias celdas de `syntax-*` el mensaje ya es
+el mismo en los tres y quedan en `DIVERGE` sólo por esa línea de más: los dos
+patrones de rango de `syntax-control-flow`, `syntax-lexer/unterminated-string-interpolation`,
+`syntax-try-catch/error-type-without-a-name`.

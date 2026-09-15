@@ -1199,7 +1199,7 @@ Cada forma, con el texto y la ayuda de los Rust, en `web/src/zymbol/zymbol.js`:
 
 ## ZYJS-021 — Los errores de sintaxis de los operadores `$` nombran tokens, y dos dicen `[object Object]`
 
-**Estado:** abierto
+**Estado:** abierto — **la parte «acepta lo que debe rechazar» corregida el 2026-09-15** (paso 2.3); quedan las lecturas erróneas (2.4) y los textos (2.5)
 **Encontrado por:** `axes/syntax-collection-ops.toml`, paso B4 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media: rechaza lo que debe, con un texto que no ayuda
 **Familia:** `ZYJS-006` (`[object Object]` en el diagnóstico, cerrado el 2026-08-30 en otro sitio)
@@ -1290,6 +1290,39 @@ formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
   escribir la celda de `GLB-024`, donde ese aviso tapaba la pregunta.
   *Decidido el 2026-09-15:* **no se avisa**, como en los Rust: una lambda recibe
   los parámetros que la operación le da, los use o no. Se corrige en la F2.
+
+### Corregido: lo que aceptaba — 2026-09-15 (paso 2.3)
+
+Quince formas que `zyjs` ejecutaba se rechazan ahora al parsear, con el texto de
+Rust:
+
+| forma | ahora |
+|---|---|
+| `a$^ f`, con `f` en una variable | `expected comparator lambda after '$^', e.g. …` |
+| `a$^ (v)` | `expected '->' in lambda expression` + ayuda |
+| `a$^ (x y -> #1)` | `expected ')' after lambda parameters` + ayuda |
+| `f(a b) { }` | `expected ')' after parameters` + ayuda |
+| `?? c { 'a'..5 => … }`, `1..'z'` | `expected char / integer after '..' in range pattern` |
+| `m::sqrt 4` | `expected '(' for module function call` + ayuda |
+| `m[1>-a]` | `expected integer after '-' in nav index` + ayuda |
+| `m[1>1.5]` | `expected navigation step: a position …` + ayuda |
+| `x = <\ "echo"` sin cerrar | `unterminated bash execute expression` + ayuda |
+| `<< #\|n` sin cerrar | `expected '\|' to close #\|variable\|` + ayuda |
+| `\ 5` | `expected variable name after \` + ayuda |
+| `x°[1] 5`, `x°[1]$~ 5` | `expected '=' after index expression for indexed assignment`, **sin la ayuda de Rust**, que enseña `arr[i] = val` (`GLB-027`) |
+| `:! ## { }` | `expected error type name after '##'`, **sin ayuda**: la de Rust lista 7 de los 11 tipos (`GLB-022`) |
+| `# m { … }` y una sentencia detrás | `unexpected token after module block` + ayuda, dentro de `failed to parse module` |
+
+Los pasos de una ruta de navegación, después de `>`, `;` o `..`, siguen ahora la
+gramática estricta de `parse_nav_atom`: entero, `-`entero, nombre, cadena o
+`( expr )`. El primer átomo sigue siendo una expresión, porque el índice simple
+la admite. **Barrido de parseo** con el `zyjs` anterior y el nuevo sobre los 1189
+`.zy` de los ejemplos, las aplicaciones LDV y el corpus: los mismos 9 errores, y
+ningún fichero deja de parsear. Las 10 `WRONG` de los ejes `syntax-*` son 0.
+
+Registrado por el camino: `x[1] 5` —sin `°`— ejecuta el `5` suelto en `zyjs`
+(celda `refusal/stray-literal-statement`), y los Rust añaden errores en cascada
+(`GLB-028`).
 
 ### Qué lo sujeta
 

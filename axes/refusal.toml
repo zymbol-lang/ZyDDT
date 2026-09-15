@@ -260,3 +260,12 @@ src  = """
 x = 1 ~ 2
 >> x ¶
 """
+
+[[cell]]
+id   = "stray-literal-statement"
+what = "a literal on its own after an index — `x[1] 5`: both Rust engines refuse the `5` as a statement, zyjs ran it and said nothing (found in step 2.3, 2026-09-15; ZYJS-021)"
+src  = """
+x = [1, 2]
+x[1] 5
+>> x ¶
+"""
