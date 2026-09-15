@@ -1289,7 +1289,11 @@ formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
   `'b'` en `zyjs`, y en los Rust no. Nada dice cuál es lo correcto; salió al
   escribir la celda de `GLB-024`, donde ese aviso tapaba la pregunta.
   *Decidido el 2026-09-15:* **no se avisa**, como en los Rust: una lambda recibe
-  los parámetros que la operación le da, los use o no. Se corrige en la F2.
+  los parámetros que la operación le da, los use o no. **Corregido el 2026-09-15
+  (paso 2.13)**, y lo mismo para un alias de módulo sin usar (`ZYJS-022`).
+  Medido en el mismo paso: los Rust **tampoco** avisan de un parámetro sin usar
+  de una **función con nombre** (`f(a, b) { <~ a }`), y `zyjs` sí lo hace. Como no
+  estaba en la decisión, `zyjs` sigue avisando en ese caso hasta que el autor diga.
 
 ### Corregido: lo que aceptaba — 2026-09-15 (paso 2.3)
 
@@ -1442,8 +1446,8 @@ los ejemplos del playground siguen en verde.
    líneas al pie de la letra.
 2. **Un aviso que sólo da `zyjs`:** `unused variable 'md'` para un alias de
    módulo importado y no usado, también con un módulo correcto. Los Rust no
-   avisan, y un alias no es una variable. *Decidido el 2026-09-15: no se avisa*
-   (paso 2.13).
+   avisan, y un alias no es una variable. *Decidido el 2026-09-15: no se avisa.*
+   **Corregido el 2026-09-15 (paso 2.13).**
    Y sobre la columna, *decidido el 2026-09-15*: `zyjs` tendrá columnas (paso 2.16).
 3. `zyjs` añade `--> main.zy:4` detrás del error de carga; los Rust no.
 4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
