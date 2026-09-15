@@ -1254,7 +1254,7 @@ límite variable es cierto y no es lo que preguntan.
 
 ## GLB-015 — Llamadas y funciones de orden superior con algo que no es lo que necesitan: kinds `##_` contra `##Type`, y un `$<` con lambda de un parámetro que la VM y `zyjs` aceptan
 
-**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`)
+**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`); **A corregido en la VM el 2026-09-15** (paso 1.10), queda `zyjs`
 **Encontrado por:** `axes/runtime-functions-hof.toml`, paso C7 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1279,6 +1279,16 @@ got Int` donde el TW nombra la operación).
 **A:** un `$<` con una lambda de un solo parámetro es un **error de aridad**, no
 un borde de la colección, así que no entra en la tabla de tolerancias de
 `GLB-011`. Se corrige en la VM en el paso 1.10 y en `zyjs` en la F2.
+
+### Corregido A en la VM — 2026-09-15
+
+`ArrayReduce` llamaba al callable con `(acumulador, elemento)` sin mirar su
+aridad, y una lambda de un parámetro devolvía el valor inicial. Ahora, antes de
+mirar el array y como hace el TW, una `Function` o una `Closure` cuya aridad no
+es 2 lanzan `reduce lambda requires 2 parameters (accumulator, element), got {n}`.
+La aridad de una `Closure` no cuenta sus capturas. Barrido TW contra VM,
+idéntico: lambda y función con nombre de 1, 2, 3 y 0 parámetros, array vacío y
+una lambda con captura (`R 23`). `zyjs` devuelve todavía `0` o `1`.
 
 **C (D1):** los 9 son `##Type` en los tres motores: algo que no es array ni
 lambda, o llamar a algo que no es función.
