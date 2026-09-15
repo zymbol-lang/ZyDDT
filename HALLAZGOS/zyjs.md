@@ -1352,7 +1352,9 @@ los ejemplos del playground siguen en verde.
    líneas al pie de la letra.
 2. **Un aviso que sólo da `zyjs`:** `unused variable 'md'` para un alias de
    módulo importado y no usado, también con un módulo correcto. Los Rust no
-   avisan, y un alias no es una variable. Necesita decisión.
+   avisan, y un alias no es una variable. *Decidido el 2026-09-15: no se avisa*
+   (paso 2.13).
+   Y sobre la columna, *decidido el 2026-09-15*: `zyjs` tendrá columnas (paso 2.16).
 3. `zyjs` añade `--> main.zy:4` detrás del error de carga; los Rust no.
 4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
    porque lo detecta su checker, y como `1 parse error(s)` en Rust. Paso 2.5.
