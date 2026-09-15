@@ -1,0 +1,87 @@
+# The syntax-index-nav axis — Phase B, family B11 of the diagnostics plan.
+#
+# Navigation (`m[i>j]`), computed steps, and flat and structured extraction left
+# open or written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line.
+#
+# The computed step is asked in two positions. As the SECOND step, `m[1>(a 1]`,
+# the parser reaches the navigator's own `(` branch. As the FIRST, `m[(a 1)>1]`,
+# the browser engine reads `(a 1)` as a juxtaposition (`11`) and fails at run
+# time instead.
+
+id      = "syntax-index-nav"
+what    = "the parser diagnostics of navigation and extraction: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "computed-step-left-open"
+what = "expected ')' after computed index — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>(a 1] ¶
+"""
+
+[[cell]]
+id   = "computed-step-not-closed-in-first-position"
+what = "expected ')' after computed index — in the first step"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[(a 1)>1] ¶
+"""
+
+[[cell]]
+id   = "flat-extraction-left-open"
+what = "expected ']' after flat extraction"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>1 ; 2>2 ¶
+"""
+
+[[cell]]
+id   = "extraction-group-left-open"
+what = "expected ']' to close extraction group — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[[1>1 ; [2>2]] ¶
+"""
+
+[[cell]]
+id   = "structured-extraction-left-open"
+what = "expected ']' to close structured extraction — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[[1>1] ; [2>2] ¶
+"""
+
+[[cell]]
+id   = "negative-step-without-an-integer"
+what = "expected integer after '-' in nav index — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>-a] ¶
+"""
+
+[[cell]]
+id   = "step-is-a-float-literal"
+what = "expected navigation step — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>1.5] ¶
+"""
+
+[[cell]]
+id   = "navigation-left-open"
+what = "expected ']' after index — with the navigator help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>1 ¶
+"""
