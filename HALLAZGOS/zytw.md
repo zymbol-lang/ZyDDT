@@ -300,7 +300,7 @@ Sin celda propia: es el `{:?}` de este mismo hallazgo.
 
 ## ZYTW-005 — Una lambda no captura un nombre que sólo lee dentro de una interpolación
 
-**Estado:** abierto — sin decisión pendiente
+**Estado:** **corregido el 2026-09-15** (paso 2.15b), en el TW y en la VM
 **Encontrado por:** paso 2.15, 2026-09-15, al arreglar el mismo defecto en `zyjs`
 **Gravedad:** media: un valor que nadie calculó, invisible si el programa no lo imprime
 
@@ -327,3 +327,14 @@ debería ser error y no texto.
 ### Qué lo sujeta
 
 `runtime-functions-hof/lambda-captures-a-name-read-in-a-string`, roja por el TW.
+
+### Corregido — 2026-09-15 (paso 2.15b)
+
+`collect_refs_in_expr` (`functions_lambda.rs`) pasaba de largo por los literales;
+ahora cuenta como referencia cada nombre de una cadena interpolada, con el
+escáner compartido de `zymbol-semantic` (`interpolated_names`, hecho público). Al
+medirlo con una lambda devuelta desde el bloque de otra apareció **el mismo
+defecto en la VM**: `collect_free_in_expr` tampoco entraba en las cadenas, y
+`(x -> "x={x} m={m}")` imprimía `m={m}`. Se corrigió en el mismo paso. Los tres
+motores coinciden con una lambda anidada, un local de función y el iterador de un
+bucle. La celda pasa a `AGREE`.
