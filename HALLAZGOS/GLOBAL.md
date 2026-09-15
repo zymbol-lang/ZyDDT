@@ -1789,7 +1789,7 @@ escrito en línea), y `zyjs` ordena con ella (`ZYJS-021`).
 
 ## GLB-025 — Una variable destruida con `\` se lee en `{…}` sin error: los tres imprimen `{x}`
 
-**Estado:** abierto — sin decisión pendiente, pero **se pregunta** (ver abajo)
+**Estado:** abierto — **decidido el 2026-09-15**: el mismo error en ejecución que el identificador, en los tres motores (paso 2.15)
 **Encontrado por:** leyendo `interpolate_string` del TW en el paso 1.11, 2026-09-15
 **Gravedad:** media: el silencio que cerró `GLB-018` A, entrando por la destrucción
 **Familia:** `GLB-008` (uso tras destruir), `GLB-018` A
@@ -1827,7 +1827,7 @@ tres.
 
 ## GLB-026 — Un fichero con BOM no corre en Rust, y los caracteres raros son identificador en Rust y ruido en `zyjs`
 
-**Estado:** abierto — A sin decisión pendiente; **B necesita decisión**
+**Estado:** abierto — A sin decisión pendiente; **B decidido el 2026-09-15** (ver abajo)
 **Encontrado por:** midiendo el paso 2.1 (`ZYJS-020`), 2026-09-15
 
 ### A. La marca de orden de bytes (BOM)
@@ -1863,3 +1863,11 @@ un carácter de formato invisible.
 ¿Un carácter de formato invisible (U+200B) o la comilla invertida pueden formar
 parte de un nombre, o son un error? Hasta decidirlo no hay celda: cualquier verde
 elegiría por el autor.
+
+*Decidido el 2026-09-15:* **los símbolos visibles sí** pueden ir en un nombre
+(`€`, como dice `GUIDE.md`), y **un carácter invisible o la comilla invertida
+son error** en los tres motores. Queda una pregunta antes de implementarlo:
+U+200C y U+200D (ZWNJ/ZWJ) son invisibles, pero hacen falta para escribir bien
+palabras en devanagari y otras escrituras índicas, y `zyjs` los admite a
+propósito dentro de un nombre. Se medirá su uso en las aplicaciones LDV y se
+preguntará antes de tocarlos.
