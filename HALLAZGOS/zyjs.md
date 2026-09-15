@@ -26,8 +26,9 @@
 | [`ZYJS-019`](#zyjs-019--termwidth-rechaza-con-otro-texto) | **abierto** | `term::width` con un número rechaza con otro texto |
 | [`ZYJS-020`](#zyjs-020--el-lexer-acepta-siete-formas-que-los-dos-rust-rechazan) | **abierto** | el lexer acepta 7 formas que los Rust rechazan, y otras 5 las rechaza el parser con otro mensaje |
 | [`ZYJS-021`](#zyjs-021--los-errores-de-sintaxis-de-los-operadores--nombran-tokens-y-dos-dicen-object-object) | **abierto** | los errores de sintaxis de `$` nombran tokens internos, y dos dicen `[object Object]` |
+| [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **abierto** | un módulo importado con el bloque de exportación mal escrito se carga sin error |
 
-**Cuatro abiertos: `ZYJS-014`, `ZYJS-019`, `ZYJS-020` y `ZYJS-021`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Cinco abiertos: `ZYJS-014`, `ZYJS-019`, `ZYJS-020`, `ZYJS-021` y `ZYJS-022`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -1224,4 +1225,30 @@ sin usar) y un `<< #|n` sin cerrar, que se pone a leer la entrada; y
 `axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15),
 `axes/syntax-control-flow.toml` (7), `axes/syntax-index-nav.toml` (8) y
 `axes/syntax-io.toml` (12).
+
+---
+
+## ZYJS-022 — Un módulo importado con el bloque de exportación mal escrito se carga sin error
+
+**Estado:** abierto
+**Encontrado por:** `axes/syntax-modules.toml`, paso B13 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** media-alta: el módulo roto no se nota hasta que alguien use lo que exporta
+
+Doce módulos rotos, cada uno importado por un programa que no llega a usarlo
+(`<# ./m/x => md` y `>> "x" ¶`). Los dos Rust fallan en los doce al cargar el
+módulo, con el diagnóstico del parser del módulo dentro de `failed to parse
+module`. `zyjs`:
+
+- **acepta 6** —dos bloques `#>`, `#> { 5 }`, `#> { mat. }`,
+  `#> { mat::sqrt => }`, `#> { f => }` y el separador antiguo `#> { mat::sqrt :
+  raiz }`— y sólo avisa `unused variable 'md'`;
+- rechaza los otros 6 (inicializador no literal, `<#` sin `=>`, módulo sin `{`,
+  bloque de exportación sin cerrar, alias que no es nombre) con otra forma.
+
+Todo lo que acepta está dentro del bloque `#>`: su parser de la lista de
+exportación no valida los elementos.
+
+### Qué lo sujeta
+
+`axes/syntax-modules.toml`: 12 celdas, 6 `WRONG` (las aceptadas) y 6 `DIVERGE`.
 
