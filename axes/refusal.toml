@@ -252,3 +252,11 @@ src  = """
 f(v) { <~ "{v} {tampoco}" }
 >> f(1) ¶
 """
+
+[[cell]]
+id   = "lone-tilde"
+what = "a `~` with nothing to mark — `1 ~ 2`: both Rust engines refuse the token, and zyjs dropped it and printed `12` (found in step 2.1, 2026-09-15; ZYJS-020)"
+src  = """
+x = 1 ~ 2
+>> x ¶
+"""

@@ -113,3 +113,19 @@ id   = "unterminated-char-literal-at-end-of-file"
 what = "unterminated char literal: the quote is the last byte"
 src  = """
 c = '"""
+
+[[cell]]
+id   = "uppercase-base-prefix"
+what = "a base prefix is lowercase: `0X41` is not a character literal — zyjs read it as `A`, both Rust engines refuse (found in step 2.1, 2026-09-15)"
+src  = """
+c = 0X41
+>> c ¶
+"""
+
+[[cell]]
+id     = "byte-order-mark"
+expect = "ok"
+what   = "a file that begins with a UTF-8 byte order mark runs — the Rust lexer glued the mark to the first identifier, so `x` was undefined (found in step 2.1, 2026-09-15; GLB-026)"
+src    = """\ufeffx = 1
+>> x ¶
+"""

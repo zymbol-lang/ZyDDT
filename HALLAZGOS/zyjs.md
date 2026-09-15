@@ -1110,7 +1110,7 @@ los tres motores, y también en el kind.
 
 ## ZYJS-020 — El lexer acepta siete formas que los dos Rust rechazan
 
-**Estado:** abierto
+**Estado:** **corregido el 2026-09-15** (paso 2.1): 11 de 13 en verde. Las dos que quedan no son de `zyjs` (ver «Lo que queda»)
 **Encontrado por:** `axes/syntax-lexer.toml`, paso B3 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** **alta** en el playground: un programa mal escrito corre y enseña un resultado
 
@@ -1142,6 +1142,58 @@ Sólo `"a{}b"` coincide en los tres.
 ### Qué lo sujeta
 
 `axes/syntax-lexer.toml`: 13 celdas, 1 verde.
+
+### Corregido — 2026-09-15
+
+Cada forma, con el texto y la ayuda de los Rust, en `web/src/zymbol/zymbol.js`:
+
+| forma | qué hacía | qué hace |
+|---|---|---|
+| `/* abierto` | fin de fichero, estado 0 | `Unterminated multi-line comment`. Los comentarios **anidan**, como en Rust: `/* a /* b */ c */` era un error de parser en `zyjs` y `/* a /* b */` pasaba sin cerrar |
+| `0xD800`, `0x110000` | `�` | `invalid Unicode code point: 0xD800 (hexadecimal D800)`, en las cuatro bases (`codePointChar`) |
+| `"a{1}"` | `a1` | `invalid character in string interpolation`, con la regla de identificador de `readIdent` y del checker |
+| `"a{b"` | «carácter inválido» | `unterminated string interpolation` |
+| `'\q'` | `q` | `invalid escape sequence: '\q'`: la tabla de Rust (`n t r ' \ 0`) y nada más |
+| `'ab'` | `undefined variable 'b''` | `expected closing ' for char literal` |
+| `c = '` al final | sólo un aviso | `unterminated char literal` |
+| `1٢` | `12` | `mixed digit scripts in numeric literal`, en la parte entera y en la decimal |
+| `1.0e+`, `1e` | el parser tropezaba | `invalid float literal: '1.0e+'` |
+| `#2` | se descartaba sin ruido | `invalid boolean literal: digit 2 is not valid after '#'` |
+| `1 & 2` | `12` | `unexpected character: '&'` |
+
+**Dos cosas que la medición cambió por el camino.**
+- El `consume()` final del lexer descarta todo carácter que no reconoce. Al
+  convertirlo en error para todos los caracteres de operador, `corpus/functions/param_marks.zy`
+  **divergió**: la marca de parámetro `a~` funciona en `zyjs` *porque* el `~`
+  desaparece. Rust sólo da `unexpected character` para `&`, que es el único
+  carácter de operador sin token; la comprobación se quedó en `&`.
+- La expresión regular vieja de la interpolación tenía comillas dentro, y eso
+  desemparejaba el escáner de `zyquality/messages/extract.py`. Al quitarla, el
+  inventario vio por primera vez entero `unmatched '}' in string` con la ayuda
+  pegada al texto, y falló. Ese throw pasó a `ZyStaticError(mensaje, línea,
+  ayuda)`, como los demás, y el inventario cerró además 16 mensajes que ahora
+  casan con los de Rust.
+
+### Lo que queda
+
+- `unterminated-execute-expression`: `zyjs` no implementa `</ ruta />`; el
+  rechazo es otro y la celda queda en `WORDING`.
+- `unterminated-string-interpolation`: en `DIVERGE` **por los Rust**, que dan
+  un segundo diagnóstico falso (`unterminated string literal @4:8`): tras parar
+  en la comilla, la vuelven a leer como apertura de otra cadena. Los Rust también
+  añaden `expected expression, found Error("invalid boolean literal")` detrás de
+  varios errores de lexer, un token interno a la vista. Es trabajo de la F3.
+
+### Lo que sigue desapareciendo en silencio (registrado, sin tocar)
+
+- `~` fuera de su sitio (`1 ~ 2` imprime `12`; Rust: `unexpected token:
+  Tilde`), del que depende `a~`. Celda `refusal/lone-tilde`.
+- `0X41`, el prefijo en mayúscula: `zyjs` lo lee como `A`, y Rust sólo acepta
+  minúscula (`undefined variable 'X41'`). Celda `syntax-lexer/uppercase-base-prefix`.
+- Los caracteres que Rust lee como identificador y `zyjs` descarta o rechaza:
+  `` `x `` y un espacio de ancho cero (Rust: parte del nombre; `zyjs`: no están), o
+  `€` (Rust: identificador; `zyjs`: error). Necesita decisión: `GLB-026`.
+
 
 ---
 
