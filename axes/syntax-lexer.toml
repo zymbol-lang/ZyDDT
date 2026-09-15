@@ -1,0 +1,115 @@
+# The syntax-lexer axis — Phase B, family B3 of the diagnostics plan.
+#
+# The lexer's diagnostics that no program provoked on 2026-09-14
+# (`zyquality/messages/reach.py --list sintaxis`). Every cell expects `error`:
+# these are forms every engine must refuse, and each cell also provokes the
+# `help:` line that goes with its diagnostic.
+#
+# Two need their input exactly: the invalid escape is a CHAR literal (`'\\q'`)
+# — a string keeps an unknown escape as written — and the unterminated char
+# literal needs the quote to be the LAST byte of the file, which is why that
+# cell's source ends with no newline.
+
+id      = "syntax-lexer"
+what    = "the lexer's diagnostics: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "unterminated-multiline-comment"
+what = "Unterminated multi-line comment — and its help, add */"
+src  = """
+/* abierto
+>> 1 ¶
+"""
+
+[[cell]]
+id   = "empty-string-interpolation"
+what = "empty string interpolation {} — and its help"
+src  = """
+>> "a{}b" ¶
+"""
+
+[[cell]]
+id   = "char-literal-expects-closing-quote"
+what = "expected closing ' for char literal"
+src  = """
+c = 'ab'
+>> c ¶
+"""
+
+[[cell]]
+id   = "invalid-unicode-code-point"
+what = "invalid Unicode code point: a surrogate written as a base literal"
+src  = """
+c = 0xD800
+>> c ¶
+"""
+
+[[cell]]
+id   = "invalid-boolean-digit"
+what = "invalid boolean literal: digit {} is not valid after '#' — and its help"
+src  = """
+b = #2
+>> b ¶
+"""
+
+[[cell]]
+id   = "invalid-character-in-interpolation"
+what = "invalid character in string interpolation — and its help"
+src  = """
+>> "a{1}" ¶
+"""
+
+[[cell]]
+id   = "invalid-escape-in-char-literal"
+what = "invalid escape sequence in a char literal"
+src  = """
+c = '\\q'
+>> c ¶
+"""
+
+[[cell]]
+id   = "invalid-float-literal"
+what = "invalid float literal: an exponent with no digits"
+src  = """
+x = 1.0e+
+>> x ¶
+"""
+
+[[cell]]
+id   = "mixed-digit-scripts"
+what = "mixed digit scripts in numeric literal"
+src  = """
+x = 1٢
+>> x ¶
+"""
+
+[[cell]]
+id   = "unexpected-character"
+what = "unexpected character: a lone `&`"
+src  = """
+x = 1 & 2
+>> x ¶
+"""
+
+[[cell]]
+id   = "unterminated-execute-expression"
+what = "unterminated execute expression — and its help"
+src  = """
+x = </ ./a.zy
+>> x ¶
+"""
+
+[[cell]]
+id   = "unterminated-string-interpolation"
+what = "unterminated string interpolation — and its help"
+src  = """
+>> "a{b" ¶
+"""
+
+[[cell]]
+id   = "unterminated-char-literal-at-end-of-file"
+what = "unterminated char literal: the quote is the last byte"
+src  = """
+c = '"""

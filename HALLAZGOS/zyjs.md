@@ -24,8 +24,9 @@
 | [`ZYJS-017`](#zyjs-017--un--dentro-de--n--termina-el-programa-en-silencio) | **corregido 2026-09-14** | un `@>` dentro de `@ N` termina el programa, con estado 0 |
 | [`ZYJS-018`](#zyjs-018--el-analizador-no-cuenta-como-uso-lo-escrito-en-los-límites-de-un-corte-ni-en-un-) | **corregido 2026-09-14** | `a$[n..2]` y `"" $++ m` avisan `unused variable` |
 | [`ZYJS-019`](#zyjs-019--termwidth-rechaza-con-otro-texto) | **abierto** | `term::width` con un número rechaza con otro texto |
+| [`ZYJS-020`](#zyjs-020--el-lexer-acepta-siete-formas-que-los-dos-rust-rechazan) | **abierto** | el lexer acepta 7 formas que los Rust rechazan, y otras 5 las rechaza el parser con otro mensaje |
 
-**Dos abiertos: `ZYJS-014` y `ZYJS-019`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Tres abiertos: `ZYJS-014`, `ZYJS-019` y `ZYJS-020`.** `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -1102,4 +1103,41 @@ Runtime error: term::width: expected a String or Char
 
 Las otras 20 funciones de `std/` del mismo paso coinciden palabra por palabra en
 los tres motores, y también en el kind.
+
+---
+
+## ZYJS-020 — El lexer acepta siete formas que los dos Rust rechazan
+
+**Estado:** abierto
+**Encontrado por:** `axes/syntax-lexer.toml`, paso B3 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** **alta** en el playground: un programa mal escrito corre y enseña un resultado
+
+### Qué se observa
+
+Los 13 diagnósticos del lexer que nada provocaba. `zytw` y `zyvm` los dan los
+13, con las mismas palabras. `zyjs`:
+
+**A. Acepta 7 y ejecuta:**
+
+| forma | `zyjs` |
+|---|---|
+| `/* abierto` (comentario sin cerrar) | programa vacío, estado 0 |
+| `0xD800` (un sustituto no es un carácter) | imprime `�` |
+| `"a{1}"` (una interpolación que no es un nombre) | imprime `a1` |
+| `'\q'` (escape desconocido en un carácter) | imprime `q` |
+| `1٢` (cifras de dos escrituras) | imprime `12` |
+| `1 & 2` (un `&` suelto) | imprime `12` |
+| `c = '` al final del fichero | sólo avisa `unused variable 'c'` |
+
+**B. Rechaza 5 con otro diagnóstico**, porque su lexer no tiene la comprobación
+y el error sale después, en el parser: `#2` → `expected expression, found
+Output`; `1.0e+` → lo mismo; `'ab'` → `undefined variable 'b''`; `</ ./a.zy` →
+`expected expression, found Lt`; `"a{b"` → `invalid character in string
+interpolation`.
+
+Sólo `"a{}b"` coincide en los tres.
+
+### Qué lo sujeta
+
+`axes/syntax-lexer.toml`: 13 celdas, 1 verde.
 
