@@ -1145,7 +1145,7 @@ respuesta que ningún motor debería dar.
 
 ## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
 
-**Estado:** abierto — **A y B corregidos en la VM el 2026-09-15** (pasos 1.3 y 1.4); C, D y G **decididos el 2026-09-15** (error estático; `##Type`); E, F, H y la parte `zyjs` de B sin decisión pendiente
+**Estado:** abierto — **A, B, E, H y el patrón de F corregidos el 2026-09-15** (pasos 1.3, 1.4 y 2.7); el código de carácter de F va en el paso 2.8; C, D y G **decididos** (error estático; `##Type`), pendientes en F4/F5
 **Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
 
@@ -1218,6 +1218,28 @@ había medido— se alejaba del final para siempre. Instrucción nueva
 cuando el paso es un literal entero positivo. La celda base pasa de «sin
 veredicto» a `WORDING` (sólo difiere la frase de `zyjs`) y la `-met` a `AGREE`.
 `zyq consensus` sigue en 660 de acuerdo y 0 divergiendo.
+
+### Corregido en `zyjs` — 2026-09-15 (paso 2.7)
+
+- **Bucle de rango:** `zyjs` tomaba `.v` de cualquier valor y daba la vuelta en
+  silencio a un paso negativo. Ahora sigue las comprobaciones y el orden del TW:
+  `step must be an integer, got Float`, `step must be positive, got -1` (también
+  con 0, que antes decía `Loop step cannot be zero`) y `range bounds must be
+  integers, got Float and Int`. La magnitud del paso va en la dirección del rango.
+- **`@~`:** `@~ requires integer milliseconds, got ##"` y `@~ requires non-negative
+  duration, got -1`, como el TW; el checker cuenta el operando como uso y deja de
+  avisar `unused variable 'v'`.
+- **Patrón de rango:** Ints contra Int y Chars contra Char, o `range pattern type
+  mismatch`; una cadena caía al comodín.
+- **Iteración:** el texto del TW, `can only iterate over ranges, arrays, strings,
+  tuples and dictionaries, got Bool`.
+
+Los textos siguen la plantilla del TW con el nombre del tipo, que es lo que dejará
+el paso 3.5 y lo que casa con el inventario. `runtime-loops-ranges` pasa de 11
+`WRONG` a 4: la del código de carácter (paso 2.8) y las tres de desestructurar un
+rango (D4, F5). Las `WORDING` y las `-met` que quedan son la diferencia de texto y
+de kind entre el TW y la VM (pasos 3.5 y 4.1). Ningún programa del workspace usa
+pasos negativos ni decimales.
 
 ### Decidido B y corregido en la VM — 2026-09-15
 
