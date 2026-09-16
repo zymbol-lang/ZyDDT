@@ -144,7 +144,8 @@ src    = """
 
 [[cell]]
 id     = "propagate-at-top-level"
-what   = "`v$!!` on a soft error outside any function ends the program with status 1 — the two Rust engines say nothing, zyjs writes `Runtime error: [object Object]`. Asks only that the engines agree: whether the program should say why it ended is undecided (found in step 3.2, 2026-09-16; ZYJS-027)"
+expect = "error"
+what   = "`v$!!` on a soft error outside any function ends the program saying which error ended it — `Runtime error: ##IO(…)` and its line, status 1. The two Rust engines used to say nothing and zyjs wrote `[object Object]` (decided 2026-09-16; ZYJS-027)"
 src    = """
 <# std/io => io
 v = io::read("/no/existe/zz.txt")

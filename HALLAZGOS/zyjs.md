@@ -1752,7 +1752,7 @@ Rust ejecutan y `zyjs` refusa.
 
 ## ZYJS-027 — `$!!` fuera de una función: `zyjs` escribe `Runtime error: [object Object]`
 
-**Estado:** abierto — **necesita decisión**
+**Estado:** **decidido y corregido el 2026-09-16** (paso 3.2b), en los tres motores
 **Encontrado por:** el paso 3.2, 2026-09-16, probando qué tipos de error se capturan
 
 ```zymbol
@@ -1784,6 +1784,38 @@ los Rust; `zyjs` dejaría de escribir) o **diciendo el error**, p. ej.
 `Runtime error: ##IO(No such file or directory (os error 2))` (los tres
 escribirían eso)?
 
+*Decidido el 2026-09-16:* **diciendo el error.** Un programa que acaba en fallo
+dice por qué.
+
+### Corregido el 2026-09-16 (paso 3.2b)
+
+Un `$!!` que saca un error del nivel superior se convierte en un error de
+ejecución, por el mismo canal que cualquier otro:
+
+```
+Runtime error: ##IO(No such file or directory (os error 2))
+  --> main.zy:4
+```
+
+y estado 1. El texto es el del valor, el mismo que imprime `>> v`.
+
+- **TW**: el bucle de nivel superior, donde un `<~` que llega arriba fija el
+  estado de salida (GAP-ZYB-006), devuelve ahora un `RuntimeError` situado en la
+  sentencia del `$!!` cuando lo que llega es un error.
+- **VM**: el `Return` sin marco llamante devuelve un `VmError`, y `run` lo sitúa en
+  esa instrucción, compilada desde la línea del `$!!`.
+- **`zyjs`**: la señal de propagación recuerda la sentencia más interna que dejó, y
+  `run` la convierte en `ZyRuntimeError` cuando llega arriba. Dentro de una función
+  la llamada devuelve el valor antes, como siempre.
+
+Igual dentro de un `!?` de nivel superior (la línea es la del `$!!`, dentro del
+bloque): un error blando no se lanza y ningún `:!` lo ve, que es [[GLB-032]].
+Medido: los tres dan el mismo texto, la misma línea y estado 1; un `$!!` dentro de
+una función sigue devolviendo el valor al llamante. `GUIDE.md` § `$!!` lo
+documenta. `cargo test` 1039/0, consensus 660/0, `reject` 42/42, `expect`, el
+inventario de mensajes, las siete aplicaciones y los 216 ejemplos, en verde.
+
 ### Qué lo sujeta
 
-`runtime-errors/propagate-at-top-level`, que sólo pregunta que coincidan, roja.
+`runtime-errors/propagate-at-top-level`, con `expect = "error"` desde la
+decisión, verde.
