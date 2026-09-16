@@ -2314,7 +2314,7 @@ Cinco celdas en `syntax-format-convert`, verdes: `blank-inside-a-round-operator`
 
 ## GLB-032 — REFERENCE y GUIDE prometen capturar un error blando con `:! ##Tipo`, y ningún motor lo hace
 
-**Estado:** abierto — sin decisión
+**Estado:** **decidido y corregido el 2026-09-16** (paso 3.2c): estaban mal las frases
 **Encontrado por:** el paso 3.2, 2026-09-16
 
 `interpreter/REFERENCE.md` (§ soft errors): *«test it with `$!`, propagate it with
@@ -2338,3 +2338,23 @@ never sees them, because nothing was thrown».
 comprueba con `$!` y se propaga con `$!!`, pero no se captura con `:!`— o está mal
 el comportamiento, y un `$!!` debería **lanzar** el error para que un `:!` lo
 capture?
+
+*Decidido el 2026-09-16:* **están mal las frases.** El comportamiento de los tres
+motores es el del lenguaje, y es lo que ya decía `LLM.md` § 9.
+
+### Corregido el 2026-09-16 (paso 3.2c)
+
+Buscadas todas antes de tocar ninguna, eran **tres** y no dos:
+
+- `REFERENCE.md` § soft errors: *«or catch it with `!? … :! ##Kind`»* → se
+  comprueba con `$!` y se propaga con `$!!`; es un valor, así que un `:!` no lo ve,
+  ni siquiera uno que rodee la llamada.
+- `GUIDE.md` § convención de errores de la biblioteca: *«that you test with `$!` or
+  catch with `!?`»* → se comprueba con `$!`; `!? … :!` no lo captura.
+- `GUIDE.md` § `std/db`: *«catchable with `!? … :! ##DB`»*, la misma promesa para
+  `##DB`, que no nombraba la ficha.
+
+`REFERENCE.md` línea 526 dice que un error *lanzado* se captura con `!?`, y es
+verdad; no se toca. El ejemplo de § Try / Catch / Finally tiene un `:! ##IO` entre
+varios `catch` tipados: es sintaxis válida y no afirma nada sobre errores blandos.
+La suite de GUIDE sigue con sus tres fallos de siempre.
