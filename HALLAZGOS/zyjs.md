@@ -1747,3 +1747,43 @@ Rust ejecutan y `zyjs` refusa.
 ### Qué lo sujeta
 
 `syntax-format-convert/format-expects-a-decimal-count`, verde.
+
+---
+
+## ZYJS-027 — `$!!` fuera de una función: `zyjs` escribe `Runtime error: [object Object]`
+
+**Estado:** abierto — **necesita decisión**
+**Encontrado por:** el paso 3.2, 2026-09-16, probando qué tipos de error se capturan
+
+```zymbol
+<# std/io => io
+v = io::read("/no/existe/zz.txt")
+>> "antes" ¶
+v$!!
+>> "después" ¶
+```
+
+| motor | salida | stderr | estado |
+|---|---|---|---|
+| `zytw`, `zyvm` | `antes` | nada | 1 |
+| `zyjs` | `antes` | `Runtime error: [object Object]` | 1 |
+
+Los tres terminan el programa con estado 1 en el `$!!`, que es «propagar al
+llamante», y en el nivel superior el llamante es el sistema. Igual dentro de un
+`!? { … } :! ##IO { … }`: un error blando no se lanza, así que el `:!` no lo ve y
+el programa acaba igual.
+
+`zyjs` escribe el objeto interno de su señal de propagación en vez de un
+mensaje. Los dos Rust no escriben nada: un programa termina en fallo sin decir
+por qué.
+
+### Qué hay que decidir
+
+¿Un `$!!` en el nivel superior termina el programa **en silencio** (lo que hacen
+los Rust; `zyjs` dejaría de escribir) o **diciendo el error**, p. ej.
+`Runtime error: ##IO(No such file or directory (os error 2))` (los tres
+escribirían eso)?
+
+### Qué lo sujeta
+
+`runtime-errors/propagate-at-top-level`, que sólo pregunta que coincidan, roja.

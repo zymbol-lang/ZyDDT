@@ -1795,7 +1795,7 @@ Por el camino: `#,.|5|` y sus hermanos se refusan en `zyjs` con otro texto,
 
 ## GLB-022 — La ayuda de los tipos de error lista siete de once
 
-**Estado:** abierto — sin decisión pendiente
+**Estado:** **corregido el 2026-09-16** (paso 3.2)
 **Encontrado por:** `syntax-try-catch/error-type-without-a-name`, paso B7, 2026-09-14
 **Gravedad:** baja en efecto; alta como documento: es lo que lee quien no sabe qué tipos hay
 
@@ -1811,6 +1811,43 @@ Faltan `##Range`, `##Key`, `##DB` y `##Time`, que existen y se capturan
 (missing second #)` enumera todavía menos: `##IO, ##Network, ##Parse`.
 
 Y `zyjs` acepta `:! ## { }` sin nombre y ejecuta el `!?` (añadido a `ZYJS-021`).
+
+### Corregido el 2026-09-16 (paso 3.2)
+
+Medido antes cuál es la lista: once tipos que produce algún motor —`##Div`,
+`##Index`, `##Key`, `##Range`, `##Type`, `##Parse`, `##IO`, `##Network`, `##DB`,
+`##Time`, `##_`—. Los cinco primeros se lanzan y se capturan con `:! ##Tipo`
+igual en los tres motores; `##Parse`, `##IO` y `##Time` llegan como valor blando
+de su módulo, también igual en los tres. Un `catch` con cada uno de los once
+nombres se parsea y corre en los tres. (`zyjs` tiene además un `##Scope` que no
+se alcanza: el analizador refusa antes.)
+
+- Las **tres** ayudas de `parse_error_type` —no dos: también la de
+  `expected '##' for error type`— listan los once, en el orden de la tabla del
+  manual v009: los que lanza la operación, los de los módulos y `##_`.
+- `zyjs` da las mismas dos ayudas donde llega (`:! #Div`, `:! ## { }`); antes no
+  daba ninguna para no copiar la lista corta.
+- `GUIDE.md` § Error Types completa su tabla (faltaban `##Key`, `##Range` y
+  `##Time`) y dice cuáles vienen de dónde, y que el parser acepta cualquier nombre
+  tras `##`. `LLM.md` § 9 añade `##Key` y `##Time`.
+
+`syntax-try-catch/error-type-with-one-hash` pasa a `AGREE`.
+`error-type-without-a-name` ya coincide en texto y ayuda, y sigue en `DIVERGE`
+sólo por la línea en cascada de Rust ([[GLB-028]], paso 3.7).
+
+### Lo que no se toca aquí
+
+- `zymbol-design/SYMBOLS.md` y `SIMBOLOS_ES.md` (§ «Error kinds») listan los
+  siete de antes, «six English words plus `##_`». Son documentos de diseño, de
+  rango fuente: se pregunta al autor.
+- El comentario de la regla `error-types` de `vscode/syntaxes/zymbol.tmGrammar.json`
+  lista siete; la regla en sí acepta cualquier nombre y resalta los once.
+- Los manuales traducidos (`web/data/manuals/`) se quedan como están: la tabla de
+  `v009/manual_en.md` ya tenía los once.
+- Por el camino, [[ZYJS-027]] (un `$!!` fuera de una función) y [[GLB-032]] (la
+  documentación promete capturar un error blando con `:!`).
+- Y un tipo distinto entre motores: `##.("abc")` es `##_` en el TW y en `zyjs` y
+  `##Type` en la VM. Es de F4 (4.1, tipos según la decisión D1).
 
 ---
 
@@ -2272,3 +2309,32 @@ igual en los tres. `cargo test` 1039/0, el formateador P1–P4 sin fallos.
 Cinco celdas en `syntax-format-convert`, verdes: `blank-inside-a-round-operator`,
 `blank-before-the-bar-of-a-round`, `blank-inside-a-format-operator`,
 `comment-inside-a-round-operator` y `blanks-inside-the-bars-are-the-value`.
+
+---
+
+## GLB-032 — REFERENCE y GUIDE prometen capturar un error blando con `:! ##Tipo`, y ningún motor lo hace
+
+**Estado:** abierto — sin decisión
+**Encontrado por:** el paso 3.2, 2026-09-16
+
+`interpreter/REFERENCE.md` (§ soft errors): *«test it with `$!`, propagate it with
+`$!!`, or catch it with `!? … :! ##Kind`»*. `GUIDE.md` (§ standard library):
+*«that you test with `$!` or catch with `!?`»*.
+
+Medido en los tres motores, un error blando no se captura nunca con `:!`:
+
+- dentro de un `!?`, el valor no se lanza y el `:!` no se ejecuta;
+- con `v$!!` dentro de una función, el error vuelve al llamante **como valor**
+  (`>> f()` imprime `##IO(…)`), y el `:!` que rodea la llamada no lo ve;
+- con `v$!!` en el nivel superior, el programa termina ([[ZYJS-027]]).
+
+`LLM.md` § 9 y la cabecera de `axes/runtime-errors.toml` (medida el 2026-09-14)
+dicen lo contrario que las dos frases: un error blando es un valor, «a `:!`
+never sees them, because nothing was thrown».
+
+### Qué hay que decidir
+
+¿Están mal las dos frases —se corrigen para decir que un error blando se
+comprueba con `$!` y se propaga con `$!!`, pero no se captura con `:!`— o está mal
+el comportamiento, y un `$!!` debería **lanzar** el error para que un `:!` lo
+capture?

@@ -141,3 +141,14 @@ src    = """
     >> (_err#?)[1] ¶
 }
 """
+
+[[cell]]
+id     = "propagate-at-top-level"
+what   = "`v$!!` on a soft error outside any function ends the program with status 1 — the two Rust engines say nothing, zyjs writes `Runtime error: [object Object]`. Asks only that the engines agree: whether the program should say why it ended is undecided (found in step 3.2, 2026-09-16; ZYJS-027)"
+src    = """
+<# std/io => io
+v = io::read("/no/existe/zz.txt")
+>> "antes" ¶
+v$!!
+>> "después" ¶
+"""
