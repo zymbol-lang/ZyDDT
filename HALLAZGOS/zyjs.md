@@ -1581,7 +1581,7 @@ sin regresiones y el barrido de parseo de los 1189 `.zy` del workspace, idéntic
 
 ## ZYJS-025 — El lexer de `zyjs` se come un `#` que no reconoce, y con él a veces la línea entera
 
-**Estado:** A **corregido el 2026-09-16** (paso 2.18); B abierto — sin decisión
+**Estado:** **corregido el 2026-09-16**: A en el paso 2.18, B en el 2.18b
 **Encontrado por:** el paso 2.18, 2026-09-16, buscando por qué `syntax-modules/module-without-brace` refusaba otra cosa
 
 ### A. Una línea que empieza por `# texto` y no es `# nombre {`
@@ -1630,6 +1630,30 @@ parsea (con textos distintos, y los de los dos lados nombran tokens internos).
 ¿La última rama emite el token `#` —y el parser lo refusa como en Rust—, igual
 que se hizo en A? Es un cambio de una línea.
 
+*Decidido el 2026-09-16:* **se corrige ya**, antes del paso 2.19.
+
+### Corregido el 2026-09-16 (paso 2.18b)
+
+Emitir el token no bastaba: el parser de `zyjs` leía un `#` como principio de
+módulo en **cualquier** posición, y refusaba una línea tarde (`expected module
+name after '#'`, en el token de después). La regla de Rust está en la cabecera
+de `Parser::parse`: `#` declara un módulo **sólo si es el primer token del
+fichero**; en cualquier otro sitio no empieza ninguna sentencia y cae en el brazo
+genérico, `unexpected token: Hash` con la ayuda de «expected statement».
+
+- La última rama del lexer emite `#` en vez de tirarlo.
+- `_parseStmt` abre un módulo con `#` sólo en la posición 0, y si no lo refusa
+  donde está, con las palabras de Rust. El nombre del token sale del mapa
+  `RUST_TOKEN_NAME`, el mismo que ya usa `expected expression, found X`; es un
+  nombre interno en los dos motores ([[GLB-028]]), y cuando F3 lo cambie en
+  Rust se cambia en un sitio.
+
+`x = 1 #`, `x = 1` seguido de `#{ 2 }`, y `>> "x" ¶` seguido de `# hola` se
+refusan en el `#`, con el mismo texto y la misma línea en los tres motores. La
+celda pasa a `AGREE`; la matriz se queda en 264 rojas sin que entre ninguna.
+Consensus 660/0, `reject` 42/42, inventario sin nada nuevo, las siete
+aplicaciones, los 216 ejemplos y el barrido de parseo, idéntico.
+
 ### Qué lo sujeta
 
-`refusal/lone-hash-at-end-of-line`, roja.
+`refusal/lone-hash-at-end-of-line`, verde.
