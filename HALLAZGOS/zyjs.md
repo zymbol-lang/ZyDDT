@@ -1705,7 +1705,7 @@ aplicaciones, los 216 ejemplos y el barrido de parseo, idéntico.
 
 ## ZYJS-026 — `#,` y `#^` con `.` o `!` y sin cuenta se refusan con otro texto
 
-**Estado:** abierto — sin decisión
+**Estado:** **corregido el 2026-09-16** (paso 3.1b)
 **Encontrado por:** el paso 3.1, 2026-09-16, midiendo `GLB-021` en todas sus formas
 
 | forma | `zytw`, `zyvm` | `zyjs` |
@@ -1722,6 +1722,28 @@ dicen lo mismo que Rust, y desde el paso 3.1 con la misma ayuda.
 ¿Se da a `#,` y `#^` el mismo rechazo que a `#.` y `#!` —`expected a decimal count
 after '#,'` con su ayuda— en el lexer de `zyjs`?
 
+*Decidido el 2026-09-16:* **se corrige ya** (paso 3.1b).
+
+### Corregido el 2026-09-16 (paso 3.1b)
+
+Medido antes, el hueco era de cinco formas y no de cuatro: cuando `#,` o `#^` no
+forman el operador, `zyjs` dejaba el `#` solo, también con la cuenta escrita y
+sin `|` detrás (`#,.2 5`, `#^!n 5`) y con `#^` seguido de otra cosa (`#^5|`).
+
+Tras intentar leer el operador, el lexer refusa ahora como `parse_format_expr`:
+un `.` o `!` sin cuenta es `expected a decimal count after '#,'` (o `'#^'`), con
+la ayuda del paso 3.1, y una cuenta sin `|` —o `#^` seguido de otra cosa— es
+`expected '|' after format operator`, con la ayuda de Rust. Cada rechazo apunta
+donde apunta Rust, a lo que ocupa el sitio de la cuenta o del `|` (un
+`posAhead` que salta el blanco como lo salta el lexer de Rust): las cinco formas
+coinciden en texto, ayuda, línea y columna.
+
+`#,5|` ya decía lo mismo que Rust y sigue apuntando al operador y no al `5`: es
+de las columnas registradas en [[ZYJS-024]].
+
+Por el camino, [[GLB-031]]: con espacios dentro del operador (`#. 2|v|`) los dos
+Rust ejecutan y `zyjs` refusa.
+
 ### Qué lo sujeta
 
-`syntax-format-convert/format-expects-a-decimal-count`, roja.
+`syntax-format-convert/format-expects-a-decimal-count`, verde.

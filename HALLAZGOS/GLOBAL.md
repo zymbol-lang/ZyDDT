@@ -2205,3 +2205,35 @@ su celda, no un número en un fichero.
 
 `refusal/undefined-name-inside-a-tui-block`, roja: `zyjs` la refusa en estático y
 los dos motores Rust llegan a intentar abrir la pantalla alterna.
+
+---
+
+## GLB-031 — Espacios dentro de un operador de formato: Rust los acepta y `zyjs` los refusa
+
+**Estado:** abierto — **necesita decisión**
+**Encontrado por:** el paso 3.1b, 2026-09-16, midiendo los vecinos de [[ZYJS-026]]
+
+Con `v = 1234.5678`:
+
+| forma | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `#,. 2\|v\|` | `1,234.57` | refusa |
+| `#. 2\|v\|` | `1234.57` | refusa (`expected a decimal count after '#.'`) |
+| `#, .2\|v\|` | `1,234.57` | refusa (`expected '\|' after format operator '#,'`) |
+| `#,.2 \|v\|` | `1,234.57` | refusa |
+| `#.2 \|v\|` | `1234.57` | refusa (`expected '\|' after precision`) |
+
+El lexer de Rust lee `#,`, `.`, `2` y `|` como tokens separados y el parser los
+junta, así que cualquier espacio entre ellos pasa. El de `zyjs` lee el operador
+entero, con su cuenta, de una pasada y sin espacios. Ningún documento dice si
+`#. 2|v|` es una forma del lenguaje o una permisividad del parser: `GUIDE.md`
+escribe siempre el operador junto.
+
+No es una diferencia de texto: `zyjs` refusa programas que los dos motores Rust
+ejecutan.
+
+### Qué hay que decidir
+
+¿Un operador de formato admite espacios entre sus piezas (`#.`, la cuenta, el
+`|`)? Si sí, `zyjs` los salta. Si no, los dos Rust los refusan. Hasta decidirlo no
+hay celda: cualquier verde elegiría por el autor.
