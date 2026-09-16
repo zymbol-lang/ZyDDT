@@ -1445,15 +1445,26 @@ los ejemplos del playground siguen en verde.
 
 1. **La columna.** El detalle de Rust es `fichero:3:5:` y el de `zyjs`
    `fichero:3:0:`: los tokens de `zyjs` no llevan columna. ZyDDT compara esas
-   líneas al pie de la letra.
+   líneas al pie de la letra. **Corregido el 2026-09-16 (paso 2.16),
+   [[ZYJS-024]].**
 2. **Un aviso que sólo da `zyjs`:** `unused variable 'md'` para un alias de
    módulo importado y no usado, también con un módulo correcto. Los Rust no
    avisan, y un alias no es una variable. *Decidido el 2026-09-15: no se avisa.*
    **Corregido el 2026-09-15 (paso 2.13).**
    Y sobre la columna, *decidido el 2026-09-15*: `zyjs` tendrá columnas (paso 2.16).
 3. `zyjs` añade `--> main.zy:4` detrás del error de carga; los Rust no.
+   **Corregido el 2026-09-16 (paso 2.16).**
 4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
-   porque lo detecta su checker, y como `1 parse error(s)` en Rust. Paso 2.5.
+   porque lo detecta su checker, y como `1 parse error(s)` en Rust. Abierto.
+
+*Al 2026-09-16, 7 de las 12 celdas están en verde.* Las cinco que quedan no son
+columnas: dos son el E013 del punto 4 (`const-not-literal`,
+`variable-not-literal`, que además no llevan la ayuda), dos enseñan el nombre
+interno del token de `zyjs` (`Expected FAT_ARROW, got 'mat'` y `Expected IDENT,
+got '5'`, donde Rust dice `expected '=>' for module alias` y `expected alias name
+after '=>'` con sus ayudas) y una da otro error distinto (`module-without-brace`:
+Rust refusa `expected '{' after module name` en 1:24 y `zyjs` llega a decir que un
+bloque de exportación va dentro de un módulo, en 2:1).
 
 ---
 
@@ -1493,3 +1504,52 @@ de `zymbol.js` con el catálogo.
   gana una entrada o deja de emitirse. Comprobado quitando a propósito la clave de
   `E016`. La prueba DOM del playground sigue en 32 de 32.
 
+---
+
+## ZYJS-024 — Los tokens de `zyjs` no llevan columna, y todo diagnóstico dice la columna 0
+
+**Estado:** **corregido el 2026-09-16** (paso 2.16)
+**Encontrado por:** `axes/syntax-modules.toml` al cerrar [[ZYJS-022]], 2026-09-15
+
+Un token de `zyjs` era `{ type, value, line }`. Sin columna, el detalle de un
+módulo que no se lee salía `fichero.zy:3:0:` donde los dos motores Rust escriben
+`fichero.zy:3:10:`, y ningún editor podía saltar al carácter. ZyDDT compara esas
+líneas al pie de la letra, y por eso las doce celdas de `syntax-modules` estaban
+en `DIVERGE` aunque el texto del error ya coincidiera.
+
+Encima, `zyjs` añadía detrás del error de carga una línea `--> main.zy:4` —la
+sentencia que importó el módulo— que los Rust no escriben: el mismo fallo se leía
+como dos errores distintos, uno en el módulo y otro en el fichero de entrada.
+
+### Corregido el 2026-09-16 (paso 2.16)
+
+- **El lexer cuenta columnas**, 1-based y en puntos de código, que es lo que
+  cuenta el span de Rust: medido con `x = "éé" ]` escrito con acento combinante,
+  los dos ponen el `]` en la columna 12, no en el décimo grafema.
+- **Una posición es el principio de la cosa que nombra.** El token guarda la
+  línea y la columna de su primer carácter, tomadas al principio de la vuelta
+  del bucle —lo de antes era la posición de después de leerlo—, y el token de fin
+  de fichero está donde el fichero acaba: `#> { f,` sin cerrar se refusa en 3:1
+  en los tres motores.
+- **`ZyError` y `ZyStaticError` reciben el token**, no un número de línea. Un
+  número suelto se sigue aceptando y entonces no hay columna que dar.
+- **El detalle de un módulo que no se lee escribe `fichero:línea:columna`**, y el
+  error de carga se marca como ya situado, así que nadie le pega detrás la línea
+  del `<#`.
+
+Siete de las doce celdas de `syntax-modules` pasan a `AGREE` (la matriz entera
+baja de 276 rojas a 270). Consensus 660/0, `reject` 42/42, el inventario de
+mensajes sin nada nuevo, las siete aplicaciones, los 216 ejemplos, `test_check`
+sin regresiones y el barrido de parseo de los 1189 `.zy` del workspace, idéntico.
+
+### Lo que queda
+
+- Un nodo del AST lleva columna sólo donde se estampa (cada sentencia, y el
+  bloque `#>`); un diagnóstico que apunta a un nodo de expresión sigue diciendo
+  0. Los tres sitios que quedan así son errores del propio fichero de entrada,
+  donde la columna no se imprime todavía.
+- `tests/run_one.mjs` sigue escribiendo la posición como `--> line N`, sin
+  columna, y ZyDDT la lee con su regla `LOC_LINE`. Escribirla como la escribe
+  Rust —`--> fichero:línea:columna`— haría comparable la columna en todas las
+  celdas con `--strict-column`; es un cambio del arnés y de cómo se ve todo
+  diagnóstico, y se pregunta antes.
