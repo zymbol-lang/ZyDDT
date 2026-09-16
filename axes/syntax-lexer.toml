@@ -129,3 +129,43 @@ what   = "a file that begins with a UTF-8 byte order mark runs — the Rust lexe
 src    = """\ufeffx = 1
 >> x ¶
 """
+
+[[cell]]
+id     = "visible-symbol-in-a-name"
+expect = "ok"
+what   = "a visible symbol the language has no token for is a letter of a name: `€`, `±`, `§` and an emoji all name variables (GLB-026 A)"
+src    = """
+€precio = 5
+a±b = €precio
+§total = a±b
+_🔑 = §total
+>> _🔑 ¶
+"""
+
+[[cell]]
+id     = "invisible-character-in-a-name"
+expect = "error"
+what   = "an invisible character is not a letter: a soft hyphen inside a name is refused, and named by its code point rather than quoted (GLB-026 B). One occurrence only: how many errors an engine goes on to report after the first is GLB-028's question, not this cell's"
+src    = """
+a­b = 5
+>> 5 ¶
+"""
+
+[[cell]]
+id     = "backtick-is-not-a-name"
+expect = "error"
+what   = "the backtick names nothing and is no operator: it is refused rather than dropped (GLB-026 B)"
+src    = """
+x = 1
+>> `x ¶
+"""
+
+[[cell]]
+id     = "zero-width-joiner-inside-a-name"
+expect = "ok"
+what   = "ZWJ and ZWNJ join letters, so they are allowed INSIDE a name — never at its start (GLB-026 B)"
+src    = """
+a‌b = 5
+c‍d = a‌b
+>> c‍d ¶
+"""
