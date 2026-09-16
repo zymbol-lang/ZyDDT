@@ -279,3 +279,12 @@ src    = """
     >> "{nada}" ¶
 }
 """
+
+[[cell]]
+id     = "lone-hash-at-end-of-line"
+expect = "error"
+what   = "a `#` that begins nothing is refused — both Rust engines say so, and zyjs dropped it without a sound and printed 1 (found in step 2.18, 2026-09-16; ZYJS-025 B)"
+src    = """
+x = 1 #
+>> x ¶
+"""

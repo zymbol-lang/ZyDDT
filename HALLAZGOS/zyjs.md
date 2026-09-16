@@ -1399,7 +1399,7 @@ Registrado por el camino: `x[1] 5` —sin `°`— ejecuta el `5` suelto en `zyjs
 
 ## ZYJS-022 — Un módulo importado con el bloque de exportación mal escrito se carga sin error
 
-**Estado:** **corregido el 2026-09-15** (paso 2.2): los 12 módulos rotos se rechazan. Las 12 celdas siguen en `DIVERGE` por dos cosas que no son este hallazgo (ver «Lo que queda»)
+**Estado:** **corregido el 2026-09-15** (paso 2.2): los 12 módulos rotos se rechazan. **Las 12 celdas en verde desde el 2026-09-16** (pasos 2.16 y 2.18; ver «Lo que queda»)
 **Encontrado por:** `axes/syntax-modules.toml`, paso B13 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media-alta: el módulo roto no se nota hasta que alguien use lo que exporta
 
@@ -1455,7 +1455,8 @@ los ejemplos del playground siguen en verde.
 3. `zyjs` añade `--> main.zy:4` detrás del error de carga; los Rust no.
    **Corregido el 2026-09-16 (paso 2.16).**
 4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
-   porque lo detecta su checker, y como `1 parse error(s)` en Rust. Abierto.
+   porque lo detecta su checker, y como `1 parse error(s)` en Rust.
+   **Corregido el 2026-09-16 (paso 2.18).**
 
 *Al 2026-09-16, 7 de las 12 celdas están en verde.* Las cinco que quedan no son
 columnas: dos son el E013 del punto 4 (`const-not-literal`,
@@ -1465,6 +1466,28 @@ got '5'`, donde Rust dice `expected '=>' for module alias` y `expected alias nam
 after '=>'` con sus ayudas) y una da otro error distinto (`module-without-brace`:
 Rust refusa `expected '{' after module name` en 1:24 y `zyjs` llega a decir que un
 bloque de exportación va dentro de un módulo, en 2:1).
+
+### Corregido el 2026-09-16 (paso 2.18) — las cinco que quedaban
+
+- **El cuerpo de un módulo se lee como lo lee `parse_module_block`**: elemento a
+  elemento, y cada uno se juzga al leerlo. Un módulo contiene imports, un solo
+  `#>`, constantes, variables y definiciones de función; un enlace se inicializa
+  con un literal. Las tres formas del E013 —constante, variable y «executable
+  statement»— pasan del checker al parser de `zyjs`, con su ayuda y en la
+  posición de Rust (el principio del inicializador, o de la sentencia): salen
+  como `1 parse error(s)` en los tres motores. El checker ya no las repite.
+- **`<#` sin `=>` y el alias que no es un nombre** dicen las palabras de
+  `parse_import_statement` —`expected '=>' for module alias` con su ayuda,
+  `expected alias name after '=>'`— en vez de los nombres de token de este motor.
+- **`# nombre` sin `{`** se refusa con `expected '{' after module name`. La causa
+  de que `zyjs` dijera otra cosa estaba en el lexer y es [[ZYJS-025]]: la línea
+  entera desaparecía, y lo que llegaba al parser era el `#>` de la línea
+  siguiente.
+
+`syntax-modules` pasa a 12 de 12. Sale también de rojo
+`modularity/import-executes-nothing`, la celda que sujeta la premisa **AGT-1**:
+estaba en `DIVERGE` por esta misma causa (el E013 de «executable statement» como
+error semántico, en la línea 4 y sin ayuda). La matriz baja de 270 rojas a 264.
 
 ---
 
@@ -1553,3 +1576,60 @@ sin regresiones y el barrido de parseo de los 1189 `.zy` del workspace, idéntic
   Rust —`--> fichero:línea:columna`— haría comparable la columna en todas las
   celdas con `--strict-column`; es un cambio del arnés y de cómo se ve todo
   diagnóstico, y se pregunta antes.
+
+---
+
+## ZYJS-025 — El lexer de `zyjs` se come un `#` que no reconoce, y con él a veces la línea entera
+
+**Estado:** A **corregido el 2026-09-16** (paso 2.18); B abierto — sin decisión
+**Encontrado por:** el paso 2.18, 2026-09-16, buscando por qué `syntax-modules/module-without-brace` refusaba otra cosa
+
+### A. Una línea que empieza por `# texto` y no es `# nombre {`
+
+El lexer sólo emitía `#` como token cuando, mirando adelante, encontraba
+`# nombre {`. Cualquier otra línea así era una «cabecera antigua» y se saltaba
+hasta el fin de línea, sin decir nada:
+
+| programa | `zytw`, `zyvm` | `zyjs` antes |
+|---|---|---|
+| `# hola` y `>> "x" ¶` | `expected '{' after module name` | `x` |
+| `# hola mundo con texto` | `expected '{' after module name` | `x` |
+| `# ` (nada detrás) | `expected module name after '#'` | `x` |
+| `#_x [` | `expected '{' after module name` | `x` |
+| `>> "x" ¶` y luego `# hola` | `unexpected token: Hash` | `x` |
+
+Un programa que corría en el playground y que los dos motores Rust rechazan: la
+familia de [[ZYJS-020]].
+
+*Corregido el 2026-09-16 (paso 2.18).* `#` seguido de un espacio, un tabulador,
+un punto o el principio de un nombre (la regla de [[GLB-026]], así que `#🔑 {`
+declara un módulo como en Rust) es siempre el token `#`, y es el parser quien
+refusa lo que no es una declaración de módulo, con las palabras de Rust. Las cinco
+formas se refusan. En la última Rust dice `unexpected token: Hash` —el nombre de
+un token interno, [[GLB-028]]— y `zyjs` dice `expected '{' after module name`:
+los dos refusan, y el texto de Rust es el que está mal.
+
+El barrido de parseo de los 1189 `.zy` del workspace es idéntico: nada dependía
+de la cabecera antigua.
+
+### B. Un `#` suelto
+
+La última rama de la lectura de `#` todavía lo consume y sigue (`this.consume();
+continue;`), así que un `#` que no empieza nada desaparece:
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `x = 1 #` y `>> x ¶` | `unexpected token: Hash` | `1` |
+| `>> x #; ¶` | `expected expression, found Hash` | `1` |
+
+Con `#{`, `#@` y `#"a"` los tres refusan, porque lo que sigue al `#` perdido ya no
+parsea (con textos distintos, y los de los dos lados nombran tokens internos).
+
+### Qué hay que decidir
+
+¿La última rama emite el token `#` —y el parser lo refusa como en Rust—, igual
+que se hizo en A? Es un cambio de una línea.
+
+### Qué lo sujeta
+
+`refusal/lone-hash-at-end-of-line`, roja.
