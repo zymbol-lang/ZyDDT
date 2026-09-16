@@ -2398,3 +2398,37 @@ Buscadas todas antes de tocar ninguna, eran **tres** y no dos:
 verdad; no se toca. El ejemplo de § Try / Catch / Finally tiene un `:! ##IO` entre
 varios `catch` tipados: es sintaxis válida y no afirma nada sobre errores blandos.
 La suite de GUIDE sigue con sus tres fallos de siempre.
+
+---
+
+## GLB-033 — Los mensajes de error nombran los tipos con un vocabulario que `#?` ya no usa
+
+**Estado:** abierto — **necesita decisión**
+**Encontrado por:** el paso 3.4, 2026-09-16, cerrando [[ZYTW-004]]
+
+`#?` nombra los tipos igual en los tres motores. Los mensajes de la biblioteca
+estándar y de varios operadores los nombran con otro vocabulario, también igual
+en los tres:
+
+| valor | `#?` | mensajes de error |
+|---|---|---|
+| `[1, 2]` | `##]` | `##[]` |
+| `#[1, "x"]` | `##[` | `##[]` |
+| `(1, 2)` | `##)` | `##()` |
+| `#(k: 1)` | `##(` | `##(name:)` |
+| `x -> x` | `##->` | `##fn` |
+
+Los escalares (`###`, `##.`, `##"`, `##'`, `##?`, `##_`) coinciden. La diferencia
+está en las colecciones y las funciones: la taxonomía de `#?` es la de v0.0.9
+(`zymbol-design/COLLECTIONS.md`) y los helpers que construyen los mensajes
+—`Value::type_name()` en el TW, `Value::zymbol_type_name()` en la VM, y seis
+literales en `zyjs`— son anteriores. Se usan en unos 90 sitios de Rust.
+
+No es una divergencia entre motores —las celdas están de acuerdo—, así que el
+gate no lo ve. Es un diagnóstico que dice `cannot bind ##[]` a quien, preguntando
+con `#?`, oye `##]`.
+
+### Qué hay que decidir
+
+¿Los mensajes pasan a nombrar los tipos como `#?` (`##]`, `##[`, `##)`, `##(`,
+`##->`), en los tres motores? ¿O se quedan como están?
