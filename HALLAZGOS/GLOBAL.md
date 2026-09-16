@@ -2403,7 +2403,7 @@ La suite de GUIDE sigue con sus tres fallos de siempre.
 
 ## GLB-033 — Los mensajes de error nombran los tipos con un vocabulario que `#?` ya no usa
 
-**Estado:** abierto — **necesita decisión**
+**Estado:** **decidido el 2026-09-16**; en curso (paso 3.5, por sub-pasos)
 **Encontrado por:** el paso 3.4, 2026-09-16, cerrando [[ZYTW-004]]
 
 `#?` nombra los tipos igual en los tres motores. Los mensajes de la biblioteca
@@ -2432,3 +2432,44 @@ con `#?`, oye `##]`.
 
 ¿Los mensajes pasan a nombrar los tipos como `#?` (`##]`, `##[`, `##)`, `##(`,
 `##->`), en los tres motores? ¿O se quedan como están?
+
+*Decidido el 2026-09-16:* **con nombres, como el analizador** —ni los símbolos
+de `#?` ni los antiguos—. Y con él, lo que faltaba para escribirlos en ejecución:
+
+| valor | nombre en un mensaje |
+|---|---|
+| escalares | `Int` `Float` `String` `Char` `Bool` `Unit` `Error` |
+| `[1, 2]` | `[Int]`, calculado de los elementos |
+| `#[1, "x"]` | `[Any]` |
+| `[]` | `[?]` |
+| `[[1], [2, 3]]` | `[[Int]]` |
+| `(1, "a")` | `(Int, String)` |
+| `#(k: 1)` | `#(k: Int)` — y el analizador pasa a decirlo así también |
+| una función o una lambda | `Function` |
+
+Decidido a la vez para el paso 3.5: los mensajes que el TW escribía con `{:?}`
+(`got Float(1.5)`) usan **la redacción específica del TW con el nombre del tipo**
+en los tres motores (`step must be an integer, got Float`); la VM deja su
+genérico `this needs X and got Y`.
+
+Sub-pasos: 3.5a nombrador y los `{:?}` del TW · 3.5b la VM · 3.5c `zyjs` · 3.5d la
+biblioteca estándar (`##[]`, `##fn`) · 3.5e el diccionario en el analizador.
+
+### 3.5a — 2026-09-16
+
+`zymbol_common::typeword` guarda la tabla, con las reglas de las colecciones en
+un solo sitio; el TW la usa con `Value::type_label()`. Los 39 mensajes del TW que
+formateaban un valor con `{:?}` escriben su tipo: `map requires array, got
+#(k: Int, j: [Int])`, `$/ requires a string on the left, got [?]`. Los otros
+cuatro `{:?}` del TW no formatean un valor (un operador del AST, una ruta, la lista
+de tipos de `mat::`, que es del 3.5d).
+
+El TW tenía ya otros dos nombradores, y quedan para los sub-pasos que tocan a su
+contraparte: `type_ident` (`Int`, `Array` — el de la VM) y `type_word` (prosa:
+`integer`, `lambda`).
+
+Medido: ZyDDT sigue en 258, como se esperaba —la VM aún dice otra cosa—; en tres
+celdas `WORDING` el TW y `zyjs` ya dicen lo mismo (`index-must-be-an-integer-got`,
+`range-bounds-must-be-integers-got-and`, `step-must-be-an-integer-got`).
+`cargo test` 1040/0, consensus 660/0, `reject`, `expect`, el inventario y las
+siete aplicaciones, en verde.
