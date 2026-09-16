@@ -1839,7 +1839,9 @@ sólo por la línea en cascada de Rust ([[GLB-028]], paso 3.7).
 
 - `zymbol-design/SYMBOLS.md` y `SIMBOLOS_ES.md` (§ «Error kinds») listan los
   siete de antes, «six English words plus `##_`». Son documentos de diseño, de
-  rango fuente: se pregunta al autor.
+  rango fuente: se pregunta al autor. *Decidido el 2026-09-16: a los once;*
+  **actualizados el 2026-09-16 (paso 3.2d)**, en un commit que sólo cambia esa
+  fila en los dos idiomas.
 - El comentario de la regla `error-types` de `vscode/syntaxes/zymbol.tmGrammar.json`
   lista siete; la regla en sí acepta cualquier nombre y resalta los once.
 - Los manuales traducidos (`web/data/manuals/`) se quedan como están: la tabla de
