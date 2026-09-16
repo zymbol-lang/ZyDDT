@@ -94,3 +94,52 @@ src    = """
 x = #,.|5|
 >> x ¶
 """
+
+[[cell]]
+id     = "blank-inside-a-round-operator"
+expect = "error"
+what   = "a precision operator is written together: `#. 2|v|` is refused — both Rust engines used to run it (decided 2026-09-16, GLB-031)"
+src    = """
+v = 1234.5678
+x = #. 2|v|
+>> x ¶
+"""
+
+[[cell]]
+id     = "blank-before-the-bar-of-a-round"
+expect = "error"
+what   = "the `|` that opens the value touches the count: `#.2 |v|` is refused (decided 2026-09-16, GLB-031)"
+src    = """
+v = 1234.5678
+x = #.2 |v|
+>> x ¶
+"""
+
+[[cell]]
+id     = "blank-inside-a-format-operator"
+expect = "error"
+what   = "a format operator is written together: `#, .2|v|` and `#,. 2|v|` are refused (decided 2026-09-16, GLB-031)"
+src    = """
+v = 1234.5678
+x = #,. 2|v|
+>> x ¶
+"""
+
+[[cell]]
+id     = "comment-inside-a-round-operator"
+expect = "error"
+what   = "a comment between two pieces of an operator separates them like a blank: `#./*c*/2|v|` is refused (decided 2026-09-16, GLB-031)"
+src    = """
+v = 1234.5678
+x = #./*c*/2|v|
+>> x ¶
+"""
+
+[[cell]]
+id     = "blanks-inside-the-bars-are-the-value"
+expect = "ok"
+what   = "the value between the bars is an ordinary expression and keeps its blanks: `#.2| v |` runs (GLB-031)"
+src    = """
+v = 1234.5678
+>> #.2| v | ¶
+"""
