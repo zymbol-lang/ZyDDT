@@ -2210,7 +2210,7 @@ los dos motores Rust llegan a intentar abrir la pantalla alterna.
 
 ## GLB-031 — Espacios dentro de un operador de formato: Rust los acepta y `zyjs` los refusa
 
-**Estado:** abierto — **necesita decisión**
+**Estado:** **decidido y corregido el 2026-09-16** (paso 3.1c): el operador va junto
 **Encontrado por:** el paso 3.1b, 2026-09-16, midiendo los vecinos de [[ZYJS-026]]
 
 Con `v = 1234.5678`:
@@ -2237,3 +2237,38 @@ ejecutan.
 ¿Un operador de formato admite espacios entre sus piezas (`#.`, la cuenta, el
 `|`)? Si sí, `zyjs` los salta. Si no, los dos Rust los refusan. Hasta decidirlo no
 hay celda: cualquier verde elegiría por el autor.
+
+*Decidido el 2026-09-16:* **no, el operador va junto.** `#.2|v|` es un símbolo,
+como `$+` o `>>`.
+
+### Corregido el 2026-09-16 (paso 3.1c)
+
+Medido antes: ningún `.zy` del workspace ni ningún documento escribe un espacio
+dentro de un operador de formato, así que nada dependía de la permisividad.
+
+El parser de Rust comprueba ahora que las piezas se tocan —el fin de una en bytes
+es el principio de la siguiente—: el operador, el `.` o `!` de la precisión, la
+cuenta y el `|` que abre el valor. Un blanco o un comentario entre dos piezas se
+refusa con el diagnóstico de la pieza que no está donde debe, que son los mismos
+textos que `zyjs` ya daba: ningún mensaje nuevo.
+
+| forma | los tres motores |
+|---|---|
+| `#. 2\|v\|`, `#! 2\|v\|`, `#./*c*/2\|v\|` | `expected a decimal count after '#.'` (o `'#!'`) |
+| `#,. 2\|v\|`, `#^! n\|v\|` | `expected a decimal count after '#,'` (o `'#^'`) |
+| `#.2 \|v\|` | `expected '\|' after precision` |
+| `#, .2\|v\|`, `#,.2 \|v\|`, `#, \|v\|` | `expected '\|' after format operator '#,'` |
+| `#.2\| v \|` | corre: los blancos son del valor |
+
+Texto, ayuda y línea coinciden en los tres; en cinco formas la columna de `zyjs`
+es la del operador y no la de la pieza, de la familia registrada en
+[[ZYJS-024]]. `GUIDE.md` § Number Formatting lo documenta («An operator is
+written together»). Las doce formas correctas —`#.2`, `#.n`, `#!2`, `#!n`,
+`#,.2`, `#,.n`, `#,!2`, `#,!n`, `#^.2`, `#^.n`, `#^!2`, `#^!n`— siguen corriendo
+igual en los tres. `cargo test` 1039/0, el formateador P1–P4 sin fallos.
+
+### Qué lo sujeta
+
+Cinco celdas en `syntax-format-convert`, verdes: `blank-inside-a-round-operator`,
+`blank-before-the-bar-of-a-round`, `blank-inside-a-format-operator`,
+`comment-inside-a-round-operator` y `blanks-inside-the-bars-are-the-value`.
