@@ -1954,7 +1954,7 @@ identificador: es el resto de `GLB-008`.
 
 ## GLB-026 — Un fichero con BOM no corre en Rust, y los caracteres raros son identificador en Rust y ruido en `zyjs`
 
-**Estado:** abierto — A sin decisión pendiente; **B decidido el 2026-09-15** (ver abajo)
+**Estado:** **corregido el 2026-09-15** (paso 2.17), A y B
 **Encontrado por:** midiendo el paso 2.1 (`ZYJS-020`), 2026-09-15
 
 ### A. La marca de orden de bytes (BOM)
@@ -2012,6 +2012,41 @@ lexer de `zyjs` sólo sigue leyendo el nombre si viene letra, uso privado, cifra
 `_` (`[\p{L}\p{Co}0-9_]`), y un emoji es `\p{So}`; el `_` se queda solo y el
 parser falla. Rust lo lee como un nombre. El ejemplo lleva `@skip-parity`, y por
 eso nada lo ejecutaba en `zyjs`. Entra en el paso 2.17.
+
+### Corregido el 2026-09-15 (paso 2.17)
+
+Los dos lexers dicen ahora lo mismo, y lo dicen en una sola regla escrita dos
+veces:
+
+- **A.** Una marca de orden de bytes al principio del fichero se salta, en Rust
+  y en `zyjs`. En cualquier otra posición es un carácter invisible, y por tanto
+  un error.
+- **B.** Un símbolo visible que no es operador es una letra del nombre (`€`,
+  `±`, `§`, `©`, un emoji, `_🔑`); un carácter invisible o la comilla invertida
+  no lo son y se rechazan con `unexpected character`. Un invisible se nombra por
+  su punto de código (`U+00AD`) en vez de entrecomillarse, porque entrecomillarlo
+  no enseñaría nada. ZWJ y ZWNJ se permiten **dentro** del nombre, nunca al
+  principio.
+
+`zymbol-lexer` gana `is_invisible_char` (los `Cf` de formato más los controles) y
+`zyjs` exporta `isInvisibleChar`, `isIdentStart`, `isIdentContinue` e
+`isIdentName` con la misma tabla. Las veinte formas de la matriz —`€`, `±`, `¿`,
+`§`, `¨`, `©`, emoji, combinante, uso privado, `_🔑`, BOM al principio, BOM en
+medio, `` ` ``, U+00AD, U+200B, U+2060, U+200F, ZWNJ al principio, ZWNJ y ZWJ en
+medio— dan hoy la misma respuesta en los tres motores.
+
+### Qué lo sujeta
+
+`syntax-lexer/byte-order-mark` (verde), y tres celdas nuevas:
+`syntax-lexer/visible-symbol-in-a-name`,
+`syntax-lexer/invisible-character-in-a-name`,
+`syntax-lexer/backtick-is-not-a-name` y
+`syntax-lexer/zero-width-joiner-inside-a-name`.
+
+El arnés tenía un defecto que salió aquí: `zyddt gen` antepone un banner de tres
+líneas a la fuente de cada celda, así que una marca de orden de bytes declarada
+al principio nunca lo estaba, y la celda no podía llegar a verde. El generador
+escribe ahora la marca delante del banner.
 
 ---
 
@@ -2093,3 +2128,55 @@ celda pasa a `AGREE`.
 ### Qué lo sujeta
 
 `runtime-format-convert/format-a-numeric-string`, que sólo pide que coincidan.
+
+---
+
+## GLB-030 — Dentro de un bloque TUI (`>>| { … }`) el analizador de Rust no comprueba nada
+
+**Estado:** abierto — sin decisión
+**Encontrado por:** el paso 2.17, 2026-09-15, al cargar `emoji.zy` en `zyjs`
+
+`TypeChecker` de `zymbol-semantic` no desciende al cuerpo de un `>>| { … }`: su
+único brazo para `Statement::TuiBlock` es `check_top_level_exit`. Todo lo que ese
+paso comprueba queda apagado dentro del bloque. Medido con el mismo programa,
+dentro y fuera:
+
+| forma | fuera del bloque | dentro de `>>\| { … }` | `zyjs` |
+|---|---|---|---|
+| `x = f(1)` con `f(a, b)` | `error: function 'f' expects 2 argument(s), but 1 were provided` | nada | error |
+| `a $+ "t"` con `a = [1, 2]` | `error: cannot append String to [Int]: type mismatch` | nada | error |
+| `>> "{nada}" ¶` | `error: undefined variable 'nada' in string interpolation` | nada | error |
+| `@ i:1..c` con `c` calculada | `warning: range direction is decided at runtime…` | nada | aviso |
+
+Es la cuarta vez que aparece la misma forma de fallo: un brazo que no desciende
+apaga TODAS las comprobaciones de ese paso, no una. `variable_analysis`,
+`last_use`, `loop_context` y `def_use` sí bajan al cuerpo, y por eso los avisos
+de variable no usada sí salen dentro del bloque — que es lo que hace difícil de
+ver el hueco.
+
+Sale a la luz porque `web/examples/graphics/mandelbrot/emoji.zy` es un programa
+TUI entero: `zyjs` da allí dos avisos de dirección de rango correctos y Rust
+ninguno, y `web/tests/test_check.mjs` lo cuenta como regresión de paridad
+(0/1 → 0/2) desde que `zyjs` sabe leer `_🔑` (paso 2.17).
+
+### Qué hay que decidir
+
+¿Se hace descender al analizador de tipos por el cuerpo del bloque TUI —un
+`self.check_block(&tb.body)` en ese brazo—, con lo que aparecerán diagnósticos
+nuevos en los programas TUI del corpus y de los ejemplos? ¿O el bloque TUI queda
+declarado como zona sin comprobar?
+
+*Decidido el 2026-09-15:* **se corrige en F3**, con los demás textos y
+comprobaciones de Rust, midiendo antes cuántos diagnósticos nuevos aparecen en el
+corpus, en los ejemplos y en las aplicaciones LDV — un bloque TUI es el cuerpo
+entero de varios programas.
+
+La línea base de `web/tests/test_check.mjs` se regraba a `0 2` para `emoji.zy`
+en el mismo paso 2.17, con esta causa escrita: los dos avisos son de `zyjs` y son
+correctos; lo que falta es el lado Rust. La divergencia la sujetan esta ficha y
+su celda, no un número en un fichero.
+
+### Qué lo sujeta
+
+`refusal/undefined-name-inside-a-tui-block`, roja: `zyjs` la refusa en estático y
+los dos motores Rust llegan a intentar abrir la pantalla alterna.

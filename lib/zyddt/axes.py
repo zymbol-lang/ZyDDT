@@ -388,7 +388,12 @@ def generate(axes: list[Axis], oracles: dict | None = None) -> list[Cell]:
                     sib.write_text(body.lstrip("\n"), encoding="utf-8")
             banner = BANNER.format(axis=cell.axis, axis_what=axis.what,
                                    cell_id=cell.id, cell_what=cell.what)
-            cell.path.write_text(banner + cell.src.lstrip("\n"), encoding="utf-8")
+            body = cell.src.lstrip("\n")
+            # A byte order mark is only a mark when it is the FIRST character of
+            # the file: a banner in front of it makes it an ordinary invisible
+            # character, and the cell that declares one could never be green.
+            mark = "\ufeff" if body.startswith("\ufeff") else ""
+            cell.path.write_text(mark + banner + body[len(mark):], encoding="utf-8")
             keep.add(cell.path.name)
             if cell.oracle and oracles:
                 oid, osrc = cell.oracle
