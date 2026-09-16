@@ -1433,7 +1433,7 @@ de desestructuración del mismo paso coinciden en los tres motores.
 
 ## GLB-017 — Módulos, subscripts y shell: la VM pasa una función al shell, el TW enseña un `Located { … }` de Rust, y cada motor cuenta distinto un módulo que no compila
 
-**Estado:** abierto — **A y G corregidos el 2026-09-15** (pasos 1.5 y 1.5b); B–F abiertos
+**Estado:** abierto — **A y G corregidos el 2026-09-15** (pasos 1.5 y 1.5b); **B corregido el 2026-09-16** (paso 3.3); C–F e I abiertos
 **Encontrado por:** `axes/runtime-modules-scripts.toml`, paso C9 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1499,10 +1499,48 @@ colecciones dentro, un error como valor (`##Div(division by zero)`) y el modo de
 cifras `#०९#`, que en el shell sigue en ASCII. `GUIDE.md` § BashExec lo documenta.
 La celda pasa a `AGREE [2/3]`.
 
+### Corregido B — 2026-09-16 (paso 3.3)
+
+Medido antes, B no era sólo del TW: los dos imprimían mal.
+
+| motor | antes |
+|---|---|
+| `zytw` | `Runtime error: error executing ./sub/falla.zy: Located { message: "division by zero", file: "./sub/falla.zy", line: 1, column: 0 }` y `--> main.zy:4` |
+| `zyvm` | `Runtime error: Runtime error: division by zero`, `--> ./sub/falla.zy:1` y `--> main.zy:4` |
+
+Las dos arquitecturas explican la diferencia: el TW ejecuta el subscript dentro
+del mismo proceso, con un intérprete que captura la salida, y la VM lo lanza como
+un proceso aparte y toma como mensaje lo que ese proceso escribió en stderr —el
+informe de la CLI hija, con su `Runtime error:` y su `-->`—.
+
+La corrección no elige entre las dos: el TW formatea el error del subscript **como
+lo escribe la CLI**, el mensaje y su línea, que es exactamente el texto que la VM
+reenvía. Los dos dicen ahora, byte a byte:
+
+```
+Runtime error: Runtime error: division by zero
+  --> ./sub/falla.zy:1
+  --> main.zy:4
+```
+
+y el `_err` de la celda `-met` es el mismo en los dos. El `Runtime error:` repetido
+es el informe de la hija anidado en el de la madre; si debe decirse de otra forma
+es cosa de C–F, que no se tocan.
+
+`runtime-modules-scripts/subscript-runtime-error` pasa a `AGREE [2/3]`.
+
+**I. Un subscript con avisos que falla** (medido en el paso 3.3). Como la VM
+reenvía todo el stderr de la hija, los avisos del subscript entran en el error y
+en `_err`: `##Div(warning: unused variable 'aviso' … Runtime error: division by
+zero …)`. El TW, que no analiza el subscript, informa sólo del fallo. Misma raíz
+que C. Celda `subscript-with-warnings-that-fails`, que sólo pide que coincidan,
+roja.
+
 ### Qué lo sujeta
 
 `axes/runtime-modules-scripts.toml`: 14 celdas, 4 verdes, 10 rojas, más
-`bash-collection-interpolation` (G), añadida el 2026-09-15. Los errores
+`bash-collection-interpolation` (G), añadida el 2026-09-15, y
+`subscript-with-warnings-that-fails` (I), añadida el 2026-09-16. Los errores
 de carga de módulo no tienen `-met`: una importación va antes de cualquier
 sentencia y no hay `!?` que la rodee.
 

@@ -59,7 +59,7 @@ d = #(k: 1, j: "z")
 [[cell]]
 id     = "subscript-runtime-error"
 expect = "error"
-what   = "error executing {}: {:?}"
+what   = "a subscript that fails is reported as the CLI reports it — `Runtime error: division by zero` and its `-->` line, nested; the tree-walker printed Rust's `Located { … }` (GLB-017 B, corrected 2026-09-16)"
 src    = """
 x = </ ./sub/falla.zy />
 >> x ¶
@@ -249,4 +249,21 @@ src    = """
         <~ nada_definido
     }
 }
+"""
+
+[[cell]]
+id     = "subscript-with-warnings-that-fails"
+what   = "a subscript that has warnings and then fails: the VM runs it as a process and passes its whole stderr on, warnings included, into the error and into `_err`; the tree-walker runs it in-process and reports the failure alone. Asks only that the engines agree (found in step 3.3, 2026-09-16; GLB-017 I)"
+src    = """
+r = "?"
+!? {
+    r = </ ./sub/avisa.zy />
+} :! {
+    >> "[" _err "]" ¶
+}
+"""
+[cell.files]
+"sub/avisa.zy" = """
+aviso = 5
+x = 1 / 0
 """
