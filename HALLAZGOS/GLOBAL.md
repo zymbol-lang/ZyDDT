@@ -1750,7 +1750,7 @@ escribir.
 
 ## GLB-021 — La ayuda de `#.|x|` enseña `#..2|value|`, con dos puntos
 
-**Estado:** abierto — sin decisión pendiente
+**Estado:** **corregido el 2026-09-16** (paso 3.1)
 **Encontrado por:** `syntax-format-convert/round-expects-a-decimal-count`, paso B6, 2026-09-14
 **Gravedad:** baja, pero es una ayuda que enseña una forma que no existe
 
@@ -1765,6 +1765,31 @@ error: expected a decimal count after '#.'
 `{prefix}.2|value|`, y para el redondeo el prefijo que recibe es `"#."`, que ya
 termina en punto. Para `#,` sale bien (`#,.2|value|`). `zyjs` no llega a este
 mensaje (`ZYJS-021`).
+
+### Corregido el 2026-09-16 (paso 3.1)
+
+Medido en las seis formas, el defecto era de tres ayudas y no de una:
+
+| forma | ayuda de Rust antes | después |
+|---|---|---|
+| `#.\|5\|` | `#..2\|value\|` | `#.2\|value\|` |
+| `#!\|5\|` | `#!.2\|value\|` | `#!2\|value\|` |
+| `#,!\|5\|`, `#^!\|5\|` | `#,.2\|value\|` — enseñaba `.` a quien escribió `!` | `#,!2\|value\|`, `#^!2\|value\|` |
+
+`parse_format_precision` recibe ahora dos textos: el operador que nombra el
+mensaje, que no cambia, y lo escrito antes de la cuenta, que es lo que la ayuda
+repite. La ayuda de `precision must be a non-negative integer` tenía la misma
+composición y se corrige igual (hoy no se alcanza: `-1` no llega como un solo
+token).
+
+Cada forma que enseñan las ayudas —`#.2`, `#.n`, `#!2`, `#!n`, `#,.2`, `#,.n`,
+`#,!2`, `#,!n`, `#^.2`, `#^.n`, `#^!2`, `#^!n`— corre, y da lo mismo en los tres
+motores. `zyjs` da ya la ayuda en `#.` y `#!`, donde antes la omitía para no
+copiar la mala. `syntax-format-convert/round-expects-a-decimal-count` pasa a
+`AGREE`, y el eje queda en 9 de 9.
+
+Por el camino: `#,.|5|` y sus hermanos se refusan en `zyjs` con otro texto,
+[[ZYJS-026]].
 
 ---
 

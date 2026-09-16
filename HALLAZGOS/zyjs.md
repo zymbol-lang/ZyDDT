@@ -1700,3 +1700,28 @@ aplicaciones, los 216 ejemplos y el barrido de parseo, idéntico.
 ### Qué lo sujeta
 
 `refusal/lone-hash-at-end-of-line`, verde.
+
+---
+
+## ZYJS-026 — `#,` y `#^` con `.` o `!` y sin cuenta se refusan con otro texto
+
+**Estado:** abierto — sin decisión
+**Encontrado por:** el paso 3.1, 2026-09-16, midiendo `GLB-021` en todas sus formas
+
+| forma | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `#,.\|5\|`, `#,!\|5\|`, `#^.\|5\|`, `#^!\|5\|` | `expected a decimal count after '#,'` (o `'#^'`), con la ayuda que enseña `#,.2\|value\|` | `expected expression, found Hash` |
+
+Los tres refusan. `zyjs` lee la cuenta de `#,.N|` dentro del mismo token, y si
+no hay cifras ni nombre antes del `|` no forma el operador: el `#` queda solo y
+el parser lo refusa como un `#` suelto ([[ZYJS-025]] B). `#.|5|` y `#!|5|` sí
+dicen lo mismo que Rust, y desde el paso 3.1 con la misma ayuda.
+
+### Qué hay que decidir
+
+¿Se da a `#,` y `#^` el mismo rechazo que a `#.` y `#!` —`expected a decimal count
+after '#,'` con su ayuda— en el lexer de `zyjs`?
+
+### Qué lo sujeta
+
+`syntax-format-convert/format-expects-a-decimal-count`, roja.

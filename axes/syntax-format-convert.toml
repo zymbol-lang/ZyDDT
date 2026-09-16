@@ -85,3 +85,12 @@ src  = """
 x = #.|5|
 >> x ¶
 """
+
+[[cell]]
+id     = "format-expects-a-decimal-count"
+expect = "error"
+what   = "`#,.` with no count before the `|`: both Rust engines say `expected a decimal count after '#,'` and show the form, zyjs says `expected expression, found Hash` (found in step 3.1, 2026-09-16; ZYJS-026)"
+src    = """
+x = #,.|5|
+>> x ¶
+"""
