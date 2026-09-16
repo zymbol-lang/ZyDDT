@@ -265,7 +265,7 @@ el límite entre lineal (4,0) y cuadrático (16,0). Tras el arreglo, `zytw` 3,75
 
 ## ZYTW-004 — `db: cannot bind` imprime la estructura interna de la lambda, con sus spans
 
-**Estado:** abierto
+**Estado:** **corregido el 2026-09-16** (paso 3.4) el caso de `db`; el segundo caso pasa al paso 3.5
 **Encontrado por:** `runtime-std-db/cannot-bind-a-function`, paso C11 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** baja en efecto, alta en lo que enseña: el mensaje expone el `Debug` de Rust
 **Familia:** `GLB-017` B (`error executing … Located { … }`)
@@ -295,6 +295,26 @@ mismo en el `_err`: `##Index(index must be an integer, got Function(FunctionValu
 La VM dice `##Type(this needs Int and got Function)`. Además del texto, el kind:
 un índice del tipo equivocado es `##Type` (decisión D1 del 2026-09-15, `GLB-012`).
 Sin celda propia: es el `{:?}` de este mismo hallazgo.
+
+### Corregido el 2026-09-16 (paso 3.4)
+
+`bind_params` escribe el tipo con `Value::type_name()`, el mismo vocabulario que
+la VM usa en ese mensaje (`zymbol_type_name()`). Medido con cada tipo que no se
+puede enlazar, texto y tipo coinciden en los dos motores:
+
+| valor | los dos motores |
+|---|---|
+| `[1, 2]` | `##_(db: cannot bind ##[] as a parameter)` |
+| `(1, 2)` | `##_(db: cannot bind ##() as a parameter)` |
+| `#(a: 1)` | `##_(db: cannot bind ##(name:) as a parameter)` |
+| `x -> x` | `##_(db: cannot bind ##fn as a parameter)` |
+
+`runtime-std-db/cannot-bind-a-function` pasa a `AGREE [2/3]` y el eje queda en
+16 de 16. El segundo caso —indexar con una lambda— es uno de los `{:?}` del paso
+3.5, y su tipo (`##Type`) es de F4.
+
+Por el camino, [[GLB-033]]: esos nombres de tipo (`##[]`, `##fn`) no son los que
+da `#?` (`##]`, `##->`).
 
 ---
 
