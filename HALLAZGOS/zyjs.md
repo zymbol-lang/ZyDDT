@@ -1576,6 +1576,49 @@ sin regresiones y el barrido de parseo de los 1189 `.zy` del workspace, idéntic
   Rust —`--> fichero:línea:columna`— haría comparable la columna en todas las
   celdas con `--strict-column`; es un cambio del arnés y de cómo se ve todo
   diagnóstico, y se pregunta antes.
+  *Decidido el 2026-09-16:* **sí, como Rust**, en un paso propio (2.19).
+
+### El arnés escribe la columna (paso 2.19, 2026-09-16)
+
+`tests/run_one.mjs` escribe `--> fichero:línea:columna`, la grafía de la CLI,
+siempre que el motor sepa la columna. Un diagnóstico que sólo tiene línea sigue
+saliendo `--> line N`: escribir `fichero:línea:0` afirmaría una columna que nadie
+ha medido, y una columna que falta tiene que verse en una celda, no quedar tapada
+por un cero.
+
+Para que haya columna que escribir:
+
+- `checkSource` pasa la columna de un error del lexer o del parser.
+- El checker (`error`, `warn`, `define`, `defineOrKeep`, `hotDefine`) recibe el
+  nodo en vez de su línea. La línea es la misma de antes, la del nodo; la columna
+  es la que el parser estampa en cada sentencia, y sólo si es de esa misma línea.
+
+Medido antes y después con `zyddt --strict-column`:
+
+| matriz | antes | después |
+|---|---|---|
+| normal (no compara columnas) | 264 | 264 — no entra ni sale ninguna: ninguna línea se movió |
+| `--strict-column` | 530 | **433** |
+
+Salen 103. Las seis que «entran» en la estricta son celdas que pasan de `DIVERGE`
+a `WORDING`: la columna ya coincide y sólo quedan las palabras. Consensus 660/0,
+`reject` 42/42, inventario sin nada nuevo, las siete aplicaciones, los 216
+ejemplos, `test_check`, `test_agents`, `test_manual` e i18n, en verde.
+
+### Lo que queda tras el 2.19: 172 celdas rojas sólo por la columna
+
+- **165, `zyjs` no da columna**: el diagnóstico apunta a un nodo de *expresión*, y
+  esos no llevan columna. Por mensaje: tipo de un operador aritmético o lógico
+  (≈ 80, eje `operator`), `chained index does not exist` (34) e `indexed
+  assignment does not exist` (6), `undefined variable` (12), el acceso desde
+  fuera de una función (4), la interpolación (`undefined variable … in string
+  interpolation`, `{}` vacío, carácter inválido: 6), aridad y marcas `<~` en una
+  llamada (5), y sueltos.
+- **7, la columna es distinta**: `expected '|' after precision` y `expected '|'
+  after format operator` (Rust apunta al token de después del prefijo, `zyjs` al
+  prefijo), un parámetro repetido o con el nombre de su función (Rust apunta al
+  parámetro, `zyjs` a la declaración), `$~` sin sitio donde escribir (4:4 contra
+  4:5) y un parámetro de lambda que no es nombre (5:10 contra 5:9).
 
 ---
 
