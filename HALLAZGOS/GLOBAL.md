@@ -2474,6 +2474,45 @@ celdas `WORDING` el TW y `zyjs` ya dicen lo mismo (`index-must-be-an-integer-got
 `cargo test` 1040/0, consensus 660/0, `reject`, `expect`, el inventario y las
 siete aplicaciones, en verde.
 
+### 3.5b — 2026-09-16
+
+La VM deja su genérico `this needs X and got Y` en 50 sitios y dice lo que dice
+el TW, con `Value::type_label`. Lleva variante propia, `VmError::TypeMsg`, para
+no perder la familia `##Type` que daba `TypeError`. Dos instrucciones nuevas de
+comprobación —`CallableCheck`— dan las palabras del TW a `5 |> v` y a `v[1](2)`,
+y map/filter/reduce comprueban la función **antes** del array, como el TW: eso
+corrigió además un comportamiento, `[] $> 5` respondía `[]` en la VM.
+
+Un texto por fallo (decidido el 2026-09-16): la VM compila `v[1]` y `v[1>1]` a
+una sola instrucción, así que los dos textos que tenía el TW para cada fallo
+pasan a ser uno —`cannot index into X — expected array, tuple, or string`,
+`index must be an integer, got X`— y `a String addresses a dictionary key, and
+this is X` cubre ahora también `v["k"]` sobre una lista. ZyDDT 258 → 226.
+
+### 3.5c y 3.5d — 2026-09-18
+
+`zyjs` dice ya, en los mismos términos, lo que dicen los dos Rust en los
+operadores de colección y de orden superior: una tabla por operador sustituye a
+`${op} not supported on ${tipo}` en veinte sitios, y `typeLabel` nombra el tipo
+como el analizador.
+
+Y la barrida de este hallazgo: **ningún mensaje de los tres motores nombra ya un
+tipo con un símbolo**. Cambian los patrones de desestructuración (`[ … ]`,
+`( … )`, `#(…)`), el punto sobre lo que no es un diccionario, `$~`, `$*`,
+`term::width`, `@~`, `db: cannot bind` y `mat::`, que además volcaba el `Debug`
+de una lista de símbolos (`["##\""]`). Un golden del corpus lo recogía y se
+regrabó: `mat::sqrt: incompatible argument type(s) String`.
+
+Por el camino, dos correcciones de camino y un hallazgo: en `zyjs`, `v[1]$~ 9`
+sobre un Int llegaba a la aritmética de índices y decía `tuple index out of
+bounds`, y ahora dice lo que dicen los otros dos; y [[ZYJS-028]], que **acepta**
+`"ab"$* 1.5` y `"ab"$* -1`, que los dos Rust refusan.
+
+ZyDDT 226 → 202. `cargo test` 1040/0, consensus 660/0, `reject` 42/42, `expect`
+634+26 (con ese golden), el inventario sin nada nuevo, las siete aplicaciones,
+los 216 ejemplos, `test_check`, `test_agents`, `test_manual` y el barrido de
+parseo de los 1189 `.zy`, idéntico.
+
 ---
 
 ## GLB-034 — Llamar a un nombre que no guarda una función: tres textos, y el del TW dice que no existe

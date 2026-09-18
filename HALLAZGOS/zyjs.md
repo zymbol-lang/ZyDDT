@@ -1819,3 +1819,30 @@ inventario de mensajes, las siete aplicaciones y los 216 ejemplos, en verde.
 
 `runtime-errors/propagate-at-top-level`, con `expect = "error"` desde la
 decisión, verde.
+
+---
+
+## ZYJS-028 — `$*` acepta una cuenta de repetición que los dos Rust rechazan
+
+**Estado:** abierto — **necesita decisión**
+**Encontrado por:** el paso 3.5d, 2026-09-18, alineando los textos de `$*`
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `"ab"$* 1.5` | `$* repetition count must be an integer, got Float` | `abab` (la trunca) |
+| `"ab"$* -1` | `$* repetition count must be non-negative, got -1` | `""` |
+
+No es un texto distinto: `zyjs` **ejecuta** dos programas que los otros dos
+refusan, y el gate no lo ve porque comparar una salida con un error no es una
+divergencia que `consensus` mida.
+
+### Qué hay que decidir
+
+¿`zyjs` refusa las dos formas, con los textos del TW —que desde el paso 3.5d ya
+da para el receptor—, o son formas del lenguaje y son los dos Rust los que
+sobran?
+
+### Qué lo sujeta
+
+`runtime-collection-ops/repeat-count-with-decimals` y
+`runtime-collection-ops/repeat-count-that-is-negative`, rojas.
