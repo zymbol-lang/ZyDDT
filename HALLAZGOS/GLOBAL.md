@@ -2473,3 +2473,41 @@ celdas `WORDING` el TW y `zyjs` ya dicen lo mismo (`index-must-be-an-integer-got
 `range-bounds-must-be-integers-got-and`, `step-must-be-an-integer-got`).
 `cargo test` 1040/0, consensus 660/0, `reject`, `expect`, el inventario y las
 siete aplicaciones, en verde.
+
+---
+
+## GLB-034 — Llamar a un nombre que no guarda una función: tres textos, y el del TW dice que no existe
+
+**Estado:** abierto — sin decisión
+**Encontrado por:** el paso 3.5b, 2026-09-16, dando a la VM los textos del TW
+
+```zymbol
+t(v) {
+    <~ v(2)
+}
+>> t(5) ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `undefined function: 'v'` |
+| `zyvm` | `this needs Function and got Int` |
+| `zyjs` | `'v' is not a function` |
+
+`v` sí está definido: es un parámetro, y vale 5. El texto del TW manda a buscar
+una función que no falta.
+
+Cuando el callee es una **expresión** (`v[1](2)`) los tres dicen ya
+`expression is not callable` (paso 3.5b). Este es el caso del **nombre**, que el
+compilador de la VM distingue —no emite `CallableCheck` para él, a propósito—
+porque los tres lo dicen de forma distinta y no hay decisión.
+
+### Qué hay que decidir
+
+¿Qué dicen los tres? `'v' is not a function` (lo de `zyjs`, que es lo único
+cierto de los tres), `expression is not callable` (un solo texto para llamar a lo
+que no es función), u otro.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/a-name-that-holds-something-else-is-called`, roja.

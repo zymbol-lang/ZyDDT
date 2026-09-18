@@ -17,7 +17,7 @@ engines = ["zytw", "zyvm", "zyjs"]
 [[cell]]
 id     = "a-string-navigation-step-addresses-a-dictionary"
 expect = "error"
-what   = "a String navigation step addresses a dictionary key, and this is {}"
+what   = "a String addresses a dictionary key, and this is [Int] — the same words through `v[\"k\"]` and through `v[1>\"k\"]` (step 3.5b, decided 2026-09-16)"
 src    = """
 t(v) {
     <~ v[1>"a"]
@@ -173,7 +173,7 @@ t(v) {
 [[cell]]
 id     = "cannot-index-into-expected-array-tuple-or"
 expect = "error"
-what   = "cannot index into {:?} — expected array, tuple, or string"
+what   = "cannot index into Int — expected array, tuple, or string, whether the index came through `v[1]` or through `v[1>1]` (step 3.5b, decided 2026-09-16)"
 src    = """
 t(v) {
     <~ v[1>1]
@@ -199,7 +199,7 @@ t(v) {
 [[cell]]
 id     = "cannot-index-only-arrays-tuples-and-strings"
 expect = "error"
-what   = "cannot index {:?} - only arrays, tuples, and strings are indexable"
+what   = "the plain index says what the navigation form says: cannot index into Int — expected array, tuple, or string (step 3.5b, decided 2026-09-16)"
 src    = """
 t(v) {
     <~ v[1]
@@ -407,7 +407,7 @@ t(v) {
 [[cell]]
 id     = "navigation-index-must-be-an-integer-got"
 expect = "error"
-what   = "navigation index must be an integer, got {:?}"
+what   = "index must be an integer, got Float — the same words as a plain index (step 3.5b, decided 2026-09-16)"
 src    = """
 t(v, s) {
     <~ v[1>s..2]

@@ -360,3 +360,14 @@ f() {
 }
 >> f() ¶
 """
+
+[[cell]]
+id     = "a-name-that-holds-something-else-is-called"
+expect = "error"
+what   = "calling a NAME that holds something other than a function: the tree-walker says `undefined function: 'v'` — and `v` is defined — the VM `this needs Function and got Int`, zyjs `'v' is not a function` (found in step 3.5b, 2026-09-16; GLB-034)"
+src    = """
+t(v) {
+    <~ v(2)
+}
+>> t(5) ¶
+"""
