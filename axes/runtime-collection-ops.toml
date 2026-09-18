@@ -1327,3 +1327,25 @@ t(v) {
     >> (_err#?)[1] ¶
 }
 """
+
+[[cell]]
+id     = "repeat-count-with-decimals"
+expect = "error"
+what   = "`$*` with a repetition count that is not whole: both Rust engines refuse it, zyjs truncates it and repeats (found in step 3.5d, 2026-09-18; ZYJS-028)"
+src    = """
+t(n) {
+    <~ "ab"$* n
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "repeat-count-that-is-negative"
+expect = "error"
+what   = "`$*` with a negative repetition count: both Rust engines refuse it, zyjs answers the empty string (found in step 3.5d, 2026-09-18; ZYJS-028)"
+src    = """
+t(n) {
+    <~ "ab"$* n
+}
+>> t(-1) ¶
+"""
