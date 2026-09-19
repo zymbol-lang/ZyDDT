@@ -2154,9 +2154,11 @@ escribe ahora la marca delante del banner.
 
 ## GLB-027 — La ayuda de Rust para `x°[1] 5` enseña `arr[i] = val`, una forma que no existe
 
-**Estado:** abierto — sin decisión pendiente (F3)
+**Estado:** **corregido 2026-09-19 (paso 3.6)** — la ayuda era el síntoma
 **Encontrado por:** paso 2.3, 2026-09-15, al portar el rechazo a `zyjs`
 **Familia:** `GLB-021`, `GLB-022` (ayudas que enseñan lo que no es)
+**Decisión del autor (2026-09-19):** implementar — un nombre caliente es un ancla
+de edición como cualquier otro.
 
 `x = [1, 2]` y luego `x°[1] 5`, o `x°[1]$~ 5`, en los dos motores Rust:
 
@@ -2168,8 +2170,79 @@ error: expected '=' after index expression for indexed assignment
 `COL-2` dice que `arr[i] = v` no existe, y el propio parser rechaza `arr[i] = v`
 dos líneas antes con `indexed assignment does not exist`. La ayuda enseña
 justo la forma retirada. `zyjs` rechaza igual desde el paso 2.3, **sin** esa
-ayuda. Sujeta la celda `syntax-variables/hot-index-without-operator`, en
-`WORDING` por esa línea.
+ayuda.
+
+### Lo que se midió antes de tocar nada
+
+A ese mensaje se llegaba por **una sola puerta**, y no era la redacción. El
+despachador de sentencias trataba los dos nombres de forma distinta: `x[` sólo
+entraba en `parse_assignment` si `is_indexed_assignment` veía un operador de
+asignación tras el grupo de corchetes, mientras que `x°[` entraba **siempre**.
+Y dentro de esa rama todo era ya un rechazo: el `matches!` que refusa la
+asignación indexada cubría exactamente el mismo conjunto de tokens que el
+`match` de debajo, así que el único brazo alcanzable del segundo era el `_`, y
+las cuarenta líneas que le seguían — el desazucarado `arr[i] = val` →
+`CollectionUpdate` — eran código muerto desde la decisión 6.
+
+Lo que la asimetría le costaba al nombre caliente, medido en los tres motores:
+
+| forma | antes | ahora |
+|---|---|---|
+| `x°[1]$~ 5` | **rechazada en los tres** | `[5, 2]` en los tres |
+| `x°[1]` como sentencia | **rechazada en los tres**, señalando la línea siguiente | `[1, 2]`, como `x[1]` |
+| `acc°[1]$~ 99` dentro de `@` | rechazada | `[99, 20]`, escribiendo en el `acc` del bucle |
+| `>> x°[1] ¶`, `y = x°[1]` | ya funcionaban | sin cambio |
+| `x°[1] = 5`, `x°[1] += 5` | «indexed assignment does not exist» | igual |
+
+O sea: `x°[1]$~ 5` es la forma que declara `COLLECTIONS.md` y estaba rechazada
+para nombres calientes en los tres motores, mientras la misma lectura funcionaba
+en cualquier posición de expresión. `zymbol check` daba el mismo mensaje, así que
+el LSP también. Uso real de `°[` en todo el workspace: **cero**.
+
+### Lo que se hizo
+
+Rust — `zymbol-parser`:
+1. La rama `HotIdent` pide el mismo `is_indexed_assignment` que la rama `Ident`.
+2. La rama de expresión de las dos comparte un método, `parse_expr_or_edit_statement`:
+   la caliente devolvía un `Statement::Expr` pelado, así que darle la puerta sin
+   esto le habría comprado a `x°[1]$~ 5` un parseo y **DI-01** otra vez — correr y
+   no hacer nada en silencio.
+3. El desazucarado lleva el anclaje: `flatten_receiver` devuelve un `EditRoot`
+   (nombre + `hot` + `pre_hot`) en vez de un nombre pelado, y tanto el
+   `Assignment` como el identificador raíz de `rewrite_edit_at_path` se
+   construyen con él. `°` no es adorno sobre el receptor: dice en qué ámbito
+   vive el nombre, y el desazucarado asigna a ese nombre.
+4. El mensaje y su ayuda se borraron con el código muerto que los sostenía.
+
+`zyjs` — la misma forma: fuera el rechazo que sólo miraba `hot`, y el receptor
+lleva `hot` hasta `InPlaceEdit`, que define con `hotDef` cuando no hay nada que
+actualizar, igual que `VarAssign`.
+
+### Un texto por fallo, de propina
+
+Al quitar la puerta, `x°[1 = 2` dejó de ir a `parse_assignment` y pasó a fallar
+donde falla su gemelo frío — y ahí se vio que el corchete de índice sin cerrar
+tenía **tres** redacciones repartidas entre los dos motores: la de
+`expressions.rs`/`closeNav` con su ayuda, y sendos textos privados en la rama de
+sentencia de cada motor, sin ayuda. El privado de Rust seguía vivo para
+`x[1 2] = 5`. Los dos se retiraron: ahora las siete formas —`x[1 = 2`,
+`x°[1 = 2`, `x°[1`, `x[1 2] = 5`, `x[1 2] $~ 5`, `x°[1 2] = 5`, `x[1>2 3] = 5`—
+dan el mismo texto y la misma ayuda en los tres motores, y la ayuda del
+navegador aparece cuando el índice trae un `>`, que es lo que decide
+`is_nav_index` en Rust.
+
+### Lo que queda rojo, y por qué no es esto
+
+`syntax-variables/hot-index-without-operator` (`x°[1] 5`) pasa de `WORDING` a
+`WRONG`, y el rojo **es ahora el mismo** que el de
+`refusal/stray-literal-statement` (`x[1] 5`): los dos motores Rust refusan el
+`5` suelto y `zyjs` lo ejecuta sin decir nada (ZYJS-021, registrado en el paso
+2.3). La celda dejó de medir GLB-027 y mide un hallazgo que ya tiene el suyo.
+
+**Puertas:** `cargo test` 1040/0; consensus 660/0; reject 42/42; expect 634+26,
+0 stale; messages verde (línea base 618→616 de 934: dos textos retirados);
+project, fmt y guide en línea base; barrido de parseo de `zyjs` idéntico sobre
+2810 `.zy`. Matriz: 177 ids rojos, los mismos de antes.
 
 ---
 
@@ -2563,3 +2636,111 @@ que no es función), u otro.
 ### Qué lo sujeta
 
 `runtime-functions-hof/a-name-that-holds-something-else-is-called`, roja.
+
+---
+
+## GLB-035 — `°x` indexado: los dos motores Rust hablan del prefijo y `zyjs` de la asignación indexada
+
+**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.6)
+**Encontrado por:** paso 3.6, 2026-09-19, barriendo las formas vecinas de `GLB-027`
+**Familia:** `GLB-027` (el nombre caliente indexado), pero el prefijo, no el sufijo
+
+Con `x = [1, 2]`:
+
+| forma | `zytw` / `zyvm` | `zyjs` |
+|---|---|---|
+| `°x[1] = 5` | `'°name' is only valid as an assignment target` <br> help: `use '°x += n' to anchor accumulation above the nearest loop` | `indexed assignment does not exist: 'x[…] =' is not a form of Zymbol` <br> help: `use 'x[i]$~ value' to modify in place …` |
+| `°x[1] 5` | el mismo rechazo del prefijo | **lo ejecuta** y no dice nada |
+| `>> °acc[1] ¶` dentro de `@` | imprime `10` | `` `°` has no effect in output context — use `>> x ¶` `` |
+
+Tres desacuerdos en tres formas. El primero es el que importa: **el de `zyjs` es
+el mejor de los dos** —`°x[1] = 5` es la asignación indexada, y lo que hay que
+decirle al lector es que esa forma no existe, no dónde puede ir un `°`—, pero
+el de Rust tampoco es falso. El segundo es la familia
+`refusal/stray-literal-statement`. El tercero es una divergencia de
+comportamiento: el TW lee `°acc[1]` y `zyjs` refusa el `°` en `>>`.
+
+El paso 3.6 **no lo tocó**: `°x` no llega a `parse_expr_or_edit_statement` en
+Rust —su rama no acepta operadores `$`— y el arreglo del sufijo no lo movió.
+
+### Qué hay que decidir
+
+Si `°x[…]` se rechaza por lo que es (asignación indexada, el texto de `zyjs`) o
+por dónde está el `°` (el texto de Rust), y si `>> °x[1] ¶` lee o se rechaza.
+
+### Qué lo sujeta
+
+Nada todavía: no hay celda. Las formas están medidas en los tres motores.
+
+---
+
+## GLB-036 — Un corchete de índice sin cerrar en posición de expresión: Rust y `zyjs` eligen distinta ayuda
+
+**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.6)
+**Encontrado por:** paso 3.6, 2026-09-19
+**Gravedad:** baja: el mismo texto, distinta ayuda; ninguna de las dos es falsa
+
+`>> x[1 = 2 ¶` y `y = x[1 = 2` — el índice no trae `>`:
+
+| | texto | ayuda |
+|---|---|---|
+| `zytw`, `zyvm` | `expected ']' after index` | `array indexing must use brackets: arr[index]` |
+| `zyjs` | `expected ']' after index` | `array indexing must use brackets: arr[index] or arr[i>j]` |
+
+Los dos motores tienen las **mismas dos** ayudas y las reparten distinto. Rust
+decide con `is_nav_index`, una mirada adelante antes de consumir el `[`, así que
+para un índice sin `>` da la ayuda llana; `closeNav` de `zyjs` da la del
+navegador siempre que no sea un destino de tubería ni una extracción.
+
+Con un `>` dentro (`>> m[1>1 ¶`) los dos dan la del navegador y coinciden — es
+lo que hace verde a `syntax-index-nav/navigation-left-open`.
+
+El paso 3.6 alineó las **rutas de sentencia** de los dos motores con esta misma
+regla (`x[1 2] = 5`, `x°[1 = 2`, `x[1>2 3] = 5` coinciden ahora en los tres), y
+al hacerlo dejó a la vista que la ruta de expresión no la sigue.
+
+### Qué hay que decidir
+
+Nada de diseño: es cuál de las dos reparte bien. Si la regla es la de Rust
+—ayuda del navegador sólo cuando el índice navega—, `closeNav` tiene que
+preguntar lo mismo que ya pregunta la rama de sentencia de `zyjs`.
+
+### Qué lo sujeta
+
+Nada todavía: `syntax-index-nav/navigation-left-open` sólo cubre el caso con `>`,
+que coincide. Hace falta una celda para el caso sin `>` en posición de expresión.
+
+---
+
+## GLB-037 — El formateador sabe reimprimir `arr[i] = val`, una forma que ya no se puede construir
+
+**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.6)
+**Encontrado por:** paso 3.6, 2026-09-19, al borrar el desazucarado muerto
+**Gravedad:** baja: código inalcanzable, pero es la forma retirada escrita en un motor
+
+`AssignSugar::IndexedAssign` y `AssignSugar::IndexedCompound(op)`
+(`zymbol-ast/src/variables.rs:29,31`) las construía **sólo** el desazucarado de
+la asignación indexada, que el paso 3.6 retiró por muerto: la decisión 6 la había
+dejado inalcanzable y nadie la había borrado. Las dos variantes siguen ahí, y
+con ellas sus lectores:
+
+- `zymbol-formatter/src/visitor.rs:553,565` — sabe reimprimir un `Assignment`
+  marcado así **como `arr[i] = val`**, que es la forma que el parser refusa.
+- `zymbol-compiler/src/lib.rs:1516` — las trata aparte.
+- `zymbol-bytecode/src/lib.rs:401` — un comentario que explica cómo el TW las
+  distingue.
+
+Nada puede construirlas ya, así que no es un fallo observable. Es lo mismo que
+GLB-027 una capa más abajo: una regla cuya razón se borró es indistinguible de
+una que nadie puede justificar, y aquí lo que quedó escrito es la forma retirada.
+
+### Qué hay que decidir
+
+Si se borran las dos variantes y sus cuatro lectores, o se quedan con una nota
+que diga que están muertas. Toca cinco crates, así que no se hizo dentro del
+paso 3.6.
+
+### Qué lo sujeta
+
+Nada: no hay forma de provocarlas. `zymbol fmt` sobre el corpus no las alcanza —
+`zyq suite --only fmt` da P1–P4 sin fallos.
