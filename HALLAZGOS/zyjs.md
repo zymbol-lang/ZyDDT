@@ -1824,7 +1824,7 @@ decisión, verde.
 
 ## ZYJS-028 — `$*` acepta una cuenta de repetición que los dos Rust rechazan
 
-**Estado:** abierto — **necesita decisión**
+**Estado:** **decidido y corregido el 2026-09-18** (paso 3.5d-bis)
 **Encontrado por:** el paso 3.5d, 2026-09-18, alineando los textos de `$*`
 
 | programa | `zytw`, `zyvm` | `zyjs` |
@@ -1842,7 +1842,23 @@ divergencia que `consensus` mida.
 da para el receptor—, o son formas del lenguaje y son los dos Rust los que
 sobran?
 
+*Decidido el 2026-09-18:* **`zyjs` refusa las dos**, con los textos que ya dan
+los dos Rust.
+
+### Corregido el 2026-09-18 (paso 3.5d-bis)
+
+`$*` exige una cuenta entera y no negativa: `$* repetition count must be an
+integer, got Float` y `$* repetition count must be non-negative, got -1`. Una
+cuenta de 0 sigue dando la cadena vacía, y `"ab"$* 3` sigue dando `ababab`.
+
+Al medirlo salió un error del paso 3.5b en la VM: una cuenta negativa recibía el
+mensaje de «no es entero» (`got Int`), porque los dos casos compartían rama. Ya
+son dos.
+
+Las dos celdas pasan a `AGREE`, y el eje `runtime-collection-ops` sube de 3 a 20
+celdas de acuerdo con los textos del paso 3.5c.
+
 ### Qué lo sujeta
 
 `runtime-collection-ops/repeat-count-with-decimals` y
-`runtime-collection-ops/repeat-count-that-is-negative`, rojas.
+`runtime-collection-ops/repeat-count-that-is-negative`, verdes.
