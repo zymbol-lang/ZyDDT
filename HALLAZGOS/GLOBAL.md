@@ -2403,7 +2403,7 @@ La suite de GUIDE sigue con sus tres fallos de siempre.
 
 ## GLB-033 — Los mensajes de error nombran los tipos con un vocabulario que `#?` ya no usa
 
-**Estado:** **decidido el 2026-09-16**; en curso (paso 3.5, por sub-pasos)
+**Estado:** **corregido el 2026-09-18** (paso 3.5, en cinco sub-pasos)
 **Encontrado por:** el paso 3.4, 2026-09-16, cerrando [[ZYTW-004]]
 
 `#?` nombra los tipos igual en los tres motores. Los mensajes de la biblioteca
@@ -2512,6 +2512,19 @@ ZyDDT 226 → 202. `cargo test` 1040/0, consensus 660/0, `reject` 42/42, `expect
 634+26 (con ese golden), el inventario sin nada nuevo, las siete aplicaciones,
 los 216 ejemplos, `test_check`, `test_agents`, `test_manual` y el barrido de
 parseo de los 1189 `.zy`, idéntico.
+
+### 3.5e — 2026-09-18
+
+El analizador nombra el diccionario `#(k: Int)`, como se escribe y como lo
+nombran ya los mensajes de ejecución; decía `(k: Int)`, que se lee como una
+tupla posicional con etiquetas. Cambia en los dos sitios que lo construyen: el
+`ZymbolType::name` de `zymbol-semantic` y el `operandTypeName` de `zyjs`.
+
+Con esto el hallazgo queda cerrado: **un solo vocabulario de tipos en los tres
+motores, en los mensajes de ejecución y en los del analizador**. El eje
+`operator`, que es el que más los nombra, está en 252 de 252.
+
+Medida final del paso 3.5 completo: la matriz baja de 258 rojas a **198**.
 
 ---
 
