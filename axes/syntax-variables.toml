@@ -2,11 +2,14 @@
 #
 # Destructuring patterns, `\\ name`, and the indexed form after a hot name
 # (`x°[…]`), written wrong: the parser diagnostics no program provoked on
-# 2026-09-14. Every cell expects `error` and provokes its `help:` line.
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line, except
+# `hot-index-edit`, which declares its own `expect`.
 #
-# The indexed-assignment diagnostics are reached only after a HOT name: for a
-# plain name the dispatch looks ahead for a complete `name[…] op` before it ever
-# calls parse_assignment, and for `x°` it routes on the `[` alone.
+# The indexed-assignment diagnostics used to be reached only after a HOT name:
+# for a plain name the dispatch looked ahead for a complete `name[…] op` before
+# it ever called parse_assignment, and for `x°` it routed on the `[` alone. That
+# asymmetry was the whole of GLB-027 and it is gone (2026-09-19, step 3.6) — the
+# hot name asks the same question, and `x[…] =` is the only way in for either.
 #
 # Six lines have no cell (reasons in the queue): each is a check that a token is
 # what the dispatch already confirmed it is.
@@ -77,9 +80,26 @@ x°[1 = 2
 """
 
 [[cell]]
-id   = "hot-index-without-operator"
-what = "expected '=' after index expression — after a hot name, with its help"
+id   = "hot-index-edit"
+what = "a hot name edits like a cold one — `x°[i]$~ v` writes, and the write anchors where `°` says"
+expect = "ok"
+# This cell used to be `hot-index-without-operator`, `x°[1] 5`, and measured the
+# help that taught `arr[i] = val` (GLB-027). The help was the symptom: `x°[` was
+# routed to the withdrawn indexed assignment unconditionally where `x[` asked
+# first, so the hot name lost BOTH halves of the form — this edit and the bare
+# read — while the same read in any expression worked. What `x°[1] 5` measures
+# now is the stray `5`, which is `refusal/stray-literal-statement` with a cold
+# name and already has its own cell. So the cell moved to what the step fixed.
+# Inside the loop, where `°` is doing its work: at global scope over a name that
+# already exists the analyzer warns that the `°` is redundant, which is right and
+# which zyjs does not implement — a hole the message inventory already counts,
+# and not what this cell is for.
 src  = """
-x = [1, 2]
-x°[1] 5
+@ 2 {
+    acc° = [10, 20]
+    acc°[1]$~ 99
+    >> acc ¶
+    >> acc°[1] ¶
+    acc°[1]
+}
 """
