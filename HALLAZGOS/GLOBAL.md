@@ -2248,9 +2248,11 @@ project, fmt y guide en línea base; barrido de parseo de `zyjs` idéntico sobre
 
 ## GLB-028 — Los parsers Rust añaden errores falsos en cascada y enseñan sus tokens internos
 
-**Estado:** abierto — sin decisión pendiente (F3)
+**Estado:** **la cascada corregida 2026-09-19 (paso 3.7)**; los nombres de token
+siguen abiertos y son de los DOS motores
 **Encontrado por:** pasos 2.1 y 2.3, 2026-09-15
 **Gravedad:** media: el lector recibe dos errores donde hay uno, y el segundo nombra el lexer por dentro
+**Decisión del autor (2026-09-19):** las tres causas, sólo la cascada.
 
 Tras el error real, los dos Rust siguen leyendo e informan de algo que no está mal:
 
@@ -2266,6 +2268,92 @@ Tras el error real, los dos Rust siguen leyendo e informan de algo que no está 
 el mismo en los tres y quedan en `DIVERGE` sólo por esa línea de más: los dos
 patrones de rango de `syntax-control-flow`, `syntax-lexer/unterminated-string-interpolation`,
 `syntax-try-catch/error-type-without-a-name`.
+
+### Lo que se midió antes de tocar nada
+
+Barrido de los 1258 programas mal escritos que hay (`ZyDDT/generated/` más
+`zyquality/reject/`), contando diagnósticos por motor:
+
+| superficie | programas con 2+ errores |
+|---|---|
+| `zymbol run`, `zytw` y `zyvm` idénticos | 12 |
+| `zymbol check` — lo que ve el LSP | **41** |
+| `zyjs` | 1, y es correcto |
+
+El analizador cascadeaba **tres veces más** que el ejecutor, que es justo la
+superficie donde un lector lo encuentra. Y no era una causa: eran **cinco**.
+
+### Las cinco causas
+
+**1 — `skip_statement` contaba las llaves desde donde falló.** La `{` que abrió
+el cuerpo ya quedaba detrás, así que `depth` arrancaba en 0 y el salto **se
+paraba en la `}` de cierre** en vez de tragarla. Es el escenario que el propio
+comentario de la función decía haber arreglado en GLB-007 — sólo se había
+arreglado el caso en que el fallo ocurre ANTES de la `{`, en la condición. El
+salto recibe ahora el token donde empezó la sentencia y cuenta desde ahí.
+
+**2 — y se comía la `}` del bloque que lo contiene.** El avance obligatorio del
+principio tomaba la `}` sobre la que había fallado la sentencia, así que
+`parse_block` tomaba por suya la del bloque de fuera y el módulo quedaba sin
+cerrar: «expected '}' to close module body». Ahora no toca una `}` de nivel 0
+cuando hay un `parse_block` esperándola y la sentencia ya avanzó algo; en el
+nivel superior, donde nadie la espera, se sigue consumiendo o la recuperación no
+avanzaría.
+
+**3 — el lexer releía la comilla de cierre.** Tras «unterminated string
+interpolation» no consumía la `"` que había parado la lectura, así que el token
+siguiente empezaba una segunda cadena ahí y esa corría hasta el final del
+fichero: «unterminated string literal», y una ayuda que manda cerrar con una
+comilla que ya está escrita.
+
+**4 — el bucle de imports avanzaba un solo token.** Los otros dos bucles de
+recuperación saltan la sentencia entera desde GLB-007; éste se quedó atrás, así
+que `<# ./2malo => m` informaba del `=>` que el primer error ya había dado por
+inalcanzable.
+
+**5 — el parser hablaba del token que el lexer ya había refusado.** El lexer
+emite su diagnóstico y devuelve un `TokenKind::Error` con su carga dentro;
+`run` y `build` paran ahí, pero `check` y el LSP siguen a propósito, y el parser
+decía `expected expression, found Error("invalid float: '1.0e+'")` — la cadena
+interna del lexer, en la grafía `Debug` de Rust, a un lector que no la pidió. Un
+diagnóstico del parser que señala un token que el lexer ya refusó es siempre un
+duplicado, y se descarta. **Ésta sola explica 26 de los 41.**
+
+### Antes y después
+
+| | antes | ahora |
+|---|---|---|
+| `run` con 2+ errores | 12 | **1** |
+| `check` con 2+ errores | 41 | **4** |
+| celdas | — | **5 verdes, 0 nuevas rojas** (176 → 171 ids rojos) |
+| goldens | — | 4 encogen: 2→1, 13→7, 6→3, 6→3 |
+
+El único que queda en `run` es `refusal/undefined-name-in-string-interpolation`,
+y son dos errores **reales**, uno por cada nombre indefinido: `zyjs` da los dos
+también. Ningún programa pasó de tener un error a no tener ninguno.
+
+### Lo que NO se arregló, y por qué
+
+**Los nombres de token internos los enseñan los DOS motores.** La ficha sólo
+acusaba a Rust y eso era la mitad de la medida:
+
+| | |
+|---|---|
+| Rust | `unexpected token: RBrace`, `expected pattern, found Star`, `unexpected token: FatArrow`, `expected expression, found Error(…)` |
+| `zyjs` | `Expected FAT_ARROW, got 'string'`, `expected expression, found FatArrow`, `expected expression, found LBrace`, `Expected IDENT, got '2'` |
+
+Decidido por el autor: fuera de este paso. Son decenas de sitios en cada motor y
+cada uno pide decidir cómo se llama ese token en el idioma del lenguaje.
+
+**Cortar la cascada puso 4 celdas en verde, no 11.** Tres de `syntax-control-flow`
+pasaron de `DIVERGE` a `WORDING`: ya no sobra ninguna línea, y lo que queda es
+que `zyjs` **no tiene** los tres mensajes, que son los buenos —
+`expected '=>' after pattern`, `expected ']' to close list pattern`,
+`'_?' requires a condition` con su ayuda — y contesta con nombres de token. Eso
+lo cuenta el inventario de `zyquality/messages/` y no es esta cascada.
+
+**Y una quinta celda se puso verde de propina**, `runtime-modules-scripts/module-with-parse-errors`,
+por la causa 2.
 
 ---
 
@@ -2744,3 +2832,114 @@ paso 3.6.
 
 Nada: no hay forma de provocarlas. `zymbol fmt` sobre el corpus no las alcanza —
 `zyq suite --only fmt` da P1–P4 sin fallos.
+
+---
+
+## GLB-038 — La recuperación de cadena del lexer se come el resto del fichero, y el TW y la VM informan de errores distintos del mismo módulo
+
+**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.7)
+**Encontrado por:** paso 3.7, 2026-09-19, midiendo lo que quedaba de la cascada
+**Familia:** `GLB-028`, pero no se arregla con ella
+
+`skip_rest_of_string` corre hasta la comilla de cierre **o hasta el final del
+fichero**. Cuando no hay comilla de cierre se lleva todo lo que queda, llaves
+incluidas, y el parser se queda sin cerrar bloques que sí estaban cerrados:
+
+```
+# lexico {
+    #> { f }
+    f() {
+        <~ "abc
+    }
+}
+```
+
+| | |
+|---|---|
+| `zytw` | `failed to parse module: 1 lexer error(s)` — `unmatched '}' in string` @4:12 |
+| `zyjs` | lo mismo |
+| `zyvm` | `failed to parse module: 1 parse error(s)` — `expected '}' to close block` @7:1 |
+
+Los dos diagnósticos existen en los dos motores Rust; lo que difiere es **cuál
+informa cada cargador de módulos**. El TW da el del lexer y para; la VM da el del
+parser, que es el *segundo*. Con `zymbol check` salen los dos.
+
+No lo cierra el filtro del paso 3.7 (causa 5): ese descarta lo que señala un
+token `Error`, y éste señala el final del fichero.
+
+Vecino, con la misma raíz y sin celda: `>> "a{b ¶` — sin comilla de cierre — da
+`invalid character in string interpolation` en Rust (por el `¶`) y
+`unterminated string interpolation` en `zyjs`.
+
+### Qué hay que decidir
+
+Hasta dónde recupera el lexer cuando una cadena no cierra. El salto de línea no
+sirve de tope: una cadena de Zymbol puede abarcar varias líneas a propósito. Y,
+aparte, cuál de los dos diagnósticos informa un cargador de módulos, que hoy no
+es el mismo en los dos motores Rust.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/module-with-lexer-errors`, roja — y roja por la
+divergencia TW/VM, no por la cascada.
+
+---
+
+## GLB-039 — Dos reglas del analizador sobre el mismo nombre: no puedes verlo, y además no existe
+
+**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.7)
+**Encontrado por:** paso 3.7, 2026-09-19
+**Gravedad:** baja: los dos textos son ciertos, pero el segundo desmiente al primero
+
+```
+? #1 { _t = 1 }
+>> _t ¶
+```
+
+| | |
+|---|---|
+| `zytw`, `zyvm` | `cannot access underscore variable '_t' from outer scope` **y** `undefined variable '_t'` |
+| `zyjs` | `undefined variable '_t'` |
+
+El primero dice que el nombre existe y no se alcanza; el segundo, que no existe.
+Un lector que arregle el segundo borra la declaración que el primero señala. Es
+el analizador, no el parser: la cascada del paso 3.7 no lo toca.
+
+La celda `isolation/underscore-is-invisible-outside` está **verde**: el gate
+compara el veredicto y los dos motores llegan a `error`. Lo que no ve es que uno
+llega con dos textos y el otro con uno.
+
+### Qué hay que decidir
+
+Cuál de las dos reglas habla cuando las dos aciertan. `zyjs` da la menos precisa
+de las dos; el texto bueno es el primero de Rust.
+
+### Qué lo sujeta
+
+Nada: la celda es verde. Haría falta una que compare el número de diagnósticos.
+
+---
+
+## GLB-040 — `wording.baseline` lleva 23 líneas sin decidir
+
+**Estado:** abierto — hace falta decisión (arnés, encontrado por el paso 3.7)
+**Encontrado por:** paso 3.7, 2026-09-19
+
+`ZyDDT/wording.baseline` dice de sí mismo que «puede encoger sola, y nunca puede
+crecer sola: una línea que aparezca aquí sin haberse escrito a propósito es un
+mensaje nuevo de un solo lado». Tiene 9 entradas. Hoy hay **23** celdas en
+`WORDING`, y **8** de las 9 registradas ya no lo están.
+
+O sea: el fichero no se regraba desde hace varios pasos, y las 23 «NEW WORDING»
+que imprime `zyddt axis` son 23 decisiones que nadie ha tomado. Tres son del
+paso 3.7 (las tres de `syntax-control-flow` que pasaron de `DIVERGE` a `WORDING`
+al retirarse la cascada); las otras 20 vienen de antes.
+
+No se regrabó en el paso 3.7 **a propósito**: `--regen-baseline` absorbería de
+una vez las 20 ajenas, que es exactamente contra lo que el fichero avisa.
+
+### Qué hay que decidir
+
+Si se regraba la línea base entera —y entonces las 23 quedan aceptadas de golpe—
+o se repasan una a una. Y, si es lo segundo, si el gate debería quejarse de que
+lleva 23 pendientes, porque hoy no se queja de nada.
