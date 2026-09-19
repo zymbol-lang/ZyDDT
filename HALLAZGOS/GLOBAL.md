@@ -2396,7 +2396,7 @@ celda pasa a `AGREE`.
 
 ## GLB-030 — Dentro de un bloque TUI (`>>| { … }`) el analizador de Rust no comprueba nada
 
-**Estado:** abierto — sin decisión
+**Estado:** **corregido 2026-09-19 (paso 3.8)** — y eran tres huecos, no uno
 **Encontrado por:** el paso 2.17, 2026-09-15, al cargar `emoji.zy` en `zyjs`
 
 `TypeChecker` de `zymbol-semantic` no desciende al cuerpo de un `>>| { … }`: su
@@ -2443,6 +2443,53 @@ su celda, no un número en un fichero.
 
 `refusal/undefined-name-inside-a-tui-block`, roja: `zyjs` la refusa en estático y
 los dos motores Rust llegan a intentar abrir la pantalla alterna.
+
+### Lo que se midió antes de tocar nada: eran TRES huecos
+
+`check_statement` no tenía brazo para `TuiBlock` —lo que decía la ficha— **ni
+para `OutputPos` (`>>~`) ni para `Sleep` (`@~`)**. Los tres caían en el mismo
+`_ => {}`. `>>~` se escribe **539 veces** en el corpus y los ejemplos y no había
+nada mirando ni sus posiciones ni lo que imprime. `zyjs` comprueba los tres.
+
+| forma | `zytw` antes | `zyjs` | `zytw` ahora |
+|---|---|---|---|
+| `>>\| { x = f(1) }` con `f(a,b)` | nada | error | error |
+| `>>\| { >> "{nada}" ¶ }` | nada | error | error |
+| `>>~ (nada, 1) > "A"` | nada | error | error |
+| `>>~ (1,1) > f(1)` | nada | error | error |
+| `@~ nada` | nada | error | error |
+| `@~ f(1)` | nada | error | error |
+
+El cuerpo del bloque entra con ámbito propio, porque `execute_block` empuja uno:
+un nombre definido dentro no existe después, y este paso tiene que decir lo
+mismo que los demás.
+
+### Lo que apareció al encenderlo
+
+Barrido de los 154 ficheros con `>>|`, `>>~` o `@~` (corpus, `project`,
+ejemplos, generados de ZyDDT y las ocho aplicaciones): de 15 líneas de
+diagnóstico a **239**, ninguna perdida. Son **tres hechos**:
+
+**1. Los 110 ficheros de `mandelbrot`, dos avisos de dirección de rango cada
+uno.** Es exactamente para lo que era el paso: `@ y:1..medio` con `medio`
+sacado del tamaño del terminal. `zyjs` ya los daba y Rust no. **Ahora
+coinciden**, que es lo que la ficha pedía.
+
+**2. Los mismos 110, un `type mismatch: 'marca' was String but assigned Char`.**
+También cierto: `trazo = " .:-=+*#%"` es String y `trazo[paso]` es Char. Ver
+[[GLB-043]]: `zyjs` tiene la regla y no la dispara aquí porque sólo compara
+literal contra literal.
+
+**3. Un fallo real en ZyBank, a la primera.** `pantalla/tui.zy:595` escribía
+`@! principal` donde el salto con etiqueta se escribe `@:principal!`. Ver
+[[GLB-041]]. Corregido en el mismo paso, por decisión del autor.
+
+Ningún fichero del corpus y ninguna otra aplicación cambian.
+
+**Puertas:** `cargo test` 1040/0; consensus 660/0; reject 42/42; expect 634+26,
+0 stale; messages, project, fmt y guide en línea base; las seis suites de `web/`
+en verde. Matriz: 171 → 170 ids rojos, y la celda que sujetaba esta ficha en
+verde.
 
 ---
 
@@ -2943,3 +2990,129 @@ una vez las 20 ajenas, que es exactamente contra lo que el fichero avisa.
 Si se regraba la línea base entera —y entonces las 23 quedan aceptadas de golpe—
 o se repasan una a una. Y, si es lo segundo, si el gate debería quejarse de que
 lleva 23 pendientes, porque hoy no se queja de nada.
+
+---
+
+## GLB-041 — `@! etiqueta` parece un salto con etiqueta y es un salto pelado más un nombre tirado
+
+**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.8)
+**Encontrado por:** paso 3.8, 2026-09-19, al encender el analizador dentro de `>>| { … }`
+**Clase:** 1 — los tres coinciden, y los tres se quedan cortos
+
+El salto con etiqueta se escribe **`@:etiqueta!`** y **`@:etiqueta>`**: la
+etiqueta va DENTRO del salto, y el lexer la lee como un solo token
+(`AtColonLabelBreak`). Escrita aparte, `@! etiqueta` es otra cosa: un `@!`
+pelado —que sale sólo del bucle más interno— seguido de un identificador suelto
+que se lee y se tira.
+
+| lo escrito | lo que pasa |
+|---|---|
+| `@:principal!` | sale de los dos bucles. `n` = 1 |
+| `@!` | sale sólo del interno; el `@:principal {` sin condición no termina nunca |
+| `@! principal`, con `principal` **sin definir** | `undefined variable 'principal'` en ejecución, en los tres motores |
+| `@! principal`, con `principal` **definido** | `warning: this statement does nothing: 'principal' is read and discarded`, y corre haciendo lo del `@!` pelado |
+
+La última fila es la que importa: **el programa corre, hace lo que no se quiso,
+y el único aviso habla de una lectura inútil sin mencionar que a dos caracteres
+de ahí está el salto que el lector creía escribir.** Los tres motores dan el
+mismo aviso, así que ningún diferencial lo ve.
+
+Apareció porque `ZyBank/pantalla/tui.zy:595` lo escribía así, en la tecla `q`
+de salir y **dentro de un `>>| { … }`**, que es justo donde el analizador de
+Rust no entraba ([[GLB-030]]). Corregido allí el 2026-09-19 por decisión del
+autor: comprobado que `@:principal!` sale de los dos bucles y que `@!` deja el
+exterior girando. Es la **única** ocurrencia en todo el workspace; las otras
+cuatro coincidencias son comentarios.
+
+### Qué hay que decidir
+
+Si `@!` o `@>` seguidos de un identificador **en la misma línea** se refusan,
+con una ayuda que enseñe `@:nombre!`. Hoy son dos sentencias legales que juntas
+no hacen nada de lo que parecen.
+
+### Qué lo sujeta
+
+Nada todavía: no hay celda, y el aviso que sale no distingue este caso de
+cualquier otro nombre tirado.
+
+---
+
+## GLB-042 — Los mensajes de `>>~` nombran el valor, y la VM llama «ms» a lo que los otros dos llaman «duration»
+
+**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.8)
+**Encontrado por:** paso 3.8, 2026-09-19, midiendo las formas vecinas de `>>~` y `@~`
+**Familia:** `GLB-033` (los tipos en los mensajes), cerrado en el paso 3.5
+
+Dos restos en la misma zona:
+
+| forma | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `>>~ ("fila", 1) > "A"` | `>>~ slot expects Int, got fila` | igual | igual |
+| `>>~ (2.5, 1) > "A"` | `>>~ slot expects Int, got 2.5` | igual | igual |
+| `@~ -5` | `@~ requires non-negative **duration**, got -5` | `@~ requires non-negative **ms**, got -5` | como el TW |
+| `@~ "medio"` | `@~ requires integer milliseconds, got String` | igual | igual |
+
+1. **`>>~ slot` nombra el valor.** GLB-033 lo dejó escrito: los mensajes dicen el
+   tipo, nunca el valor. Debería ser `got String` y `got Float`. Los tres lo
+   hacen igual —`to_display_string()`, `{got}`, `this.display(v)`— así que
+   ningún diferencial lo ve.
+2. **La VM dice «ms» donde el TW y `zyjs` dicen «duration».** Una palabra, en un
+   mensaje de ejecución que el gate no compara.
+
+`@~ requires integer milliseconds, got String` sí está bien en los tres.
+
+### Qué hay que decidir
+
+Nada de diseño: es aplicar GLB-033 a `>>~ slot` y que la VM copie la redacción
+del TW, que es la regla («un mensaje se redacta como el TW redacta esa
+operación»).
+
+### Qué lo sujeta
+
+Nada: no hay celda para ninguna de las cuatro formas.
+
+---
+
+## GLB-043 — El aviso de cambio de tipo: Rust infiere el lado derecho y `zyjs` sólo compara literales
+
+**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.8)
+**Encontrado por:** paso 3.8, 2026-09-19, al medir el impacto de [[GLB-030]]
+**Decisión del autor (2026-09-19):** aceptar y regrabar la línea base de paridad.
+
+```zymbol
+trazo = " .:-=+*#%"
+marca = "@"
+marca = trazo[1]      // String → Char
+```
+
+| | |
+|---|---|
+| `zytw`, `zyvm` | `warning: type mismatch: 'marca' was String but assigned Char` |
+| `zyjs` | nada |
+
+Los dos tienen la regla. `zyjs` sólo la aplica **literal contra literal**, y lo
+declara en su propio comentario: *«Only literal-to-literal is decided without
+inference, which is the same limit the condition check works under»*. Rust
+infiere el lado derecho, así que ve el `trazo[1]`.
+
+Sale a la luz con [[GLB-030]]: la asignación vive dentro de un `>>| { … }` en
+los **110** ficheros de `mandelbrot`, y al encender el analizador allí la
+paridad de cada uno pasa de `0 2` —dos avisos de rango que sólo daba `zyjs`— a
+`1 0`, el de cambio de tipo que sólo da Rust. **Por fichero la divergencia baja
+de dos a una**, pero `web/tests/test_check.mjs` cuenta cualquier dirección y
+cantó 110 regresiones.
+
+La línea base se regrabó el 2026-09-19 con esta causa escrita aquí, igual que se
+hizo con `emoji.zy` en el paso 2.17: la divergencia la sujeta esta ficha, no un
+número en un fichero. El diff son exactamente 110 filas, todas de `mandelbrot`,
+y ninguna otra se movió.
+
+### Qué hay que decidir
+
+Hasta dónde infiere el analizador de `zyjs` en el lado derecho de una
+reasignación. Estrechar Rust no se hizo: perdería un aviso cierto que ya daba
+fuera de los bloques TUI.
+
+### Qué lo sujeta
+
+`web/tests/check_parity_baseline.txt`, 110 filas en `1 0`. No hay celda.
