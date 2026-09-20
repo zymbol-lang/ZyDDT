@@ -3236,7 +3236,7 @@ dos rojas.
 
 ## GLB-046 — Las colecciones pasan a ser ESTRICTAS (D2 derogada), medido
 
-**Estado:** **decidido por el autor 2026-09-20** — queda implementarlo (paso 4.3)
+**Estado:** **implementado 2026-09-20 (paso 4.3)**, salvo dos formas — ver [[GLB-048]]
 **Encontrado por:** paso 4.2, midiendo las 40 celdas del grupo B
 **Deroga:** D2 («colecciones tolerantes»). El autor: *«la permisividad es un
 error, debería ser más estricto y solicitar expresiones correctas a sus valores;
@@ -3337,10 +3337,29 @@ fichero del corpus** el que hay que reescribir, no una aplicación.
 descendentes literales en el corpus y ninguno en una aplicación. El autor:
 *«ya esto está correctamente implementado»*.
 
+### Implementado (paso 4.3, 2026-09-20)
+
+| motor | aceptaba | acepta | idénticas al TW |
+|---|---|---|---|
+| `zyvm` | 13 | **2** | 18 de 40 |
+| `zyjs` | 34 | **2** | **35 de 40** |
+
+Las dos que quedan son las mismas en los dos motores y están en [[GLB-048]]: el
+rango de navegación y la constante redeclarada, que piden decisión y no puerto.
+
+Lo sostienen guardas compartidos en cada motor —`needInt`, `needCharStr`,
+`needInBounds` y `rangeBounds` en `zyjs`, `range_bounds` en la VM— para que los
+operadores no puedan volver a separarse.
+
+Matriz: **29 celdas en verde, ninguna nueva roja**, 127 → **98** ids rojos.
+Puertas: `cargo test` 1040/0, consensus 660/0, reject 42/42, expect 634+26 sin
+stale, project 7/7, fmt, examples 216/0, `test_check` sin regresiones, barrido
+de parseo de `zyjs` idéntico sobre 2810 `.zy`.
+
 ### Qué lo sujeta
 
-Las 40 celdas del grupo B, todas rojas: `runtime-collection-ops` 31,
-`runtime-index-nav` 5, `runtime-loops-ranges` 3, `runtime-operators` 1.
+Las 40 celdas del grupo B: `runtime-collection-ops` 31, `runtime-index-nav` 5,
+`runtime-loops-ranges` 3, `runtime-operators` 1.
 
 ---
 
