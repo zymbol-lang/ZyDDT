@@ -12,9 +12,13 @@
 # a literal, the analyzer refuses most of these before anything runs, and the
 # runtime diagnostic is never reached — which is how they came to be unprovoked.
 #
-# The `-met` cells print the kind rather than filtering on one: which family
-# these belong to is not decided (the tree-walker answers `##_`, the VM
-# `##Type`), and a cell that filtered on a guess would encode the guess.
+# The `-met` cells print the kind rather than filtering on one. They were
+# written when the family was NOT decided — the tree-walker answered `##_` and
+# the VM `##Type` — and a cell that filtered on a guess would have encoded the
+# guess. It is decided now (D1, 2026-09-15): a wrong TYPE is `##Type` and a
+# wrong VALUE is `##Index`, and the three engines were aligned on it in step 4.1
+# (GLB-044). Printing the kind is still what these cells do, because what they
+# are for is the comparison and not the filter.
 #
 # Three diagnostics of this family have no cell because nothing can reach them;
 # their reasons are in zyquality/messages/queue/runtime.tsv:
