@@ -3341,3 +3341,68 @@ descendentes literales en el corpus y ninguno en una aplicación. El autor:
 
 Las 40 celdas del grupo B, todas rojas: `runtime-collection-ops` 31,
 `runtime-index-nav` 5, `runtime-loops-ranges` 3, `runtime-operators` 1.
+
+---
+
+## GLB-047 — Los mensajes de corte y de borrado por rango imprimían el desplazamiento interno
+
+**Estado:** **corregido 2026-09-20 (paso 4.3)**
+**Encontrado por:** paso 4.3, al ir a copiar los textos del TW a los otros dos
+
+Cuatro mensajes del tree-walker nombraban números que el lector no había escrito:
+
+| escrito | decía | dice ahora |
+|---|---|---|
+| `a$[3..1]` | `slice start (2) cannot be greater than end (1)` | `slice start (3) cannot be greater than end (1)` |
+| `a$[4..2]` | `slice start (3) … end (2)` | `slice start (4) … end (2)` |
+| `a$[1..9]` | `slice indices out of bounds: [0..9]` | `[1..9]` |
+| `a$-[1..9]` | `$-[0..9] out of bounds for collection of length 3` | `$-[1..9] …` |
+
+El **inicio** salía como el desplazamiento 0-based en que la función lo había
+convertido y el **fin** salía crudo, así que la pareja mezclaba dos sistemas de
+numeración y la relación que afirmaba —«2 no puede ser mayor que 1»— era cierta
+sobre valores que no estaban en el programa.
+
+Se corrigió **antes** de copiar los textos a la VM y a `zyjs`, que es lo que el
+paso 4.3 hace: alinear sobre el TW habría extendido el defecto a dos motores
+más. Los sitios guardan ahora lo escrito antes de normalizar.
+
+Ningún golden los graba: son diagnósticos que ningún programa provoca, que es
+para lo que existen los ejes de ZyDDT.
+
+---
+
+## GLB-048 — Lo que falta para que la VM sea estricta: dos formas que piden decisión
+
+**Estado:** abierto — hace falta decisión (F4, paso 4.3)
+**Encontrado por:** paso 4.3, 2026-09-20
+
+La VM pasó de aceptar 13 de las 40 formas a aceptar **2**. Las dos que quedan no
+son puerto mecánico:
+
+**1 — `v[1>3..1]`, el rango de navegación.** El TW dice
+`invalid nav range 3..1 — indices are 1-based and start must be ≤ end`; la VM
+devuelve `[]`. El compilador baja el paso con rango a un bucle
+`i = inicio … fin` y, si el inicio supera al fin, el bucle sencillamente no
+corre. Para refusarlo con el texto del TW hace falta **una instrucción nueva**:
+la única que lanza, `RaiseError(StrIdx)`, sólo lleva una cadena fija del pool y
+el mensaje necesita los dos números en ejecución.
+
+*Qué hay que decidir:* una instrucción que lance con valores, o un texto sin los
+números (y entonces el TW también lo pierde, porque el texto es uno).
+
+**2 — `C := 1` seguido de `C := 2`.** El TW lo refusa en **ejecución**
+(`constant 'C' already declared`); la VM y `zyjs` imprimen `2`. El compilador
+trata `ConstDecl` como una asignación cualquiera: la constancia no existe en la
+VM.
+
+*Qué hay que decidir:* **dónde vive la regla.** Si va a `zymbol-semantic` la
+heredan los tres motores y `check` la ve —es lo que se hizo con E014— pero pasa
+a ser un error ESTÁTICO, y entonces la celda `-met` deja de poder atraparlo con
+`!?`, porque un error estático no se atrapa. Si se queda en ejecución hay que
+llevar la constancia hasta la VM.
+
+### Qué lo sujeta
+
+`runtime-index-nav/invalid-nav-range-indices-are-1-based` y
+`runtime-operators/constant-already-declared`, con sus `-met`.
