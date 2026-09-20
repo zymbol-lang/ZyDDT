@@ -1232,11 +1232,34 @@ t(v) {
 id     = "slice-start-cannot-be-greater-than-end"
 expect = "error"
 what   = "slice start ({}) cannot be greater than end ({})"
+# Written `$[v..1]` until D3 landed (step 4.4, 2026-09-20): a slice from a
+# higher position to a lower one no longer fails, it BUILDS by reversing. The
+# message is still reached, by an end that is not a position at all — a 0 in a
+# 1-based language — and that is what this cell asks for now.
 src    = """
 t(v) {
-    <~ [1, 2, 3]$[v..1]
+    <~ [1, 2, 3]$[v..0]
 }
 >> t(3) ¶
+"""
+
+[[cell]]
+id     = "slice-descending-builds-reversed"
+expect = "ok"
+what   = "a slice written high-to-low builds backwards — D3, and the only reversal the language has"
+# `$^-` SORTS descending, which answers a different question: on [3, 1, 2] it
+# gives [3, 2, 1] and this gives [2, 1, 3]. The three collections and the two
+# spellings of the whole one.
+src    = """
+a = [3, 1, 2]
+s = "abc"
+t = (10, 20, 30)
+>> a$[3..1] ¶
+>> a$[2..1] ¶
+>> a$[-1..1] ¶
+>> s$[3..1] ¶
+>> t$[3..1] ¶
+>> a$[2:0] ¶
 """
 
 [[cell]]
