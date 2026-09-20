@@ -3116,3 +3116,118 @@ fuera de los bloques TUI.
 ### Qué lo sujeta
 
 `web/tests/check_parity_baseline.txt`, 110 filas en `1 0`. No hay celda.
+
+---
+
+## GLB-044 — La familia `##` de un error: el TW la leía de las palabras y los otros dos la llevaban
+
+**Estado:** **corregido 2026-09-19 (paso 4.1)**
+**Encontrado por:** el eje `runtime-collection-ops` lo declaraba en su propia
+cabecera desde que se escribió: *«which family these belong to is not decided
+(the tree-walker answers `##_`, the VM `##Type`)»*
+**Decisión del autor:** D1 — tipo equivocado → `##Type`, valor equivocado →
+`##Index`. Y el mandato del paso: **alinear los tres motores**.
+
+### Lo que se midió antes de tocar nada
+
+Las 84 celdas `-met` rojas —la mitad de toda la matriz— no eran un problema sino
+**dos**:
+
+| | celdas | |
+|---|---|---|
+| **A — sólo discrepan en la familia** | **44** | este paso |
+| **B — algún motor no falla** (`zyjs` imprime `[1, 2]`, `abc`, `[]`…) | 40 | la tabla de tolerancia de D2, paso 4.3 |
+
+Aplicando D1 a las 44, la tabla sale sin ambigüedad: **41 son `##Type`** —
+`filter requires array, got X`, `cannot index into X`, `expression is not
+callable`, `index must be an integer, got X`— y **3 son `##Index`**, porque el
+tipo es correcto y el valor no: `$* repetition count must be non-negative`,
+`decimal count must not be negative`, y `range indices in nav path must be
+positive integers` (`v[1>-1..2]`).
+
+Frente a ese objetivo:
+
+| motor | ya correcto | había que cambiar |
+|---|---|---|
+| `zytw` | **0** | 44 |
+| `zyvm` | 40 | 4 |
+| `zyjs` | 1 | 43 |
+
+### Por qué el TW estaba a cero
+
+Los tres motores comparten **una regla por palabras** —
+`zymbol_common::errkind` y `errorKindOfMessage`— documentada como el único sitio
+donde vive esa fragilidad. Pero los otros dos llevan **además** la familia en el
+sitio donde se levanta el error: la VM en la variante (`VmError::TypeMsg`) y
+`zyjs` en `ZyRuntimeError(msg, kind)`. Cuando hay familia declarada, gana; si no,
+se leen las palabras.
+
+**Al TW le faltaba esa mitad entera.** Y la regla por palabras no puede
+distinguir `index must be an integer` —un TIPO equivocado— de `index out of
+bounds` —un VALOR—: «index» casa antes que «type», y por eso siete celdas de
+tipo caían en `##Index` sin que nadie pudiera corregirlas sin romper las otras.
+
+### Lo que se hizo
+
+- **`zytw`**: variante `RuntimeError::Kinded { kind, inner }`, que **envuelve**
+  en vez de añadir un campo, para que los ~200 sitios que no tienen nada que
+  declarar sigan sin declarar nada y los lea la regla por palabras. Anotados
+  **57 sitios**, con `RuntimeError::kinded("Type"|"Index", …)`.
+- **`zyvm`**: variante `IndexMsg(String)`, la gemela de `TypeMsg` para el valor
+  equivocado — no existía ninguna que llevara un mensaje a `##Index`, así que
+  los dos casos de valor contestaban `##Type`. Y cuatro sitios más movidos de
+  `Generic` a `TypeMsg`.
+- **`zyjs`**: 37 sitios pasan de `ZyError` a `ZyRuntimeError(msg, '##Type')`,
+  incluida la tabla `NOT_SUPPORTED` entera, que da trece mensajes desde un solo
+  `throw`, y las ocho llamadas a `notPositionalMsg`. Un sitio que ya declaraba
+  `'##_'` a mano pasa a `'##Type'`.
+
+### Resultado
+
+**`zytw` 44/44, `zyvm` 44/44, `zyjs` 43/44.** Matriz: **43 celdas en verde,
+ninguna nueva roja**, 170 → **127** ids rojos. `runtime-format-convert` pasa de
+8 divergencias a **0**.
+
+La que queda es `cannot-index-into-during-deep-update`, y no es de familia: ver
+[[GLB-045]].
+
+**Puertas:** `cargo test` 1040/0; consensus 660/0; reject 42/42; expect 634+26,
+0 stale; messages, project, fmt y guide en línea base; las seis suites de `web/`
+en verde; barrido de parseo de `zyjs` idéntico sobre 2810 `.zy`.
+
+---
+
+## GLB-045 — Escribir en profundidad dentro de algo que no es colección: tres motores, tres mensajes, y el de `zyjs` es falso
+
+**Estado:** abierto — hace falta decisión (F4, encontrado por el paso 4.1)
+**Encontrado por:** paso 4.1, 2026-09-19, la única celda `-met` que no se alineó
+**Clase:** 2 — los tres difieren entre sí
+
+Con `v = [1, 2]`:
+
+| forma | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| **leer** `>> v[1>1] ¶` | `cannot index into Int — expected array, tuple, or string` | igual | igual |
+| **escribir** `v[1>1]$~ 9` | `cannot index into Int during deep update` | `$~ writes into a collection, and this is Int` | `tuple index out of bounds: index 1 for tuple of length 0` |
+
+La lectura la unificó el paso 3.5b y coincide palabra por palabra. La escritura
+no la unificó nadie, y **el mensaje de `zyjs` es falso**: habla de una tupla
+donde hay un array, de longitud 0 donde hay dos elementos, y de un índice fuera
+de rango cuando el índice 1 existe. Lo que pasa es que el segundo paso del
+camino (`>1`) cae sobre el `Int` que hay en la posición 1.
+
+Con un `v` realmente anidado (`[[1, 2], [3, 4]]`) los tres escriben igual y bien.
+
+Por eso su celda `-met` es la única de las 44 que no se pudo alinear: no es la
+familia lo que difiere, es el fallo.
+
+### Qué hay que decidir
+
+Un texto para el fallo, como ya lo tiene la lectura. El del TW nombra la
+operación («during deep update») y el de la VM nombra lo que hace falta
+(«writes into a collection»); el de `zyjs` hay que retirarlo en cualquier caso.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/cannot-index-into-during-deep-update` y su `-met`, las
+dos rojas.
