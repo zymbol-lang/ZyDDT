@@ -3341,8 +3341,14 @@ descendentes literales en el corpus y ninguno en una aplicación. El autor:
 
 | motor | aceptaba | acepta | idénticas al TW |
 |---|---|---|---|
-| `zyvm` | 13 | **2** | 18 de 40 |
-| `zyjs` | 34 | **2** | **35 de 40** |
+| `zyvm` | 13 | **2** | 18 → **34** de 40 |
+| `zyjs` | 34 | **2** | **35** de 40 |
+
+La segunda tanda cerró las redacciones de la VM: `as_int_for` nombra la
+operación que pregunta (siete sitios donde decía `this needs Int and got
+String`), la inserción y el borrado recuperan sus dos formas distintas, el
+diccionario tiene sus propias palabras para `$+` y `$+[i]`, y `vm_deep_set`
+distingue una escritura de UN paso de un camino.
 
 Las dos que quedan son las mismas en los dos motores y están en [[GLB-048]]: el
 rango de navegación y la constante redeclarada, que piden decisión y no puerto.
@@ -3351,7 +3357,7 @@ Lo sostienen guardas compartidos en cada motor —`needInt`, `needCharStr`,
 `needInBounds` y `rangeBounds` en `zyjs`, `range_bounds` en la VM— para que los
 operadores no puedan volver a separarse.
 
-Matriz: **29 celdas en verde, ninguna nueva roja**, 127 → **98** ids rojos.
+Matriz: **45 celdas en verde, ninguna nueva roja**, 127 → **82** ids rojos.
 Puertas: `cargo test` 1040/0, consensus 660/0, reject 42/42, expect 634+26 sin
 stale, project 7/7, fmt, examples 216/0, `test_check` sin regresiones, barrido
 de parseo de `zyjs` idéntico sobre 2810 `.zy`.
@@ -3421,7 +3427,21 @@ a ser un error ESTÁTICO, y entonces la celda `-met` deja de poder atraparlo con
 `!?`, porque un error estático no se atrapa. Si se queda en ejecución hay que
 llevar la constancia hasta la VM.
 
+**3 — `[1,2,3]$-[1:-1]`, la cuenta negativa.** El TW dice
+`$-[..] count must be non-negative, got -1`; la VM informa de la otra mitad del
+rango (`end must be positive`). El compilador **funde la cuenta en el fin**
+(`AddInt` + `SubIntImm`), así que la VM no puede distinguir `$-[1:-1]` de
+`$-[1..0]`. Es la misma falta que la 1: un guarda que lance con un valor de
+ejecución, o una instrucción propia para la forma con cuenta.
+
+**4 — `@ (a, b):1..3` y `v..3` sueltos.** La VM dice
+`unsupported construct: range outside loop` sobre un rango que **sí** está en un
+bucle, y `zyjs` ni lo parsea. Es una forma del lenguaje que le falta a dos
+motores, no una permisividad.
+
 ### Qué lo sujeta
 
-`runtime-index-nav/invalid-nav-range-indices-are-1-based` y
-`runtime-operators/constant-already-declared`, con sus `-met`.
+`runtime-index-nav/invalid-nav-range-indices-are-1-based`,
+`runtime-operators/constant-already-declared`,
+`runtime-collection-ops/remove-range-count-must-be-non-negative` y las tres de
+`runtime-loops-ranges`, con sus `-met`.
