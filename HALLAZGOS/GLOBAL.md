@@ -3231,3 +3231,149 @@ operación («during deep update») y el de la VM nombra lo que hace falta
 
 `runtime-collection-ops/cannot-index-into-during-deep-update` y su `-met`, las
 dos rojas.
+
+---
+
+## GLB-046 — La tabla de tolerancia de colecciones (D2), medida y propuesta
+
+**Estado:** abierto — **esperando que el autor valide la tabla** (F4, paso 4.2)
+**Encontrado por:** paso 4.2, 2026-09-20, midiendo las 40 celdas del grupo B
+**Decisión previa:** D2 — las colecciones son **tolerantes** (principio). La
+tabla es lo que falta.
+**No se tocó ningún motor en este paso.**
+
+### Lo primero que hay que saber
+
+De las 40 formas, el **tree-walker refusa 36** y `zyjs` **acepta 34**. Pero el
+dato que decide no es ése:
+
+> **Donde los dos motores permisivos aceptan, no coinciden entre sí.**
+
+| forma | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `[1, 2]$-[1..9]` | error | `[1, 2]` — no borra nada | `[]` — **lo borra todo** |
+| `"aa"$~~["a":"b":-1]` | error | `bb` — **−1 es «todas»** | `aa` — no reemplaza nada |
+| `[1, 2]$-[0..2]` | error | `[]` — **el 0 es un inicio válido** | error, `index 0 is invalid` |
+
+Hoy «tolerante» no es un comportamiento, son **dos**, y en tres formas la
+diferencia es entre *no tocar nada* y *destruirlo todo*. Por eso la tabla no
+puede salir de «cuál de los tres tiene razón»: hay que decidirla.
+
+### Las cinco preguntas, separadas
+
+**1 — El ÍNDICE tiene el tipo equivocado.** Un Float o una cadena donde va un Int.
+
+| forma | `zytw` | `zyvm` | `zyjs` | propuesta |
+|---|---|---|---|---|
+| `[1,2][1.5]$~ 9` | error | error | `[1, 2]` | **error** |
+| `[1,2]$+["x"] 9` | error | error | `[9, 1, 2]` | **error** |
+| `[1,2]$-["x"]` | error | error | `[2]` | **error** |
+| `[1,2]$-["x"..2]`, `$-[1.."x"]`, `$["x"..2]`, `$[1.."x"]` | error | error | pasa | **error** |
+| `"abc"$~~["a":"b":"x"]` | error | error | `abc` | **error** |
+
+D1 ya lo dice: un tipo equivocado es `##Type`. Y la tolerancia de `zyjs` aquí
+**destruye datos en silencio**: `[1,2]$-["x"]` convierte `"x"` en 0, resuelve la
+posición 1 y **borra un elemento**. Ocho formas, ocho errores.
+
+**2 — La operación NO EXISTE para esa colección.**
+
+| forma | `zytw` | `zyvm` | `zyjs` | propuesta |
+|---|---|---|---|---|
+| `#(a: 1)$+ 5` | error | error | `#(a: 1, null: 5)` | **error** |
+| `#(a: 1)$+[1] 2` | error | error | `#(null: 2, a: 1)` | **error** |
+| `#(a: 1)$? 5` | error | error | `#0` | **error** |
+
+`zyjs` **se inventa una clave llamada `null`**. Un diccionario se direcciona por
+clave (decisión 11) y añadir sin clave no es una operación que exista.
+
+**3 — El ÍNDICE está FUERA DE RANGO, con el tipo correcto.** Aquí la tolerancia
+sí tiene un resultado que se puede definir por el borde.
+
+| forma | `zytw` | `zyvm` | `zyjs` | propuesta |
+|---|---|---|---|---|
+| `[1]$+[9] 2` | error | error | `[1, 2]` | **tolerante: al final** |
+| `"ab"$+[9] "c"` | error | error | `abc` | **tolerante: al final** |
+| `(1,2)$+[9] 3` | error | error | `(1, 2, 3)` | **tolerante: al final** |
+| `[1,2]$-[9]` | error | error | `[1, 2]` | **tolerante: no borra nada** |
+| `"ab"$-[9]`, `(1,2)$-[9]` | error | error | sin cambio | **tolerante: no borra nada** |
+| `[1,2]$[1..9]` | error | `[1, 2]` | `[1, 2]` | **tolerante: hasta el final** |
+| `[1,2]$-[1..9]` | error | `[1, 2]` | **`[]`** | **hasta el final → `[]`** |
+
+La última fila es la que hay que decidir a mano: si `$[1..9]` corta *hasta el
+final*, entonces `$-[1..9]` borra *hasta el final* y queda `[]`, que es lo que
+hace `zyjs`. La VM no borra nada, y eso hace que el mismo rango signifique dos
+cosas distintas según el operador.
+
+**4 — El VALOR está mal con el tipo bien.**
+
+| forma | `zytw` | `zyvm` | `zyjs` | propuesta |
+|---|---|---|---|---|
+| `[1,2,3]$-[1:-1]` (cuenta negativa) | error | `[1,2,3]` | `[1,2,3]` | **error `##Index`** |
+| `"aa"$~~["a":"b":-1]` | error | **`bb`** | `aa` | **error `##Index`** |
+| `[1,2]$-[0..2]` (índice 0) | error | **`[]`** | error | **error `##Index`** |
+| `[1,2]$-[1..0]` | error | `[1, 2]` | error | **error `##Index`** |
+| `[1,2,3]$-[3..1]`, `$[3..1]` (descendente) | error | `[1,2,3]` / `[]` | igual | **D3: invertir → paso 4.4** |
+
+Una cuenta negativa y un índice 0 no son «fuera de rango»: son valores que el
+lenguaje no tiene. El 0 no existe en un lenguaje 1-based y la VM lo trata como
+un inicio válido; una cuenta de −1 la lee como «todas» y **reemplaza toda la
+cadena**. Las dos son fallos de la VM, no tolerancia.
+
+El corte descendente ya está decidido por **D3** —construye invirtiendo— y los
+tres motores lo hacen mal hoy: ninguno devuelve `[3, 2, 1]`. Es el paso 4.4.
+
+**5 — El OPERANDO tiene el tipo equivocado.** Ésta es la única fila donde hay
+una pregunta de diseño de verdad, y se parte en dos.
+
+| forma | `zytw` | `zyvm` | `zyjs` | qué es |
+|---|---|---|---|---|
+| `"ab"$+ 5` | error | `ab5` | `ab5` | **coerción**: escribe el 5 |
+| `"ab"$+[1] 5` | error | error | `5ab` | coerción |
+| `"abc"$~~["a":5]` | error | error | `5bc` | coerción |
+| `5 $++ "a"` | error | `5a` | error | coerción |
+| `"ab"$? 5` | error | `#0` | `#0` | **no encontrado** |
+| `"ab"$?? 5` | error | error | `[]` | no encontrado |
+| `"ab"$- 5`, `$-- 5` | error | error | `ab` | no encontrado |
+| `"a,b"$/ 5` | error | error | `[a,b]` | no encontrado |
+| `#(a: 1)$? 5` | error | error | `#0` | no encontrado |
+
+**Las dos mitades no son la misma pregunta.** «¿Contiene esta cadena un 5?»
+tiene una respuesta honesta —no— y `$?`, `$??`, `$-`, `$/` son eso: preguntas.
+Escribir un Int dentro de una cadena con `$+` es otra cosa: es la yuxtaposición
+del lenguaje metida por la puerta de atrás, y hoy la hacen dos motores y el
+tercero no.
+
+**Propuesta:** las de CONSULTA son tolerantes y contestan «no está» —`#0`, `[]`,
+la colección sin tocar—; las de ESCRITURA (`$+`, `$+[i]`, `$~~`, `$++`) son
+error. Que coincide con la regla del resultado: consultar no cambia nada, y una
+escritura que no sabe qué escribir no debe adivinar.
+
+### Fuera de la familia, encontradas por el camino
+
+Tres de las 40 no son tolerancia de colecciones y van aparte:
+
+- `constant-already-declared` — `C := 1` seguido de `C := 2`: **ninguno de los
+  tres refusa**. El TW y la VM dan un aviso de variable no usada y `zyjs`
+  imprime `2`. Una constante redeclarada no es un aviso de otra cosa.
+- `range-start/end-must-be-an-integer` — `@ (a, b):1..1.5`: el TW y la VM dan un
+  **aviso** y corren; `zyjs` lo refusa. Es un bucle, no una colección.
+- `ranges-can-only-be-used-in-for` — `v..3` suelto: los tres refusan, con tres
+  textos. Es redacción.
+
+### Qué hay que decidir
+
+La tabla entera, fila por fila, y en particular las tres que no salen de la
+medida:
+
+1. `$-[1..9]` con dos elementos: ¿`[]` (como `zyjs`, coherente con `$[1..9]`) o
+   `[1, 2]` (como la VM)?
+2. La mitad de ESCRITURA de la pregunta 5: ¿error, o el Int se escribe?
+3. Si las tres de «fuera de la familia» se abren como hallazgos propios.
+
+Con la tabla validada, el paso 4.3 la implementa en los tres motores.
+
+### Qué lo sujeta
+
+Las 40 celdas del grupo B, todas rojas. El desglose por eje:
+`runtime-collection-ops` 31, `runtime-index-nav` 5, `runtime-loops-ranges` 3,
+`runtime-operators` 1.
