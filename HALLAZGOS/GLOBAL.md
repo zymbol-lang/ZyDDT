@@ -1677,7 +1677,7 @@ rojas.
 
 ## GLB-019 — Operadores con un operando inválido: la VM responde `!5` → `#0` y `+"a"` → `a`, y dos motores redeclaran una constante
 
-**Estado:** abierto — **A y B corregidos el 2026-09-15** (pasos 1.8, 1.9 y 2.12); C va con D5 (F5)
+**Estado:** **cerrado el 2026-09-21** — A y B el 2026-09-15 (pasos 1.8, 1.9 y 2.12); **C con D5 (F5)**: `C := 1` seguido de `C := 2` es error estático en los tres analizadores, y `check` lo ve
 **Encontrado por:** `axes/runtime-operators.toml`, paso C13 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1783,6 +1783,36 @@ exigen `MEM-1` («reassignment is a static error») y `MEM-7` (un entorno ligero
 no puede tener otra cosa bajo un nombre que su entorno fuerte ya usa), así que
 no cambia ninguna premisa. La celda ya tiene un verde posible y se puede
 escribir.
+
+### Implementado — 2026-09-21 (F5)
+
+Las tres formas de la constante y las dos del rango viven en el analizador
+compartido, así que `zymbol check` las ve y los tres motores las heredan. Los
+seis textos coinciden palabra por palabra.
+
+| forma | antes | ahora |
+|---|---|---|
+| `C := 1` / `C := 2` | TW error en ejecución, VM y `zyjs` imprimen `2` | `constant 'C' already declared`, estático |
+| `<< C` | TW y VM **sobrescriben** la constante en silencio | `cannot reassign constant 'C'`, estático |
+| `@ C:1..2` | TW y VM dejan el último valor; `zyjs` itera una copia | igual, estático |
+| `@ (a, b):1..3` | TW falla en el primer elemento, VM dice `range outside loop`, `zyjs` no parsea | `tuple pattern '( … )' requires a tuple, got Int`, estático |
+| `v..3` suelto | tres textos distintos | `ranges can only be used in for-each loops`, estático |
+
+En `zyjs` hizo falta el parser: no tiene VALOR de rango, así que las dos formas
+de D4 eran errores de parseo —refusadas por no parsear, no por lo que son—. La
+cabecera del bucle lee ahora el rango tras un patrón para poder refusarlo con la
+frase compartida, y el parser de expresiones dice lo mismo ante un `..` suelto
+en vez de nombrar el token. Sin producción nueva y sin gramática más ancha: el
+barrido de parseo sobre los 2810 `.zy` sale idéntico.
+
+**Un falso positivo que destapó la primera forma:** `C := 1  C := 2  >> C ¶`
+avisaba de que `C` no se usaba mientras la imprimía dos líneas más abajo. El
+paso de variables no usadas registraba la segunda declaración, que jubilaba a la
+primera, y una jubilada que nadie usó se informa como no usada. Ahora la
+declaración se refusa y no desplaza nada.
+
+Matriz: **5 celdas en verde, ninguna nueva roja**, 81 → **76** ids rojos.
+`runtime-operators` queda en 14 de 14.
 
 ---
 
