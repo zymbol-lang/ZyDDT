@@ -179,8 +179,13 @@ C := 2
 
 [[cell]]
 id     = "constant-already-declared-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "error"
+what   = "and `!?` does NOT meet it: a static refusal is not an error value"
+# Asked for `ok` until D5 landed (F5, 2026-09-21), when a constant declared
+# twice became a STATIC error in all three analyzers. A static refusal happens
+# before anything runs, so there is no `!?` to catch it and no `##` family to
+# print — which is the property this cell measures now. The `-met` question
+# only has an answer for a refusal that happens at RUN time.
 src    = """
 C := 1
 !? {
