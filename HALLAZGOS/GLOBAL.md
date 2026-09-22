@@ -3634,3 +3634,94 @@ después de arreglar: sujeta el arreglo, no lo anuncia.
 `runtime-index-nav/nav-range-written-downwards-selects-descending` y su `-met`
 están verdes desde G2; `runtime-operators/constant-already-declared` y las tres
 de `runtime-loops-ranges` también, porque sus formas son estáticas.
+
+---
+
+## GLB-049 — Los operadores de orden superior: `zyjs` decía tres frases genéricas, y los tres motores recorrían colecciones distintas
+
+**Estado:** **corregido el 2026-09-22 (paso G4.1)**, decidido por el autor el mismo día
+**Encontrado por:** paso G4, al agrupar las 48 rojas por quién es el distinto
+**Clase:** 7 celdas `WORDING` con una sola causa, más una divergencia de comportamiento que ninguna celda veía
+
+### Qué se observa
+
+`zyjs` tenía **tres** frases para lo que los dos Rust dicen con **siete**:
+
+| lo que pasa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `[1,2]$> v`, `v` no es lambda | `map requires lambda function` | `Expected a function for collection operator` |
+| lo mismo con `$|` y `$<` | `filter…` / `reduce requires lambda function` | la misma frase, para los tres |
+| `7$> (x -> x)` | `map requires array, got Int` | `collection op not supported on int` |
+| lo mismo con `$|` y `$<` | `filter…` / `reduce requires array, got Int` | la misma frase, para los tres |
+| `v[1](2)`, `v = [5]` | `expression is not callable` | `Expression is not a function` |
+
+Un solo texto para tres operadores no dice **cuál** falló, que es lo que el
+lector necesita en una línea con varios.
+
+### Y debajo, lo que las celdas no veían
+
+Medir las cuatro colecciones —no sólo el `Int` que las celdas provocan— enseñó
+que **los tres motores recorrían cosas distintas**:
+
+| | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| array | `[1, 2]` | `[1, 2]` |
+| tupla `(1, 2)` | **error** | `(1, 2)` |
+| cadena `"ab"` | **error** | `ab` |
+| diccionario | **error** | `(1, 2)` — los **valores** |
+
+Lo del diccionario es lo peor de los tres: `zyjs` entregaba los **valores**,
+cuando su propio `@ k:d` entrega las **claves**. El mismo motor contestaba dos
+cosas distintas a la misma pregunta.
+
+### Decidido — 2026-09-22
+
+**Un operador de orden superior recorre lo que `@` recorre.** En palabras del
+autor, «todo lo iterable». Es una regla en vez de una lista: *lo que `@ e:v` te
+entrega es lo que `v$> (e -> …)` transforma*. De ahí sale todo lo demás sin
+inventar nada — el diccionario entrega **claves**, porque eso es lo que entrega
+en `@ k:d` desde la decisión 8.
+
+| | los tres, ahora |
+|---|---|
+| `[1,2]$> (x -> x)` | `[1, 2]` |
+| `(1,2)$> (x -> x)` | `(1, 2)` — entra tupla, sale tupla |
+| `"ab"$> (c -> c)` | `ab` — entra cadena, sale cadena |
+| `#(x:1,y:2)$> (k -> k)` | `[x, y]` — las claves, como `@` |
+| `7$> (x -> x)` | `map requires array, tuple, string or dictionary, got Int` |
+
+La forma vuelve a la que entró; un diccionario recorrido por clave no tiene
+forma a la que volver, así que contesta un array.
+
+### Una corrección en el camino
+
+El cuadro que se llevó a la decisión tenía una fila falsa: decía que los tres
+aceptaban tupla y que el texto «requires array» mentía. `#[1, 2]` **es un
+array** (`##]`), no una tupla —la tupla es `(1, 2)`, `##)`— así que los Rust
+sólo aceptaban array y su texto era exacto. La decisión de ampliar se tomó
+igualmente, pero el argumento que la acompañaba era erróneo y queda dicho.
+
+### La trampa del inventario, en vivo
+
+El primer intento dio a `zyjs` una plantilla con hueco,
+`${what} requires array, tuple, string or dictionary`, frente a las tres
+completas de Rust. El gate cantó **cinco mensajes nuevos de un solo lado** que
+no eran nuevos. Se escribieron las tres plantillas **completas** por operador
+(`HOF_NEEDS`, `HOF_LAMBDA`), que es exactamente lo que el método ya advertía.
+Y hubo un segundo tropiezo propio: las tablas nacieron dentro de
+`evalCollectionOp`, y `evalCallable` es un método aparte, así que el camino de
+«falta la lambda» moría con `HOF_LAMBDA is not defined` — un camino que el
+fichero de sondas no tocaba y que hubo que provocar aparte.
+
+`messages/baseline.txt` se editó a mano: **614 de 932 → 607 de 923**. Siete
+salen porque ya no son de un solo lado (las tres `requires array` en su forma
+larga, las tres `requires lambda function` y `expression is not callable`).
+
+### Qué lo sujeta
+
+Las 7 celdas `WORDING` de `runtime-functions-hof` pasaron a verde, y tres
+nuevas sujetan lo que nadie medía: `map-over-a-tuple-keeps-the-tuple`,
+`map-over-a-string-keeps-the-string` y
+`map-over-a-dictionary-yields-its-keys`. El eje va de 18 de 28 de acuerdo a
+**28 de 31**.
+
