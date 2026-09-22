@@ -146,6 +146,45 @@ t(v) {
 """
 
 [[cell]]
+id     = "map-over-a-tuple-keeps-the-tuple"
+expect = "ok"
+what   = "a HOF walks what `@` walks: a tuple in, a tuple out"
+# Until step G4 the two Rust engines took an array and nothing else, while
+# `zyjs` took everything and said so in generic words. Decided 2026-09-22: a
+# higher-order operator walks whatever `@ e:v` hands over, which is one rule
+# instead of a list of accepted types.
+src    = """
+t(v) {
+    <~ v$> (x -> x)
+}
+>> t((1, 2)) ¶
+"""
+
+[[cell]]
+id     = "map-over-a-string-keeps-the-string"
+expect = "ok"
+what   = "a HOF walks what `@` walks: a string in, characters through, a string out"
+src    = """
+t(v) {
+    <~ v$> (c -> c)
+}
+>> t("ab") ¶
+"""
+
+[[cell]]
+id     = "map-over-a-dictionary-yields-its-keys"
+expect = "ok"
+what   = "a dictionary hands over its KEYS, exactly as `@ k:d` does (decision 8)"
+# `zyjs` used to hand over the VALUES here, which contradicted its own loop.
+# The keys are a list once they are out, so the answer is an array.
+src    = """
+t(v) {
+    <~ v$> (k -> k)
+}
+>> t(#(x: 1, y: 2)) ¶
+"""
+
+[[cell]]
 id     = "map-requires-lambda-function"
 expect = "error"
 what   = "map requires lambda function"
