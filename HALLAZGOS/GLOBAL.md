@@ -3471,7 +3471,7 @@ para lo que existen los ejes de ZyDDT.
 
 ## GLB-048 — Lo que falta para que la VM sea estricta: dos formas que piden decisión
 
-**Estado:** abierto — hace falta decisión (F4, paso 4.3)
+**Estado:** abierto — **de los cuatro puntos quedan dos**, y el primero choca con D3 (medido en el paso G2, 2026-09-22)
 **Encontrado por:** paso 4.3, 2026-09-20
 
 La VM pasó de aceptar 13 de las 40 formas a aceptar **2**. Las dos que quedan no
@@ -3511,9 +3511,47 @@ ejecución, o una instrucción propia para la forma con cuenta.
 bucle, y `zyjs` ni lo parsea. Es una forma del lenguaje que le falta a dos
 motores, no una permisividad.
 
+### Medido en el paso G2 — 2026-09-22
+
+**El punto 4 está cerrado, y el 2 también.** D4 y D5 (F5) hicieron estáticas las
+dos formas: `zymbol check` refusa `@ (patrón):rango` en las cuatro grafías
+—literal, agrupada, con paso, y con límites enteros válidos— y refusa el rango
+suelto y la constante redeclarada. Sus tres celdas `-met` de `runtime-loops-ranges`
+pasaron a `expect = "error"` en G2 y están verdes. Lo que ese camino dejó muerto
+en el tree-walker es [[ZYTW-006]].
+
+**El punto 1 no es lo que dice esta ficha, y hay que resolver la contradicción
+antes de implementar nada.** Medido en los tres motores:
+
+| forma | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `[10,20,30,40]$[3..1]` corte descendente | `[30, 20, 10]` | `[30, 20, 10]` | `[30, 20, 10]` |
+| `v[1>3..1]` navegación descendente | **error** `invalid nav range 3..1 …`, familia `##_` | `[]` | `[]` |
+| `v[1>1..3]` navegación ascendente | `[10, 20, 30]` | `[10, 20, 30]` | `[10, 20, 30]` |
+
+**D3 ya decidió esta forma, y dice lo contrario que esta ficha.** [[GLB-012]]
+punto 2, decidido el 2026-09-15, en sus palabras: *«ni error ni vacío, sino
+selección descendente … `[10, 20, 30, 40]$[3..1]` → `[30, 20, 10]`, **y
+`v[1>3..1]` invierte igual, dando un array**»*. El paso 4.4 implementó D3 en el
+**corte** y dejó fuera la **navegación**: hoy ningún motor cumple D3 ahí — el TW
+la refusa y los otros dos dan vacío.
+
+Así que lo que este punto 1 pide —una instrucción de la VM que lance con los dos
+números para copiar el texto del TW— **implementaría un mensaje que D3 dice que
+no debe existir**. Y la celda `runtime-index-nav/invalid-nav-range-indices-are-1-based`
+pide `expect = "error"`, que es una premisa que D3 retiró: por eso no es del
+grupo C del plan (una refusa que pasó a estática) sino una celda cuyo `expect`
+contradice una decisión ya tomada.
+
+*Qué hay que decidir:* si vale D3 tal como está escrita —y entonces el trabajo
+es implementar la inversión en navegación en los tres motores y reescribir esa
+celda y su `-met` para que midan la selección descendente, no una refusa— o si
+la navegación se aparta de D3 a propósito y el corte es la única forma que
+invierte, y entonces lo que hay que corregir es el texto de D3 en [[GLB-012]].
+
 ### Qué lo sujeta
 
-`runtime-index-nav/invalid-nav-range-indices-are-1-based`,
-`runtime-operators/constant-already-declared`,
-`runtime-collection-ops/remove-range-count-must-be-non-negative` y las tres de
-`runtime-loops-ranges`, con sus `-met`.
+`runtime-index-nav/invalid-nav-range-indices-are-1-based` y su `-met` (rojas),
+`runtime-collection-ops/remove-range-count-must-be-non-negative` (roja).
+`runtime-operators/constant-already-declared` y las tres de
+`runtime-loops-ranges` ya están verdes: sus formas son estáticas.
