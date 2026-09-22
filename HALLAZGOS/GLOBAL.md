@@ -2835,7 +2835,7 @@ Medida final del paso 3.5 completo: la matriz baja de 258 rojas a **198**.
 
 ## GLB-034 — Llamar a un nombre que no guarda una función: tres textos, y el del TW dice que no existe
 
-**Estado:** abierto — sin decisión
+**Estado:** **corregido el 2026-09-22 (paso G4.2)**, decidido por el autor el mismo día
 **Encontrado por:** el paso 3.5b, 2026-09-16, dando a la VM los textos del TW
 
 ```zymbol
@@ -2859,11 +2859,21 @@ Cuando el callee es una **expresión** (`v[1](2)`) los tres dicen ya
 compilador de la VM distingue —no emite `CallableCheck` para él, a propósito—
 porque los tres lo dicen de forma distinta y no hay decisión.
 
-### Qué hay que decidir
+### Decidido y corregido — 2026-09-22 (paso G4.2)
 
-¿Qué dicen los tres? `'v' is not a function` (lo de `zyjs`, que es lo único
-cierto de los tres), `expression is not callable` (un solo texto para llamar a lo
-que no es función), u otro.
+**`'v' is not a function`, y familia `##Type` en los tres.** Nombrar el nombre
+es lo único que sirve en una línea con varias llamadas; el tipo que resultó
+tener, no.
+
+Medir añadió algo que la ficha no decía: **la familia también divergía**. El TW
+y `zyjs` contestaban `##_` y la VM `##Type`, así que un `!?` clasificaba el
+mismo programa de dos maneras. `##Type` es lo que D1 manda.
+
+| motor | qué cambió |
+|---|---|
+| `zytw` | distingue ahora el nombre que **existe** del que no: sólo el primero llega aquí, porque el analizador refusa el segundo, pero la distinción se hace igual — un diagnóstico que depende de que otro pase haya corrido antes está a un fallo de mentir |
+| `zyvm` | el compilador **no emitía** `CallableCheck` para un nombre, a propósito, por no haber decisión. Ahora emite `CallableCheckNamed`, una instrucción nueva que lleva el nombre en el pool, porque la que había no tenía ninguno que imprimir |
+| `zyjs` | lanzaba un `ZyError` pelado, sin familia |
 
 ### Qué lo sujeta
 
@@ -3296,7 +3306,7 @@ en verde; barrido de parseo de `zyjs` idéntico sobre 2810 `.zy`.
 
 ## GLB-045 — Escribir en profundidad dentro de algo que no es colección: tres motores, tres mensajes, y el de `zyjs` es falso
 
-**Estado:** abierto — hace falta decisión (F4, encontrado por el paso 4.1)
+**Estado:** **corregido el 2026-09-22 (paso G4.2)**, decidido por el autor el mismo día
 **Encontrado por:** paso 4.1, 2026-09-19, la única celda `-met` que no se alineó
 **Clase:** 2 — los tres difieren entre sí
 
@@ -3318,11 +3328,42 @@ Con un `v` realmente anidado (`[[1, 2], [3, 4]]`) los tres escriben igual y bien
 Por eso su celda `-met` es la única de las 44 que no se pudo alinear: no es la
 familia lo que difiere, es el fallo.
 
-### Qué hay que decidir
+### Decidido y corregido — 2026-09-22 (paso G4.2)
 
-Un texto para el fallo, como ya lo tiene la lectura. El del TW nombra la
-operación («during deep update») y el de la VM nombra lo que hace falta
-(«writes into a collection»); el de `zyjs` hay que retirarlo en cualquier caso.
+**El mismo texto que ya tiene la lectura**, porque es el mismo fallo: un paso
+que cae sobre algo que no es colección. `cannot index into Int — expected array,
+tuple, or string`, familia `##Type`, en los tres.
+
+El caso vecino se mantiene aparte y con su propio texto: cuando **el receptor
+entero** no es colección (`5[1]$~ 9`), sigue diciendo `$~ writes into a
+collection, and this is Int`, porque ahí nombrar `$~` es lo que ayuda. La VM ya
+llevaba un parámetro `single` que distingue los dos, así que no hizo falta
+inventar la distinción.
+
+La causa en `zyjs` era de orden: `deepUpdateValue` comprobaba el tipo **al
+final**, después de calcular longitud e índice. Un `Int` no tiene `.v`, así que
+la longitud caía a 0 y el lector leía `tuple index out of bounds: index 1 for
+tuple of length 0` — una tupla que no está, una longitud que no es y un índice
+que sí existe. El guarda va ahora antes de indexar.
+
+### Y dos más que la ficha no tenía
+
+Medir las formas vecinas del mismo operador encontró otros dos, ninguno con
+celda:
+
+**`v["k"]$~ 9` sobre un array.** Los dos Rust dicen `array update index must be
+an integer, got String`; `zyjs` decía `$~ writes into a collection, and this is
+[Int]`, **falso**: un array sí es colección, lo que falla es la clase de
+dirección. Corregido copiando el texto de los Rust — y con plantillas
+**completas** por contenedor, porque la que había llevaba un hueco
+(`${container} update index …`) que no emparejaba con ninguno de los tres
+literales de Rust. Eso cerró de paso `tuple-update-index-must-be-an-integer`.
+
+**`"abc"[1]$~ "z"`.** Los dos Rust refusan escribir en una cadena; `zyjs`
+reescribía el carácter y contestaba `zbc`. **El mismo programa cambiaba una
+cadena en el navegador y se negaba en el CLI**, y ninguna celda preguntaba.
+`zyjs` pasa a refusarlo, que es la regla de siempre: los Rust son la referencia.
+El texto con que lo refusan es otro asunto, y es [[GLB-050]].
 
 ### Qué lo sujeta
 
@@ -3724,4 +3765,59 @@ nuevas sujetan lo que nadie medía: `map-over-a-tuple-keeps-the-tuple`,
 `map-over-a-string-keeps-the-string` y
 `map-over-a-dictionary-yields-its-keys`. El eje va de 18 de 28 de acuerdo a
 **28 de 31**.
+
+---
+
+## GLB-050 — `$~` no escribe en una cadena, y el texto con que lo dice afirma que una cadena no es colección
+
+**Estado:** abierto — **pide decisión**
+**Encontrado por:** paso G4.2, 2026-09-22, midiendo las formas vecinas de [[GLB-045]]
+**Gravedad:** baja — el comportamiento ya está homologado; lo que queda es un texto que afirma algo falso
+
+### Qué se observa
+
+Los dos motores Rust refusan escribir en una cadena por posición, y lo dicen
+así:
+
+```zymbol
+t(v) { v[1]$~ "z"  <~ v }
+>> t("abc") ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `$~ writes into a collection, and this is String` |
+| `zyjs` | contestaba `zbc` — escribía. **Homologado en el paso G4.2** |
+
+El comportamiento ya coincide en los tres. El problema es la frase: **una cadena
+SÍ es una colección** —`$#` la mide, `@` la recorre carácter a carácter, `$[..]`
+la corta y, desde el paso G4.1, `$>` la transforma—, así que decirle al lector
+«esto es String» como razón de que no se pueda escribir en ella no le dice lo
+que pasa. Lo que pasa es que la escritura por posición no está entre lo que una
+cadena admite.
+
+Es el mismo modo de fallo que [[GLB-047]] y que el mensaje de `zyjs` que
+[[GLB-045]] retiró: una frase que el lector puede comprobar que no es cierta.
+
+### Qué hay que decidir
+
+Dos cosas, y la segunda sólo si la primera dice que no:
+
+1. **¿Debe `$~` escribir en una cadena?** Hoy no lo hace ningún motor, y el
+   corte ya da la forma de construir una cadena nueva (`s$[..]` más `$+`). Si la
+   respuesta es que sí, esto deja de ser un texto y pasa a ser una función que
+   falta en dos motores.
+2. Si no debe, **qué dice**. Algo que nombre la operación y no el tipo, en la
+   línea de «una cadena se construye, no se escribe en ella», sin afirmar que no
+   es colección.
+
+No se toca sin respuesta: el texto lo dan los dos Rust a la vez, así que
+cambiarlo es cambiar la redacción de referencia, no alinear un motor con otro.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/update-on-a-string-is-refused` y su `-met`, verdes desde
+G4.2 — el comportamiento está sujeto. El texto no lo mide nadie todavía, porque
+`WORDING` sólo salta cuando los motores discrepan, y aquí los tres dicen la
+misma frase.
 
