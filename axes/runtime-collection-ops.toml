@@ -681,6 +681,79 @@ t(v) {
 """
 
 [[cell]]
+id     = "remove-count-out-of-bounds-for-collection"
+expect = "error"
+what   = "$-[{}:{}] out of bounds for collection of length {} — the COUNT form"
+# The count form had no cell of its own, and all three engines were wrong about
+# it in different ways (step G3, 2026-09-22): the VM folded the count into an
+# end, so it printed `$-[2..4]`; `zyjs` clamped with `splice` and answered
+# `[1]`; the tree-walker printed the range spelling `$-[2..3]` for something
+# the reader wrote as `[2:3]`, which are different requests.
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[2:v]
+}
+>> t(3) ¶
+"""
+
+[[cell]]
+id     = "remove-count-out-of-bounds-for-collection-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[2:v]
+}
+!? {
+    >> t(3) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "remove-count-of-zero-removes-nothing"
+expect = "ok"
+what   = "`$-[i:0]` asks to remove nothing, and that is not an error"
+# The VM refused this until step G3, because a count of 0 folded into an end of
+# 0 and tripped the `end must be positive` guard. It depended on the start:
+# `$-[2:0]` passed and `$-[1:0]` did not, which is what folding costs.
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[1:v]
+}
+>> t(0) ¶
+"""
+
+[[cell]]
+id     = "remove-count-start-must-be-positive"
+expect = "error"
+what   = "$-[start..] start must be positive (1-based), got {} — the COUNT form"
+# `zyjs` accepted a negative start here and removed from the end, where both
+# Rust engines refuse (step G3).
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[v:1]
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "remove-count-start-must-be-positive-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2, 3]$-[v:1]
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
 id     = "split-delimiter-must-be-a-char-or"
 expect = "error"
 what   = "$/ delimiter must be a char or string, got {:?}"
