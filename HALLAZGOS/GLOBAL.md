@@ -3492,11 +3492,20 @@ más. Los sitios guardan ahora lo escrito antes de normalizar.
 Ningún golden los graba: son diagnósticos que ningún programa provoca, que es
 para lo que existen los ejes de ZyDDT.
 
+### El hermano que faltaba — 2026-09-22 (paso G3)
+
+Esta corrección tocó la forma de **rango** y dejó intacta la de **cuenta**, que
+seguía imprimiéndose con la grafía del rango: quien escribía `a$-[2:3]` leía
+`$-[2..3] out of bounds for collection of length 3`, y `[2..3]` son dos
+posiciones que sí caben en tres. No era el número lo que mentía esta vez, sino
+el **signo entre los números**: `[i:n]` y `[i..j]` piden cosas distintas. Los
+tres motores lo escriben ya como el lector lo escribió. Ver [[GLB-048]].
+
 ---
 
 ## GLB-048 — Lo que falta para que la VM sea estricta: dos formas que piden decisión
 
-**Estado:** abierto — **queda uno**: el punto 3, la cuenta negativa. Los puntos 1, 2 y 4 se cerraron en el paso G2 (2026-09-22)
+**Estado:** **cerrado el 2026-09-22.** Los puntos 1, 2 y 4 en el paso G2; el punto 3 en el G3, donde resultó ser **cinco** defectos y no uno
 **Encontrado por:** paso 4.3, 2026-09-20
 
 La VM pasó de aceptar 13 de las 40 formas a aceptar **2**. Las dos que quedan no
@@ -3580,13 +3589,48 @@ el mismo `WORDING` que `range-indices-in-nav-path-must-be` ya registraba, el TW
 diciendo lo suyo y los otros dos `index 0 is invalid`. Es un camino que hasta
 ahora no medía nadie.
 
-**Lo que sigue abierto es el punto 3**, `[1,2,3]$-[1:-1]`: ahí la cuenta sí se
-funde en el fin al compilar, y el remedio del paso 4.4 —una instrucción propia
-para la forma con cuenta— sigue siendo el que hace falta.
+**El punto 3 se cerró en el paso G3, y medirlo lo multiplicó por cinco.** La
+ficha decía «la VM informa de la otra mitad del rango». Barrer las formas
+vecinas —inicio y cuenta, en array, cadena y tupla, 23 casos— enseñó que los
+**tres** motores estaban mal, cada uno de una manera:
+
+| caso | `zytw` antes | `zyvm` antes | `zyjs` antes |
+|---|---|---|---|
+| `a$-[1:-1]` | correcto | **A**: dice `end must be positive, got -1` | correcto |
+| `a$-[1:0]` | `[1,2,3]` | **B**: error, donde borrar nada es lo que pide | correcto |
+| `a$-[2:3]` fuera | **E**: dice `$-[2..3]` | **C**: dice `$-[2..4]` | **D**: contesta `[1]` |
+| `a$-[-1:1]` | correcto | correcto | **D**: borra desde el final |
+| `a$-[4:1]` | correcto | correcto | **D**: deja el array intacto |
+
+**A, B y C son la misma causa**, la que la ficha nombraba: el compilador fundía
+la cuenta en el fin con `AddInt` + `SubIntImm`, así que la VM no podía
+distinguir `$-[1:-1]` de `$-[1..0]` ni `$-[1:0]` de `$-[1..0]`. Y `B` dependía
+del inicio — `$-[2:0]` pasaba y `$-[1:0]` no—, que es la firma de una cuenta
+fundida. Se resolvió como el paso 4.4 resolvió el gemelo del corte: una
+instrucción propia, `ArrayRemoveCount`, donde la cuenta viaja **como cuenta**.
+
+**D es la estrictez de [[GLB-046]] sin aplicar**: `zyjs` usaba `splice`, que
+recorta en silencio, así que un inicio o una cuenta que se pasan del final no
+eran error. Ahora los refusa, con las palabras de los Rust.
+
+**E es [[GLB-047]] sin aplicar a esta forma.** Aquella corrigió el rango; la
+cuenta se quedó imprimiéndose con la grafía del rango. Quien escribía
+`a$-[2:3]` leía «`$-[2..3]` out of bounds for collection of length 3», y
+`[2..3]` son dos posiciones que **sí** caben en tres: el mensaje negaba lo que
+el lector podía comprobar. Una cuenta se escribe `[i:n]` y un rango `[i..j]`
+porque piden cosas distintas, y ahora el mensaje lo respeta en los tres motores.
+
+Los 23 casos coinciden ahora en los tres.
 
 ### Qué lo sujeta
 
-`runtime-collection-ops/remove-range-count-must-be-non-negative` (roja) es lo que
-queda del punto 3. `runtime-index-nav/nav-range-written-downwards-selects-descending`
-y su `-met` están verdes desde G2; `runtime-operators/constant-already-declared`
-y las tres de `runtime-loops-ranges` también, porque sus formas son estáticas.
+`runtime-collection-ops/remove-range-count-must-be-non-negative` pasó a verde en
+G3, y con ella **cinco celdas nuevas** para la forma con cuenta, que no tenía
+ninguna: `remove-count-out-of-bounds-for-collection` y su `-met`,
+`remove-count-of-zero-removes-nothing`, `remove-count-start-must-be-positive` y
+su `-met`. Las cinco nacen verdes, que es lo que se pide de una celda escrita
+después de arreglar: sujeta el arreglo, no lo anuncia.
+
+`runtime-index-nav/nav-range-written-downwards-selects-descending` y su `-met`
+están verdes desde G2; `runtime-operators/constant-already-declared` y las tres
+de `runtime-loops-ranges` también, porque sus formas son estáticas.
