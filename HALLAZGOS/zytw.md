@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Uno abierto: `ZYTW-004`.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Dos abiertos: `ZYTW-004` y `ZYTW-006`.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -358,3 +358,82 @@ defecto en la VM**: `collect_free_in_expr` tampoco entraba en las cadenas, y
 `(x -> "x={x} m={m}")` imprimía `m={m}`. Se corrigió en el mismo paso. Los tres
 motores coinciden con una lambda anidada, un local de función y el iterador de un
 bucle. La celda pasa a `AGREE`.
+
+---
+
+## ZYTW-006 — Tres diagnósticos de rango del tree-walker quedaron inalcanzables cuando D4 los hizo estáticos, y dos celdas verdes miden otro mensaje
+
+**Estado:** abierto — **pide decisión**
+**Encontrado por:** paso G2, 2026-09-22, al medir las celdas del grupo C
+**Gravedad:** baja en ejecución (nadie los ve), media en el arnés: dos celdas están verdes midiendo un mensaje distinto del que declaran
+
+### Qué se observa
+
+`eval_iterable` (`crates/zymbol-interpreter/src/expr_eval.rs:16`) tiene un brazo
+`Expr::Range` con tres diagnósticos propios:
+
+| línea | mensaje |
+|---|---|
+| `expr_eval.rs:28` | `range start must be an integer, got {}` |
+| `expr_eval.rs:38` | `range end must be an integer, got {}` |
+| `expr_eval.rs:~46` | el del paso (`step`) del mismo brazo |
+
+Ese brazo ya no es alcanzable. Sólo hay dos caminos hasta él:
+
+1. `loops.rs:196`, la vía lenta de `@ var:iterable` — pero `loops.rs:147`
+   intercepta **todo** `Expr::Range` antes, en la vía rápida, y allí el mensaje
+   es otro: `range bounds must be integers, got {} and {}` (`loops.rs:169`), un
+   solo texto para los dos bordes.
+2. `eval_iterable_pairs` ← `loops.rs:131`, la vía de `@ (patrón):iterable` — y
+   **D4 (F5, 2026-09-21) hizo `@ (patrón):rango` un error estático.**
+
+Medido el 2026-09-22 con `zymbol check`: las cuatro formas —`@ (a,b):1..v`,
+la agrupada `@ (a,b):(1..v)`, la del paso `@ (a,b):1..v:2` y **la que tiene
+límites enteros válidos** `@ (a,b):1..3`— se refusan antes de correr. No queda
+ninguna vía a ejecución.
+
+El mensaje vivo, en cambio, sí está en los tres motores y coincide:
+
+```zymbol
+t(v) { @ i:1..v { >> i ¶ }  <~ 1 }
+>> t(1.5) ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm`, `zyjs` | `range bounds must be integers, got Int and Float` |
+
+(`loops.rs:169`, `zymbol-vm/src/lib.rs:3506`, `web/src/zymbol/zymbol.js:7429`.)
+
+### Lo que esto le hace al arnés
+
+`runtime-loops-ranges/range-start-must-be-an-integer-got` y
+`…/range-end-must-be-an-integer-got` declaran
+`what = "range start/end must be an integer, got {:?}"` y están **verdes** —
+pero lo que los tres motores contestan a su programa es
+`tuple pattern '( … )' requires a tuple, got Int`. El veredicto es honesto
+(los tres refusan), el `what` no: ningún motor produce ya ese texto.
+
+Y `range bounds must be integers, got {} and {}` —el mensaje que sí sale— **no
+lo mide ninguna celda**. Es cobertura perdida, no ganada: las dos celdas que
+deberían sujetarlo se quedaron sujetando otra cosa sin que nadie lo notara,
+que es el mismo modo de fallo que [[GLB-047]].
+
+Sus `-met` sí se arreglaron en el paso G2: piden `error`, con la razón escrita.
+
+### Qué hay que decidir
+
+1. ¿El brazo `Expr::Range` de `eval_iterable` **se borra** (es código muerto) o
+   hay una vía a él que no encontré?
+2. ¿Las dos celdas se **reapuntan** a `@ i:1..v` para volver a medir el mensaje
+   vivo (`range bounds must be integers`) —y entonces sus ids cambian, porque
+   hoy nombran un texto que no existe— o se quedan midiendo la refusa estática
+   del patrón de tupla, con el `what` corregido para decir eso?
+
+No lo toco sin respuesta: la opción 2 cambia qué mide una celda que hoy está
+verde, y eso no es un arreglo de arnés, es una decisión sobre el denominador.
+
+### Qué lo sujeta
+
+Nada, y ése es el punto. `runtime-loops-ranges` está 22 de 23 tras el paso G2,
+y ese verde incluye las dos celdas que miden un mensaje que no es el suyo.
