@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Dos abiertos: `ZYTW-004` y `ZYTW-006`.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Uno abierto: `ZYTW-004`.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -363,7 +363,7 @@ bucle. La celda pasa a `AGREE`.
 
 ## ZYTW-006 — Tres diagnósticos de rango del tree-walker quedaron inalcanzables cuando D4 los hizo estáticos, y dos celdas verdes miden otro mensaje
 
-**Estado:** abierto — **pide decisión**
+**Estado:** **corregido el 2026-09-22** (paso G2), decidido por el autor el mismo día
 **Encontrado por:** paso G2, 2026-09-22, al medir las celdas del grupo C
 **Gravedad:** baja en ejecución (nadie los ve), media en el arnés: dos celdas están verdes midiendo un mensaje distinto del que declaran
 
@@ -421,19 +421,36 @@ que es el mismo modo de fallo que [[GLB-047]].
 
 Sus `-met` sí se arreglaron en el paso G2: piden `error`, con la razón escrita.
 
-### Qué hay que decidir
+### Decidido y corregido — 2026-09-22 (paso G2)
 
-1. ¿El brazo `Expr::Range` de `eval_iterable` **se borra** (es código muerto) o
-   hay una vía a él que no encontré?
-2. ¿Las dos celdas se **reapuntan** a `@ i:1..v` para volver a medir el mensaje
-   vivo (`range bounds must be integers`) —y entonces sus ids cambian, porque
-   hoy nombran un texto que no existe— o se quedan midiendo la refusa estática
-   del patrón de tupla, con el `what` corregido para decir eso?
+El autor eligió **borrar el muerto y reapuntar las dos celdas**.
 
-No lo toco sin respuesta: la opción 2 cambia qué mide una celda que hoy está
-verde, y eso no es un arreglo de arnés, es una decisión sobre el denominador.
+1. **El brazo se borró.** `eval_iterable` ya no hace `match expr`: evalúa la
+   expresión y reparte por el valor. Con el brazo se fueron los dos textos de
+   rango. El tercero, `step must be positive, got {}`, **no se perdió**: vive en
+   `loops.rs:154`, `zymbol-vm/src/lib.rs:3493` y `zymbol.js:7426`, comprobado
+   antes de borrar.
+2. **Las dos celdas se reapuntaron** a `@ i:` y se renombraron
+   `range-bounds-must-be-integers-end` y `…-start`, con la razón escrita en el
+   TOML. Las dos miden ahora el texto vivo, y miden cosas distintas: el mismo
+   mensaje imprime `Int and Float` en una y `Float and Int` en la otra.
+   `tuple pattern '( … )' requires a tuple`, lo que medían sin querer, ya lo
+   sujeta `runtime-match-patterns` — comprobado antes de reapuntar, para no
+   dejar el mensaje sin celda.
+3. **Sus `-met` piden `warn`, no `ok`.** Primero las puse en `ok` y salieron
+   rojas: los tres motores contestan `##Type` y lo atrapan, pero el programa
+   también emite `range direction is decided at runtime`, porque el límite viene
+   de una variable. Ése era el motivo del `warn` que las celdas traían de
+   origen, y volverlo a poner es lo correcto, no un apaño.
+
+**El inventario de mensajes se editó a mano**, como manda el método: fuera las
+dos líneas de `messages/baseline.txt` (616 de 932 → **614 de 930**: sólo baja, y
+baja exactamente por los dos borrados), fuera sus dos filas de
+`messages/queue/runtime.tsv`, y de paso se repararon dos filas que ya apuntaban
+a sitios muertos — `range bounds…` nombraba una celda inexistente y
+`step must be positive` seguía apuntando a `expr_eval.rs:51`.
 
 ### Qué lo sujeta
 
-Nada, y ése es el punto. `runtime-loops-ranges` está 22 de 23 tras el paso G2,
-y ese verde incluye las dos celdas que miden un mensaje que no es el suyo.
+`runtime-loops-ranges/range-bounds-must-be-integers-end` y `…-start`, con sus
+`-met`. El eje queda 22 de 23, y ahora ese verde mide lo que dice medir.
