@@ -1074,7 +1074,7 @@ y dos `WORDING`), y son del grupo D del plan.
 
 ## GLB-012 — Índices y navegación con un valor inválido: `zyjs` contesta donde los Rust fallan, y el kind se reparte entre `##_`, `##Index` y `##Type`
 
-**Estado:** **corregido 2026-09-22 (paso G1)** en lo que tocaba a la familia. Decidido el 2026-09-15 (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente, D3 — hecho en el paso 4.4). La estrictez es el paso 4.3; la celda `-met` que contestaba `##_` se cerró anotando su sitio en el tree-walker. Queda abierto el rango de navegación invertido (`v[1>3..1]`), que es [[GLB-048]] y el paso G2
+**Estado:** **cerrado el 2026-09-22 (pasos G1 y G2).** Decidido el 2026-09-15 (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente, D3). La familia se cerró en G1 anotando el sitio del tree-walker; D3 se completó en G2, llevando a la navegación la inversión que el paso 4.4 sólo había construido para el corte
 **Encontrado por:** `axes/runtime-index-nav.toml`, paso C4 del plan de cobertura de diagnósticos, 2026-09-14
 **Familia:** `GLB-011` (la misma pregunta de kind, en otra familia de operaciones)
 
@@ -1138,10 +1138,35 @@ De este eje quedaba **una** celda `-met` contestando `##_` en el tree-walker:
 que está mal, D1 punto 1 — y la celda cerró. El método y la medida completa están
 en [[GLB-011]], que es donde se anotaron los 23 sitios de una vez.
 
-Lo que **sigue abierto** de esta ficha es el punto 2 de la decisión, el rango de
-navegación invertido `v[1>3..1]`: la VM no lo refusa porque su única instrucción
-que lanza lleva una cadena fija del pool. Es [[GLB-048]], y el paso G2 tiene que
-medir antes si la celda `-met` es legítima o si su premisa la retiró F5.
+### Corregido el punto 2 (D3) — 2026-09-22 (paso G2)
+
+El paso 4.4 construyó D3 para el **corte** y dejó fuera la **navegación**. Medido
+al empezar G2: ningún motor hacía lo que D3 dice — el TW refusaba `v[1>3..1]` y
+la VM y `zyjs` contestaban `[]`. El autor confirmó D3 tal como está escrita, así
+que la inversión se llevó a los tres:
+
+| | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| **antes** | error `invalid nav range 3..1 …` | `[]` | `[]` |
+| **ahora** | `[30, 20, 10]` | `[30, 20, 10]` | `[30, 20, 10]` |
+
+Cada motor por su camino: el tree-walker construye la lista de posiciones y la
+recorre; el compilador de la VM cambió el incremento fijo del bucle por un
+**paso** de +1 o −1 decidido en ejecución, y sale cuando `(i − fin) × paso > 0`,
+una sola prueba que lee las dos direcciones porque el paso lleva el signo;
+`zyjs` hace lo mismo en `evalNavPath`. Ninguno necesitó una instrucción nueva,
+que era lo que [[GLB-048]] temía.
+
+Comprobado además que coinciden en lo anidado y en las demás colecciones:
+`m[3..1>3..1]`, `m[3..1>1..3]`, la tupla y la cadena dan lo mismo en los tres.
+
+**Los bordes se leen como en el corte, no aparte.** Una posición fuera de la
+colección se sigue refusando (`v[1>9..1]` da fuera de límites en los tres, igual
+que `a$[9..1]`), y un límite 0 sigue siendo error. Lo que cambió del mensaje es
+que perdió su segunda mitad: era `invalid nav range {}..{} — indices are 1-based
+and start must be ≤ end`, y «start must be ≤ end» dejó de ser verdad. Ahora dice
+`invalid nav range {}..{} — indices are 1-based`. La línea base de mensajes se
+editó a mano, cerrando el viejo y abriendo el nuevo en su sitio.
 
 ### Corregido en `zyjs` lo que no es `$` — 2026-09-15 (paso 2.9)
 
@@ -3471,7 +3496,7 @@ para lo que existen los ejes de ZyDDT.
 
 ## GLB-048 — Lo que falta para que la VM sea estricta: dos formas que piden decisión
 
-**Estado:** abierto — **de los cuatro puntos quedan dos**, y el primero choca con D3 (medido en el paso G2, 2026-09-22)
+**Estado:** abierto — **queda uno**: el punto 3, la cuenta negativa. Los puntos 1, 2 y 4 se cerraron en el paso G2 (2026-09-22)
 **Encontrado por:** paso 4.3, 2026-09-20
 
 La VM pasó de aceptar 13 de las 40 formas a aceptar **2**. Las dos que quedan no
@@ -3543,15 +3568,25 @@ pide `expect = "error"`, que es una premisa que D3 retiró: por eso no es del
 grupo C del plan (una refusa que pasó a estática) sino una celda cuyo `expect`
 contradice una decisión ya tomada.
 
-*Qué hay que decidir:* si vale D3 tal como está escrita —y entonces el trabajo
-es implementar la inversión en navegación en los tres motores y reescribir esa
-celda y su `-met` para que midan la selección descendente, no una refusa— o si
-la navegación se aparta de D3 a propósito y el corte es la única forma que
-invierte, y entonces lo que hay que corregir es el texto de D3 en [[GLB-012]].
+**Resuelto el mismo día: vale D3 tal como está escrita.** La inversión se
+implementó en los tres motores y el punto 1 queda cerrado — sin la instrucción
+que lanza con valores que esta ficha pedía, porque con D3 ya no hay nada que
+lanzar ahí. El detalle está en [[GLB-012]].
+
+La celda pasó a `nav-range-written-downwards-selects-descending`, que pide `ok`,
+y la mitad de la refusa que sobrevive —un límite 0— se quedó en una celda propia,
+`nav-range-indices-are-1-based`. Esa nace **roja**, y no es una regresión: cae en
+el mismo `WORDING` que `range-indices-in-nav-path-must-be` ya registraba, el TW
+diciendo lo suyo y los otros dos `index 0 is invalid`. Es un camino que hasta
+ahora no medía nadie.
+
+**Lo que sigue abierto es el punto 3**, `[1,2,3]$-[1:-1]`: ahí la cuenta sí se
+funde en el fin al compilar, y el remedio del paso 4.4 —una instrucción propia
+para la forma con cuenta— sigue siendo el que hace falta.
 
 ### Qué lo sujeta
 
-`runtime-index-nav/invalid-nav-range-indices-are-1-based` y su `-met` (rojas),
-`runtime-collection-ops/remove-range-count-must-be-non-negative` (roja).
-`runtime-operators/constant-already-declared` y las tres de
-`runtime-loops-ranges` ya están verdes: sus formas son estáticas.
+`runtime-collection-ops/remove-range-count-must-be-non-negative` (roja) es lo que
+queda del punto 3. `runtime-index-nav/nav-range-written-downwards-selects-descending`
+y su `-met` están verdes desde G2; `runtime-operators/constant-already-declared`
+y las tres de `runtime-loops-ranges` también, porque sus formas son estáticas.
