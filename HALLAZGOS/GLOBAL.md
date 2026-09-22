@@ -977,7 +977,7 @@ dicen por qué no lo llevan) y las cuatro de `runtime-errors`:
 
 ## GLB-011 — Los operadores `$` con un operando del tipo equivocado: el TW rechaza, la VM y `zyjs` a veces contestan, y los tres dan kinds distintos
 
-**Estado:** abierto — **implementado en F4 salvo la anotación del TW.** La parte «colecciones tolerantes» quedó **derogada** el 2026-09-20: son ESTRICTAS ([[GLB-046]]), y el paso 4.3 lo implementó en la VM y en `zyjs`. Lo que falta son las celdas `-met` cuyo TW sigue contestando `##_`
+**Estado:** **corregido 2026-09-22 (paso G1).** La parte «colecciones tolerantes» quedó **derogada** el 2026-09-20: son ESTRICTAS ([[GLB-046]]), y el paso 4.3 lo implementó en la VM y en `zyjs`. Lo que faltaba —las celdas `-met` cuyo TW contestaba `##_`— se cerró anotando los 22 sitios que quedaban en el tree-walker
 **Encontrado por:** `axes/runtime-collection-ops.toml`, paso C3 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media-alta: el mismo programa falla en un motor y contesta un valor en otro
 
@@ -1036,16 +1036,45 @@ Sin esas dos respuestas, arreglar sería elegir por el autor.
    tabla, no antes. Y `LLM.md` § 9 («type/arity mistakes raise») deja de ser
    cierto para estas formas: se corrige cuando la tabla esté validada.
 
+### Corregido — 2026-09-22 (paso G1)
+
+El paso 4.3 hizo estrictos a la VM y a `zyjs`, y al hacerlo **convirtió celdas
+de comportamiento en celdas de familia**: 22 de este eje y 1 de `runtime-index-nav`
+pasaron a diferir sólo en el kind, porque su sitio en el tree-walker seguía
+construyendo `RuntimeError::Generic` y el clasificador por palabras
+(`zymbol_common::errkind`) no encontraba «type» en el mensaje, así que contestaba
+`##_`.
+
+**Qué se midió antes de tocar.** Las 23 celdas `-met`, corriendo el programa
+generado en los tres motores: el TW contestaba `##_` en las 23, y la VM y `zyjs`
+coincidían entre sí en las 23 — `##Type` en 17, `##Index` en 6. Los 6 `##Index`
+son todos «el tipo es Int y el valor no vale» (`-1`, `0`, `start > end`), que es
+lo que D1 manda. Después, cada texto se buscó en el crate del tree-walker: **23
+textos, 23 sitios, ninguno duplicado** — 17 en `collection_ops.rs`, 6 en
+`string_ops.rs`, todos de la forma `RuntimeError::Generic { message, span: op.span }`,
+ninguno con la forma abreviada de campo.
+
+**Qué se cambió.** Esos 23 sitios pasan a `RuntimeError::kinded(kind, message, span)`,
+que **envuelve** el error en vez de añadirle un campo: el texto impreso no cambia,
+y por eso `zyq consensus`, `zyq expect` y el inventario de mensajes no ven nada.
+
+**Resultado.** 23 celdas en verde, ninguna roja nueva; la matriz completa pasó de
+**76 a 53 ids rojos**. `runtime-collection-ops` de 75 a 97 de acuerdo,
+`runtime-index-nav` de 38 a 39.
+
 ### Qué lo sujeta
 
 `axes/runtime-collection-ops.toml`: 50 celdas `expect = "error"` y 50 `-met`.
-3 verdes, 97 rojas.
+97 de 103 verdes; las 6 rojas que quedan son de texto o de comportamiento
+(`cannot-index-into-during-deep-update` y su `-met`,
+`named-tuple-update-index-must-be-an`, `tuple-update-index-must-be-an-integer`,
+y dos `WORDING`), y son del grupo D del plan.
 
 ---
 
 ## GLB-012 — Índices y navegación con un valor inválido: `zyjs` contesta donde los Rust fallan, y el kind se reparte entre `##_`, `##Index` y `##Type`
 
-**Estado:** abierto — **implementado en F4 y F5 salvo la anotación del TW.** Decidido el 2026-09-15 (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente, D3 — hecho en el paso 4.4). La estrictez es el paso 4.3; lo que falta son las celdas `-met` cuyo TW sigue contestando `##_` porque su sitio no lleva `RuntimeError::kinded` (el paso 4.1 anotó las 44 que entonces eran de familia, no éstas)
+**Estado:** **corregido 2026-09-22 (paso G1)** en lo que tocaba a la familia. Decidido el 2026-09-15 (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente, D3 — hecho en el paso 4.4). La estrictez es el paso 4.3; la celda `-met` que contestaba `##_` se cerró anotando su sitio en el tree-walker. Queda abierto el rango de navegación invertido (`v[1>3..1]`), que es [[GLB-048]] y el paso G2
 **Encontrado por:** `axes/runtime-index-nav.toml`, paso C4 del plan de cobertura de diagnósticos, 2026-09-14
 **Familia:** `GLB-011` (la misma pregunta de kind, en otra familia de operaciones)
 
@@ -1100,6 +1129,19 @@ hoy de tres maneras: el TW dice `range indices in nav path must be positive
 integers`, la VM `index 0 is invalid` y `zyjs` `Expected RBRACKET, got '..'`.
 `$-[9]` y `#(a: 1)$? 5` de la parte A son operaciones `$`, así que entran en la
 tabla de tolerancias de `GLB-011`.
+
+### Corregido la familia — 2026-09-22 (paso G1)
+
+De este eje quedaba **una** celda `-met` contestando `##_` en el tree-walker:
+`a-dictionary-is-asked-about-a-key-met` (`#(a: 1)$? 5`). Su sitio,
+`collection_ops.rs:284`, pasó a `RuntimeError::kinded("Type", …)` — el tipo es el
+que está mal, D1 punto 1 — y la celda cerró. El método y la medida completa están
+en [[GLB-011]], que es donde se anotaron los 23 sitios de una vez.
+
+Lo que **sigue abierto** de esta ficha es el punto 2 de la decisión, el rango de
+navegación invertido `v[1>3..1]`: la VM no lo refusa porque su única instrucción
+que lanza lleva una cadena fija del pool. Es [[GLB-048]], y el paso G2 tiene que
+medir antes si la celda `-met` es legítima o si su premisa la retiró F5.
 
 ### Corregido en `zyjs` lo que no es `$` — 2026-09-15 (paso 2.9)
 
