@@ -179,8 +179,14 @@ t(v) {
 
 [[cell]]
 id     = "range-end-must-be-an-integer-got-met"
-expect = "warn"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "error"
+what   = "and `!?` does NOT meet it: a static refusal is not an error value"
+# Asked for `warn` until D4 landed (F5, 2026-09-21), when `@ (patrón):rango`
+# became a STATIC error in all three analyzers — measured 2026-09-22: every
+# form is refused by `check`, the grouped one and the one whose bounds are
+# valid integers included. A static refusal happens before anything runs, so
+# there is no `!?` to catch it and no `##` family to print. The `-met` question
+# only has an answer for a refusal that happens at RUN time.
 src    = """
 t(v) {
     @ (a, b):1..v {
@@ -237,8 +243,14 @@ t(v) {
 
 [[cell]]
 id     = "range-start-must-be-an-integer-got-met"
-expect = "warn"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "error"
+what   = "and `!?` does NOT meet it: a static refusal is not an error value"
+# Asked for `warn` until D4 landed (F5, 2026-09-21), when `@ (patrón):rango`
+# became a STATIC error in all three analyzers — measured 2026-09-22: every
+# form is refused by `check`, the grouped one and the one whose bounds are
+# valid integers included. A static refusal happens before anything runs, so
+# there is no `!?` to catch it and no `##` family to print. The `-met` question
+# only has an answer for a refusal that happens at RUN time.
 src    = """
 t(v) {
     @ (a, b):v..3 {
@@ -266,8 +278,13 @@ t(v) {
 
 [[cell]]
 id     = "ranges-can-only-be-used-in-for-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "error"
+what   = "and `!?` does NOT meet it: a static refusal is not an error value"
+# Asked for `ok` until D4 landed (F5, 2026-09-21), when a range outside a
+# for-each loop became a STATIC error in all three analyzers. A static refusal
+# happens before anything runs, so there is no `!?` to catch it and no `##`
+# family to print. The `-met` question only has an answer for a refusal that
+# happens at RUN time.
 src    = """
 t(v) {
     <~ v..3
