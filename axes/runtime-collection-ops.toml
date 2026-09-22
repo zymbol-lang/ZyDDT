@@ -754,6 +754,68 @@ t(v) {
 """
 
 [[cell]]
+id     = "update-on-a-string-is-refused"
+expect = "error"
+what   = "`$~` does not write into a string, in every engine"
+# `zyjs` rewrote the character and answered `zbc` where both Rust engines
+# refuse, so the same program changed a string in the browser and refused to in
+# the CLI. No cell was asking (step G4.2, 2026-09-22). The message they all
+# give is the one GLB-050 is about: a string IS a collection.
+src    = """
+t(v) {
+    v[1]$~ "z"
+    <~ v
+}
+>> t("abc") ¶
+"""
+
+[[cell]]
+id     = "update-on-a-string-is-refused-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    v[1]$~ "z"
+    <~ v
+}
+!? {
+    >> t("abc") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "array-update-index-with-a-key"
+expect = "error"
+what   = "array update index must be an integer, got {} — a position, not a key"
+# `zyjs` used to answer `$~ writes into a collection, and this is [Int]`, which
+# is false: an array IS a collection. What is wrong is the kind of address.
+src    = """
+t(v, k) {
+    v[k]$~ 9
+    <~ v
+}
+>> t([1, 2], "k") ¶
+"""
+
+[[cell]]
+id     = "array-update-index-with-a-key-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v, k) {
+    v[k]$~ 9
+    <~ v
+}
+!? {
+    >> t([1, 2], "k") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
 id     = "split-delimiter-must-be-a-char-or"
 expect = "error"
 what   = "$/ delimiter must be a char or string, got {:?}"
