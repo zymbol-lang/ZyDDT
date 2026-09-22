@@ -164,13 +164,20 @@ t(v) {
 """
 
 [[cell]]
-id     = "range-end-must-be-an-integer-got"
+id     = "range-bounds-must-be-integers-end"
 expect = "error"
-what   = "range end must be an integer, got {:?}"
+what   = "range bounds must be integers, got {} and {} — the END is not one"
+# Was `@ (a, b):1..v` and asked for `range end must be an integer, got {:?}`.
+# That text stopped being reachable when D4 (F5) made `@ (patrón):rango` a
+# static error: the cell stayed green while measuring `tuple pattern '( … )'
+# requires a tuple`, which `runtime-match-patterns` already owns, and the
+# message that a bad bound really produces was measured by nobody. Reaimed
+# 2026-09-22 (step G2) at `@ i:`, the form that reaches it. The dead
+# tree-walker sites it used to name are gone — ZYTW-006.
 src    = """
 t(v) {
-    @ (a, b):1..v {
-        >> a b ¶
+    @ i:1..v {
+        >> i ¶
     }
     <~ 1
 }
@@ -178,19 +185,19 @@ t(v) {
 """
 
 [[cell]]
-id     = "range-end-must-be-an-integer-got-met"
-expect = "error"
-what   = "and `!?` does NOT meet it: a static refusal is not an error value"
-# Asked for `warn` until D4 landed (F5, 2026-09-21), when `@ (patrón):rango`
-# became a STATIC error in all three analyzers — measured 2026-09-22: every
-# form is refused by `check`, the grouped one and the one whose bounds are
-# valid integers included. A static refusal happens before anything runs, so
-# there is no `!?` to catch it and no `##` family to print. The `-met` question
-# only has an answer for a refusal that happens at RUN time.
+id     = "range-bounds-must-be-integers-end-met"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received"
+# `@ i:a..b` refuses at RUN time — `check` passes it — so `!?` does meet it,
+# and all three answer `##Type`. `warn` and not `ok` because a range whose
+# bound comes from a variable also raises "range direction is decided at
+# runtime", which is the whole reason this cell asked for `warn` before it was
+# reaimed. (Its `@ (patrón):` spelling met nothing: that one is static since
+# D4, which is why this cell briefly asked for `error` earlier in step G2.)
 src    = """
 t(v) {
-    @ (a, b):1..v {
-        >> a b ¶
+    @ i:1..v {
+        >> i ¶
     }
     <~ 1
 }
@@ -228,13 +235,16 @@ t(v) {
 """
 
 [[cell]]
-id     = "range-start-must-be-an-integer-got"
+id     = "range-bounds-must-be-integers-start"
 expect = "error"
-what   = "range start must be an integer, got {:?}"
+what   = "range bounds must be integers, got {} and {} — the START is not one"
+# Same reaiming as `range-bounds-must-be-integers-end`, on the other bound:
+# the one message names both, so the two cells differ in what it prints
+# (`Float and Int` here, `Int and Float` there).
 src    = """
 t(v) {
-    @ (a, b):v..3 {
-        >> a b ¶
+    @ i:v..3 {
+        >> i ¶
     }
     <~ 1
 }
@@ -242,19 +252,19 @@ t(v) {
 """
 
 [[cell]]
-id     = "range-start-must-be-an-integer-got-met"
-expect = "error"
-what   = "and `!?` does NOT meet it: a static refusal is not an error value"
-# Asked for `warn` until D4 landed (F5, 2026-09-21), when `@ (patrón):rango`
-# became a STATIC error in all three analyzers — measured 2026-09-22: every
-# form is refused by `check`, the grouped one and the one whose bounds are
-# valid integers included. A static refusal happens before anything runs, so
-# there is no `!?` to catch it and no `##` family to print. The `-met` question
-# only has an answer for a refusal that happens at RUN time.
+id     = "range-bounds-must-be-integers-start-met"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received"
+# `@ i:a..b` refuses at RUN time — `check` passes it — so `!?` does meet it,
+# and all three answer `##Type`. `warn` and not `ok` because a range whose
+# bound comes from a variable also raises "range direction is decided at
+# runtime", which is the whole reason this cell asked for `warn` before it was
+# reaimed. (Its `@ (patrón):` spelling met nothing: that one is static since
+# D4, which is why this cell briefly asked for `error` earlier in step G2.)
 src    = """
 t(v) {
-    @ (a, b):v..3 {
-        >> a b ¶
+    @ i:v..3 {
+        >> i ¶
     }
     <~ 1
 }
