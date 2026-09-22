@@ -977,7 +977,7 @@ dicen por qué no lo llevan) y las cuatro de `runtime-errors`:
 
 ## GLB-011 — Los operadores `$` con un operando del tipo equivocado: el TW rechaza, la VM y `zyjs` a veces contestan, y los tres dan kinds distintos
 
-**Estado:** abierto — **decidido el 2026-09-15** (familia `##Type`; colecciones tolerantes). Falta que el autor valide la tabla de tolerancias antes de tocar un motor
+**Estado:** abierto — **implementado en F4 salvo la anotación del TW.** La parte «colecciones tolerantes» quedó **derogada** el 2026-09-20: son ESTRICTAS ([[GLB-046]]), y el paso 4.3 lo implementó en la VM y en `zyjs`. Lo que falta son las celdas `-met` cuyo TW sigue contestando `##_`
 **Encontrado por:** `axes/runtime-collection-ops.toml`, paso C3 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** media-alta: el mismo programa falla en un motor y contesta un valor en otro
 
@@ -1045,7 +1045,7 @@ Sin esas dos respuestas, arreglar sería elegir por el autor.
 
 ## GLB-012 — Índices y navegación con un valor inválido: `zyjs` contesta donde los Rust fallan, y el kind se reparte entre `##_`, `##Index` y `##Type`
 
-**Estado:** abierto — **decidido el 2026-09-15** (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente). **La parte de A que no es `$`, corregida en `zyjs` el 2026-09-15** (paso 2.9)
+**Estado:** abierto — **implementado en F4 y F5 salvo la anotación del TW.** Decidido el 2026-09-15 (tipo `##Type`, valor `##Index`; el rango invertido selecciona en orden descendente, D3 — hecho en el paso 4.4). La estrictez es el paso 4.3; lo que falta son las celdas `-met` cuyo TW sigue contestando `##_` porque su sitio no lleva `RuntimeError::kinded` (el paso 4.1 anotó las 44 que entonces eran de familia, no éstas)
 **Encontrado por:** `axes/runtime-index-nav.toml`, paso C4 del plan de cobertura de diagnósticos, 2026-09-14
 **Familia:** `GLB-011` (la misma pregunta de kind, en otra familia de operaciones)
 
@@ -1742,7 +1742,7 @@ las dos que quedan son la constante redeclarada (C, F5).
 
 ## GLB-020 — Una constante varía: `<< C` y `@ C:1..2` la sobrescriben en el TW y en la VM
 
-**Estado:** abierto — **decidido el 2026-09-15** (error estático); sin celda todavía
+**Estado:** **cerrado el 2026-09-21 (F5)** — decidido el 2026-09-15 (error estático), implementado en los tres analizadores
 **Encontrado por:** buscando cómo alcanzar `cannot reassign constant '{}' (declared with :=)` en tiempo de ejecución, paso C13, 2026-09-14
 **Gravedad:** **alta**: incumple `MEM-1`, *las constantes son globales pero nunca varían*
 
