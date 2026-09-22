@@ -379,26 +379,61 @@ t(v) {
 """
 
 [[cell]]
-id     = "invalid-nav-range-indices-are-1-based"
-expect = "error"
-what   = "invalid nav range {}..{} — indices are 1-based and start must be ≤ end"
+id     = "nav-range-written-downwards-selects-descending"
+expect = "ok"
+what   = "D3: `v[1>3..1]` BUILDS by reversing, the same way `a$[3..1]` reads"
+# Was `invalid-nav-range-indices-are-1-based`, asking for `error` with the text
+# "indices are 1-based and start must be ≤ end". D3 (GLB-012, decided
+# 2026-09-15) retired that premise: a range written downwards selects
+# descending, and step 4.4 built it for the slice. The navigation half landed
+# in step G2 (2026-09-22) — until then the tree-walker refused it and the other
+# two answered `[]`, so no engine did what D3 says.
 src    = """
 t(v) {
     <~ v[1>3..1]
 }
->> t([[1, 2, 3]]) ¶
+>> t([[10, 20, 30, 40]]) ¶
 """
 
 [[cell]]
-id     = "invalid-nav-range-indices-are-1-based-met"
+id     = "nav-range-indices-are-1-based"
+expect = "error"
+what   = "invalid nav range {}..{} — indices are 1-based"
+# What is left of the old refusal once D3 took the direction out of it: a bound
+# of 0 is still no position. The message lost its "and start must be ≤ end"
+# half in step G2, because that half stopped being true.
+src    = """
+t(v) {
+    <~ v[1>0..2]
+}
+>> t([[10, 20, 30, 40]]) ¶
+"""
+
+[[cell]]
+id     = "nav-range-written-downwards-selects-descending-met"
 expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received"
+what   = "and it is a value, not an error: `!?` has nothing to meet"
 src    = """
 t(v) {
     <~ v[1>3..1]
 }
 !? {
-    >> t([[1, 2, 3]]) ¶
+    >> t([[10, 20, 30, 40]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "nav-range-indices-are-1-based-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>0..2]
+}
+!? {
+    >> t([[10, 20, 30, 40]]) ¶
 } :! {
     >> (_err#?)[1] ¶
 }
