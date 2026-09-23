@@ -3362,8 +3362,10 @@ literales de Rust. Eso cerró de paso `tuple-update-index-must-be-an-integer`.
 **`"abc"[1]$~ "z"`.** Los dos Rust refusan escribir en una cadena; `zyjs`
 reescribía el carácter y contestaba `zbc`. **El mismo programa cambiaba una
 cadena en el navegador y se negaba en el CLI**, y ninguna celda preguntaba.
-`zyjs` pasa a refusarlo, que es la regla de siempre: los Rust son la referencia.
-El texto con que lo refusan es otro asunto, y es [[GLB-050]].
+`zyjs` se alineó con ellos ese día — y al día siguiente resultó ser al revés: el
+autor decidió que una cadena es un arreglo de caracteres y **sí** se escribe en
+ella, así que los dos Rust crecieron la escritura y `zyjs` recuperó la suya, ya
+estricta. Es [[GLB-050]].
 
 ### Qué lo sujeta
 
@@ -3768,9 +3770,9 @@ nuevas sujetan lo que nadie medía: `map-over-a-tuple-keeps-the-tuple`,
 
 ---
 
-## GLB-050 — `$~` no escribe en una cadena, y el texto con que lo dice afirma que una cadena no es colección
+## GLB-050 — `$~` no escribía en una cadena, y el texto con que lo decía afirmaba que una cadena no es colección
 
-**Estado:** abierto — **pide decisión**
+**Estado:** **corregido el 2026-09-22 (paso G4.3)**, decidido por el autor el mismo día
 **Encontrado por:** paso G4.2, 2026-09-22, midiendo las formas vecinas de [[GLB-045]]
 **Gravedad:** baja — el comportamiento ya está homologado; lo que queda es un texto que afirma algo falso
 
@@ -3799,25 +3801,50 @@ cadena admite.
 Es el mismo modo de fallo que [[GLB-047]] y que el mensaje de `zyjs` que
 [[GLB-045]] retiró: una frase que el lector puede comprobar que no es cierta.
 
-### Qué hay que decidir
+### Decidido — 2026-09-22
 
-Dos cosas, y la segunda sólo si la primera dice que no:
+No era un texto: era una **función que faltaba en dos motores**. En palabras del
+autor:
 
-1. **¿Debe `$~` escribir en una cadena?** Hoy no lo hace ningún motor, y el
-   corte ya da la forma de construir una cadena nueva (`s$[..]` más `$+`). Si la
-   respuesta es que sí, esto deja de ser un texto y pasa a ser una función que
-   falta en dos motores.
-2. Si no debe, **qué dice**. Algo que nombre la operación y no el tipo, en la
-   línea de «una cadena se construye, no se escribe en ella», sin afirmar que no
-   es colección.
+> «todo string es una cadena o arreglo de caracteres y en zymbol eso también se
+> mantiene y por eso se ejecuta como un arreglo»
 
-No se toca sin respuesta: el texto lo dan los dos Rust a la vez, así que
-cambiarlo es cambiar la redacción de referencia, no alinear un motor con otro.
+Así que `$~` **sí escribe** en una cadena, y `zyjs` era el que tenía razón. La
+homologación del paso G4.2 iba en la dirección contraria y duró unas horas: se
+había alineado el motor correcto con los dos equivocados, por la regla de que
+los Rust son la referencia. La regla sigue valiendo para la **redacción**; para
+lo que el lenguaje **hace**, decide el autor.
+
+| forma | los tres, ahora |
+|---|---|
+| `"abc"[1]$~ "z"` | `zbc` |
+| `"abc"[1]$~ 'z'` | `zbc` — un char vale igual |
+| `"abc"[2]$~ "xy"` | `axyc` — un valor más largo ocupa el lugar del carácter |
+| `"abc"[-1]$~ "z"` | `abz` |
+| `"abc"[0]$~ "z"` | `index 0 is invalid — …` |
+| `"abc"[9]$~ "z"` | `string index out of bounds: index 9 for string of length 3` |
+| `"abc"[1]$~ 5` | `$~ on string requires char or string value, got Int` |
+| `"abc"["k"]$~ "z"` | `string update index must be an integer, got String` |
+| `["ab","cd"][1>1]$~ "z"` | `[zb, cd]` — se entra en la cadena anidada |
+| `"abc"[1>1]$~ "z"` | `cannot index into Char — expected array, tuple, or string` |
+
+**Un carácter es la hoja.** Una cadena es un arreglo de caracteres, y dentro de
+un carácter no hay nada a lo que descender.
+
+**Es ESTRICTO**, y ahí `zyjs` tampoco estaba bien: pasaba el valor por `display`,
+así que `"abc"[1]$~ 5` contestaba `5bc` en silencio. Sólo entra un char o una
+cadena, que es la regla que `$+ on string requires char or string element` ya
+decía ([[GLB-046]]).
+
+**Y otro hueco que apareció al implementarlo:** el camino **profundo** del
+tree-walker no tenía brazo de cadena, así que `["ab","cd"][1>1]$~ "z"` funcionaba
+en la VM y fallaba en el TW. Ninguna celda lo preguntaba.
 
 ### Qué lo sujeta
 
-`runtime-collection-ops/update-on-a-string-is-refused` y su `-met`, verdes desde
-G4.2 — el comportamiento está sujeto. El texto no lo mide nadie todavía, porque
-`WORDING` sólo salta cuando los motores discrepan, y aquí los tres dicen la
-misma frase.
+Seis celdas de `runtime-collection-ops`, todas verdes:
+`update-on-a-string-writes-at-that-position`,
+`update-on-a-string-takes-more-than-one-character`,
+`update-on-a-string-requires-char-or-string` y su `-met`,
+`update-through-a-string-nested-in-an-array` y `a-character-is-a-leaf`.
 

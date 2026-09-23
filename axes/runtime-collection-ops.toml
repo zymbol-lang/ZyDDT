@@ -754,13 +754,15 @@ t(v) {
 """
 
 [[cell]]
-id     = "update-on-a-string-is-refused"
-expect = "error"
-what   = "`$~` does not write into a string, in every engine"
-# `zyjs` rewrote the character and answered `zbc` where both Rust engines
-# refuse, so the same program changed a string in the browser and refused to in
-# the CLI. No cell was asking (step G4.2, 2026-09-22). The message they all
-# give is the one GLB-050 is about: a string IS a collection.
+id     = "update-on-a-string-writes-at-that-position"
+expect = "ok"
+what   = "a string is an array of characters, and is written into like one"
+# Asked for `error` for a few hours on 2026-09-22 (step G4.2), when `zyjs` was
+# aligned with the two Rust engines, which refused. The author settled it the
+# other way the same day: «todo string es una cadena o arreglo de caracteres y
+# en zymbol eso también se mantiene y por eso se ejecuta como un arreglo». So
+# `zyjs` was the one that had it right, and the two Rust engines grew the
+# write (step G4.3).
 src    = """
 t(v) {
     v[1]$~ "z"
@@ -770,19 +772,73 @@ t(v) {
 """
 
 [[cell]]
-id     = "update-on-a-string-is-refused-met"
+id     = "update-on-a-string-takes-more-than-one-character"
+expect = "ok"
+what   = "a longer value takes the place of the one character, as an array element would"
+src    = """
+t(v) {
+    v[2]$~ "xy"
+    <~ v
+}
+>> t("abc") ¶
+"""
+
+[[cell]]
+id     = "update-on-a-string-requires-char-or-string"
+expect = "error"
+what   = "$~ on string requires char or string value, got {}"
+# STRICT, the same rule `$+ on string requires char or string element` states
+# (GLB-046). `zyjs` ran the value through `display` and answered `5bc`.
+src    = """
+t(v, x) {
+    v[1]$~ x
+    <~ v
+}
+>> t("abc", 5) ¶
+"""
+
+[[cell]]
+id     = "update-on-a-string-requires-char-or-string-met"
 expect = "ok"
 what   = "and inside `!?` it is met, with the family the catch received"
 src    = """
-t(v) {
-    v[1]$~ "z"
+t(v, x) {
+    v[1]$~ x
     <~ v
 }
 !? {
-    >> t("abc") ¶
+    >> t("abc", 5) ¶
 } :! {
     >> (_err#?)[1] ¶
 }
+"""
+
+[[cell]]
+id     = "update-through-a-string-nested-in-an-array"
+expect = "ok"
+what   = "`[\"ab\", \"cd\"][1>1]$~ \"z\"` walks into the string and writes there"
+# The VM could already do this and the tree-walker could not, because its deep
+# path had no string arm — a divergence no cell was asking about (step G4.3).
+src    = """
+t(v) {
+    v[1>1]$~ "z"
+    <~ v
+}
+>> t(["ab", "cd"]) ¶
+"""
+
+[[cell]]
+id     = "a-character-is-a-leaf"
+expect = "error"
+what   = "cannot index into Char — expected array, tuple, or string"
+# A string is an array of characters, and a character is where the walking
+# stops: there is nothing inside one to descend into.
+src    = """
+t(v) {
+    v[1>1]$~ "z"
+    <~ v
+}
+>> t("abc") ¶
 """
 
 [[cell]]
