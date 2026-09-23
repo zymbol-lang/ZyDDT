@@ -2883,7 +2883,7 @@ mismo programa de dos maneras. `##Type` es lo que D1 manda.
 
 ## GLB-035 — `°x` indexado: los dos motores Rust hablan del prefijo y `zyjs` de la asignación indexada
 
-**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.6)
+**Estado:** **corregido el 2026-09-23 (paso G5.1)** en sus dos mitades; queda una tercera forma, `°x` suelto en `zyjs`
 **Encontrado por:** paso 3.6, 2026-09-19, barriendo las formas vecinas de `GLB-027`
 **Familia:** `GLB-027` (el nombre caliente indexado), pero el prefijo, no el sufijo
 
@@ -2905,10 +2905,49 @@ comportamiento: el TW lee `°acc[1]` y `zyjs` refusa el `°` en `>>`.
 El paso 3.6 **no lo tocó**: `°x` no llega a `parse_expr_or_edit_statement` en
 Rust —su rama no acepta operadores `$`— y el arreglo del sufijo no lo movió.
 
-### Qué hay que decidir
+### Decidido y corregido — 2026-09-23 (paso G5.1)
 
-Si `°x[…]` se rechaza por lo que es (asignación indexada, el texto de `zyjs`) o
-por dónde está el `°` (el texto de Rust), y si `>> °x[1] ¶` lee o se rechaza.
+**1. `°x[1] = 5` dice lo que dice `x[1] = 5`.** En palabras del autor: *«x[1] = 5
+es incorrecto, lo correcto es x[1]$~ 5, entonces el °x[1] = 5 también es
+incorrecto»*. Lo que estaba mal era el **orden**: el parser miraba el marcador
+antes que la forma, así que el mismo fallo tenía una frase con `°` y otra sin
+él. El caso del `[` ya estaba contemplado para un identificador normal; faltaba
+en la rama del prefijo.
+
+**2. `>> °acc[1] ¶` se rechaza**, como hacía `zyjs`. Un `°` ancla una
+**definición** por encima del bucle, y una lectura no define nada.
+
+Medirlo acotó mucho el trabajo: `>> °acc ¶` **ya lo rechazaban los tres**. La
+divergencia era sólo con algo detrás del nombre, porque el guarda miraba la
+expresión y no el nombre bajo ella.
+
+**Y trajo una distinción que no estaba en la ficha.** El primer arreglo rompió
+`syntax-variables/hot-index-edit`, que declara —y los tres motores cumplían— que
+`acc°[1]` **sí se lee**: `x°[i]$~ v` es una edición legítima. Prefijo y sufijo no
+son la misma pregunta: `°x` ancla **encima** del bucle y `x°` ancla **en** él, así
+que leer a través del primero pide un anclaje que una lectura no puede dar. El
+guarda distingue los dos.
+
+| forma | los tres, ahora |
+|---|---|
+| `x[1] = 5` | `indexed assignment does not exist: 'x[…] =' …` |
+| `°x[1] = 5` | **lo mismo** |
+| `>> °acc ¶` | `` `°` has no effect in output context — use `>> acc ¶` `` |
+| `>> °acc[1] ¶` | **lo mismo** |
+| `>> acc°[1] ¶` | lee — es la mitad de lectura de `x°[i]$~ v` |
+| `°n += i` en un bucle | sigue funcionando, que era la condición del autor |
+
+`zyjs` decía `use '>> x ¶'` con una `x` **literal** en vez del nombre; ahora lo
+saca del token siguiente, porque el prefijo lexea a un centinela sin nombre.
+
+### Lo que queda
+
+`°x` **suelto** como sentencia: Rust dice `'°name' is only valid as an assignment
+target` y `zyjs` dice `undefined variable 'x'`. El intento de darle la regla a
+`zyjs` no llegó a ejecutarse —su `undefined variable` sale de otra pasada,
+anterior al punto donde el centinela se consume— y **el guarda se retiró en vez
+de dejarlo muerto**, que es la lección de [[ZYTW-006]]. `syntax-expressions/hot-name-outside-an-assignment`
+sigue roja por eso, y ahora se sabe dónde hay que mirar.
 
 ### Qué lo sujeta
 
