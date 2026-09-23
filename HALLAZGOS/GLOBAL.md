@@ -3848,3 +3848,61 @@ Seis celdas de `runtime-collection-ops`, todas verdes:
 `update-on-a-string-requires-char-or-string` y su `-met`,
 `update-through-a-string-nested-in-an-array` y `a-character-is-a-leaf`.
 
+---
+
+## GLB-051 — Los índices se decían de dos maneras dentro del tree-walker, y el rango de navegación mentía en los otros dos
+
+**Estado:** **corregido el 2026-09-22 (paso G4.4)**
+**Encontrado por:** paso G4.4, agrupando las 37 rojas por quién es el distinto
+**Clase:** 4 celdas `WORDING` de `runtime-index-nav`, dos causas
+
+### Lo primero que enseñó medir
+
+De ocho formas de fallar un índice, **seis ya coincidían** en los tres motores.
+Las celdas rojas no medían ninguna de esas seis: medían el camino de
+**escritura**, y ahí el tree-walker tenía un segundo juego de palabras.
+
+| lo mismo, leído y escrito | leyendo (los tres) | escribiendo (`zytw`) |
+|---|---|---|
+| posición 0 | `index 0 is invalid — Zymbol uses 1-based indexing (use 1 for the first element, -1 for the last)` | lo mismo **sin la ayuda** |
+| posición 9 de 2 | `array index out of bounds: index 9 for array of length 2` | `index out of bounds: 9 for collection of length 2` |
+
+Un motor con dos redacciones para un fallo, y sólo una alineada: la mitad de
+escritura nunca se trajo. Es el mismo modo de fallo que [[GLB-045]] y que
+[[GLB-047]], que también aparecieron al mirar el lado que nadie había mirado.
+`resolve_idx` lleva ahora el nombre del contenedor y dice lo que dice la
+lectura, con **un literal completo por colección**.
+
+### Lo segundo: el rango de navegación
+
+| forma | `zytw` | `zyvm`, `zyjs` |
+|---|---|---|
+| `v[1>0..2]` | `invalid nav range 0..2 — indices are 1-based` | `index 0 is invalid — …` |
+| `v[1>-1..2]` | `range indices in nav path must be positive integers` | `index 0 is invalid — …` |
+
+**El de los otros dos es falso en la segunda fila**: dice que el índice 0 es
+inválido sobre un programa donde el índice es −1. Pasaba porque ninguno de los
+dos comprobaba los límites: bajaban el rango a un bucle y dejaban que
+`ArrayGet` se quejara de la posición 0 a la que el bucle llegaba. El tree-walker
+los comprueba antes, y por eso era el único que no mentía.
+
+Los dos los comprueban ahora antes de caminar —`NavRangeCheck` en la VM,
+tercera instrucción nueva de esta tanda tras `ArrayRemoveCount` y
+`CallableCheckNamed`— y en **el orden del tree-walker**: un límite negativo es
+su propio fallo, y sólo después lo es un cero. Invertirlos volvía a producir el
+índice 0 que no está en el programa.
+
+### La trampa, otra vez
+
+El primer intento etiquetó las dos lecturas como `nav range start`, y el ayudante
+que las lee **construye el mensaje con esa etiqueta**: salió
+`nav range start must be an integer, got Float` donde los otros dos dicen
+`index must be an integer, got Float`, y una celda que estaba verde se puso
+roja. La etiqueta ES el mensaje.
+
+### Qué lo sujeta
+
+`runtime-index-nav` queda **46 de 46**, el eje entero en verde. La línea base de
+mensajes baja de 607 de 923 a **604 de 920**: sale la segunda redacción del
+tree-walker, y salen los dos textos de rango porque ya no son de un solo lado.
+
