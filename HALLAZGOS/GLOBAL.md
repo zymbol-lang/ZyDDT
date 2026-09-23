@@ -3954,3 +3954,47 @@ fallaba con `Expected FAT_ARROW, got ':'` y ahora falla con
 
 Las cuatro celdas, verdes. La matriz pasa de 33 a **29** ids rojos.
 
+---
+
+## GLB-053 — La VM nombraba el dato interno donde los otros dos nombran lo que el lector escribió
+
+**Estado:** **corregido el 2026-09-23 (paso G4.6)**
+**Encontrado por:** paso G4.6, agrupando las 29 rojas por quién es el distinto
+**Clase:** 3 celdas `WORDING`, una causa — y dos defectos más que ninguna celda veía
+
+### Qué se observa
+
+En los tres casos el tree-walker y `zyjs` coincidían, y la VM decía lo suyo:
+
+| escrito | `zytw`, `zyjs` | `zyvm` |
+|---|---|---|
+| `0x\|"zz"\|` | `failed to parse 'zz' as hexadecimal number` | `… as base-16 number` |
+| `##!"x"` | `##! requires a numeric value or Char, got String` | `##! requires a numeric value, got String` |
+| `@~ -1` | `@~ requires non-negative duration, got -1` | `@~ requires non-negative ms, got -1` |
+
+Las tres son la misma costumbre: **nombrar el dato que el motor tiene a mano en
+vez de lo que el lector escribió.** `base-16` es el radix que la VM lleva en un
+registro; `hexadecimal` es lo que hay en el programa. `ms` es la unidad en que
+la VM mide; `duration` es lo que `@~` recibe. Y `##!` **sí** acepta un Char
+—contesta su punto de código—, así que omitirlo del mensaje describía mal la
+propia operación.
+
+### Lo que la celda no veía
+
+**Las bases eran cuatro, no una.** La celda sólo provocaba la hexadecimal; la
+VM decía `base-N` en las cuatro. Medirlas todas convirtió un arreglo en cuatro.
+
+**Y `##.` daba `##_` en el tree-walker.** `CastError` sirve a tres operadores
+—`##.`, `###`, `##!`— y sólo `##!` acepta Char, así que había que separarlos
+antes de tocar el texto. Al medirlos aparte salió que el sitio de `##.` en el
+tree-walker no llevaba kind: el clasificador por palabras no encuentra «type» en
+`##. requires a numeric value` y contestaba `##_`, mientras `###`, dos líneas más
+abajo, contestaba `##Type`. **El mismo `!?` clasificaba dos conversiones de dos
+maneras.** Es el resto de [[GLB-011]] en otro fichero.
+
+### Qué lo sujeta
+
+`runtime-format-convert` queda **32 de 32**. Tres celdas pasaron a verde y cinco
+son nuevas: las tres bases que nadie medía, y `float-cast-requires-a-numeric-value`
+con su `-met`, que es la que sujeta la familia. La matriz pasa de 29 a **26**.
+

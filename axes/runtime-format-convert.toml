@@ -14,6 +14,71 @@ what    = "the runtime diagnostics of casts, base conversion and format expressi
 engines = ["zytw", "zyvm", "zyjs"]
 
 [[cell]]
+id     = "failed-to-parse-as-binary-number"
+expect = "error"
+what   = "failed to parse '{}' as binary number — the base is NAMED"
+# Only the hexadecimal one had a cell, and the VM was saying `base-2`,
+# `base-8`, `base-10` and `base-16` in all four — the radix it holds rather
+# than what the reader wrote (step G4.6, 2026-09-23).
+src    = """
+t(v) {
+    <~ 0b|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-octal-number"
+expect = "error"
+what   = "failed to parse '{}' as octal number"
+src    = """
+t(v) {
+    <~ 0o|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-decimal-number"
+expect = "error"
+what   = "failed to parse '{}' as decimal number"
+src    = """
+t(v) {
+    <~ 0d|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "float-cast-requires-a-numeric-value"
+expect = "error"
+what   = "##. requires a numeric value, got {} — and the family is ##Type"
+# The tree-walker answered `##_` here, because the site carried no kind and
+# the word-based classifier found no "type" in the sentence. `###` next to it
+# answered `##Type`, so `!?` sorted two casts two ways (step G4.6).
+src    = """
+t(v) {
+    <~ ##.v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "float-cast-requires-a-numeric-value-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ##.v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
 id     = "trunc-cast-requires-a-numeric-value-or"
 expect = "error"
 what   = "##! requires a numeric value or Char, got {}"
