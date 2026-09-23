@@ -3998,3 +3998,65 @@ maneras.** Es el resto de [[GLB-011]] en otro fichero.
 son nuevas: las tres bases que nadie medía, y `float-cast-requires-a-numeric-value`
 con su `-met`, que es la que sujeta la familia. La matriz pasa de 29 a **26**.
 
+---
+
+## GLB-054 — La VM tiraba los errores del lexer, y el tree-walker tenía dos grafías para contarlos
+
+**Estado:** **corregido el 2026-09-23 (paso G4.7)** en lo medido; el subscript de la VM queda abierto
+**Encontrado por:** paso G4.7, al abrir el bloque de módulos y subscripts
+**Clase:** 1 celda `DIVERGE`, y de paso la plantilla con hueco de las conversiones
+
+### Qué se observa
+
+Un módulo con un error de **léxico** —una cadena sin cerrar, una llave sin
+pareja— se anunciaba así:
+
+| motor | |
+|---|---|
+| `zytw`, `zyjs` | `failed to parse module: 1 lexer error(s) in 'm/lexico.zy'` |
+| `zyvm` | `failed to parse module: 1 **parse** error(s) in 'm/lexico.zy'` |
+
+No era una palabra distinta: el compilador escribía
+`let (tokens, _lex_errs) = lexer.tokenize();` y **tiraba los errores del
+lexer**, dejando que el parser tropezara con los tokens rotos. Contaba la
+consecuencia en vez de la causa. Ahora los mira, como `load_module` los mira, y
+con el mismo detalle: fichero, línea, columna y la ayuda.
+
+### Y el tree-walker, dos grafías para lo mismo
+
+Al medir el gemelo del subscript salió que el propio tree-walker decía el mismo
+fallo de dos maneras, según por qué puerta se entrara al lexer:
+
+| | |
+|---|---|
+| `<# ./m/lexico` (módulo) | `1 lexer error(s) in 'm/lexico.zy'` + la línea ofensora |
+| `</ ./sub/lexico.zy />` (subscript) | `1 lexer errors in ./sub/lexico.zy`, sin detalle |
+
+Ni el plural ni las comillas ni el detalle coincidían, y la segunda no decía
+**dónde** del fichero. Correr un script e importar un módulo son dos puertas al
+mismo lexer. Unificadas. Es el tercer caso de esta tanda —tras [[GLB-045]] y
+[[GLB-051]]— en que un motor guardaba dos redacciones y sólo una estaba
+alineada.
+
+### La plantilla con hueco de las conversiones
+
+Buscando qué mensajes había cerrado el paso anterior apareció `CastError`, con
+`{op} requires a numeric value, got {got}`: **una plantilla con hueco para el
+operador**, donde el tree-walker escribe tres literales completos (`##.`, `###`,
+`##!`). Por construcción no emparejaba con ninguno, así que figuraba como
+mensaje de un solo lado sin serlo. La variante se retiró y los dos sitios que la
+usaban escriben su literal.
+
+### Lo que queda abierto
+
+`subscript-lexer-errors` sigue roja por **dos** razones ajenas a la redacción:
+la VM baja `</ path />` por una vía que propaga el error del sub-programa ya
+formateado (`error: unterminated string literal` con su propio `-->`), y `zyjs`
+**no implementa `</ path />`** en absoluto, así que no hay dónde poner las
+palabras. Lo segundo ya estaba registrado; lo primero se registra aquí.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/module-with-lexer-errors`, verde. La matriz pasa de 26
+a **25**, y la línea base de mensajes de 604 de 920 a **603 de 916**.
+
