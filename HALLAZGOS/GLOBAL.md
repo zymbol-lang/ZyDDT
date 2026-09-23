@@ -3141,7 +3141,7 @@ lleva 23 pendientes, porque hoy no se queja de nada.
 
 ## GLB-041 — `@! etiqueta` parece un salto con etiqueta y es un salto pelado más un nombre tirado
 
-**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.8)
+**Estado:** **corregido el 2026-09-23 (paso G5.2)**, decidido por el autor el mismo día
 **Encontrado por:** paso 3.8, 2026-09-19, al encender el analizador dentro de `>>| { … }`
 **Clase:** 1 — los tres coinciden, y los tres se quedan cortos
 
@@ -3170,7 +3170,41 @@ autor: comprobado que `@:principal!` sale de los dos bucles y que `@!` deja el
 exterior girando. Es la **única** ocurrencia en todo el workspace; las otras
 cuatro coincidencias son comentarios.
 
-### Qué hay que decidir
+### Decidido y corregido — 2026-09-23 (paso G5.2)
+
+El autor, sobre los tres casos medidos:
+
+> «el 1 es correcto, el 2 también es correcto pero mal programado —sale sólo del
+> interno, error de programador que no podemos evitar—. El 3 se debe rechazar
+> en la verificación.»
+
+Así que `@! nombre` y `@> nombre` en la misma línea son **error estático** en los
+tres motores, con la forma correcta en la ayuda. `@:principal!` y `@!` pelado no
+cambian.
+
+**Lo que el cuelgue costaba.** Medido con los tres programas enteros: con
+`principal` definido, los **tres motores giran para siempre**. No es un valor
+mal, es un programa que no termina, y el único aviso hablaba de «una lectura que
+se descarta». Si el nombre **no** existe, los tres dan `undefined variable` y
+salvan al lector por accidente.
+
+**Y una divergencia que nadie medía**: en `zyjs`, `CONTINUE` **sí se comía** el
+identificador siguiente y lo trataba como etiqueta, así que `@> principal`
+funcionaba en el navegador y colgaba en el CLI. Una forma, dos significados.
+Retirado.
+
+**Ningún programa se rompe**: las 5 apariciones de la forma en todo el workspace
+son comentarios, incluida `ZyBank/pantalla/tui.zy:595`, que hoy es el comentario
+que explica el caso.
+
+**De propina**, el guarda cerró `refusal/modality-before-its-label`
+(`@:outer _i:1..3 { @!outer }`), que estaba roja porque `zyjs` la aceptaba.
+
+**El barrido de parseo** de los 2853 `.zy`: 2601 parsean y 309 no, los mismos.
+Los dos cambios son esa celda —que pasa a refusarse, que es el punto— y
+`zyV.zy`, que el autor editó durante la sesión.
+
+### Lo que decía la ficha antes
 
 Si `@!` o `@>` seguidos de un identificador **en la misma línea** se refusan,
 con una ayuda que enseñe `@:nombre!`. Hoy son dos sentencias legales que juntas
