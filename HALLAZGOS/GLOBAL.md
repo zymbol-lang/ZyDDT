@@ -3906,3 +3906,51 @@ roja. La etiqueta ES el mensaje.
 mensajes baja de 607 de 923 a **604 de 920**: sale la segunda redacción del
 tree-walker, y salen los dos textos de rango porque ya no son de un solo lado.
 
+---
+
+## GLB-052 — El parser de `zyjs` nombraba su propio token donde los dos Rust nombran la equivocación
+
+**Estado:** **corregido el 2026-09-22 (paso G4.5)**
+**Encontrado por:** paso G4.5, agrupando las 33 rojas por quién es el distinto
+**Clase:** 4 celdas `WORDING`, una causa de parser y una de etiqueta
+
+### Qué se observa
+
+Tres sitios del parser dejaban salir el error genérico, que nombra el token en
+que **este** motor se paró y no lo que el lector escribió mal:
+
+| escrito | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `_? {` sin condición | `'_?' requires a condition` <br> help: `use '_' (without '?') for an unconditional else branch` | `expected expression, found LBrace` |
+| `?? v { 1 "uno" … }` | `expected '=>' after pattern` <br> help: `match case syntax: pattern => [value] [{ block }]` | `Expected FAT_ARROW, got 'string'` |
+| `?? v { [1, 2 => "a" … }` | `expected ']' to close list pattern` | `expected expression, found FatArrow` |
+
+El mecanismo para decirlo bien ya existía —`eat(type, msg, help)`—; a estos tres
+sitios no se les habían dado las palabras. El tercero no estaba donde parecía:
+el fallo ocurre al leer el **elemento siguiente** del patrón, no al cerrar el
+corchete, así que el guarda va donde el `=>` aparece, no en el `eat`.
+
+Y una cuarta, de otra clase: `decimal count must be a whole number, got float`
+—en minúscula— porque el sitio usaba `pv.type`, la etiqueta interna, en vez de
+`typeLabel`. Un barrido del fichero por `${…​.type}` en un mensaje encontró **dos**
+sitios en total; el otro es un fallback al que hoy no llega ningún operador.
+
+### Lo que NO era redacción
+
+Dos celdas de este grupo —`syntax-io/execute-without-a-path` y
+`syntax-lexer/unterminated-execute-expression`— parecían el mismo caso y no lo
+son: `</ path />` **no está implementado en `zyjs`**, así que no hay dónde poner
+las palabras. Siguen rojas, y por la razón que ya estaba registrada.
+
+### El barrido que exige tocar el parser
+
+Antes y después, lexer + parser sobre los **2853 `.zy`** del workspace: 2601
+parsean y 309 no, **los mismos**, con el AST del mismo tamaño. Cambiaron cuatro
+líneas, todas `ERR` → `ERR`: las tres celdas y un fichero de `_staging` que
+fallaba con `Expected FAT_ARROW, got ':'` y ahora falla con
+`expected '=>' after pattern`. Ningún programa que parseaba dejó de hacerlo.
+
+### Qué lo sujeta
+
+Las cuatro celdas, verdes. La matriz pasa de 33 a **29** ids rojos.
+
