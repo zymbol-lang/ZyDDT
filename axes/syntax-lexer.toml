@@ -169,3 +169,49 @@ a‌b = 5
 c‍d = a‌b
 >> c‍d ¶
 """
+
+[[cell]]
+id     = "unterminated-string-at-end-of-file"
+expect = "error"
+what   = "a quote that never closes is an error, not a string"
+# `zyjs` consumed nothing and handed back what it had, so this printed `abc`
+# while both Rust engines refused the file (GLB-038, decided 2026-09-23).
+src    = """
+>> "abc
+"""
+
+[[cell]]
+id     = "unterminated-string-swallows-a-brace"
+expect = "error"
+what   = "unterminated string literal — and the block it ate is NOT reported"
+# A string with no closing quote runs on and eats whatever follows, the `}`
+# that closed a block included. Naming the brace described what the lexer saw;
+# the reader needs to know the quote never closed. And the second error, about
+# a brace they DID write, is suppressed.
+src    = """
+f() {
+    >> "abc
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "unmatched-brace-in-a-closed-string"
+expect = "error"
+what   = "unmatched '}' in string — the string DOES close, so the brace really is the fault"
+# The other side of the rule above: same line as the opening quote means the
+# string closed and the loose brace is the actual mistake. `"\\{\\"n\\":1}"` is
+# the case that made this a rule.
+src    = """
+>> "a}b" ¶
+"""
+
+[[cell]]
+id     = "a-string-may-span-lines"
+expect = "ok"
+what   = "a line break is NOT the end of a string, which is why it cannot be the recovery boundary"
+src    = """
+x = "linea1
+linea2"
+>> x ¶
+"""

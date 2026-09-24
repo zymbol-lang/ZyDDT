@@ -3030,7 +3030,7 @@ Nada: no hay forma de provocarlas. `zymbol fmt` sobre el corpus no las alcanza �
 
 ## GLB-038 — La recuperación de cadena del lexer se come el resto del fichero, y el TW y la VM informan de errores distintos del mismo módulo
 
-**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.7)
+**Estado:** **corregido el 2026-09-23 (paso G5.3)**, decidido por el autor el mismo día
 **Encontrado por:** paso 3.7, 2026-09-19, midiendo lo que quedaba de la cascada
 **Familia:** `GLB-028`, pero no se arregla con ella
 
@@ -3064,17 +3064,65 @@ Vecino, con la misma raíz y sin celda: `>> "a{b ¶` — sin comilla de cierre �
 `invalid character in string interpolation` en Rust (por el `¶`) y
 `unterminated string interpolation` en `zyjs`.
 
-### Qué hay que decidir
+### Decidido y corregido — 2026-09-23 (paso G5.3)
 
-Hasta dónde recupera el lexer cuando una cadena no cierra. El salto de línea no
-sirve de tope: una cadena de Zymbol puede abarcar varias líneas a propósito. Y,
-aparte, cuál de los dos diagnósticos informa un cargador de módulos, que hoy no
-es el mismo en los dos motores Rust.
+**La segunda mitad ya no existía**: cuál diagnóstico informa un cargador de
+módulos se resolvió en el paso G4.7 ([[GLB-054]]), cuando la VM dejó de tirar
+los errores del lexer. Los tres motores dan hoy la misma frase, palabra por
+palabra, sobre el módulo de esta ficha.
+
+**La primera se decidió nombrando la causa.** Una `}` sin pareja dentro de una
+cadena sólo puede significar que la comilla no se cerró — nadie escribe una
+llave suelta dentro de un texto sin escaparla — así que el error pasa a ser
+`unterminated string literal` **en la comilla que abre**, y la cascada se calla.
+
+| programa | antes | ahora, en los tres |
+|---|---|---|
+| `>> "abc` | Rust `unterminated string literal`; **`zyjs` imprimía `abc`** | `unterminated string literal` |
+| `f() {` / `>> "abc` / `}` / `>> "fin" ¶` | `unmatched '}' in string` **+** `expected '}' to close block` | `unterminated string literal`, **un solo error** |
+| `>> "a}b" ¶` | `unmatched '}' in string` | igual — la cadena **sí** cierra, la llave es el fallo |
+| `x = "linea1` / `linea2"` | sin errores | igual |
+
+**La señal es la línea, no el salto de línea.** Una cadena multilínea es
+legítima, así que el tope no puede ser el fin de línea. Lo que distingue el
+olvido es **dónde** aparece la llave: en la misma línea que la comilla, la
+cadena cerró y la llave es el error; en una línea posterior, la comilla nunca
+cerró y se llevó por delante una `}` que cerraba un bloque.
+
+**La cascada se suprime donde se levanta, no filtrando por texto.** El segundo
+error culpaba a una llave que el lector sí había escrito. Se calla dándole el
+**span del token `Error` del lexer**, que el filtro de cascadas ya existente
+descarta — reutilizar ese mecanismo evita comparar contra un literal, que es
+justo lo que el inventario de mensajes no sabe distinguir de un mensaje.
+
+### La trampa del inventario, dos veces seguidas
+
+El texto de la ayuda tenía que nombrar una llave, y eso chocó con el método dos
+veces en el mismo paso:
+
+1. Con `format!`, una llave literal se escribe `}}`, así que el fichero guardaba
+   `'}}'` donde `zyjs` guarda `'}'`. **Un mensaje nuevo de cada lado.**
+2. Concatenando para esquivarlo, el literal quedó **partido en dos**, y ninguno
+   de los dos trozos emparejaba con nada. **Dos mensajes nuevos.**
+
+La salida fue **una plantilla completa sin ninguna llave literal**: la ayuda
+dice «the closing brace» en palabras. No le cuesta nada al lector y deja una
+sola frase en cada motor.
 
 ### Qué lo sujeta
 
-`runtime-modules-scripts/module-with-lexer-errors`, roja — y roja por la
-divergencia TW/VM, no por la cascada.
+Cuatro celdas nuevas en `syntax-lexer`, todas verdes:
+`unterminated-string-at-end-of-file`, `unterminated-string-swallows-a-brace`,
+`unmatched-brace-in-a-closed-string` y `a-string-may-span-lines` — la última
+está ahí para que nadie vuelva a proponer el fin de línea como tope.
+
+**Sigue abierto el vecino** que la ficha ya nombraba: `>> "a{b ¶` da
+`invalid character in string interpolation` en Rust y
+`unterminated string interpolation` en `zyjs`. El autor confirmó la regla de
+fondo —las llaves se escriben `\{` y `\}` dentro de un texto— pero no cuál de
+los dos textos queda, y los dos motores siguen diciendo cosas distintas.
+
+
 
 ---
 
