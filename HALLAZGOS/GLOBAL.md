@@ -3116,11 +3116,37 @@ Cuatro celdas nuevas en `syntax-lexer`, todas verdes:
 `unmatched-brace-in-a-closed-string` y `a-string-may-span-lines` — la última
 está ahí para que nadie vuelva a proponer el fin de línea como tope.
 
-**Sigue abierto el vecino** que la ficha ya nombraba: `>> "a{b ¶` da
-`invalid character in string interpolation` en Rust y
-`unterminated string interpolation` en `zyjs`. El autor confirmó la regla de
-fondo —las llaves se escriben `\{` y `\}` dentro de un texto— pero no cuál de
-los dos textos queda, y los dos motores siguen diciendo cosas distintas.
+### El vecino, decidido el 2026-09-24
+
+`>> "a{b ¶` tiene **dos** cosas abiertas: la comilla y la llave. Separarlas con
+programas que fallan de una sola manera enseñó que los tres casos vecinos **ya
+coincidían**, y que los dos mensajes que hacen falta **ya existían** en ambos
+motores:
+
+| programa | qué está abierto | los dos, ya antes |
+|---|---|---|
+| `>> "a{b} z" ¶` | nada | corre |
+| `>> "a{b} ¶` | la comilla | `unterminated string literal` |
+| `>> "a{b" ¶` | la llave | `unterminated string interpolation` |
+| `>> "a{b ¶` | **las dos** | Rust culpaba al carácter; `zyjs`, a la llave |
+
+El autor: *«el primer error está en el cierre del texto, que es lo primero que
+encuentras: o muestras los dos errores o sólo muestras el primero»*. Decidido
+**los dos, en orden de apertura** — la comilla primero, porque abre antes.
+
+**Los dos motores Rust dan los dos. `zyjs` da el primero**, y eso no es una
+omisión: su lexer **lanza** en el primer error en vez de acumularlos, así que
+emitir dos pediría cambiarle el modelo de errores entero. No se hizo sin
+preguntar. Lo que sí se alineó es **cuál** sale primero: la comilla, en los dos
+sitios donde su lexer puede tropezar.
+
+`invalid character in string interpolation` **no se retira**: tiene casos
+propios donde la cadena sí cierra —`"a{b+c}"`, `"a{¶}"`— y en ellos los tres
+coinciden.
+
+`syntax-lexer/quote-and-brace-both-left-open` nace **roja** por esa diferencia
+de cuenta, y es el sitio donde mirar el día que se decida si el lexer de `zyjs`
+acumula.
 
 
 
