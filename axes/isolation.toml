@@ -409,6 +409,54 @@ src     = """
 """
 
 [[cell]]
+id      = "a-block-name-is-gone-with-or-without-underscore"
+premise = "MEM-6"
+what    = "what is born in a light block dies with it — the same failure with no `_`, so the `_` is not its cause"
+# The control for the cell above: this program fails exactly as `_t` does, which
+# is why reading `_t` from outside now says only `undefined variable` instead of
+# also blaming the underscore (GLB-039, decided 2026-09-24).
+src     = """
+? #1 { t = 1 }
+>> t ¶
+"""
+
+[[cell]]
+id      = "underscore-name-is-free-again-outside"
+premise = "MEM-6"
+expect  = "ok"
+what    = "`_` means PRIVATE: once its block closes the name is free, and assigning it outside declares a new one"
+# It used to be refused as "cannot access underscore variable from outer scope",
+# twice. MEM-6 says what is born in the block dies with it, so outside there is
+# nothing left to reach — exactly as without the `_`.
+src     = """
+? #1 { _value = 10 }
+_value = 20
+>> _value ¶
+"""
+
+[[cell]]
+id      = "hot-anchor-and-underscore-contradict"
+premise = "MEM-6"
+what    = "`°_t`: `°` makes a value survive its block and `_` keeps it inside — refused before running"
+# The engines disagreed about the pair — one accepted it, one refused the
+# accumulation at run time — and no program in the workspace used it.
+src     = """
+@ i:1..2 {
+    °_t += i
+}
+"""
+
+[[cell]]
+id      = "suffix-anchor-and-underscore-contradict"
+premise = "MEM-6"
+what    = "`_t°`: the suffix anchor and the underscore, the same contradiction"
+src     = """
+@ i:1..2 {
+    _t° += i
+}
+"""
+
+[[cell]]
 id      = "underscore-is-invisible-inside"
 premise = "MEM-6"
 what    = "`_name` cannot be read from a block nested inside its own"
