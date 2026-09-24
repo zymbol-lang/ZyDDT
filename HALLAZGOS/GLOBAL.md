@@ -3134,19 +3134,30 @@ El autor: *«el primer error está en el cierre del texto, que es lo primero que
 encuentras: o muestras los dos errores o sólo muestras el primero»*. Decidido
 **los dos, en orden de apertura** — la comilla primero, porque abre antes.
 
-**Los dos motores Rust dan los dos. `zyjs` da el primero**, y eso no es una
-omisión: su lexer **lanza** en el primer error en vez de acumularlos, así que
-emitir dos pediría cambiarle el modelo de errores entero. No se hizo sin
-preguntar. Lo que sí se alineó es **cuál** sale primero: la comilla, en los dos
-sitios donde su lexer puede tropezar.
+**Los tres dan los dos**, y para eso hubo que darle a `zyjs` algo que no tenía:
+su lexer **lanza** en el primer error en vez de acumularlos, así que la celda
+nació roja por diferencia de cuenta —dos errores contra uno— y el autor
+autorizó el cambio en el acto.
+
+**Cómo se hizo sin reescribir el lexer.** Los 32 sitios que lanzan siguen
+lanzando; lo que cambia es que una refusa puede **llevar consigo** los demás
+hallazgos del mismo punto, en un campo `zyMore`, y `checkSource` los convierte
+en diagnósticos ordinarios. El canal para varios ya existía —devuelve una lista
+y el runner la imprime entera—; lo que faltaba era que el lexer pudiera aportar
+más de uno. Una lista vacía es el comportamiento de antes, exactamente.
+
+**El segundo de los dos también tuvo que alinearse**, porque los dos lexers
+tropiezan en sitios distintos: el de Rust para en el espacio de `{b `, el de
+`zyjs` llega al final. Lo que los separa es si la interpolación **cierra en
+algún momento**: `{b ` no cierra nunca, así que lo que le pasa es que está
+abierta; `{b+c}` cierra, así que lo que le pasa es el carácter de dentro. Los
+dos motores hacen ahora el mismo corte.
 
 `invalid character in string interpolation` **no se retira**: tiene casos
 propios donde la cadena sí cierra —`"a{b+c}"`, `"a{¶}"`— y en ellos los tres
 coinciden.
 
-`syntax-lexer/quote-and-brace-both-left-open` nace **roja** por esa diferencia
-de cuenta, y es el sitio donde mirar el día que se decida si el lexer de `zyjs`
-acumula.
+`syntax-lexer/quote-and-brace-both-left-open` está **verde**.
 
 
 
