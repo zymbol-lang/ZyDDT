@@ -3165,7 +3165,7 @@ coinciden.
 
 ## GLB-039 — Dos reglas del analizador sobre el mismo nombre: no puedes verlo, y además no existe
 
-**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.7)
+**Estado:** **corregido el 2026-09-24 (paso G5.5)**, tres decisiones del autor
 **Encontrado por:** paso 3.7, 2026-09-19
 **Gravedad:** baja: los dos textos son ciertos, pero el segundo desmiente al primero
 
@@ -3187,14 +3187,87 @@ La celda `isolation/underscore-is-invisible-outside` está **verde**: el gate
 compara el veredicto y los dos motores llegan a `error`. Lo que no ve es que uno
 llega con dos textos y el otro con uno.
 
-### Qué hay que decidir
+### La ficha se equivocaba en su recomendación
 
-Cuál de las dos reglas habla cuando las dos aciertan. `zyjs` da la menos precisa
-de las dos; el texto bueno es el primero de Rust.
+Decía que *«el texto bueno es el primero de Rust»*. Medir con el programa de
+control lo desmintió:
+
+```
+? #1 { _t = 1 }        ? #1 { t = 1 }
+>> _t ¶                >> t ¶
+
+rust: 2 errores         los tres: undefined variable 't'
+```
+
+**Sin el guión bajo falla igual.** Lo que esconde `_t` fuera del bloque no es el
+`_` sino el bloque: [[MEM-6]] dice que un entorno ligero —`?`, `@`, `??`— hace
+que *«lo que nace en él muera con él»*. El mensaje del `_` atribuía el fallo a
+una causa que no era, y quien quitara el guión bajo seguía con el error. El
+texto bueno era el **segundo**, el que ya daba `zyjs`.
+
+### El caso donde el mensaje del `_` sí era cierto
+
+Existía uno: `°_t += i` dentro de un bucle. El `°` ancla el nombre **por encima**
+del bucle, así que `_t` sí existía fuera, y era el `_` lo que impedía leerlo.
+Pero ahí los motores **discrepaban en dónde fallar**: Rust aceptaba la
+acumulación y refusaba la lectura final; `zyjs` refusaba ya la acumulación, en
+ejecución.
+
+La combinación pide dos cosas opuestas: MEM-6 dice que `°` es *«la marca para
+que un valor sobreviva al bloque»*, y `_` dice que no sale de él.
+
+### Decidido — 2026-09-24
+
+1. **Leer desde fuera una `_t` del bloque da sólo `undefined variable '_t'`**,
+   lo mismo que sin guión bajo.
+2. **`°_t` y `_t°` son error estático**: *«'°_t' anchors the name above the loop
+   and '_' keeps it inside its block — the two markers contradict each other»*.
+   Ningún programa del workspace la usaba — la única aparición era un
+   comentario.
+3. **Con eso, el mensaje «from outer scope» se quedó sin ningún caso propio y se
+   retiró.** Y retirarlo destapó una tercera cuestión que el autor también
+   decidió: **asignar** `_value = 20` fuera del bloque dejaba de ser error.
+
+   ```
+   ? #1 { _value = 10 }
+   _value = 20
+   >> _value ¶          antes: error, dos veces   ahora: 20
+   ```
+
+   El autor: **`_` significa privado, no reservado.** La variable no escapa de su
+   bloque, y al cerrarlo el nombre queda libre — igual que sin guión bajo. Es
+   exactamente lo que MEM-6 dice.
+
+`cannot access underscore variable '_t' from inner scope` **se queda**: leer
+desde un bloque anidado una `_t` de fuera sí es el caso propio del `_`, y los
+tres coinciden.
+
+### Cuatro tests que medían el texto retirado
+
+`crates/zymbol-semantic/tests/underscore_semantics.rs` comprobaba el mensaje de
+«outer scope» con el analizador del `_` aislado. Se reescribieron al contrato
+nuevo y se renombraron para que digan lo que comprueban: el analizador del `_`
+no dice nada en esos casos, y el chequeo **completo** sigue diciendo
+`undefined variable` — un ayudante nuevo, `full_check_errors`, lo verifica para
+que no se pierda la garantía de que siguen siendo error.
+
+### Y un defecto del inventario de mensajes
+
+Al reescribir esos tests, el inventario cantó **cinco mensajes nuevos de un solo
+lado**: eran las cadenas de los `assert!`. El extractor sólo excluía los ficheros
+cuyo nombre empieza por `test`, y leía **los directorios `tests/` enteros** como
+si fueran motor. Corregido: **149 «mensajes» que se atribuían a Rust venían de
+tests de integración**. Es la misma familia que ya había encontrado la memoria
+(*«el inventario medía sus propios tests»*), cuando sólo se quitaron los módulos
+`#[cfg(test)]`.
 
 ### Qué lo sujeta
 
-Nada: la celda es verde. Haría falta una que compare el número de diagnósticos.
+Cuatro celdas nuevas en `isolation`, bajo MEM-6 y verdes:
+`a-block-name-is-gone-with-or-without-underscore` (el control),
+`underscore-name-is-free-again-outside`, `hot-anchor-and-underscore-contradict`
+y `suffix-anchor-and-underscore-contradict`. MEM-6 pasa de 8 a 12 celdas, y el
+eje de 5 a 4 `WORDING`.
 
 ---
 
