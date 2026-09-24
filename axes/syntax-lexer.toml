@@ -215,3 +215,25 @@ x = "linea1
 linea2"
 >> x ¶
 """
+
+[[cell]]
+id     = "quote-and-brace-both-left-open"
+expect = "error"
+what   = "both open: the QUOTE is reported first, because it opened first"
+# `>> \"a{b ¶` used to name only what the interpolation tripped on, which is the
+# symptom of reading past a quote that never closed (GLB-038, decided
+# 2026-09-24). The two Rust engines report both errors, in opening order; zyjs
+# reports the first, because its lexer throws rather than collecting.
+src    = """
+b = 1
+>> "a{b ¶
+"""
+
+[[cell]]
+id     = "interpolation-left-open-in-a-closed-string"
+expect = "error"
+what   = "unterminated string interpolation — the quote DOES close, so only the brace is open"
+src    = """
+b = 1
+>> "a{b" ¶
+"""
