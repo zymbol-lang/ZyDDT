@@ -3383,6 +3383,33 @@ cuya celda ya coincide o ya no existe. La opción `--regen-baseline` y la funci�
 que reescribía el fichero ya no existen. La entrada caducada se quitó a mano.
 `VERDICTS.md` y la cabecera de `wording.baseline` dicen las reglas nuevas.
 
+### Corregido el 2026-09-25 (paso G5.3): el grupo A
+
+`zyjs` da la misma ayuda que los dos Rust en las seis formas de escribir en una
+constante (asignación, `+=`, `++`, `<< C`, iterador y desestructuración), en las
+dos mitades de la marca `<~` y en `needs a variable, not an expression`. Y, en las
+de `_`, la misma nota, `'_t' was declared at 1:8`: el `Checker` acepta ya
+`notes`, y `run_one.mjs` las imprime como `= …` antes de la ayuda, como el CLI.
+
+Al medir salió que la ayuda de Rust para `_` llevaba un `\n` dentro, y su segunda
+mitad se imprimía **suelta y sin sangría** después del bloque, donde parecía una
+línea perdida. Ahora es una frase, con las mismas palabras:
+`underscore variables are strictly local to their declaration block: '_t' was
+declared in an outer scope and cannot be accessed from nested blocks`. Los tres
+goldens que la llevaban se editaron a mano.
+
+Salen de `wording.baseline` las 5 entradas de la clase A, y la celda de fuera
+(`isolation/suffix-anchored-underscore-is-not-seen-by-inner-blocks`) pasa a
+verde. Seis celdas nuevas miden lo que nadie medía: las cinco otras formas de
+escribir en una constante y `output-argument-must-be-a-variable`. Dos de ellas
+quedan rojas por cosas que el paso encontró y no tocó: [`GLB-056`](GLOBAL.md) y
+[`ZYJS-032`](zyjs.md). La línea base de `zyquality/messages/` baja de 603 a 596:
+las siete ayudas las definen ya los dos motores.
+
+`interpreter/AGENTIC.md` (derivado) cita todavía `cannot access underscore
+variable '_t' from outer scope` con su ayuda de antes: ese mensaje ya no existe.
+Anotado, sin tocar.
+
 ---
 
 ## GLB-041 — `@! etiqueta` parece un salto con etiqueta y es un salto pelado más un nombre tirado
@@ -4543,3 +4570,31 @@ la variable del fichero desde una función, la copia de la lambda, y la función
 la lambda llamadas dos veces. El eje queda en 20 de 23: las tres rojas son las
 fichas abiertas.
 
+
+---
+
+## GLB-056 — Rust avisa `unused variable` sobre una constante usada de iterador
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** paso G5.3, 2026-09-25, midiendo las formas de escribir en una constante
+
+```zymbol
+PI := 3
+@ PI:1..2 { >> "x" ¶ }
+>> PI ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: unused variable 'PI'` (en la línea 1), y el error `cannot reassign constant 'PI'` |
+| `zyjs` | sólo el error |
+
+La última línea **lee** `PI`, así que el aviso es falso. Sin esa línea, Rust avisa
+**dos** veces, en las líneas 1 y 2. Con la desestructuración (`[PI, b] = [1, 2]`)
+no avisa. El análisis de variables parece tratar el iterador como una declaración
+nueva que tapa la constante.
+
+### Qué lo sujeta
+
+`isolation/const-refuses-to-be-an-iterator`, roja (`DIVERGE`: un aviso es parte
+de la forma).

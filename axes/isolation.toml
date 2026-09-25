@@ -214,6 +214,17 @@ sube(y<~)
 >> y ¶
 """
 
+[[cell]]
+id   = "output-argument-must-be-a-variable"
+premise = "MEM-5"
+expect = "error"
+what = "an output argument writes back into the caller, so it cannot be an expression"
+src  = """
+sube(b<~) { b = b + 100 }
+sube(1 + 2<~)
+>> "fin" ¶
+"""
+
 # ── MEM-6: the two levels ───────────────────────────────────────────────────
 #
 # The light environment already behaves as MEM-6 requires, in all three engines,
@@ -370,6 +381,67 @@ src     = """
 PI := 3.14
 PI = 3
 >> PI ¶
+"""
+
+# The other ways of writing into a constant (D5), each with the same text and
+# the same help in all three engines — zyjs gave the text without the help
+# until GLB-040 (step G5.3), and nothing measured these five.
+[[cell]]
+id      = "const-refuses-a-compound-assignment"
+premise = "MEM-1"
+expect  = "error"
+what    = "`PI += 1` is a second value too"
+src     = """
+PI := 3
+PI += 1
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-an-increment"
+premise = "MEM-1"
+expect  = "error"
+what    = "`PI++` is a second value too"
+src     = """
+PI := 3
+PI++
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-to-be-read-into"
+premise = "MEM-1"
+expect  = "error"
+what    = "`<< PI` would write what was read into the constant"
+src     = """
+PI := 3
+<< PI
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-to-be-an-iterator"
+premise = "MEM-1"
+expect  = "error"
+what    = "a loop iterator is written every turn, so a constant cannot be one"
+# Red: both Rust engines also warn `unused variable 'PI'`, about a constant the
+# last line reads, and zyjs does not — GLB-056. A warning is part of the shape.
+src     = """
+PI := 3
+@ PI:1..2 { >> "x" ¶ }
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-to-be-destructured-into"
+premise = "MEM-1"
+expect  = "error"
+what    = "a destructuring pattern writes its names, so a constant cannot be one of them"
+# zyjs gives this error without its line — ZYJS-032, red until it does.
+src     = """
+PI := 3
+[PI, b] = [1, 2]
+>> b ¶
 """
 
 [[cell]]
