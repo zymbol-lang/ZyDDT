@@ -1,0 +1,113 @@
+# The type-change axis — the reassignment warning, and how far each engine
+# infers the right-hand side to decide it.
+#
+# Until 2026-09-24 the browser engine decided it only literal against literal,
+# so `marca = "@"` then `marca = trazo[1]` — String then Char — was flagged by
+# both Rust engines and passed in silence there, in the 110 mandelbrot examples.
+# Decided: infer the six shapes the Rust type checker infers (GLB-043).
+#
+# The warning has a real basis: a one-character String and a Char print the
+# same, but `"@" == '@'` is FALSE in all three engines. A name that is sometimes
+# one and sometimes the other can fail a comparison without a sign.
+#
+# Each warning cell reassigns a String to something inferred as another type;
+# the `ok` cells are the controls — the places Rust stays silent, and must go on
+# staying silent, because a warning that fires where nothing changed is the
+# failure this axis exists to prevent.
+
+id      = "type-change"
+what    = "a reassignment to another type warns, and each engine infers the right-hand side alike"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "warn"
+
+[[cell]]
+id   = "literal"
+what = "String, then an Int literal"
+src  = """
+x = "a"
+x = 5
+>> x ¶
+"""
+
+[[cell]]
+id   = "variable"
+what = "String, then a variable holding an Int — decided from what the variable holds"
+src  = """
+x = "a"
+y = 5
+x = y
+>> x ¶
+"""
+
+[[cell]]
+id   = "string-index-is-a-char"
+what = "String, then one position of a String — a Char (the mandelbrot shape)"
+src  = """
+trazo = " .:-="
+marca = "@"
+marca = trazo[1]
+>> marca ¶
+"""
+
+[[cell]]
+id   = "arithmetic"
+what = "String, then arithmetic — an Int"
+src  = """
+x = "a"
+x = 1 + 2
+>> x ¶
+"""
+
+[[cell]]
+id   = "call"
+what = "String, then a call — the type the function's `<~` returns"
+src  = """
+f() { <~ 5 }
+x = "a"
+x = f()
+>> x ¶
+"""
+
+[[cell]]
+id   = "length"
+what = "String, then `$#` — an Int"
+src  = """
+x = "a"
+x = "abc"$#
+>> x ¶
+"""
+
+[[cell]]
+id     = "int-then-float-is-no-change"
+expect = "ok"
+what   = "Int, then Float: numbers stay compatible, as in Rust"
+src    = """
+x = 1
+x = 1.5
+>> x ¶
+"""
+
+[[cell]]
+id     = "call-returning-two-types-stays-silent"
+expect = "ok"
+what   = "a function returning Int on one path and String on another is Any: cannot tell, so nothing is said"
+src    = """
+f(a) {
+    ? a > 0 { <~ 1 }
+    <~ "neg"
+}
+x = 1
+x = f(1)
+>> x ¶
+"""
+
+[[cell]]
+id     = "same-type-through-a-call"
+expect = "ok"
+what   = "Int, then a call returning Int: nothing changed"
+src    = """
+f() { <~ 5 }
+x = 1
+x = f()
+>> x ¶
+"""

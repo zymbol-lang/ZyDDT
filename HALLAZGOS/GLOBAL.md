@@ -3413,7 +3413,7 @@ Nada: no hay celda para ninguna de las cuatro formas.
 
 ## GLB-043 — El aviso de cambio de tipo: Rust infiere el lado derecho y `zyjs` sólo compara literales
 
-**Estado:** abierto — hace falta decisión (F3, encontrado por el paso 3.8)
+**Estado:** **corregido el 2026-09-25 (paso G5.6)**, dos decisiones del autor
 **Encontrado por:** paso 3.8, 2026-09-19, al medir el impacto de [[GLB-030]]
 **Decisión del autor (2026-09-19):** aceptar y regrabar la línea base de paridad.
 
@@ -3445,15 +3445,61 @@ hizo con `emoji.zy` en el paso 2.17: la divergencia la sujeta esta ficha, no un
 número en un fichero. El diff son exactamente 110 filas, todas de `mandelbrot`,
 y ninguna otra se movió.
 
-### Qué hay que decidir
+### Lo que se midió antes de decidir
 
-Hasta dónde infiere el analizador de `zyjs` en el lado derecho de una
-reasignación. Estrechar Rust no se hizo: perdería un aviso cierto que ya daba
-fuera de los bloques TUI.
+**El aviso tiene fundamento.** Un String de un carácter y un Char se imprimen
+igual, pero son tipos distintos (`##"` y `##'`) y **`"@" == '@'` es falso en los
+tres motores**. Una variable que a veces es uno y a veces otro puede fallar una
+comparación sin que se note. Silenciar el caso —tratar String y Char como
+compatibles, igual que Int y Float— habría quitado un aviso cierto.
+
+**Rust es preciso.** Infiere el lado derecho en seis formas —literal, variable,
+índice, aritmética, llamada y `$#`— y en los controles calla donde debe: una
+función que devuelve Int por un camino y String por otro es *cannot tell*, e Int
+con Float es compatible.
+
+**Y en la práctica el aviso sale en un solo sitio.** En los 998 ficheros del
+corpus y los ejemplos, lo dan exactamente los 110 mandelbrot, siempre por la
+misma línea: el glifo por defecto guardado como String (`marca = "@"`) y
+reemplazado luego por un carácter de la paleta.
+
+### Decidido — 2026-09-24
+
+1. **`zyjs` infiere como Rust, las seis formas.** Cada rama es la de
+   `infer_expr`, incluida donde no es conservadora — `n / 4` es Int aunque `n` no
+   se conozca, porque eso contesta Rust —, y la compatibilidad es
+   `is_compatible_with`. El tipo de una llamada sale de los `<~` de la función,
+   unificados como en `unify_types_static`. El registro es un campo propio,
+   `infType`, separado de `litType`: el chequeo de condiciones lee `litType` y
+   este paso no lo toca.
+2. **Los 110 ejemplos guardan el glifo por defecto como Char** (`'@'`): la
+   variable sólo guarda caracteres, así que su valor inicial también lo es.
+
+### Corregido
+
+Medido sobre los 998 ficheros **antes** de tocar los ejemplos: `zyjs` avisaba en
+**exactamente los mismos 110** que Rust, ni uno más ni uno menos. Después de
+tocarlos: **cero avisos en los dos**.
+
+`test_check` pasa de 220 a **330 de 332 ficheros en acuerdo completo (99,4 %)**.
+La línea base de paridad se regrabó comprobando que el diff son **exactamente**
+110 filas, todas de mandelbrot, todas de `1 0` a `0 0`, y ninguna otra.
+
+**Dos copias que nadie esperaba.** `index.html` lleva el mandelbrot en inglés en
+línea —lo que se ve si la carga falla— y `test_i18n_atlas` exige que sea idéntico
+a `english.zy`; su gemelo `index.md` lleva el español. Actualizadas las dos, en
+el mismo commit, como pide la regla del gemelo.
 
 ### Qué lo sujeta
 
-`web/tests/check_parity_baseline.txt`, 110 filas en `1 0`. No hay celda.
+Un eje nuevo, `type-change`, **9 de 9 en verde**: las seis formas avisando igual
+en los tres, y tres controles que tienen que seguir callando.
+
+### Lo que queda abierto
+
+`x = 1` seguido de `x = ##_` avisa `was Int but assigned Unit` en los tres. Es la
+regla de Rust y ahora `zyjs` la sigue, pero asignar Unit puede ser la forma
+legítima de vaciar una variable. No se decidió; está aquí para cuando se decida.
 
 ---
 
