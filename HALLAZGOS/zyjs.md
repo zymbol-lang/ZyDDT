@@ -1991,3 +1991,27 @@ lleva `line`: `posOf` devuelve `null`. El playground no puede marcar la línea.
 ### Qué lo sujeta
 
 `isolation/const-refuses-to-be-destructured-into`, roja (`DIVERGE`).
+
+---
+
+## ZYJS-033 — Un `*` donde va un patrón: `zyjs` dice `expected expression`
+
+**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** paso G5.5 ([`GLB-028`](GLOBAL.md)), 2026-09-25
+
+```zymbol
+?? 3 { * => 1 }
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `expected pattern, found '*'` |
+| `zyjs` | `expected expression, found '*'` |
+
+Anterior a `GLB-028`: antes los dos decían `found Star`, con la misma diferencia
+delante. `zyjs` lee el patrón de un brazo con el parser de expresiones y el
+refuso sale de allí.
+
+### Qué lo sujeta
+
+`refusal/match-arm-with-a-star`, roja (`WORDING`).
