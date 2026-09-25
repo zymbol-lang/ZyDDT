@@ -2346,7 +2346,7 @@ project, fmt y guide en línea base; barrido de parseo de `zyjs` idéntico sobre
 ## GLB-028 — Los parsers Rust añaden errores falsos en cascada y enseñan sus tokens internos
 
 **Estado:** **la cascada corregida 2026-09-19 (paso 3.7); los nombres de token,
-decididos y corregidos el 2026-09-25 (paso G5.5)**; el operador en ejecución, paso G5.6
+decididos y corregidos el 2026-09-25 (paso G5.5), y el operador en ejecución (paso G5.6)**
 **Encontrado por:** pasos 2.1 y 2.3, 2026-09-15
 **Gravedad:** media: el lector recibe dos errores donde hay uno, y el segundo nombra el lexer por dentro
 **Decisión del autor (2026-09-19):** las tres causas, sólo la cascada.
@@ -2487,6 +2487,26 @@ dice `expected pattern` y `zyjs` `expected expression`. Y
 `corpus/i18n/test_database.expected`, que nadie compara (`ENVIRONMENT`), no se
 parece en nada a lo que el programa hace hoy: registra errores de un parser viejo,
 y el programa corre.
+
+### El operador en ejecución — corregido el 2026-09-25 (paso G5.6)
+
+Los tres motores decían `cannot compare values with operator 'Lt': Char and Int`
+—y `'Le'`, `'Gt'`, `'Ge'`—, en 47 programas del barrido: el nombre de la variante
+de `BinaryOp`, en grafía `Debug` en el TW, como literal en la VM y copiado en
+`zyjs`. Lo mismo en las cuatro frases de cadena contra número (`cannot compare
+string 'a' with integer 5 using operator 'Lt'`). Decidido: el operador **como se
+escribe**. Ahora es `operator '<'`, en los tres: el TW usa el `Display` que
+`BinaryOp` ya tenía, la VM pasa el símbolo, y `zyjs` el operador que ya tenía en
+la mano.
+
+Esas cuatro frases imprimen el **valor** y no el tipo, y no es un descuido
+frente a `GLB-033`: la comparación está definida cuando la cadena es un número
+en cualquier escritura, así que el refuso habla de ese texto concreto. Lo dice el
+comentario de `zyjs`, y se queda.
+
+Ningún golden ni documento citaba el nombre viejo. Dos celdas nuevas en
+`runtime-operators`, `cannot-compare-values-of-these-types` y
+`cannot-compare-string-with-integer`; el eje queda 16 de 16.
 
 ---
 
