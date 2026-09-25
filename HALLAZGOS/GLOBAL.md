@@ -3325,7 +3325,7 @@ eje de 5 a 4 `WORDING`.
 
 ## GLB-040 — `wording.baseline` lleva 23 líneas sin decidir
 
-**Estado:** abierto — hace falta decisión (arnés, encontrado por el paso 3.7)
+**Estado:** **decidido el 2026-09-25**; el arnés, corregido en el paso G5.2
 **Encontrado por:** paso 3.7, 2026-09-19
 
 `ZyDDT/wording.baseline` dice de sí mismo que «puede encoger sola, y nunca puede
@@ -3346,6 +3346,42 @@ una vez las 20 ajenas, que es exactamente contra lo que el fichero avisa.
 Si se regraba la línea base entera —y entonces las 23 quedan aceptadas de golpe—
 o se repasan una a una. Y, si es lo segundo, si el gate debería quejarse de que
 lleva 23 pendientes, porque hoy no se queja de nada.
+
+### Medido el 2026-09-25, antes de decidir
+
+La cuenta de arriba era vieja. Preguntadas con `zyddt ask`, que no consulta la
+lista, de las **8** entradas **7 siguen vivas** y **1 estaba caducada**
+(`isolation/underscore-is-invisible-outside`, que curó GLB-039). Las `WORDING` de
+fuera de la lista eran 9: una con la misma forma que la lista
+(`isolation/suffix-anchored-underscore-is-not-seen-by-inner-blocks`), tres
+declaradas por `GLB-055` y cinco de P4 (subscript, texto del sistema operativo,
+`$+[0]`).
+
+Las 7 vivas son de dos clases:
+
+- **A — 5 entradas, más la de fuera:** los tres dicen la misma frase, y los dos
+  Rust añaden la ayuda y, en las de `_`, dos notas. Son textos fijos.
+- **B — 2 entradas, la aridad:** Rust añade `help: expected signature: g(Number,
+  Number)`, con tipos **inferidos** del cuerpo (`g(Any, Any)` si no infiere nada).
+  `zyjs` no infiere, y ni `Number` ni `Any` son tipos de Zymbol (GLB-033).
+
+Y el gate: una `NEW WORDING` ya era roja, pero una entrada **caducada** sólo
+imprimía una nota verde, así que su celda podía volver a separarse en silencio.
+
+### Decidido el 2026-09-25
+
+1. **Grupo A: se alinea `zyjs`**, con la misma ayuda y las mismas notas.
+2. **Grupo B: la firma se escribe con los nombres de los parámetros**,
+   `expected signature: g(a, b)`, en los dos motores.
+3. **Una entrada caducada es roja** (`STALE WORDING`).
+4. **`--regen-baseline` se retira**: el fichero se edita a mano.
+
+### Corregido el 2026-09-25 (paso G5.2): el arnés
+
+`zyddt axis` da `STALE WORDING` y rc=1 por cada entrada de un eje que ha corrido
+cuya celda ya coincide o ya no existe. La opción `--regen-baseline` y la función
+que reescribía el fichero ya no existen. La entrada caducada se quitó a mano.
+`VERDICTS.md` y la cabecera de `wording.baseline` dicen las reglas nuevas.
 
 ---
 

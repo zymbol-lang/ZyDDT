@@ -499,25 +499,26 @@ def cmd_axis(args, cfg) -> int:
         rows.append((ax.id, len(ax.cells), agreed, worded, diverged, wrong,
                      noverdict, narrowed, oracled))
 
-    if args.regen_baseline:
-        if args.axes:
-            print(R.red("zyddt: --regen-baseline needs a full run — a partial one "
-                        "would erase entries it never asked about"), file=sys.stderr)
-            return NOVERDICT
-        _save_baseline(wording_now)
-        print(R.yellow(f"\n  wording.baseline rewritten: {len(wording_now)} entries"))
-        return GREEN
-
     # Only over the axes that actually ran.  `zyddt axis environment` compared
     # the whole baseline against one axis's results and announced that three
     # splits had closed; they had simply not been asked.  A partial run may not
     # report a global improvement.
+    #
+    # A stale entry is RED (GLB-040, decided 2026-09-25).  While it stays in the
+    # list, the cell it names may split again and the gate will accept it in
+    # silence — an open door, which is what `--audit-exclusions` refuses in
+    # zyquality.  It is removed by hand, in the step that healed it.  There is
+    # no command that rewrites the file: `--regen-baseline` absorbed splits
+    # nobody had decided and twice ate the comments that explained the ones
+    # somebody had (HOW_TO_CHANGE_ZYMBOL.md § 2, move 5).
     ran = {ax.id for ax in axes}
     healed = {e for e in baseline - wording_now if e.split("/", 1)[0] in ran}
     if healed:
-        print(R.green(f"\n  {len(healed)} wording split(s) closed since the baseline: "
-                      + ", ".join(sorted(healed))))
-        print(R.dim("  rerun with --regen-baseline to lock the improvement in"))
+        worst = worse(worst, RED)
+        print()
+        for e in sorted(healed):
+            print(f"{R.red('STALE WORDING')} {e}  "
+                  f"{R.dim('agrees now, or no longer exists — remove it from wording.baseline by hand')}")
 
     print()
     print(f"  {'axis':<22}{'cells':>6}{'agree':>7}{'oracled':>9}{'narrowed':>10}"
@@ -565,18 +566,6 @@ def _load_baseline() -> set[str]:
         return set()
     return {l.split("#", 1)[0].strip() for l in BASELINE.read_text().splitlines()
             if l.split("#", 1)[0].strip()}
-
-
-def _save_baseline(entries: set[str]) -> None:
-    header = (
-        "# Cells where every engine does the same thing and says it differently.\n"
-        "# Recorded by `zyddt axis --regen-baseline`, which is deliberate and\n"
-        "# separate: this file may shrink on its own, and may never grow on its\n"
-        "# own. A line appearing here that was not written on purpose is a new\n"
-        "# one-sided message, which is the thing zyquality/messages/ counts\n"
-        "# statically and this counts as it is actually emitted.\n"
-    )
-    BASELINE.write_text(header + "".join(f"{e}\n" for e in sorted(entries)))
 
 
 # ── selftest — grading the grader ────────────────────────────────────────────
@@ -904,9 +893,6 @@ def main() -> int:
                         ("axis", "generate, run, and publish the denominator")):
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("axes", nargs="*", help="axis file stems (default: all)")
-        if name == "axis":
-            sp.add_argument("--regen-baseline", action="store_true",
-                            help="record today's wording splits as the baseline")
     for name, help_ in (("observe", "what each engine said"),
                         ("ask", "CELL: all engines must answer alike"),
                         ("check", "PIN: compare against the recorded .observed")):
@@ -918,8 +904,7 @@ def main() -> int:
 
     args = p.parse_args()
     # `suite` reuses the other handlers, so give it the fields they read.
-    for attr, default in (("axes", []), ("files", []), ("regen", False),
-                          ("regen_baseline", False)):
+    for attr, default in (("axes", []), ("files", []), ("regen", False)):
         if not hasattr(args, attr):
             setattr(args, attr, default)
     cfg = E.load()

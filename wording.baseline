@@ -1,14 +1,15 @@
 # Cells where every engine does the same thing and says it differently.
-# Recorded by `zyddt axis --regen-baseline`, which is deliberate and
-# separate: this file may shrink on its own, and may never grow on its
-# own. A line appearing here that was not written on purpose is a new
-# one-sided message, which is the thing zyquality/messages/ counts
-# statically and this counts as it is actually emitted.
+# Edited BY HAND, and only by hand (GLB-040, decided 2026-09-25): there is
+# no command that rewrites it. A split that is not listed is RED (`NEW
+# WORDING`), and so is an entry whose cell agrees now or no longer exists
+# (`STALE WORDING`) — remove it in the step that healed it. An entry is
+# added only with a comment saying who accepted the difference and why.
+# This is what zyquality/messages/ counts statically, as it is actually
+# emitted.
 isolation/const-cannot-be-reassigned
 isolation/output-mark-without-an-output-parameter
 isolation/output-parameter-unmarked-at-call
 isolation/underscore-is-invisible-inside
-isolation/underscore-is-invisible-outside
 refusal/arity-inside-a-collection-operand
 refusal/arity-inside-a-lambda-block
 refusal/output-mark-missing-inside-a-lambda-block
@@ -35,10 +36,9 @@ refusal/output-mark-missing-inside-a-lambda-block
 # no cerrarla barata — salvo que aquí el `help` no exige inferencia, sólo texto,
 # así que es más barata de lo que parece y merece una decisión propia.
 #
-# AVISO SOBRE ESTE FICHERO: `--regen-baseline` lo REESCRIBE entero y no conserva
-# comentarios. El bloque de arriba se perdió al regenerar el 2026-09-12 y se
-# repuso a mano. Hasta que el runner los preserve, copiar los comentarios antes
-# de regenerar es parte del procedimiento.
+# `--regen-baseline` REESCRIBÍA este fichero entero sin conservar comentarios:
+# el bloque de arriba se perdió así el 2026-09-12 y se repuso a mano. La opción
+# se retiró el 2026-09-25 (GLB-040).
 # refusal/arity-inside-a-lambda-block — anotadas el 2026-09-12.
 # refusal/output-mark-missing-inside-a-lambda-block
 #
@@ -49,7 +49,7 @@ refusal/output-mark-missing-inside-a-lambda-block
 # familia que `refusal/arity-inside-a-collection-operand`.
 
 # isolation/const-cannot-be-reassigned — anotadas el 2026-09-13.
-# isolation/underscore-is-invisible-outside
+# isolation/underscore-is-invisible-outside  (quitada el 2026-09-25: GLB-039 la curó)
 # isolation/underscore-is-invisible-inside
 #
 # Las tres mitades que faltaban de MEM-1 y MEM-6. Los tres motores rechazan y
