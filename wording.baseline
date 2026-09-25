@@ -6,13 +6,8 @@
 # added only with a comment saying who accepted the difference and why.
 # This is what zyquality/messages/ counts statically, as it is actually
 # emitted.
-isolation/const-cannot-be-reassigned
-isolation/output-mark-without-an-output-parameter
-isolation/output-parameter-unmarked-at-call
-isolation/underscore-is-invisible-inside
 refusal/arity-inside-a-collection-operand
 refusal/arity-inside-a-lambda-block
-refusal/output-mark-missing-inside-a-lambda-block
 # refusal/arity-inside-a-collection-operand — anotada el 2026-08-30.
 #
 # Los tres rechazan y dicen lo mismo; los dos motores Rust añaden además
@@ -57,3 +52,11 @@ refusal/output-mark-missing-inside-a-lambda-block
 # línea `= help:` y zyjs no. Misma familia que el resto de este fichero, y la
 # misma razón para no cerrarla barata: el `help` no es redacción, es una guía que
 # cada motor decide si sabe dar.
+
+# Quitadas a mano el 2026-09-25 (GLB-040, paso G5.3): `zyjs` da ya la misma
+# ayuda —y, en las de `_`, la misma nota— que los dos Rust.
+#   isolation/const-cannot-be-reassigned
+#   isolation/output-mark-without-an-output-parameter
+#   isolation/output-parameter-unmarked-at-call
+#   isolation/underscore-is-invisible-inside
+#   refusal/output-mark-missing-inside-a-lambda-block

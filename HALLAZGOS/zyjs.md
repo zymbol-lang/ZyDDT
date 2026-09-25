@@ -1966,3 +1966,28 @@ panel de problemas del playground dice otra cosa. Ninguna prueba lo ve, porque
 
 ¿Un código por fallo (con su entrada en el catálogo inglés y español), o que el
 panel use el catálogo sólo cuando la plantilla inglesa coincide con el `message`?
+
+---
+
+## ZYJS-032 — El error de desestructurar en una constante no lleva línea
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** paso G5.3 ([`GLB-040`](GLOBAL.md)), 2026-09-25
+
+```zymbol
+PI := 3
+[PI, b] = [1, 2]
+>> b ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `cannot reassign constant 'PI'`, `--> fichero:2:1` |
+| `zyjs` | el mismo texto y la misma ayuda, **sin** línea `-->` |
+
+El `Checker` pasa el nodo de la desestructuración como posición, y ese nodo no
+lleva `line`: `posOf` devuelve `null`. El playground no puede marcar la línea.
+
+### Qué lo sujeta
+
+`isolation/const-refuses-to-be-destructured-into`, roja (`DIVERGE`).
