@@ -123,6 +123,19 @@ src  = """
 """
 
 [[cell]]
+id   = "fullwidth-question-mark"
+what = "`？` (U+FF1F) where `?` belongs: a name to the lexer, so the refusal falls later"
+# ZYJS-035, open: both Rust engines say `unexpected token: '{'`, zyjs
+# `expected expression, found '>'`. Neither names the character; that belongs to
+# the rule on confusable characters the author is writing in SYMBOLS.md § 2.
+src  = """
+x = 5
+？ x > 1 {
+    >> "mayor" ¶
+}
+"""
+
+[[cell]]
 id   = "expression-is-a-close-paren"
 what = "a stray `)` where an expression belongs"
 src  = """
