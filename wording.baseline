@@ -6,8 +6,6 @@
 # added only with a comment saying who accepted the difference and why.
 # This is what zyquality/messages/ counts statically, as it is actually
 # emitted.
-refusal/arity-inside-a-collection-operand
-refusal/arity-inside-a-lambda-block
 # refusal/arity-inside-a-collection-operand — anotada el 2026-08-30.
 #
 # Los tres rechazan y dicen lo mismo; los dos motores Rust añaden además
@@ -60,3 +58,10 @@ refusal/arity-inside-a-lambda-block
 #   isolation/output-parameter-unmarked-at-call
 #   isolation/underscore-is-invisible-inside
 #   refusal/output-mark-missing-inside-a-lambda-block
+
+# Quitadas a mano el 2026-09-25 (GLB-040, paso G5.4): la ayuda de la aridad
+# escribe ya la firma con los nombres de los parámetros, `expected signature:
+# g(a, b)`, en los dos motores —en vez de los tipos inferidos, que zyjs no podía
+# dar—. Con ellas, este fichero se queda sin entradas.
+#   refusal/arity-inside-a-collection-operand
+#   refusal/arity-inside-a-lambda-block
