@@ -3165,7 +3165,7 @@ coinciden.
 
 ## GLB-039 — Dos reglas del analizador sobre el mismo nombre: no puedes verlo, y además no existe
 
-**Estado:** **corregido el 2026-09-24 (paso G5.5)**, tres decisiones del autor
+**Estado:** **corregido el 2026-09-25 (paso G5.7)**, revisado un día después de cerrarse: la prohibición de `°_` era media prohibición
 **Encontrado por:** paso 3.7, 2026-09-19
 **Gravedad:** baja: los dos textos son ciertos, pero el segundo desmiente al primero
 
@@ -3241,6 +3241,58 @@ que un valor sobreviva al bloque»*, y `_` dice que no sale de él.
 `cannot access underscore variable '_t' from inner scope` **se queda**: leer
 desde un bloque anidado una `_t` de fuera sí es el caso propio del `_`, y los
 tres coinciden.
+
+### Revisado — 2026-09-25: el sufijo sí, el prefijo no
+
+La decisión 2 prohibió las dos grafías, `°_t` y `_t°`, con el argumento de que
+«las dos marcas se contradicen». **El argumento era mío y era falso para una de
+las dos.** El autor lo reabrió con su caso:
+
+```zymbol
+@ {
+    _k° += 1
+    >> _k ¶
+    ? _k == 5 { @! }
+}
+```
+
+Un acumulador que **no se puede escribir de otra forma**: inicializado fuera del
+bucle, el cuerpo no lo vería; dentro, se reiniciaría en cada vuelta. `°` decide
+**cuánto vive** y `_` **quién lo ve**: dos ejes, no una contradicción.
+
+Pero las dos grafías no piden lo mismo:
+
+- **`_k°`** (sufijo) ancla **en** el bucle: vive todas las vueltas y **muere con
+  él**. Con `_`, sólo lo ve el cuerpo del bucle. Coherente. **Se permite.**
+- **`°_k`** (prefijo) ancla **encima**: sigue existiendo **después** del bucle,
+  donde `_` impide que nada lo lea. Un valor vivo e inalcanzable. **Se refusa**,
+  con una ayuda que apunta al sufijo.
+
+| | los tres, ahora |
+|---|---|
+| `_k°` y leer en el cuerpo | `1 2 3 4 5` |
+| `_k°` y leer en un bloque hijo | `cannot access underscore variable '_k' from inner scope` |
+| `_k°` y leer después del bucle | `undefined variable '_k'` — murió con el bucle |
+| `°_k` | `'°_k' anchors the name above the loop, where '_' makes it unreadable` |
+
+**Y con el prefijo refusado se mantiene intacta la decisión 3**: ninguna `_`
+existe nunca fuera de su bloque, así que «from outer scope» sigue sin casos. En
+este paso se restauró un rato —para `°_k`— y se volvió a quitar al entender que
+el prefijo no debía existir.
+
+**`zyjs` tenía dos defectos en ejecución**, ambos tapados hasta hoy por la
+prohibición: `hotDef` guarda todo anclaje en la función o la raíz, y la regla de
+`_` de `Env.get` refusaba leerlo desde el bucle («from inner scope»); y `Env.set`
+tenía la misma regla y **perdía la escritura en silencio**, porque la asignación
+compuesta no mira lo que `set` devuelve — `_k` se quedaba en 0 y el bucle que
+esperaba el 5 no terminaba nunca. Los dos reconocen ahora un anclaje hecho a
+propósito (`hotNames`).
+
+Queda roja una celda, `suffix-anchored-underscore-is-not-seen-by-inner-blocks`:
+mismo comportamiento y mismo mensaje en los tres, pero Rust añade una nota y una
+ayuda que `zyjs` no da. **Es la misma diferencia** que la celda vecina
+`underscore-is-invisible-inside`, que está aceptada en `wording.baseline`; no se
+regrabó esa línea base, por lo que dice [[GLB-040]].
 
 ### Cuatro tests que medían el texto retirado
 
@@ -4336,4 +4388,57 @@ palabras. Lo segundo ya estaba registrado; lo primero se registra aquí.
 
 `runtime-modules-scripts/module-with-lexer-errors`, verde. La matriz pasa de 26
 a **25**, y la línea base de mensajes de 604 de 920 a **603 de 916**.
+
+---
+
+## GLB-055 — `\ nombre` sobre un nombre que no existe: Rust lo acepta en silencio
+
+**Estado:** abierto — **pide decisión**
+**Encontrado por:** paso G5.7, 2026-09-25, en el fichero de pruebas del autor
+**Gravedad:** media — un `\` que no destruye nada es un error de programa que un motor calla
+
+### Qué se observa
+
+```zymbol
+\nada
+>> "fin" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `check` sin nada; corre e imprime `fin` |
+| `zyjs` | `error: undefined variable 'nada'` |
+
+Apareció con esto, en el fichero del autor:
+
+```zymbol
+@ {
+    i° += 1
+    ? i == 5 { @! }
+}
+\i
+```
+
+`i°` muere con su bucle, y los tres motores lo reconocen si se **lee** después
+(`undefined variable 'i'`). Rust, en cambio, acepta **destruirlo**. `zyjs`
+refusa; Rust corre. Destruir dos veces el mismo nombre (`x = 1`, `\x`, `\x`) lo
+aceptan los tres.
+
+### Qué hay que decidir
+
+[[MEM-8]] tira en dos direcciones:
+
+- *«A statement nobody can be wrong about is not a statement»*: `\nada` es
+  justo una afirmación equivocada, y callarla la vacía.
+- Pero la misma premisa hizo que el error de uso tras `\` sea **en ejecución**,
+  porque un `\` dentro de una rama que no corre no destruye nada, y un chequeo
+  estático sin análisis de flujo no distingue lo destruido de lo escrito.
+
+Así que: ¿`\` sobre un nombre que no existe es error, y si lo es, estático o en
+ejecución? Y el caso del doble `\x`, que hoy aceptan los tres, ¿entra en la
+misma regla?
+
+### Qué lo sujeta
+
+`lifetime/destroy-a-name-that-does-not-exist`, roja.
 

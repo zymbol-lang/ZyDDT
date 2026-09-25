@@ -94,3 +94,17 @@ x = 1
 ? #0 { \\ x }
 >> x ¶
 """
+
+[[cell]]
+id     = "destroy-a-name-that-does-not-exist"
+expect = "error"
+what   = "`\\ nada` destroys a name that was never defined — pending decision (GLB-055)"
+# Red because the engines disagree: both Rust engines accept it in silence, and
+# zyjs refuses it as `undefined variable`. MEM-8: "a statement nobody can be
+# wrong about is not a statement" — this is one that IS wrong. But MEM-8 also
+# made the use-after-destruction error a RUN-TIME one on purpose. `expect` is
+# the reading of the first sentence, not yet a decision.
+src    = """
+\\nada
+>> "fin" ¶
+"""
