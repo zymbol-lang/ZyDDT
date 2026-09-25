@@ -22,7 +22,7 @@ engines = ["zytw", "zyvm", "zyjs"]
 [[cell]]
 id     = "cannot-compare-float-with-string"
 expect = "error"
-what   = "cannot compare float {} with string '{}' using operator '{:?}'"
+what   = "cannot compare float {} with string '{}' using operator '{}'"
 src    = """
 <# std/json => j
 v = j::decode("1.5")
@@ -46,7 +46,7 @@ v = j::decode("1.5")
 [[cell]]
 id     = "cannot-compare-string-with-float"
 expect = "error"
-what   = "cannot compare string '{}' with float {} using operator '{:?}'"
+what   = "cannot compare string '{}' with float {} using operator '{}'"
 src    = """
 <# std/json => j
 v = j::decode("1.5")
@@ -65,6 +65,24 @@ v = j::decode("1.5")
 } :! {
     >> (_err#?)[1] ¶
 }
+"""
+
+# The operator is quoted as the program writes it, `'<'` — GLB-028, decided
+# 2026-09-25; it was the Rust enum's name, `'Lt'`, in all three engines.
+[[cell]]
+id     = "cannot-compare-values-of-these-types"
+expect = "error"
+what   = "cannot compare values with operator '{}': {} and {}"
+src    = """
+>> ('a' < 7) ¶
+"""
+
+[[cell]]
+id     = "cannot-compare-string-with-integer"
+expect = "error"
+what   = "cannot compare string '{}' with integer {} using operator '{}'"
+src    = """
+>> ("a" >= 5) ¶
 """
 
 [[cell]]
