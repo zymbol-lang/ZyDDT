@@ -135,12 +135,18 @@ that refuse and accept the same program "a wording difference".
 
 Wording splits are held in `wording.baseline`, as a **list and not a count** — a
 count that stays at 3 while one split closes and another opens is a green gate
-over a regression. It may fall on its own and may never rise on its own:
+over a regression. It is **edited by hand**, and nothing else writes it:
 
 ```bash
-zyddt axis                     # a new split is RED
-zyddt axis --regen-baseline    # deliberate, separate, and a reviewable diff
+zyddt axis     # a split not in the list is RED (NEW WORDING)
+               # an entry whose cell agrees now is RED too (STALE WORDING)
 ```
+
+A stale entry is an open door: while it is listed, its cell may split again
+and be accepted in silence. It is removed in the step that healed it. An entry
+is added only with a comment saying who accepted the difference, and why.
+`--regen-baseline` existed until 2026-09-25 (GLB-040): it absorbed splits nobody
+had decided, and twice ate the comments explaining the ones somebody had.
 
 This is `zyquality/messages/` applied to what is actually emitted at runtime,
 where that suite counts what is *defined* in the source. The two are
@@ -158,6 +164,7 @@ are a pass.
 | `AGREE` | same shape, same words | 0 |
 | `WORDING` | same shape, different words, already in the baseline | 0 |
 | `NEW WORDING` | same shape, different words, **not** in the baseline | 1 |
+| `STALE WORDING` | a baseline entry whose cell agrees now, or no longer exists | 1 |
 | `DIVERGE` | different shape — the engines did different things | 1 |
 | `WRONG` | they agreed, and the axis says the category is wrong | 1 |
 | `WRONG` | at least one engine did not reach the category the cell requires — and it is **named** (§ 11) | 1 |
