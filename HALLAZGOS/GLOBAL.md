@@ -4393,7 +4393,7 @@ a **25**, y la línea base de mensajes de 604 de 920 a **603 de 916**.
 
 ## GLB-055 — `\ nombre` sobre un nombre que no existe: Rust lo acepta en silencio
 
-**Estado:** abierto — **pide decisión**
+**Estado:** **decidido y corregido el 2026-09-25** (paso P1)
 **Encontrado por:** paso G5.7, 2026-09-25, en el fichero de pruebas del autor
 **Gravedad:** media — un `\` que no destruye nada es un error de programa que un motor calla
 
@@ -4438,7 +4438,72 @@ Así que: ¿`\` sobre un nombre que no existe es error, y si lo es, estático o 
 ejecución? Y el caso del doble `\x`, que hoy aceptan los tres, ¿entra en la
 misma regla?
 
+### El programa de control
+
+Leer un nombre que no existe es error **estático** en los tres motores, también
+dentro de una rama que no corre:
+
+```zymbol
+? #0 { >> nada ¶ }
+>> "fin" ¶
+```
+
+`undefined variable 'nada'`, con `check` en rc=1. Lo que MEM-8 obliga a decidir
+en ejecución es si un `\` que **existió** llegó a correr; si un nombre **se ve**
+en un punto es otra pregunta, y la lectura ya la contestaba antes de ejecutar.
+
+### Lo que se midió (46 programas, los tres motores, `check` y ejecución)
+
+| forma | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `\nada`, también en `? #0 { }` | corre | `undefined variable` estático |
+| `\y` tras `? #1 { y = 1 }`, `\i` tras su bucle | corre | `undefined variable` |
+| `x = 1`, `\x`, `\x` | corre | corre |
+| `\x` en una función sobre la `x` del fichero | no hace nada | **destruye la del fichero** |
+| `\x` en una lambda sobre la `x` del fichero | destruye la copia de la lambda | **destruye la del fichero** |
+| `\f` sobre una función con nombre | no hace nada: `f()` sigue | la destruye |
+| `\m` sobre un alias de módulo | no hace nada | no hace nada |
+| `\K` sobre una constante, en el fichero | la destruye; `K = 2` y `K := 2` ya no valen | igual |
+| `\K` en una función | no hace nada | **destruye la global** |
+
+### Decidido el 2026-09-25
+
+1. `\` sobre un nombre que no se ve en ese punto es **error estático**, el de la
+   lectura: `undefined variable 'nada'`. Desde una función, sobre un nombre de
+   fuera: `'x' is destroyed from outside this function`.
+2. El doble `\x` es **error en ejecución**: `use after destruction`, el texto y el
+   momento de la lectura. En ejecución, porque `? #0 { \x }` seguido de `\x` es
+   legítimo.
+3. `\f` y `\m`: **error estático**. Sólo se destruyen variables:
+   `cannot destroy function 'f'`, `cannot destroy module alias 'm'`.
+4. `\K`: **error estático siempre** (MEM-1): `cannot destroy constant 'K'`.
+
+Lo que no se preguntó porque lo zanja MEM-6: una lambda escribe sólo lo que
+declara, así que su `\x` acaba con **su copia**. Es lo que ya hacían los dos Rust.
+
+### Corregido el 2026-09-25 (paso P1)
+
+- `zymbol-semantic`: `check_lifetime_end`, y la frontera de MEM-2 sale a un
+  predicado que comparten la lectura y el `\` (`crosses_strong_boundary`).
+- `zytw`: `destroy_variable` refusa un nombre ya destruido.
+- `zyvm`: `DestroyLocal` y `DestroyGlobal` refusan un hueco ya destruido. Al
+  medirlo salieron dos defectos de la VM, en [`ZYVM-006`](zyvm.md).
+- `zyjs`: el `Checker` con el mismo orden que Rust y códigos propios
+  (`E_DESTROY_*`), el doble `\` en ejecución, y lo de [`ZYJS-029`](zyjs.md). El
+  nodo `LifetimeEnd` guarda su línea y su columna. Barrido de parseo de los 2895
+  `.zy`: estado idéntico, y sólo cambia el tamaño del AST en los 27 que tienen `\`.
+
+Salieron tres diferencias de texto que ya existían, registradas y sin tocar:
+[`ZYJS-030`](zyjs.md), [`ZYTW-007`](zytw.md) y, en el playground,
+[`ZYJS-031`](zyjs.md).
+
 ### Qué lo sujeta
 
-`lifetime/destroy-a-name-that-does-not-exist`, roja.
+`lifetime/destroy-a-name-that-does-not-exist` en verde, y 13 celdas nuevas del
+eje `lifetime` en verde: la rama que no corre, el local de bloque, el contador
+del bucle, el doble `\` (suelto y en bucle), el control con la rama que no corre,
+la constante (en el fichero y en una función), la función, el alias de módulo,
+la variable del fichero desde una función, la copia de la lambda, y la función y
+la lambda llamadas dos veces. El eje queda en 20 de 23: las tres rojas son las
+fichas abiertas.
 

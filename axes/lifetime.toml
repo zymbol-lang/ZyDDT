@@ -98,13 +98,239 @@ x = 1
 [[cell]]
 id     = "destroy-a-name-that-does-not-exist"
 expect = "error"
-what   = "`\\ nada` destroys a name that was never defined — pending decision (GLB-055)"
-# Red because the engines disagree: both Rust engines accept it in silence, and
-# zyjs refuses it as `undefined variable`. MEM-8: "a statement nobody can be
-# wrong about is not a statement" — this is one that IS wrong. But MEM-8 also
-# made the use-after-destruction error a RUN-TIME one on purpose. `expect` is
-# the reading of the first sentence, not yet a decision.
+what   = "`\\ nada` destroys a name that was never defined"
+# GLB-055, decided 2026-09-25: a static error, the one a read gives. MEM-8 made
+# use-after-destruction a RUN-TIME error because only running tells a `\` that
+# ran from one that was written down; whether a name is VISIBLE is not that
+# question, and `? #0 { >> nada ¶ }` was already refused before anything runs.
+# Both Rust engines accepted this in silence.
 src    = """
 \\nada
 >> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-missing-name-in-a-branch-not-taken"
+expect = "error"
+what   = "`\\ nada` inside `? #0 { }` is refused before running, as `>> nada` is there"
+# The control that decided GLB-055: the same branch with a read is a static
+# error in all three engines.
+src    = """
+? #0 { \\nada }
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-block-local-after-its-block"
+expect = "error"
+what   = "a name born in a block is gone after it, for `\\` as for a read (MEM-6)"
+src    = """
+? #1 { y = 1 }
+\\y
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-hot-counter-after-its-loop"
+expect = "error"
+what   = "`i°` dies with its loop; destroying it afterwards names nothing — the case GLB-055 was found with"
+src    = """
+n = 0
+@ n < 3 {
+    i° += 1
+    n += 1
+}
+\\i
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-twice"
+expect = "error"
+what   = "a second `\\` that runs is a use after the first, at run time (GLB-055)"
+src    = """
+x = 1
+\\x
+\\x
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-twice-in-a-loop"
+expect = "error"
+what   = "the second pass of a loop destroys what the first already destroyed"
+src    = """
+x = 1
+@ 2 { \\x }
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-after-a-destruction-that-did-not-run"
+expect = "ok"
+what   = "why the double `\\` is a run-time error: a `\\` in a branch not taken destroyed nothing"
+src    = """
+x = 1
+? #0 { \\x }
+\\x
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-constant"
+expect = "error"
+what   = "a constant lives as long as the program (MEM-1): `\\ K` is refused before running"
+# Destroyed, the name could be neither reassigned nor declared again.
+src    = """
+K := 1
+\\K
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-constant-inside-a-function"
+expect = "error"
+what   = "a function cannot end a global constant"
+# Was a `\` that did nothing in both Rust engines, and ended the global in zyjs.
+src    = """
+K := 1
+f() {
+    \\K
+    <~ "hecho"
+}
+>> f() ¶
+>> K ¶
+"""
+
+[[cell]]
+id     = "destroy-a-function"
+expect = "error"
+what   = "only a variable can be destroyed: `\\ f` on a named function is refused"
+# Both Rust engines ran it and `f()` still answered; zyjs destroyed it.
+src    = """
+f() { <~ 1 }
+\\f
+>> f() ¶
+"""
+
+[[cell]]
+id     = "destroy-a-module-alias"
+expect = "error"
+what   = "only a variable can be destroyed: `\\ m` on a module alias is refused"
+# All three ran it, and `m::saluda()` still answered: a `\` that did nothing.
+src    = """
+<# ./m/saludo => m
+\\m
+>> m::saluda() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "destroy-a-file-variable-from-a-function"
+expect = "error"
+what   = "a function cannot end a name it cannot see (MEM-2)"
+# Was a no-op in both Rust engines and ended the file's `x` in zyjs.
+src    = """
+x = 1
+f() {
+    \\x
+    <~ "hecho"
+}
+>> f() ¶
+>> x ¶
+"""
+
+[[cell]]
+id     = "a-lambda-destroys-its-own-copy"
+expect = "ok"
+what   = "a lambda's `\\ x` ends its copy, never the file's `x` (MEM-6: it writes only what it declares)"
+# zyjs ended the file's `x`, and so did the VM, invisibly: its `DestroyGlobal`
+# ran from any body, where a write to a file variable runs only from `<main>`.
+src    = """
+x = 1
+g = () -> {
+    \\x
+    <~ "hecho"
+}
+>> g() ¶
+>> g() ¶
+>> x ¶
+"""
+
+[[cell]]
+id     = "a-function-that-destroys-its-parameter-called-twice"
+expect = "ok"
+what   = "each call has its own parameter: the mark of one call is not the next one's"
+# zyvm failed the SECOND call: its destroyed-slot marks are absolute and were
+# never cleared when a frame ended, so `>> p` read the previous call's mark.
+src    = """
+f(p) {
+    >> p ¶
+    \\p
+    <~ "hecho"
+}
+>> f(1) ¶
+>> f(2) ¶
+"""
+
+[[cell]]
+id     = "a-lambda-that-reads-then-destroys-called-twice"
+expect = "ok"
+what   = "a lambda's captured copy is fresh at every call"
+src    = """
+x = 1
+g = () -> {
+    >> x ¶
+    \\x
+    <~ "hecho"
+}
+>> g() ¶
+>> g() ¶
+"""
+
+[[cell]]
+id     = "read-a-destroyed-parameter"
+expect = "error"
+what   = "reading a parameter after `\\ p` is a use after destruction"
+# ZYJS-030, open: zyjs says `'p' is undefined — did you mean 'p°' (hot
+# definition)?`. Its `Env.get` checks for a destruction only at the root, and a
+# function's frame ends at its boundary before reaching it.
+src    = """
+f(p) {
+    \\p
+    <~ p
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id     = "read-a-lambda-copy-after-destroying-it"
+expect = "error"
+what   = "inside a lambda, reading the copy it destroyed is a use after destruction"
+# ZYJS-030, open: the same path as a parameter.
+src    = """
+x = 1
+g = () -> {
+    \\x
+    <~ x
+}
+>> g() ¶
+"""
+
+[[cell]]
+id     = "call-a-destroyed-lambda"
+expect = "error"
+what   = "calling a lambda variable after `\\ g` is a use after destruction"
+# ZYTW-007, open: the tree-walker says `undefined function: 'g'`, while zyvm and
+# zyjs say `use after destruction`.
+src    = """
+g = () -> 1
+\\g
+>> g() ¶
 """
