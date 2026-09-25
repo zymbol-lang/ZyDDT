@@ -435,25 +435,57 @@ _value = 20
 """
 
 [[cell]]
-id      = "hot-anchor-and-underscore-contradict"
+id      = "prefix-anchor-and-underscore-is-refused"
 premise = "MEM-6"
-what    = "`°_t`: `°` makes a value survive its block and `_` keeps it inside — refused before running"
-# The engines disagreed about the pair — one accepted it, one refused the
-# accumulation at run time — and no program in the workspace used it.
+what    = "`°_k`: the prefix anchors the value ABOVE the loop, where `_` makes it unreadable — refused before running"
+# A value that outlives its loop but that nothing outside the loop may read. The
+# suffix is the form that means something; see the next cell.
 src     = """
 @ i:1..2 {
-    °_t += i
+    °_k += i
 }
 """
 
 [[cell]]
-id      = "suffix-anchor-and-underscore-contradict"
+id      = "suffix-anchor-and-underscore-is-a-private-accumulator"
 premise = "MEM-6"
-what    = "`_t°`: the suffix anchor and the underscore, the same contradiction"
+expect  = "ok"
+what    = "`_k°`: lives through every iteration, dies with the loop, and only the loop's own block sees it"
+# The author's case (2026-09-25): an accumulator that cannot be initialised
+# outside the loop — the loop body would not see it — nor inside — it would
+# reset every turn. `°` decides how long it lives and `_` who sees it; with the
+# SUFFIX the two agree. On 2026-09-24 both spellings had been refused on the
+# grounds that the markers contradict each other; only the prefix does.
 src     = """
-@ i:1..2 {
-    _t° += i
+@ {
+    _k° += 1
+    >> _k ¶
+    ? _k == 5 { @! }
 }
+"""
+
+[[cell]]
+id      = "suffix-anchored-underscore-is-not-seen-by-inner-blocks"
+premise = "MEM-6"
+what    = "the `_` still applies: a block nested in the loop cannot read `_k°`"
+src     = """
+@ {
+    _k° += 1
+    ? _k == 5 { @! }
+    ? #1 { >> _k ¶ }
+}
+"""
+
+[[cell]]
+id      = "suffix-anchored-underscore-is-gone-after-the-loop"
+premise = "MEM-6"
+what    = "a suffix anchor dies with its loop: after it, `_k` is simply undefined"
+src     = """
+@ {
+    _k° += 1
+    ? _k == 5 { @! }
+}
+>> _k ¶
 """
 
 [[cell]]
