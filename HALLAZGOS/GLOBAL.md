@@ -2345,8 +2345,8 @@ project, fmt y guide en línea base; barrido de parseo de `zyjs` idéntico sobre
 
 ## GLB-028 — Los parsers Rust añaden errores falsos en cascada y enseñan sus tokens internos
 
-**Estado:** **la cascada corregida 2026-09-19 (paso 3.7)**; los nombres de token
-siguen abiertos y son de los DOS motores
+**Estado:** **la cascada corregida 2026-09-19 (paso 3.7); los nombres de token,
+decididos y corregidos el 2026-09-25 (paso G5.5)**; el operador en ejecución, paso G5.6
 **Encontrado por:** pasos 2.1 y 2.3, 2026-09-15
 **Gravedad:** media: el lector recibe dos errores donde hay uno, y el segundo nombra el lexer por dentro
 **Decisión del autor (2026-09-19):** las tres causas, sólo la cascada.
@@ -2451,6 +2451,42 @@ lo cuenta el inventario de `zyquality/messages/` y no es esta cascada.
 
 **Y una quinta celda se puso verde de propina**, `runtime-modules-scripts/module-with-parse-errors`,
 por la causa 2.
+
+### Los nombres de token — medido, decidido y corregido el 2026-09-25 (paso G5.5)
+
+**Medido** ejecutando los 1305 programas mal escritos que hay (`ZyDDT/generated`,
+`zyquality/reject` y `corpus/errors`) por `zymbol check` y por `zyjs`, y buscando en
+los diagnósticos cualquier variante del `TokenKind` de Rust o tipo de token de
+`zyjs`. No era de un solo motor: `zyjs` **imitaba a propósito** los nombres de
+Rust (`RUST_TOKEN_NAME`) para que el texto coincidiera, así que los dos enseñaban
+lo mismo:
+
+| frase | en los dos motores | sólo Rust | sólo `zyjs` |
+|---|---|---|---|
+| `expected expression, found X` / `unexpected token: X` / `expected pattern, found X` | `Assign` (3 programas), `Eq` (2), `RBrace`, `RBracket`, `RParen`, `Comma`, `Hash`, `And` | `Tilde`, `Integer(5)`, `Star` | `Lt` (el `</` sin implementar) |
+
+Y en los goldens del corpus había más: `LBrace` (14), `Pipe` (6), `Dot`, `Output`.
+
+**Decidido:** el token se cita **como se escribe**, entre comillas, como ya hacían
+`expected ')' after expression` y los demás mensajes que citan un símbolo. Un
+literal de carácter o de cadena lleva sus propias comillas y no se envuelve otra
+vez.
+
+**Corregido:** `TokenKind::quoted` y `TokenKind::spelling` en `zymbol-lexer`, con
+la grafía canónica de cada una de las 129 variantes, en los cuatro sitios del
+parser que citaban un token. `zyjs` usa la misma tabla (`Parser.tokenSpelling`) en
+sus tres sitios, y `RUST_TOKEN_NAME` desaparece. `found Assign` es ahora `found
+'='`; `unexpected token: Integer(5)`, `unexpected token: '5'`; `found RBrace`,
+`found '}'`. Barrido de parseo de los 2908 `.zy`: estado idéntico, y sólo cambia el
+texto de 35 errores que ya lo eran. Diez goldens de `corpus/i18n/` y el ejemplo de
+`REFERENCE.md` se editaron a mano. Sale `unexpected token: §` de la línea base de
+mensajes (595 → 594).
+
+Al medir salió [`ZYJS-033`](zyjs.md), anterior a esto: ante `?? 3 { * => 1 }` Rust
+dice `expected pattern` y `zyjs` `expected expression`. Y
+`corpus/i18n/test_database.expected`, que nadie compara (`ENVIRONMENT`), no se
+parece en nada a lo que el programa hace hoy: registra errores de un parser viejo,
+y el programa corre.
 
 ---
 

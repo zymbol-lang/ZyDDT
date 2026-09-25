@@ -95,6 +95,33 @@ src  = """
 x = ,
 """
 
+# The refusal quotes the token as the program writes it — `found ','`,
+# `found '='` — and not as the lexer names it inside (GLB-028, decided
+# 2026-09-25: it said `found Comma`). These two hold the spellings a table
+# could get wrong: an alternative newline, and the two-character `<>`.
+[[cell]]
+id   = "expression-is-a-newline-mark"
+what = "`¶` where an expression belongs is quoted as `'¶'`"
+src  = """
+x = ¶
+"""
+
+[[cell]]
+id   = "expression-is-a-not-equal"
+what = "`<>` where an expression belongs is quoted as `'<>'`"
+src  = """
+x = <>
+"""
+
+[[cell]]
+id   = "match-arm-with-a-star"
+what = "a `*` where a match pattern belongs"
+# ZYJS-033, open: both Rust engines say `expected pattern, found '*'`, zyjs
+# `expected expression, found '*'`.
+src  = """
+?? 3 { * => 1 }
+"""
+
 [[cell]]
 id   = "expression-is-a-close-paren"
 what = "a stray `)` where an expression belongs"
