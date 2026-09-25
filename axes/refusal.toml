@@ -177,6 +177,43 @@ s = g(1, 2, 3)$#
 >> s ¶
 """
 
+# The help of an arity refusal writes the signature as the CALLER writes it —
+# the names, and `<~` where the call must spell it (GLB-040, decided
+# 2026-09-25). It used to print inferred types, `g(Number, Number)`, which zyjs
+# could not give; these hold the new wording in its edge cases.
+[[cell]]
+id   = "arity-signature-shows-the-output-mark"
+what = "the signature in the help carries `<~` and leaves out `~`, which never reaches the caller"
+src  = """
+f(a~, b<~, c) { b = a + c }
+y = 0
+f(1, y<~)
+>> y ¶
+"""
+
+[[cell]]
+id   = "arity-of-a-function-without-parameters"
+what = "a function that takes nothing, called with something: `expected signature: g()`"
+src  = """
+g() { <~ 1 }
+>> g(5) ¶
+"""
+
+[[cell]]
+id   = "arity-of-a-module-function"
+what = "a module function called with the wrong count; no signature is offered, in either engine"
+src  = """
+<# ./m/saludo => m
+>> m::saluda(1) ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
 # ── Dentro del cuerpo de una lambda de bloque (ZYTW-001) ────────────────────
 #
 # Hasta el 2026-09-12 el analizador no entraba en un `-> { … }`: el cuerpo de

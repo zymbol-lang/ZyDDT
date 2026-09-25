@@ -3325,7 +3325,7 @@ eje de 5 a 4 `WORDING`.
 
 ## GLB-040 — `wording.baseline` lleva 23 líneas sin decidir
 
-**Estado:** **decidido el 2026-09-25**; el arnés, corregido en el paso G5.2
+**Estado:** **decidido y corregido el 2026-09-25** (pasos G5.2, G5.3 y G5.4)
 **Encontrado por:** paso 3.7, 2026-09-19
 
 `ZyDDT/wording.baseline` dice de sí mismo que «puede encoger sola, y nunca puede
@@ -3409,6 +3409,25 @@ las siete ayudas las definen ya los dos motores.
 `interpreter/AGENTIC.md` (derivado) cita todavía `cannot access underscore
 variable '_t' from outer scope` con su ayuda de antes: ese mensaje ya no existe.
 Anotado, sin tocar.
+
+### Corregido el 2026-09-25 (paso G5.4): la firma de la aridad
+
+`expected signature: g(a, b)`: los parámetros tal como los escribe **quien
+llama**, en los dos motores. `<~` aparece, porque la llamada tiene que escribir
+esa marca; `~` no, porque la copia de trabajo nunca llega al llamante —y además
+el lexer de `zyjs` todavía tira un `~` suelto (`refusal/lone-tilde`), así que no
+podría darlo—. Una función sin parámetros da `g()`. La llamada `alias::f` sigue
+sin firma en los dos, como antes.
+
+Salen de `wording.baseline` las 2 entradas de la clase B, y **el fichero se queda
+sin entradas**. El golden `corpus/arity/local_call_too_many.expected` pasa de
+`f(Any)` a `f(nombre)`, editado a mano. La línea base de mensajes baja a 595.
+Tres celdas nuevas en `refusal`: la firma con `<~`, la función sin parámetros y
+la de un módulo.
+
+### Qué lo sujeta
+
+`zyddt axis` en rojo ante una entrada caducada, y `wording.baseline` vacío.
 
 ---
 
