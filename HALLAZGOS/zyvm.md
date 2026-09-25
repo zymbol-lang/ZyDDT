@@ -432,3 +432,56 @@ lectura antes del `\`, `y = y + 1` e interpolación. Eso cierra también **el re
 de `GLB-008`** en la VM (un local destruido decía `'y' is undefined`). `zyjs` sigue
 diciendo `'y' is undefined` para un local: es el mismo resto, en su motor. `lifetime`
 queda en 5 de 5, y el gate de coste en verde.
+
+---
+
+## ZYVM-006 — La marca de «destruido» sobrevive a la llamada, y el `\` de una lambda acaba con la variable del fichero
+
+**Estado:** **corregido el 2026-09-25** (paso P1, con permiso del autor)
+**Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
+**Familia:** `ZYVM-005`
+
+### Qué se observa
+
+```zymbol
+f(p) {
+    >> p ¶
+    \p
+    <~ "hecho"
+}
+>> f(1) ¶
+>> f(2) ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyjs` | `1`, `hecho`, `2`, `hecho` |
+| `zyvm` | `1`, `hecho`, y `use after destruction: variable 'p' was destroyed after its last use` |
+
+Una función que destruye su parámetro falla **la segunda vez que se la llama**.
+Las marcas de `ZYVM-005` (`destroyed_slots`) son posiciones absolutas de la pila
+de valores y nadie las borraba al terminar un marco: el `>> p` de la segunda
+llamada leía la marca de la primera. Con una lambda que captura `x`, la lee y la
+destruye pasa lo mismo.
+
+Y un segundo defecto, invisible hasta que `GLB-055` hizo error el doble `\`: dentro
+de una lambda escrita en el fichero, `\x` emitía `DestroyGlobal` y acababa con la
+`x` **del fichero** (lo mismo que [`ZYJS-029`](zyjs.md) en `zyjs`). No se veía
+porque `<main>` lee su propia `x` de un registro. Una escritura a una variable del
+fichero sólo se emite desde `<main>` (`ERROR-ZYB-002`); el `\` no seguía esa regla.
+Salió a la luz con una lambda que sólo hace `\x` y se llama dos veces: la segunda
+llamada destruía otra vez la global.
+
+### Corregido el 2026-09-25
+
+- `forget_destroyed_from(base)`: al abrir un marco se borran las marcas de sus
+  huecos, en los tres sitios donde se abre uno (llamada, llamada dinámica y
+  retrollamada de HOF). No cuesta nada si ningún programa usa `\`.
+- `destroyed_locally` en el compilador: fuera de `<main>`, el nombre es una copia
+  local y se sigue en su registro; `DestroyGlobal` sólo se emite desde `<main>`.
+
+### Qué lo sujeta
+
+`lifetime/a-function-that-destroys-its-parameter-called-twice`,
+`lifetime/a-lambda-that-reads-then-destroys-called-twice` y
+`lifetime/a-lambda-destroys-its-own-copy`, verdes.

@@ -1862,3 +1862,107 @@ celdas de acuerdo con los textos del paso 3.5c.
 
 `runtime-collection-ops/repeat-count-with-decimals` y
 `runtime-collection-ops/repeat-count-that-is-negative`, verdes.
+
+---
+
+## ZYJS-029 — `\` desde una función o una lambda acaba con el nombre de fuera
+
+**Estado:** **corregido el 2026-09-25** (paso P1)
+**Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
+
+```zymbol
+x = 1
+g = () -> {
+    \x
+    <~ "hecho"
+}
+>> g() ¶
+>> x ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `hecho`, `1` |
+| `zyjs` | `hecho`, y `use after destruction: variable 'x' was destroyed after its last use` |
+
+Con una función con nombre pasaba igual, y con una constante global (`\K` dentro
+de `f`). Dos causas. `collectIdentNames` no contaba el nombre de un `\` (es una
+cadena, no un nodo `Ident`), así que la lambda no se llevaba copia de `x`. Y
+`Env.destroy` subía por la cadena de entornos **sin detenerse en la frontera**,
+cuando `Env.set` sí se detiene. MEM-6: una lambda escribe sólo lo que declara.
+
+### Corregido el 2026-09-25
+
+`collectIdentNames` recoge el nombre de `LifetimeEnd`, y `Env.destroy` se detiene
+en `funcBoundary`, como `set`. El `\` de la función con nombre y el de la
+constante los refusa ahora el `Checker` antes de ejecutar ([`GLB-055`](GLOBAL.md)).
+
+### Qué lo sujeta
+
+`lifetime/a-lambda-destroys-its-own-copy`,
+`lifetime/destroy-a-file-variable-from-a-function` y
+`lifetime/destroy-a-constant-inside-a-function`, verdes.
+
+---
+
+## ZYJS-030 — Leer un parámetro destruido dice `is undefined — did you mean 'p°'`
+
+**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
+
+```zymbol
+f(p) {
+    \p
+    <~ p
+}
+>> f(1) ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `use after destruction: variable 'p' was destroyed after its last use` |
+| `zyjs` | `'p' is undefined — did you mean 'p°' (hot definition)?` |
+
+Dentro de una lambda, leer la copia que destruyó da lo mismo. `Env.get` sólo mira
+`wasDestroyed` al llegar a la raíz; el marco de una función termina en su
+frontera y lanza antes el texto de «indefinido». Es el resto de `GLB-008` que la
+nota final de `ZYVM-005` ya anunciaba para los locales de `zyjs`.
+
+### Qué lo sujeta
+
+`lifetime/read-a-destroyed-parameter` y
+`lifetime/read-a-lambda-copy-after-destroying-it`, rojas (`WORDING`).
+
+---
+
+## ZYJS-031 — El playground traduce por código, y dos códigos los comparten textos distintos
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** [`GLB-055`](GLOBAL.md), 2026-09-25, al elegir el código de los diagnósticos nuevos
+
+`src/playground/problems.js` no enseña el `message` del motor: si el catálogo
+(`data/i18n/playground/*.json`) tiene una entrada para el `code`, pinta **esa**
+plantilla. Dos códigos los usan diagnósticos de fallos distintos:
+
+| código | lo que dice el motor | lo que enseña el playground |
+|---|---|---|
+| `E_SCOPE` | `'x' is read from outside this function` | `cannot access underscore variable 'x' from inner scope` |
+| `E_CONST` | `constant 'K' already declared` | `cannot reassign constant 'K'` |
+
+El programa de `E_SCOPE`, entero:
+
+```zymbol
+x = 1
+f() { <~ x }
+>> f() ¶
+```
+
+La línea de mandatos y `run_one.mjs` imprimen el `message` y están bien: sólo el
+panel de problemas del playground dice otra cosa. Ninguna prueba lo ve, porque
+`test_check.mjs` compara `message`, no lo que pinta el panel. Los diagnósticos de
+`GLB-055` tienen códigos propios (`E_DESTROY_*`) y no entran en esto.
+
+### Qué hay que decidir
+
+¿Un código por fallo (con su entrada en el catálogo inglés y español), o que el
+panel use el catálogo sólo cuando la plantilla inglesa coincide con el `message`?

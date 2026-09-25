@@ -454,3 +454,28 @@ a sitios muertos — `range bounds…` nombraba una celda inexistente y
 
 `runtime-loops-ranges/range-bounds-must-be-integers-end` y `…-start`, con sus
 `-met`. El eje queda 22 de 23, y ahora ese verde mide lo que dice medir.
+
+---
+
+## ZYTW-007 — Llamar a una lambda destruida dice `undefined function`
+
+**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
+
+```zymbol
+g = () -> 1
+\g
+>> g() ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `Runtime error: undefined function: 'g'` |
+| `zyvm`, `zyjs` | `Runtime error: use after destruction: variable 'g' was destroyed after its last use` |
+
+La llamada busca `g` entre las funciones al no encontrarla entre las variables, y
+no mira antes si la variable se destruyó.
+
+### Qué lo sujeta
+
+`lifetime/call-a-destroyed-lambda`, roja (`WORDING`).
