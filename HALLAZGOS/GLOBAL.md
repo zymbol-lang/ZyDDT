@@ -4673,3 +4673,50 @@ nueva que tapa la constante.
 
 `isolation/const-refuses-to-be-an-iterator`, roja (`DIVERGE`: un aviso es parte
 de la forma).
+
+---
+
+## GLB-057 — Caracteres de nombre que se confunden con un símbolo
+
+**Estado:** **decidido y corregido el 2026-09-25**
+**Encontrado por:** el autor, con su teclado: escribió `ºtotal += i` queriendo `°total`
+
+### Qué se midió
+
+Los 19 caracteres (`º ª ⁿ ᵒ ₒ ∘ ◦ ＠ ？ ！ ＃ ¿ ¡ § · • ¹`, la `о` cirílica y la `ο`
+griega) sirven de nombre en los tres motores, al principio y al final. Con `º` en
+lugar de `°` el error era `undefined variable 'ºtotal'`, sin decir por qué; con
+`contadοr` (ο griega) el programa **corría e imprimía `0`**. Los ejemplos están en
+`scratchpad/decisiones/1_confundibles/`.
+
+Sobre los 2913 `.zy` del workspace:
+
+- los 16 símbolos parecidos aparecen en **un** nombre, una sonda;
+- la `о` y la `ο` están en 1736 nombres, todos griegos o cirílicos legítimos, y
+  **ninguno** toca una letra latina;
+- «un nombre no mezcla escrituras» rompería 33 nombres en 21 ficheros que lo hacen
+  a propósito (`言語_English`, `πλ_el`).
+
+### Decidido por el autor
+
+**Ninguna restricción**: son caracteres de nombre válidos, porque escribir en
+cualquier escritura, aunque parezca cifrado, es libertad de quien programa. Solo
+el **editor** avisa, y la terminal (`zymbol check`, `zymbol run`) calla. Avisan el
+LSP y el panel del playground. `·` queda fuera, porque en catalán es letra.
+
+### Corregido el 2026-09-25
+
+- `zymbol-analyzer/src/confusables.rs`: un aviso `confusable-character` por
+  carácter, sobre el propio carácter (columna UTF-16):
+  `'º' (U+00BA) looks like '°' (U+00B0) — did you mean '°total'?`.
+- `zyjs`: `confusableHints`, con la misma tabla y el mismo texto, que solo llama
+  `problems.js`, nunca `checkSource`. Se añaden `chk.W_CONFUSABLE` en inglés y en
+  español.
+- Pruebas: 4 en el analizador, y `web/tests/test_confusables.mjs`, que entra en el CI.
+
+La regla escrita queda para el autor en `zymbol-design/SYMBOLS.md` §2.
+
+Y al pasar las puertas salió un fallo de **P1**: los cuatro códigos `E_DESTROY_*`
+no tenían entrada en el catálogo del playground, y `test_i18n_playground.mjs`, que
+no estaba en la lista de puertas del paso, lo refusaba. Ya la tienen, en los dos
+idiomas.
