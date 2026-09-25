@@ -2015,3 +2015,59 @@ refuso sale de allí.
 ### Qué lo sujeta
 
 `refusal/match-arm-with-a-star`, roja (`WORDING`).
+
+---
+
+## ZYJS-034 — `zyjs` no sabe que el iterador de un rango es un Int
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** preparando la decisión de GLB-043 (caso Unit), 2026-09-25
+
+```zymbol
+x = "a"
+@ i:1..2 {
+    x = i
+}
+>> x ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: type mismatch: 'x' was String but assigned Int` |
+| `zyjs` | ningún aviso |
+
+En el mismo bucle, `x = 5` y `x = n` (con `n = 3` fuera) sí avisan en `zyjs`: lo que
+no infiere es el tipo del iterador. Resto de [`GLB-043`](GLOBAL.md), que alineó
+seis formas y no esta.
+
+### Qué lo sujeta
+
+`type-change/loop-iterator`, roja (`WRONG`: `zyjs` no llega a `warn`).
+
+---
+
+## ZYJS-035 — `？ x > 1 {` se refusa con otro texto
+
+**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** preparando la decisión de los caracteres confundibles, 2026-09-25
+
+```zymbol
+x = 5
+？ x > 1 {
+    >> "mayor" ¶
+}
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `unexpected token: '{'` (columna 9) |
+| `zyjs` | `expected expression, found '>'` (columna 5) |
+
+`？` (U+FF1F) es un carácter de nombre para los dos lexers, así que el refuso cae
+más tarde y en sitios distintos. Ninguno de los dos nombra el carácter; eso le
+toca a la regla de confundibles que el autor escribe en `SYMBOLS.md` §2, y
+cuando exista esta ficha probablemente se cierre con ella.
+
+### Qué lo sujeta
+
+`refusal/fullwidth-question-mark`, roja (`WORDING`).

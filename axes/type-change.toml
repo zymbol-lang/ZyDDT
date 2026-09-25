@@ -111,3 +111,16 @@ x = 1
 x = f()
 >> x ¶
 """
+
+[[cell]]
+id   = "loop-iterator"
+what = "String, then the iterator of a range, which is an Int"
+# ZYJS-034, open: both Rust engines warn; zyjs does not know an iterator of a
+# range is an Int, while it warns for a literal or a variable in the same loop.
+src  = """
+x = "a"
+@ i:1..2 {
+    x = i
+}
+>> x ¶
+"""
