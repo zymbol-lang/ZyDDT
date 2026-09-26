@@ -521,7 +521,7 @@ lista.
 
 ## ZYVM-008 — `m.nada` (una constante que el módulo no tiene): la VM lo refusa antes de ejecutar
 
-**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Estado:** **corregido el 2026-09-26**: la decisión alcanzó también a las funciones y a `std/`
 **Encontrado por:** midiendo [`ZYJS-040`](zyjs.md)
 
 ```zymbol
@@ -533,9 +533,53 @@ Los tres dicen `Module 'm' has no constant 'nada'. Available constants: none`. L
 dice al compilar (`error:`), y el TW y `zyjs` en ejecución (`Runtime error:`). Es la misma
 diferencia de fase que tenía GLB-069 antes de corregirse.
 
+### Lo que salió al medirlo
+
+| programa | TW y `zyjs` | VM | `zymbol check` |
+|---|---|---|---|
+| `m.nada` dentro de `? #0 { … }` | corre | refusa el programa, sin sitio | nada |
+| `m.nada` leído | falla en esa línea | refusa antes, sin sitio | nada |
+| `m::nada()` dentro de `? #0 { … }` | corre | corre | nada |
+| `mt::nada(1)` de `std/math`, en una rama muerta | corre | corre | **lo refusa** |
+| `nada`, un nombre local, en una rama muerta | refusado antes | igual | igual |
+
+### Decisión del autor (2026-09-26)
+
+Un miembro que el módulo no exporta, `m.nada` o `m::nada()`, se refusa **antes de
+ejecutar**, en los tres motores y en `zymbol check`, con línea y columna. Es lo que ya
+pasaba con un nombre local.
+
+### Qué se cambió
+
+- `call_arity.rs`: `module_exports` es la tabla de lo que exporta cada alias de usuario,
+  con las constantes y las funciones separadas. Si el bloque `#>` no se resuelve entero,
+  el alias no entra y su uso se deja para la ejecución.
+- El comprobador de tipos refusa `m.nada` con `Module 'm' has no constant 'nada'.
+  Available constants: …` y `m::nada()` con `module 'm' does not export function
+  'nada'`, que son las palabras que ya daban los tres al ejecutar. Si el nombre existe pero
+  es del otro tipo, la ayuda dice cómo alcanzarlo, con los textos de `std/`. Una variable
+  local con el nombre del alias lo tapa: ver [`GLB-070`](GLOBAL.md).
+- `zymbol run` llama a `check_stdlib_access`, como ya hacía `check`.
+- `zyjs`: `moduleExportsFor`, `STDLIB_CONSTANTS` (la prueba `test_check.mjs` la compara con
+  Rust) y los mismos refusos, con los textos de `std/`. Hay seis códigos nuevos en el
+  catálogo del playground.
+- LSP: su escaneo de `alias::f` repetía el refuso con otras palabras, y el editor enseñaba
+  los dos. Ahora solo mira los reexports del bloque `#>`, que el comprobador no ve.
+
+Medido antes de fijarlo: `zymbol check` sobre los 2926 `.zy`. Caen cuatro ficheros, los
+cuatro pruebas escritas para esto. Los dos del corpus (`errors/runtime/E008_private_access`
+y `E012_no_export`) cambian de golden, y
+`runtime-modules-scripts/unexported-function-as-an-error-value` ahora espera un error: un
+refuso hecho antes de ejecutar no lo alcanza ningún `!?`.
+
 ### Qué lo sujeta
 
-`runtime-modules-scripts/dot-read-of-a-constant-the-module-does-not-have`, roja.
+`runtime-modules-scripts/dot-read-of-a-constant-the-module-does-not-have`, en verde, y
+cuatro celdas nuevas: `missing-constant-in-a-branch-that-never-runs`,
+`missing-function-in-a-branch-that-never-runs`,
+`missing-std-function-in-a-branch-that-never-runs` y
+`variable-that-shares-an-alias-name-is-not-a-module`. Esta última está roja, y es
+[`GLB-070`](GLOBAL.md).
 
 ---
 

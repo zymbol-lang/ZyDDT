@@ -148,8 +148,11 @@ src    = """
 
 [[cell]]
 id     = "unexported-function-as-an-error-value"
-expect = "ok"
-what   = "function '{}' not exported from module '{}' — the text `_err` carries when the call is caught"
+expect = "error"
+what   = "a call to a function the module does not export cannot be caught: it is refused before the program runs"
+# ZYVM-008, decided 2026-09-26. This cell used to ask for the text `_err`
+# carried when `!?` caught the call; a refusal made before running reaches no
+# `!?`, in any engine.
 src    = """
 <# ./m/ok => o
 !? {
@@ -290,11 +293,86 @@ src    = """
 id     = "dot-read-of-a-constant-the-module-does-not-have"
 expect = "error"
 what   = "`m.nada` read: `Module 'm' has no constant 'nada'` in all three"
-# ZYVM-008, open: the VM refuses it before running (`error:`), the tree-walker
-# and zyjs while running (`Runtime error:`).
+# ZYVM-008, decided 2026-09-26: refused before running in all three, with the
+# line and column. The VM refused it before running with no location; the
+# tree-walker and zyjs refused it only when the line ran.
 src    = """
 <# ./m/saludo => m
 >> m.nada ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+# ZYVM-008, decided 2026-09-26: a member the module does not export is refused
+# before the program runs, even in a branch that never runs, as an undefined
+# local name already was.
+
+[[cell]]
+id     = "missing-constant-in-a-branch-that-never-runs"
+expect = "error"
+what   = "`m.nada` inside `? #0 { … }` is refused before anything prints"
+src    = """
+<# ./m/saludo => m
+>> "antes" ¶
+? #0 {
+    >> m.nada ¶
+}
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "missing-function-in-a-branch-that-never-runs"
+expect = "error"
+what   = "`m::nada()` inside `? #0 { … }` is refused before anything prints"
+src    = """
+<# ./m/saludo => m
+>> "antes" ¶
+? #0 {
+    >> m::nada() ¶
+}
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "missing-std-function-in-a-branch-that-never-runs"
+expect = "error"
+what   = "`mt::nada(1)` on `std/math` is refused by `run` as `check` refuses it"
+src    = """
+<# std/math => mt
+>> "antes" ¶
+? #0 {
+    >> mt::nada(1) ¶
+}
+"""
+
+[[cell]]
+id     = "variable-that-shares-an-alias-name-is-not-a-module"
+expect = "ok"
+what   = "a local `m` hides the alias `m`, so `m.x` reads the dictionary"
+src    = """
+<# ./m/saludo => m
+f() {
+    m = #(x: 7)
+    <~ m.x
+}
+>> f() ¶
 """
 [cell.files]
 "m/saludo.zy" = """
