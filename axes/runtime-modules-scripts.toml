@@ -476,3 +476,26 @@ m = #(K: 5)
     K := 1
 }
 """
+
+[[cell]]
+id     = "function-variable-hides-a-constant-the-module-does-have"
+expect = "ok"
+what   = "in a function, a local `m` with key `K` hides the alias `m` that exports `K`: `m.K` is the local 5"
+# GLB-070. The earlier cells read a key the module does not have, so a
+# fall-back to the variable passed them; zyjs still preferred the module when
+# it had the name.
+src    = """
+<# ./m/k => m
+f() {
+    m = #(K: 5)
+    <~ m.K
+}
+>> f() ¶
+"""
+[cell.files]
+"m/k.zy" = """
+# k {
+    #> { K }
+    K := 1
+}
+"""
