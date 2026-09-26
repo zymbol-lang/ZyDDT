@@ -2285,3 +2285,24 @@ solo para `$<`, en ejecución y con otro texto.
 ### Qué lo sujeta
 
 `runtime-functions-hof/map-with-a-two-parameter-lambda`, roja.
+
+---
+
+## ZYJS-040 — `m.nada()` sobre un módulo: `zyjs` lee el punto como una constante
+
+**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Encontrado por:** midiendo [`GLB-066`](GLOBAL.md)
+
+```zymbol
+<# ./m/saludo => m
+>> m.nada() ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `module 'm' does not export function 'nada'` |
+| `zyjs` | `Module 'm' has no constant 'nada'. Available constants: none` |
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/dot-call-of-a-function-the-module-does-not-export`, roja.

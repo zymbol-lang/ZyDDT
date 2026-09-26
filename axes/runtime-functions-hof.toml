@@ -456,3 +456,12 @@ f = (a, b) -> a + b
 r = [1, 2]$> f
 >> r ¶
 """
+
+[[cell]]
+id     = "call-a-lambda-held-in-a-dictionary-key"
+expect = "ok"
+what   = "`d.f(1)` calls the lambda under key `f` — the tree-walker took every `x.f(…)` for a module call"
+src    = """
+d = #(f: x -> x + 1)
+>> d.f(1) ¶
+"""
