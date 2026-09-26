@@ -622,3 +622,54 @@ t(v) {
     >> (_err#?)[1] ¶
 }
 """
+
+# ── A navigation into a dictionary by position (step P4-3, 2026-09-26) ──────
+#
+# A dictionary is addressed by key (decision 11). The flat forms were aligned;
+# the nested ones were not: the tree-walker READ `v[1>k]` of `[#(a: 1)]` by
+# position, and the VM, compiling a navigation to plain `ArrayGet`s, gave the
+# plain index's words. zyjs already said what all three say now.
+
+[[cell]]
+id     = "nav-read-into-a-dictionary-by-position"
+expect = "error"
+what   = "`v[1>k]` with a dictionary at step 2 and `k` an Int — the tree-walker returned the first value"
+src    = """
+t(v, k) {
+    <~ v[1>k]
+}
+>> t([#(a: 1)], 1) ¶
+"""
+
+[[cell]]
+id     = "nav-read-with-a-decimal-step"
+expect = "error"
+what   = "a navigation step that is a Float: the navigation's words, not the plain index's"
+src    = """
+t(v, k) {
+    <~ v[1>k]
+}
+>> t([#(a: 1)], 1.5) ¶
+"""
+
+[[cell]]
+id     = "nav-edit-into-a-dictionary-by-position"
+expect = "error"
+what   = "`v[1>k]$~ 2` with a dictionary at step 2: `d[n>…]$~ value` in all three"
+src    = """
+t(v, k) {
+    <~ v[1>k]$~ 2
+}
+>> t([#(a: 1)], 1) ¶
+"""
+
+[[cell]]
+id     = "nav-edit-with-a-decimal-step"
+expect = "error"
+what   = "an edit through a navigation step that is a Float"
+src    = """
+t(v, k) {
+    <~ v[1>k]$~ 2
+}
+>> t([#(a: 1)], 1.5) ¶
+"""

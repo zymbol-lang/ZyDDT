@@ -5013,3 +5013,39 @@ redacción para `_err`. Ahora el error es un `Generic` con la frase que se impri
 `ConstantNotExported`, que no se construía en ningún sitio, se retira con ella. Las
 dos celdas pasan a verde, y salen tres frases de un solo lado de la línea base de
 mensajes (588 → 585).
+
+---
+
+## GLB-065 — Un diccionario por posición: el texto plano (E1) y la navegación anidada
+
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4-3, E1)
+**Encontrado por:** la celda `runtime-collection-ops/named-tuple-update-index-must-be-an`, y al medir sus formas vecinas
+
+**E1, decidido:** el texto de la VM y de `zyjs`, `a dictionary is addressed by key, not by
+position: …`, que llama *diccionario* a lo que ahora se llama así. El TW decía
+`named tuple update index must be…` para un índice Float, Bool o Char. Ahora usa la misma
+frase que ya daba para un Int.
+
+**Al medir la forma anidada salió un defecto de comportamiento**, arreglado con permiso
+del autor. Con `v = [#(a: 1)]` y `k = 1`, el TW **leía `v[1>k]` por posición** y devolvía
+`1`, cuando la decisión 11 dice que un diccionario se lee por clave, y la forma plana `d[1]`
+ya se refusaba. Los textos de la navegación, además, diferían en los tres:
+
+| forma | TW, antes | VM, antes | ahora, los tres (lo que ya hacía `zyjs`) |
+|---|---|---|---|
+| leer, Int | **devuelve `1`** | la frase de `d[1]` | `… \`d[n>…]\` has no meaning here` |
+| leer, Float | la frase de la navegación | `index must be an integer` | `a navigation step is a position (Int) or a dictionary key (String), got Float` |
+| editar, Int | `d[n>…]` | `d[n]$~ value` | `d[n>…]$~ value` |
+| editar, Float o Bool | la frase de la navegación | la frase del diccionario | la frase de la navegación |
+
+**Corregido:**
+
+- TW: `descend` refusa el diccionario en vez de leerlo por posición. `deep_update_value`
+  refusa un paso por posición con el texto de la edición, en lugar de leerlo antes.
+- VM: una instrucción nueva, `NavStepCheck`, antes de cada `ArrayGet` de una navegación.
+  La VM compilaba la navegación como índices planos, y en ejecución no sabía que estaba
+  navegando. En la edición, `vm_deep_set_at` usa su marca `single` para distinguir la
+  forma plana de la anidada.
+
+Cuatro celdas nuevas en `runtime-index-nav`, que queda 50 de 50. El banco de rendimiento
+pasa (16 de 16) con la instrucción nueva.
