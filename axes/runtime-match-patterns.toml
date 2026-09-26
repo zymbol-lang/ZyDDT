@@ -109,3 +109,30 @@ t(v) {
     >> (_err#?)[1] ¶
 }
 """
+
+[[cell]]
+id   = "match-arm-with-a-negative-literal"
+what = "`-1 => …` as a match pattern"
+# GLB-062, open — a decision, so no `expect`: this cell only asks that the
+# engines agree. Both Rust engines refuse `-` as the start of a pattern
+# (`expected pattern, found '-'`); zyjs accepts it and matches.
+src  = """
+x = -1
+r = ?? x { -1 => "menos uno"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-value-and-a-block"
+expect = "ok"
+what   = "`pattern => value { block }`: an arm with a value and a side-effect block"
+# ZYJS-038, open: both Rust engines run it (interpreter/examples/phase11 uses
+# it); zyjs refuses the `{`. The exclusion of corpus/scope04_match_block.zy
+# gives another reason (ANSI_FORMAT) and hides this.
+src    = """
+g = ?? 92 {
+    90..100 => 'A' { >> "bien" ¶ }
+    _       => '?' { >> "otro" ¶ }
+}
+>> g ¶
+"""
