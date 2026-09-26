@@ -5151,3 +5151,39 @@ En `run`, los tres lo refusan al cargar el módulo, con la forma de cualquier er
 semántico de un módulo (`failed to parse module: 1 semantic error(s) in …`). Siguen
 exportándose una constante y una función, y se refusan una variable privada (`_n`) y dos
 variables a la vez.
+
+---
+
+## GLB-070 — Una variable local con el nombre de un alias: `m.x` lee cosas distintas
+
+**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Encontrado por:** la celda de control de [`ZYVM-008`](zyvm.md)
+
+```zymbol
+<# ./m/saludo => m
+f() {
+    m = #(x: 7)
+    <~ m.x
+}
+>> f() ¶
+```
+
+| motor | |
+|---|---|
+| `zytw` | `Runtime error: Module 'm' has no constant 'x'. Available constants: none` |
+| `zyvm` | el mismo texto, al compilar |
+| `zyjs` | `7` |
+
+`f` es un entorno fuerte, así que MEM-7 le deja reutilizar el nombre `m`. Dentro de él,
+`m` es el diccionario. El TW y la VM miran antes la tabla de alias y leen el módulo.
+`zyjs` resuelve el nombre por ámbito, y el más cercano es la variable. El comprobador de
+tipos de Rust, desde ZYVM-008, también da la razón a la variable: no refusa el `m.x`, y
+el refuso llega después, del motor.
+
+Es la mitad de `.` de un caso que `zyjs` ya corrigió para `::` (`duj::bIj` en
+zyKlingonGalaxy, donde una variable `duj` tapaba el módulo). Decidir qué gana es del autor.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/variable-that-shares-an-alias-name-is-not-a-module`, roja
+(`WRONG` en `zytw` y `zyvm`).
