@@ -381,3 +381,35 @@ f() {
     saluda() { <~ "hola" }
 }
 """
+
+# GLB-017 C and I, decided 2026-09-26: a subscript runs in this process, down
+# the road `zymbol run` takes in the caller's engine; no shell, no PATH; its
+# path is resolved from the file the `</` is written in.
+
+[[cell]]
+id     = "subscript-inside-a-module-resolves-from-the-module"
+expect = "ok"
+what   = "`</ ./s.zy />` in a function of `lib/l.zy` runs `lib/s.zy`, not `./s.zy`"
+src    = """
+<# ./lib/l => l
+>> l::corre()
+"""
+[cell.files]
+"lib/l.zy" = """
+# l {
+    #> { corre }
+    corre() { <~ </ ./s.zy /> }
+}
+"""
+"lib/s.zy" = """
+>> "soy lib/s" ¶
+"""
+
+[[cell]]
+id     = "subscript-path-with-a-quote-is-only-a-path"
+expect = "error"
+what   = "a `\"` and a `;` in the path are part of the file name: nothing reaches a shell"
+src    = """
+x = </ ./a";echo INYECTADO;"b.zy />
+>> x ¶
+"""
