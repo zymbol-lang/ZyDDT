@@ -1620,6 +1620,19 @@ ejemplos, `test_check`, `test_agents`, `test_manual` e i18n, en verde.
   parámetro, `zyjs` a la declaración), `$~` sin sitio donde escribir (4:4 contra
   4:5) y un parámetro de lambda que no es nombre (5:10 contra 5:9).
 
+### Un resto más, cerrado el 2026-09-25 (paso P4.1)
+
+El nodo `Ident` del parser no guardaba la columna, aunque el token la tenía, así
+que un diagnóstico sobre un nombre no la llevaba. Donde más se veía era en el
+detalle de un módulo que no carga: `mira.zy:3:0` donde Rust dice `mira.zy:3:16`.
+Pasaba lo mismo con `unexpected token after module block`, que daba `7:0` en vez
+de `7:1`, porque le llegaba la sentencia y no su `zyLine`/`zyCol`.
+El `Ident` lleva ahora `col`, y el error del bloque de módulo, la posición de la
+sentencia. Barrido de parseo de los 2926 `.zy` quitando `col`: idéntico. Tres
+celdas pasan a verde: `modularity/module-does-not-see-its-importer`,
+`runtime-modules-scripts/module-with-semantic-errors` y
+`syntax-expressions/module-with-a-statement-after-its-block`.
+
 ---
 
 ## ZYJS-025 — El lexer de `zyjs` se come un `#` que no reconoce, y con él a veces la línea entera
