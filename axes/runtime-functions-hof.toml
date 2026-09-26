@@ -465,3 +465,31 @@ src    = """
 d = #(f: x -> x + 1)
 >> d.f(1) ¶
 """
+
+[[cell]]
+id     = "filter-with-a-two-parameter-lambda"
+expect = "error"
+what   = "filter lambda must have exactly 1 parameter, got {} — zyjs had no such check (ZYJS-039)"
+src    = """
+r = [1, 2]$| (a, b) -> a > b
+>> r ¶
+"""
+
+[[cell]]
+id     = "reduce-with-a-one-parameter-lambda"
+expect = "error"
+what   = "reduce lambda must have exactly 2 parameters (acc, elem), got {}"
+src    = """
+r = [1, 2]$< (0, a -> a)
+>> r ¶
+"""
+
+[[cell]]
+id     = "map-with-a-two-parameter-named-function"
+expect = "error"
+what   = "a named function of two parameters handed to `$>`: refused at the call, as a lambda value is (GLB-063)"
+src    = """
+g(a, b) { <~ a + b }
+r = [1, 2]$> g
+>> r ¶
+"""

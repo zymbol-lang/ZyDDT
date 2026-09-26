@@ -285,3 +285,21 @@ src    = """
     saluda() { <~ "hola" }
 }
 """
+
+[[cell]]
+id     = "dot-read-of-a-constant-the-module-does-not-have"
+expect = "error"
+what   = "`m.nada` read: `Module 'm' has no constant 'nada'` in all three"
+# ZYVM-008, open: the VM refuses it before running (`error:`), the tree-walker
+# and zyjs while running (`Runtime error:`).
+src    = """
+<# ./m/saludo => m
+>> m.nada ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""

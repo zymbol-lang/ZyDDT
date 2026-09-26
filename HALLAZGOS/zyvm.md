@@ -516,3 +516,23 @@ patrón de lista y la pertenencia. En los tres:
 en los tres sitios. Todas las formas quedan iguales en los tres motores. Tres celdas en
 `runtime-match-patterns`: decimal negativo, entero de más de 32 bits y decimal dentro de una
 lista.
+
+---
+
+## ZYVM-008 — `m.nada` (una constante que el módulo no tiene): la VM lo refusa antes de ejecutar
+
+**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Encontrado por:** midiendo [`ZYJS-040`](zyjs.md)
+
+```zymbol
+<# ./m/saludo => m
+>> m.nada ¶
+```
+
+Los tres dicen `Module 'm' has no constant 'nada'. Available constants: none`. La VM lo
+dice al compilar (`error:`), y el TW y `zyjs` en ejecución (`Runtime error:`). Es la misma
+diferencia de fase que tenía GLB-069 antes de corregirse.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/dot-read-of-a-constant-the-module-does-not-have`, roja.
