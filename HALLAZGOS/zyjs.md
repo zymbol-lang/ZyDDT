@@ -2018,7 +2018,7 @@ Los ficheros que lo enseñan están en `scratchpad/decisiones/3_playground/`.
 
 ## ZYJS-032 — El error de desestructurar en una constante no lleva línea
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.3)
 **Encontrado por:** paso G5.3 ([`GLB-040`](GLOBAL.md)), 2026-09-25
 
 ```zymbol
@@ -2039,6 +2039,18 @@ lleva `line`: `posOf` devuelve `null`. El playground no puede marcar la línea.
 
 `isolation/const-refuses-to-be-destructured-into`, roja (`DIVERGE`).
 
+
+### Corregido el 2026-09-25 (paso P4.3)
+
+`Checker.posOf` toma `zyLine` cuando el nodo no trae `line`, que es la posición que
+`parseStmt` estampa en cada sentencia. El cambio es general y se midió así: sobre
+el corpus, `reject/` y `ZyDDT/generated`, los diagnósticos de `zyjs` con el mismo
+mensaje y la misma línea que Rust pasan de **230 a 240**, sin ninguna diferencia
+nueva. Además de este, lo arregla en los 14 `unused variable` que salían sin línea y en
+el `<~` de salida no entera (`E-EXIT-TYPE`).
+
+La celda sigue roja por otra cosa, [`GLB-061`](GLOBAL.md): Rust avisa de la constante
+sin usar y `zyjs` no.
 ---
 
 ## ZYJS-033 — Un `*` donde va un patrón: `zyjs` dice `expected expression`

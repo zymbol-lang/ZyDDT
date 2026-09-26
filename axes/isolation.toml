@@ -437,7 +437,9 @@ id      = "const-refuses-to-be-destructured-into"
 premise = "MEM-1"
 expect  = "error"
 what    = "a destructuring pattern writes its names, so a constant cannot be one of them"
-# zyjs gives this error without its line — ZYJS-032, red until it does.
+# ZYJS-032 (no line in zyjs) fixed in step P4.3. Still red, for GLB-061: both
+# Rust engines warn `variable 'PI' is assigned but never read` about the
+# constant, and zyjs never warns about an unused constant.
 src     = """
 PI := 3
 [PI, b] = [1, 2]
@@ -580,4 +582,17 @@ what    = "two sibling blocks may each hold the same `_name`"
 src     = """
 ? #1 { _t = 1   >> _t ¶ }
 ? #1 { _t = 2   >> _t ¶ }
+"""
+
+[[cell]]
+id      = "an-unused-constant"
+premise = "MEM-1"
+expect  = "ok"
+what    = "a constant declared and never read"
+# GLB-061, open — a decision: both Rust engines warn `unused variable 'K'`,
+# zyjs says nothing. Whether an unused constant warns, and whether it is called
+# a variable, is the author's.
+src     = """
+K := 1
+>> "x" ¶
 """
