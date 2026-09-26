@@ -4846,3 +4846,28 @@ valores de las constantes de otro módulo.
 `TypeEnv::is_known_int_bound` y `literal_int_consts` en Rust; `Checker.isIntLiteral`
 y `literalIntConsts` en `zyjs`. Cinco celdas nuevas en `runtime-loops-ranges`: tres
 que ya no avisan y dos que sí.
+
+---
+
+## GLB-061 — Una constante sin usar: Rust avisa «unused variable», `zyjs` calla
+
+**Estado:** abierto — **pide decisión**; registrado el 2026-09-25
+**Encontrado por:** paso P4.3, al quedar roja `isolation/const-refuses-to-be-destructured-into` por otra causa
+
+```zymbol
+K := 1
+>> "x" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: unused variable 'K'` |
+| `zyjs` | nada |
+
+Con una variable (`k = 1`) avisan los tres. Hay que decidir si una constante que
+nadie lee avisa, y si el aviso la llama *variable*.
+
+### Qué lo sujeta
+
+`isolation/an-unused-constant` (`expect = "ok"`, roja en los dos Rust) y
+`isolation/const-refuses-to-be-destructured-into`.
