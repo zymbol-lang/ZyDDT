@@ -5049,3 +5049,29 @@ ya se refusaba. Los textos de la navegación, además, diferían en los tres:
 
 Cuatro celdas nuevas en `runtime-index-nav`, que queda 50 de 50. El banco de rendimiento
 pasa (16 de 16) con la instrucción nueva.
+
+---
+
+## GLB-066 — El TW tomaba todo `x.f(…)` por la llamada a un módulo (E2, E3)
+
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4-3, E2 y E3)
+**Encontrado por:** las celdas `member-function-calls-not-supported` y `undefined-module-alias`
+
+**E2 y E3, decidido:** el texto de la VM y de `zyjs`, `the dot reaches a dictionary key, and
+this is Int`, que dice lo que pasa. El TW decía `member function calls not supported` para
+`v[1].f(2)`, y `undefined module alias: 'v'` para `v.f(1)`, con `v` un Int. Este segundo
+texto es falso: `v` es una variable.
+
+**Al medir salió la causa, y un defecto de comportamiento**, arreglado en el mismo cambio.
+El TW trataba **todo** `x.f(…)` como una llamada a un módulo:
+
+| programa | TW, antes | VM y `zyjs`, y ahora el TW |
+|---|---|---|
+| `d = #(f: x -> x + 1)`, `d.f(1)` | `undefined module alias: 'd'` | `2` |
+| `#(a: 1)`, `.f(1)` | `undefined module alias` | `no key 'f' in dictionary`, de la familia `##Key` |
+| `5`, `"ab"`, `[1, 2]` o `1.5`, `.f(1)` | `undefined module alias` | `the dot reaches a dictionary key, and this is …` |
+
+Ahora, si `x` es un alias de módulo, se llama al módulo, como antes. Si no, `x.f` se evalúa
+como cualquier valor, con los errores que ya da su lectura, y el resultado se llama
+(`call_evaluated`, compartido con la rama de «cualquier otra expresión»). Los módulos siguen
+funcionando con `.` y con `::`. Al medir apareció también [`ZYJS-040`](zyjs.md).

@@ -267,3 +267,21 @@ r = "?"
 aviso = 5
 x = 1 / 0
 """
+
+[[cell]]
+id     = "dot-call-of-a-function-the-module-does-not-export"
+expect = "error"
+what   = "`m.nada()` on a module that does not export `nada`"
+# ZYJS-040, open: both Rust engines say `module 'm' does not export function
+# 'nada'`; zyjs reads the dot as a constant: `Module 'm' has no constant …`.
+src    = """
+<# ./m/saludo => m
+>> m.nada() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
