@@ -4935,7 +4935,7 @@ ninguno, porque leen la constante. `isolation` queda 45 de 45.
 
 ## GLB-062 — `-1 =>` y `(3) =>` como patrón: Rust los refusa, `zyjs` los acepta
 
-**Estado:** abierto — **pide decisión**; registrado el 2026-09-25
+**Estado:** **decidido y corregido el 2026-09-26**
 **Encontrado por:** paso P4.5, al medir las formas vecinas de ZYJS-033
 
 ```zymbol
@@ -4957,6 +4957,24 @@ decidir si un literal negativo, y un paréntesis, pueden ser un patrón.
 
 `runtime-match-patterns/match-arm-with-a-negative-literal`, sin `expect`: solo
 pregunta si los motores coinciden, hasta que se decida.
+
+### Decidido y corregido el 2026-09-26
+
+**Decidido:** `-1 =>` es un patrón, porque un número negativo es un literal. `(3) =>` no lo
+es, porque un patrón no es una expresión.
+
+**Corregido:**
+
+- Rust (`parse_pattern_primary`): un `-` seguido de un número empieza un patrón, entero o
+  decimal, y un rango puede llevar signo en cualquiera de sus extremos (`-5..-1`,
+  `-3..3`). La lectura del rango sale a `finish_int_pattern`, que sirve al número con
+  signo y al número sin signo. `-y =>` sigue refusándose.
+- `zyjs`: `(` sale de lo que puede empezar un patrón, y `-` solo entra si le sigue un
+  número.
+
+Diecisiete formas iguales en los tres motores, incluido un negativo dentro de una lista
+(`[-1, 2]`). El formateador conserva `-1`, `-1.5` y `-5..-1`. Barrido de parseo: idéntico.
+Al medir el decimal salió [`ZYVM-007`](zyvm.md), corregida en el mismo paso.
 
 ---
 
