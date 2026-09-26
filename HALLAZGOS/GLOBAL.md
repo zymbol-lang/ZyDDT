@@ -4796,3 +4796,53 @@ Unit. La guía es la de otro fallo, `"a" + "b"`, que comparte rama.
 Nada todavía: los tres dicen lo mismo, así que una celda saldría verde. Hace falta
 una redacción decidida (por ejemplo, la de la familia de GLB-033: `arithmetic
 requires numeric operands: Unit, Int`) para poder afirmarla con `expect`.
+
+---
+
+## GLB-060 — El aviso de dirección del rango saltaba con constantes y con `-1`
+
+**Estado:** **decidido y corregido el 2026-09-25**
+**Encontrado por:** el autor, en `zyV.zy`
+
+```zymbol
+LIM_INI := 1
+LIM_FIN := 5
+@ i:LIM_INI..LIM_FIN {
+    >> i ¶
+}
+```
+
+Los tres motores avisaban `range direction is decided at runtime…`, igual que con
+dos variables. El autor: *«por qué tiene que dar un warning si este valor es un
+límite fijo, no una variable»*.
+
+### Qué se midió
+
+La regla callaba solo si los dos extremos eran un entero escrito en el fuente. Diez
+formas vecinas, los tres motores igual:
+
+| forma | antes | ahora |
+|---|---|---|
+| `A := 1`, `B := 3`, `@ i:A..B` | avisa | calla |
+| `B := 3`, `@ i:1..B` | avisa | calla |
+| `A := 3`, `B := 1`, `@ i:A..B` (hacia abajo) | avisa | calla, como `@ i:3..1` |
+| `A := -1`, `B := 1` | avisa | calla |
+| `@ i:-1..1` (literales) | **avisa**: `-1` es una expresión | calla |
+| una constante dentro de una función | avisa | calla |
+| `A := 1`, `b = 3`, `@ i:A..b` | avisa | avisa |
+| `B := 1 + 2` (constante calculada) | avisa | avisa |
+| `@ i:1..l.MAX` (constante de módulo) | avisa | avisa |
+
+### Decidido
+
+Un extremo es conocido si su valor **se lee en el fuente**: un entero escrito
+(también con `-`) o una constante del fichero declarada con uno. Una variable o una
+constante calculada siguen avisando, porque ahí el valor no se ve al leer. La
+constante de módulo queda para otro paso: el analizador de Rust no conoce hoy los
+valores de las constantes de otro módulo.
+
+### Corregido
+
+`TypeEnv::is_known_int_bound` y `literal_int_consts` en Rust; `Checker.isIntLiteral`
+y `literalIntConsts` en `zyjs`. Cinco celdas nuevas en `runtime-loops-ranges`: tres
+que ya no avisan y dos que sí.
