@@ -4893,3 +4893,30 @@ nadie lee avisa, y si el aviso la llama *variable*.
 
 `isolation/an-unused-constant` (`expect = "ok"`, roja en los dos Rust) y
 `isolation/const-refuses-to-be-destructured-into`.
+
+---
+
+## GLB-062 — `-1 =>` y `(3) =>` como patrón: Rust los refusa, `zyjs` los acepta
+
+**Estado:** abierto — **pide decisión**; registrado el 2026-09-25
+**Encontrado por:** paso P4.5, al medir las formas vecinas de ZYJS-033
+
+```zymbol
+x = -1
+r = ?? x { -1 => "menos uno"  _ => "otro" }
+>> r ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `expected pattern, found '-'` |
+| `zyjs` | `menos uno` |
+
+Con `(3) => …` pasa lo mismo: Rust dice `expected pattern, found '('` y `zyjs`
+empareja. `parse_pattern_primary` no tiene rama para `-` ni para `(`. Hay que
+decidir si un literal negativo, y un paréntesis, pueden ser un patrón.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-arm-with-a-negative-literal`, sin `expect`: solo
+pregunta si los motores coinciden, hasta que se decida.

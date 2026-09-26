@@ -365,3 +365,10 @@ src    = """
 x = 1 #
 >> x ¶
 """
+
+[[cell]]
+id   = "match-arm-with-an-at-sign"
+what = "`@` where a match pattern belongs — refused with the pattern's words in both"
+src  = """
+?? 3 { @ => 1 }
+"""

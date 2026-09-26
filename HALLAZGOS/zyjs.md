@@ -2071,7 +2071,7 @@ sin usar y `zyjs` no.
 
 ## ZYJS-033 — Un `*` donde va un patrón: `zyjs` dice `expected expression`
 
-**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.5)
 **Encontrado por:** paso G5.5 ([`GLB-028`](GLOBAL.md)), 2026-09-25
 
 ```zymbol
@@ -2091,6 +2091,14 @@ refuso sale de allí.
 
 `refusal/match-arm-with-a-star`, roja (`WORDING`).
 
+
+### Corregido el 2026-09-25 (paso P4.5)
+
+Antes de pasarle un brazo al parser de expresiones, `parseMatchPatternPrimary` mira
+si el token puede empezar un patrón, con la lista de `parse_pattern_primary`. Si no
+puede, refusa con el texto de Rust: `expected pattern, found '*'`. `-` y `(` pasan
+como antes, porque los dos Rust los refusan y eso lo decide el autor
+([`GLB-062`](GLOBAL.md)). Al medir salió también [`ZYJS-038`](zyjs.md).
 ---
 
 ## ZYJS-034 — `zyjs` no sabe que el iterador de un rango es un Int
@@ -2224,3 +2232,31 @@ El refuso de una comparación dentro de la salida vale ahora en cualquier línea
 también como en Rust. Barrido de parseo: cambian los dos ficheros de GoL, y ninguno
 más. Tres celdas en `syntax-io`: la continuación, la llamada absorbida y el corte
 ante una asignación.
+
+---
+
+## ZYJS-038 — Un brazo con valor y bloque (`patrón => valor { … }`) no se parsea
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** el barrido de parseo del paso P4.5
+
+```zymbol
+g = ?? 92 {
+    90..100 => 'A' { >> "bien" ¶ }
+    _       => '?' { >> "otro" ¶ }
+}
+>> g ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `bien`, `A` |
+| `zyjs` | `expected pattern, found '{'` (antes `expected expression`) |
+
+La usa `interpreter/examples/phase11/05_grade_calculator.zy`. Además, la exclusión de
+`corpus/scope04_match_block.zy` para `zyjs` da otra razón (`ANSI_FORMAT`), y detrás
+de esa razón está esta divergencia: una exclusión cuya razón ya no es la verdadera.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-arm-with-a-value-and-a-block`, roja.
