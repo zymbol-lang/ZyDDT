@@ -3019,9 +3019,17 @@ asignación ni un `[`, `zyjs` refusa con el texto y la ayuda de Rust. Barrido de
 parseo de los 2926 `.zy`: cambia un solo fichero, el de la celda. Siguen funcionando
 `°t += i`, `°t = i` y `°t++`, y `°x[1] = 5` dice lo mismo que `x[1] = 5`.
 
-Al medir apareció una forma que ninguna decisión cubre todavía: `y = °x + 1`, un
-`°` prefijo en una lectura dentro de una expresión. Los tres motores la aceptan e
-imprimen `2`. Queda para el autor.
+Al medir apareció una forma que ninguna decisión cubría: `y = °x + 1`, un `°`
+prefijo en una lectura dentro de una expresión. Los tres motores la aceptan.
+
+**Decidido el 2026-09-25: se permite.** Es el modismo del acumulador,
+`filas = °filas$+ fila`, que tiene 30 usos en las aplicaciones LDV (ZyBank, la
+serpiente, el curso). La regla de arriba queda como estaba: se refusan la salida
+(`>> °acc ¶`) y la sentencia suelta. `zyjs` refusaba la lectura en la condición de
+`?` y de `_?` (`expected '{' to start block`) porque ahí parseaba sin
+yuxtaposición. Ahora `parseCond` usa el mismo camino que la parte derecha de una
+asignación cuando la condición empieza por el centinela. Tres celdas en
+`syntax-expressions`, que queda 18 de 18.
 
 ---
 

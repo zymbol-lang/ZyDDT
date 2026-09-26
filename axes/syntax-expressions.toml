@@ -157,3 +157,44 @@ src  = """
 }
 x = 1
 """
+
+# ── A prefix `°` read inside an expression (decided 2026-09-25) ──────────────
+#
+# Allowed: it is the accumulator idiom — `filas = °filas$+ fila`, 30 uses in the
+# LDV applications. What GLB-035 refuses is the prefix as OUTPUT (`>> °acc ¶`)
+# and as a statement on its own; a read inside an expression stays. zyjs refused
+# it in the condition of `?` and `_?`, where it parsed without juxtaposition.
+
+[[cell]]
+id     = "prefix-hot-read-on-the-right-of-an-assignment"
+expect = "ok"
+what   = "`y = °x + 1` reads the anchored value"
+src    = """
+x = 1
+y = °x + 1
+>> y ¶
+"""
+
+[[cell]]
+id     = "prefix-hot-read-in-a-condition"
+expect = "ok"
+what   = "`? °x > 0 { … }` — zyjs said `expected '{' to start block`"
+src    = """
+x = 1
+? °x > 0 {
+    >> "si" ¶
+}
+"""
+
+[[cell]]
+id     = "prefix-hot-read-in-an-else-if"
+expect = "ok"
+what   = "the same read in the condition of `_?`"
+src    = """
+x = 1
+? #0 {
+    >> "no" ¶
+} _? °x > 0 {
+    >> "si" ¶
+}
+"""
