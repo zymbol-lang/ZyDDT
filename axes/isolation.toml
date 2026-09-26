@@ -437,9 +437,8 @@ id      = "const-refuses-to-be-destructured-into"
 premise = "MEM-1"
 expect  = "error"
 what    = "a destructuring pattern writes its names, so a constant cannot be one of them"
-# ZYJS-032 (no line in zyjs) fixed in step P4.3. Still red, for GLB-061: both
-# Rust engines warn `variable 'PI' is assigned but never read` about the
-# constant, and zyjs never warns about an unused constant.
+# ZYJS-032 (no line in zyjs) fixed in step P4.3; the unused-constant warning
+# the Rust engines added here is the same in all three since GLB-061.
 src     = """
 PI := 3
 [PI, b] = [1, 2]
@@ -587,11 +586,10 @@ src     = """
 [[cell]]
 id      = "an-unused-constant"
 premise = "MEM-1"
-expect  = "ok"
-what    = "a constant declared and never read"
-# GLB-061, open — a decision: both Rust engines warn `unused variable 'K'`,
-# zyjs says nothing. Whether an unused constant warns, and whether it is called
-# a variable, is the author's.
+expect  = "warn"
+what    = "a constant declared and never read warns, and is called a constant"
+# GLB-061, decided 2026-09-26: `unused constant 'K'` in all three. Both Rust
+# engines said `unused variable 'K'`; zyjs said nothing.
 src     = """
 K := 1
 >> "x" ¶
