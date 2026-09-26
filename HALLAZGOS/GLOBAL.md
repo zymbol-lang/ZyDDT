@@ -4931,6 +4931,11 @@ escrito para esto (`analysis/unused_variable.zy`). Los ejemplos están en
 Medido en 13 formas: igual en los dos analizadores. `K += 2` y `K++` no avisan en
 ninguno, porque leen la constante. `isolation` queda 45 de 45.
 
+Una puerta que no pasé en ese paso lo encontró después: la prueba del navegador
+`web/tests/dom/reading-help.html`, cuyo programa de ejemplo declara `PI` y no lo lee nunca,
+esperaba exactamente dos avisos. Ahora son tres, los mismos que da Rust. Actualizada en el
+paso P4-3 E5.
+
 ---
 
 ## GLB-062 — `-1 =>` y `(3) =>` como patrón: Rust los refusa, `zyjs` los acepta
@@ -5094,3 +5099,21 @@ positive»), así que `zyjs` pasa a refusarlo. Corregido en la VM y en `zyjs` co
 de la comprobación de límites. Doce formas iguales en los tres, en lista y en cadena: 0,
 `-1`, `-5`, el final, pasado el final y un decimal. Una celda nueva para el negativo; el eje
 queda 117 de 117.
+
+---
+
+## GLB-068 — `>>|` sin terminal: el TW y la VM daban el texto del sistema operativo (E5)
+
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4-3, E5)
+**Encontrado por:** la celda `runtime-io/alternate-screen-without-a-terminal`
+
+**Decidido:** el texto de `zyjs`, `failed to enable raw mode: not a terminal`. El TW y la VM
+decían `No such device or address (os error 6)`, que es lo que devuelve Linux y en Windows
+o en macOS diría otra cosa.
+
+**Corregido:** los dos motores de Rust comprueban con `IsTerminal` que la entrada y la salida
+sean una terminal antes de activar el modo raw, que es la misma comprobación que hace el
+arnés `run_one.mjs`. Si falla por otra razón, se conserva el texto del sistema. En `zyjs`, la
+frase entera vive ahora en `zymbol.js`: antes el motor decía `no terminal` y el resto venía
+del arnés, así que no emparejaba en el inventario de mensajes. `tui/` (un pty de verdad) sigue
+3 de 3. El golden `corpus/manual/tui/06_tui_block.expected` se editó a mano.
