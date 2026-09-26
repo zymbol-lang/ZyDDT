@@ -2071,3 +2071,27 @@ cuando exista esta ficha probablemente se cierre con ella.
 ### Qué lo sujeta
 
 `refusal/fullwidth-question-mark`, roja (`WORDING`).
+
+---
+
+## ZYJS-036 — `zyjs` no avisa de una condición que vale Unit
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** midiendo las formas vecinas del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
+
+```zymbol
+x = 1
+x = ##_
+? x {
+    >> "si" ¶
+}
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: if condition should be Bool, got Unit` |
+| `zyjs` | ningún aviso |
+
+### Qué lo sujeta
+
+`type-change/a-condition-on-an-emptied-variable`, roja.

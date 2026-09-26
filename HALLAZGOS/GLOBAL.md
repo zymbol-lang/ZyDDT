@@ -3691,6 +3691,29 @@ en los tres, y tres controles que tienen que seguir callando.
 regla de Rust y ahora `zyjs` la sigue, pero asignar Unit puede ser la forma
 legítima de vaciar una variable. No se decidió; está aquí para cuando se decida.
 
+### El caso Unit — decidido y corregido el 2026-09-25
+
+**Medido:** `zymbol check` sobre los 2913 `.zy` del workspace: **ningún** aviso con
+Unit a ningún lado; nadie usaba `##_` para vaciar una variable, así que la decisión
+fue de diseño puro. Los ejemplos, en `scratchpad/decisiones/2_unit/`.
+
+**Decidido:** Unit es la ausencia de un valor y no cambia el tipo, como un `NULL`
+de SQL no cambia el de su columna. Entre las tres formas de implementarlo, el autor
+eligió la que no pierde ninguna forma vecina:
+
+| forma | antes | ahora |
+|---|---|---|
+| `x = 1`, `x = ##_` | avisa Int → Unit | sin aviso |
+| `x = ##_`, `x = 1` | avisa Unit → Int | sin aviso |
+| `x = 1`, `x = ##_`, `x = "a"` | avisa dos veces | avisa **Int → String**, una |
+| `x = 1`, `x = ##_`, `? x { … }` | `if condition should be Bool, got Unit` | igual: la condición sigue viendo Unit |
+
+**Corregido:** el aviso compara con el **último tipo real**, el que no fue Unit. En
+Rust, `TypeEnv::real_types`, ámbito a ámbito junto a `scopes`; en `zyjs`,
+`info.realType` junto a `infType`. Seis celdas nuevas en `type-change`: cuatro
+verdes, y dos rojas por lo que salió al medir los ámbitos y la condición:
+[`GLB-058`](GLOBAL.md) y [`ZYJS-036`](zyjs.md).
+
 ---
 
 ## GLB-044 — La familia `##` de un error: el TW la leía de las palabras y los otros dos la llevaban
@@ -4720,3 +4743,56 @@ Y al pasar las puertas salió un fallo de **P1**: los cuatro códigos `E_DESTROY
 no tenían entrada en el catálogo del playground, y `test_i18n_playground.mjs`, que
 no estaba en la lista de puertas del paso, lo refusaba. Ya la tienen, en los dos
 idiomas.
+
+---
+
+## GLB-058 — Rust compara la variable local de una función con la del fichero
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** midiendo los ámbitos del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
+
+```zymbol
+x = "s"
+f() {
+    x = 1
+    <~ x
+}
+>> f() ¶
+>> x ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: type mismatch: 'x' was String but assigned Int` |
+| `zyjs` | ningún aviso |
+
+La `x` de `f` es suya (MEM-2: una función es un espacio aislado, y escribir en ella
+crea un local), y los dos Rust la comparan con la del fichero porque
+`lookup_var` del entorno de tipos cruza la frontera de la función. Es anterior al
+caso Unit: sin ningún `##_` de por medio avisa igual.
+
+### Qué lo sujeta
+
+`type-change/a-function-local-is-not-the-file-name`, roja.
+
+---
+
+## GLB-059 — `x + 1` con `x` vacía habla de concatenar cadenas
+
+**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** midiendo las formas vecinas del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
+
+```zymbol
+x = ##_
+>> (x + 1) ¶
+```
+
+Los tres motores dicen `+ is arithmetic only — use juxtaposition to concatenate
+strings: "a" b "c"`. No hay ninguna cadena en el programa: el operando izquierdo es
+Unit. La guía es la de otro fallo, `"a" + "b"`, que comparte rama.
+
+### Qué lo sujeta
+
+Nada todavía: los tres dicen lo mismo, así que una celda saldría verde. Hace falta
+una redacción decidida (por ejemplo, la de la familia de GLB-033: `arithmetic
+requires numeric operands: Unit, Int`) para poder afirmarla con `expect`.

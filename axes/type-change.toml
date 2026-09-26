@@ -124,3 +124,85 @@ x = "a"
 }
 >> x ¶
 """
+
+# ── Unit is the absence of a value, not a type (GLB-043, decided 2026-09-25) ──
+#
+# Emptying a variable with `##_`, or filling one that started empty, does not
+# warn. A change of type is judged against the last type that was not Unit, so
+# `x = 1`, `x = ##_`, `x = "a"` still warns Int -> String, while every other
+# check keeps seeing what the name holds now: Unit.
+
+[[cell]]
+id     = "unit-empties-a-variable"
+expect = "ok"
+what   = "`x = ##_` over an Int does not warn"
+src    = """
+x = 1
+x = ##_
+>> x ¶
+"""
+
+[[cell]]
+id     = "unit-starts-a-variable-empty"
+expect = "ok"
+what   = "a variable born `##_` and then given an Int does not warn"
+src    = """
+x = ##_
+x = 1
+>> x ¶
+"""
+
+[[cell]]
+id     = "unit-empties-and-refills-in-a-loop"
+expect = "ok"
+what   = "a «last seen» that starts empty and is emptied again"
+src    = """
+ultimo = ##_
+@ i:1..4 {
+    ultimo = i
+    ? i == 2 {
+        ultimo = ##_
+    }
+}
+>> ultimo ¶
+"""
+
+[[cell]]
+id   = "a-change-across-unit-still-warns"
+what = "Int, emptied, then String: judged against the Int"
+src  = """
+x = 1
+x = ##_
+x = "a"
+>> x ¶
+"""
+
+[[cell]]
+id   = "a-condition-on-an-emptied-variable"
+what = "the condition check still sees Unit, not the Int it held"
+# Not a type change: kept here because it is the other half of the rule — the
+# emptied name is Unit for every check but this one. ZYJS-036, open: zyjs gives
+# no condition warning for a name that holds Unit.
+src  = """
+x = 1
+x = ##_
+? x {
+    >> "si" ¶
+}
+"""
+
+[[cell]]
+id     = "a-function-local-is-not-the-file-name"
+expect = "ok"
+what   = "a function's own `x` is compared with nothing outside it (MEM-2)"
+# GLB-058, open: both Rust engines warn `'x' was String but assigned Int`,
+# comparing the function's local with the file's `x`. zyjs does not.
+src    = """
+x = "s"
+f() {
+    x = 1
+    <~ x
+}
+>> f() ¶
+>> x ¶
+"""
