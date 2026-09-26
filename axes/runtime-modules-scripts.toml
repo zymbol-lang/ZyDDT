@@ -413,3 +413,66 @@ src    = """
 x = </ ./a";echo INYECTADO;"b.zy />
 >> x ¶
 """
+
+# GLB-070, decided 2026-09-26: behind a `.`, a local variable that shares an
+# alias's name hides the alias; `::` names the module whatever the scope holds.
+
+[[cell]]
+id     = "variable-that-shares-an-alias-name-calls-its-own-lambda"
+expect = "ok"
+what   = "a local `m` holding a lambda at `g`: `m.g(1)` calls the lambda, not the module"
+src    = """
+<# ./m/saludo => m
+f() {
+    m = #(g: (n) -> n + 100)
+    <~ m.g(1)
+}
+>> f() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "scope-operator-reaches-the-module-through-a-shadowing-variable"
+expect = "ok"
+what   = "with a local `m`, `m::saluda()` still calls the module"
+src    = """
+<# ./m/saludo => m
+f() {
+    m = #(x: 7)
+    <~ m::saluda() m.x
+}
+>> f() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "file-variable-that-shares-an-alias-name-leaves-the-dot-to-the-module"
+expect = "ok"
+what   = "at file level `m = #(K: 5)` lives where the `<#` does: `m.K` still reads the module"
+# GLB-070: the variable hides the alias only inside a function, its own strong
+# environment. corpus/modules_scope/alias_shadowed_by_variable.zy holds the same
+# rule with an Int.
+src    = """
+<# ./m/k => m
+m = #(K: 5)
+>> m.K ¶
+"""
+[cell.files]
+"m/k.zy" = """
+# k {
+    #> { K }
+    K := 1
+}
+"""

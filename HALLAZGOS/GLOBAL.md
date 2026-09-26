@@ -5193,7 +5193,7 @@ variables a la vez.
 
 ## GLB-070 — Una variable local con el nombre de un alias: `m.x` lee cosas distintas
 
-**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Estado:** **decidido y corregido el 2026-09-26**
 **Encontrado por:** la celda de control de [`ZYVM-008`](zyvm.md)
 
 ```zymbol
@@ -5220,7 +5220,35 @@ el refuso llega después, del motor.
 Es la mitad de `.` de un caso que `zyjs` ya corrigió para `::` (`duj::bIj` en
 zyKlingonGalaxy, donde una variable `duj` tapaba el módulo). Decidir qué gana es del autor.
 
+### Decisión del autor (2026-09-26)
+
+**Tras un `.` gana la variable**, como en `zyjs`: la función es su propio entorno. Tras `::`
+se nombra siempre el módulo, tenga el ámbito lo que tenga.
+
+El alcance lo fija esa misma razón: la variable gana **cuando es de una función**. Una
+variable del fichero vive en el mismo entorno que el `<#`, y ahí el `.` sigue siendo del
+módulo. Eso ya lo fijaba el corpus
+(`modules_scope/alias_shadowed_by_variable.zy`, con `s = 10` y `s.LIMITE`), que la primera
+versión del arreglo rompió. `zyjs` lo cumplía a medias: con un Int en la variable recurría
+al módulo, y con un diccionario leía el diccionario.
+
+Al corregirlo salió la mitad que faltaba en `zyjs`: `m.g(1)` con un `m` local seguía
+tratándose como llamada al módulo, por el arreglo de ZYJS-040, que forzaba `::` sin
+mirar qué contenía el nombre.
+
+### Qué se cambió
+
+- TW: `variable_hides_alias`, que vale para una variable del marco de la función en curso,
+  en la lectura y en la llamada con `.`.
+- VM: `local_hides_alias` en el compilador, para un registro de una función y no de
+  `<main>`, en la lectura y en los dos caminos de llamada.
+- `zyjs`: `Env.hidesAlias`, para una variable ligada bajo la frontera de una función, en la
+  lectura y en la llamada con `.`.
+- Los dos comprobadores (Rust y `zyjs`) solo consideran la sombra tras `.`.
+
 ### Qué lo sujeta
 
-`runtime-modules-scripts/variable-that-shares-an-alias-name-is-not-a-module`, roja
-(`WRONG` en `zytw` y `zyvm`).
+`runtime-modules-scripts/variable-that-shares-an-alias-name-is-not-a-module`,
+`variable-that-shares-an-alias-name-calls-its-own-lambda`,
+`scope-operator-reaches-the-module-through-a-shadowing-variable` y
+`file-variable-that-shares-an-alias-name-leaves-the-dot-to-the-module`, en verde.
