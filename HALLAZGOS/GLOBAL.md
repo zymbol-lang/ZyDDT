@@ -1500,7 +1500,7 @@ de desestructuración del mismo paso coinciden en los tres motores.
 
 ## GLB-017 — Módulos, subscripts y shell: la VM pasa una función al shell, el TW enseña un `Located { … }` de Rust, y cada motor cuenta distinto un módulo que no compila
 
-**Estado:** abierto — **A y G corregidos el 2026-09-15** (pasos 1.5 y 1.5b); **B corregido el 2026-09-16** (paso 3.3); C–F e I abiertos
+**Estado:** abierto — **A y G corregidos el 2026-09-15** (pasos 1.5 y 1.5b); **B corregido el 2026-09-16** (paso 3.3); **C e I decididos y corregidos el 2026-09-26**; D–F abiertos
 **Encontrado por:** `axes/runtime-modules-scripts.toml`, paso C9 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1602,6 +1602,43 @@ en `_err`: `##Div(warning: unused variable 'aviso' … Runtime error: division b
 zero …)`. El TW, que no analiza el subscript, informa sólo del fallo. Misma raíz
 que C. Celda `subscript-with-warnings-that-fails`, que sólo pide que coincidan,
 roja.
+
+### Decidido C e I, y corregido — 2026-09-26
+
+Al medirlo para decidir salió más de lo que las celdas veían. La VM lanzaba
+`zymbol run "<ruta>"` **a través de `sh`**:
+
+- el `zymbol` que corría era **el del `PATH`**, no el binario que ejecutaba el programa;
+- el subscript corría **siempre en el tree-walker**, aunque el programa se lanzara con `--vm`;
+- una comilla en la ruta salía de las comillas: con `</ ./a";echo INYECTADO;"b.zy />` el
+  `echo` se ejecutaba.
+
+Y ninguno de los dos motores resolvía la ruta desde el fichero que contiene el `</` cuando
+ese fichero es un módulo de otra carpeta.
+
+*Decidido por el autor:* **dentro del proceso en los dos motores**, con el mismo camino que
+`zymbol run` en ese motor:
+
+1. el subscript pasa por el analizador, y en `--vm` lo corre la VM;
+2. la ruta se resuelve desde el fichero que contiene el `</`;
+3. no hay shell ni `PATH`;
+4. si falla, el error lleva **solo el fallo**, escrito como lo escribe el CLI y sin
+   colores. Los avisos no viajan dentro de `_err`, igual que no aparecen cuando el
+   subscript sale bien.
+
+Qué se cambió:
+
+- `zymbol-cli`: `run_file_inner` pasa a ser `run_program`, genérica sobre la salida, con un
+  `Report` que o escribe en stderr o guarda los errores y suelta los avisos.
+  `subscript_runner` la usa para cada `</`, y los dos motores reciben ese gancho.
+- `zymbol-error`: `Diagnostic::render` da el bloque que imprime `emit` como texto, con color
+  o sin él.
+- VM: el compilador emite la ruta resuelta, ya no un comando. Sin gancho (un ejecutable de
+  `zymbol build`) el subscript se refusa: `cannot run '…': a subscript needs the zymbol
+  command, and this program runs without it`.
+- TW: con gancho, el mismo camino. Sin él, que es el caso del REPL, sigue el camino de antes
+  dentro del proceso.
+- Los dos resuelven la ruta desde el módulo cuando el `</` está en una función de un módulo.
 
 ### Qué lo sujeta
 
