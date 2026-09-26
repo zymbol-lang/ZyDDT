@@ -101,3 +101,46 @@ what = "expected '{' after >>| — with the TUI block help"
 src  = """
 >>| >> 1 ¶
 """
+
+# ── An output that goes on to the next line (decided 2026-09-25) ────────────
+#
+# A line break does not end a `>>`: it ends at `¶`, `\\`, `}`, `;`, another
+# `>>`, or what starts a statement — the rule of `parse_output` in both Rust
+# engines. zyjs cut at the line and lost the rest in silence (ZYJS-037); GoL's
+# multi-line outputs came out short in the playground.
+
+[[cell]]
+id     = "output-continues-on-the-next-line"
+expect = "ok"
+what   = "`>> \"valor: \" x` and `\" unidades\" ¶` on the next line are one output"
+src    = """
+x = 5
+>> "valor: " x
+   " unidades" ¶
+"""
+
+[[cell]]
+id     = "output-without-pilcrow-takes-a-call-on-the-next-line"
+expect = "ok"
+what   = "the price of the rule: a call on the next line joins an output left without `¶`"
+src    = """
+f() {
+    >> "[llamada]" ¶
+    <~ 0
+}
+x = 1
+>> x
+f()
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "output-stops-at-an-assignment"
+expect = "ok"
+what   = "a name being assigned on the next line starts a statement and ends the output"
+src    = """
+x = 1
+>> x
+y = 2
+>> y ¶
+"""
