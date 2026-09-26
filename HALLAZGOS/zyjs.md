@@ -2383,3 +2383,44 @@ En `CallExpr`, un `alias.f` sobre un alias de módulo se evalúa como `alias::f`
 llamada pide una función. Es lo mismo que decide el TW desde GLB-066. La lectura `m.nada`
 sigue diciendo `has no constant` en los tres. Al medirla salió que la VM la refusa antes
 de ejecutar y los otros dos en ejecución: [`ZYVM-008`](zyvm.md).
+
+---
+
+## ZYJS-041 — `zyjs` no parseaba `</ ruta />`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** registrado dos veces sin ficha propia: en las notas de la F3
+(«`zyjs` no implementa `</ ruta />`») y en GLB-052 («Lo que NO era redacción»)
+
+### Qué se observa
+
+`zyjs` no tenía token para `</`, así que el `<` caía en la expresión y todo acababa
+en `expected expression, found '<'`: el programa válido y los dos mal formados.
+
+| programa | `zytw`, `zyvm` | `zyjs` antes |
+|---|---|---|
+| `x = </ />` | `expected file path after </` | `expected expression, found '<'` |
+| `x = </ ./a.zy` | `unterminated execute expression` | lo mismo |
+| `x = </ ./a.zy />` | corre el fichero | lo mismo |
+
+El tercero hacía que el panel del playground refusara como error de sintaxis un
+programa que el CLI acepta.
+
+### Qué se cambió
+
+El lexer lee la ruta cruda hasta `/>`, como los de Rust, y el parser da los dos
+refusos con las mismas palabras y la misma ayuda. Al ejecutarse, un subscript falla:
+`cannot run '<ruta>': a subscript runs another file as a process, and the browser has
+none`. Es un mensaje que solo tiene `zyjs`, como el de `std/db`, y está en la línea
+base del inventario. La exclusión `SUBSCRIPT` sigue en pie, porque lo que excluye es
+la ejecución.
+
+Barrido del parser sin posiciones: cambian 14 ficheros. Doce pasan de `ERR` a `OK`,
+y todos son programas con un subscript válido (`vscode/syntax_test.zy`,
+`corpus/i18n/test_execute.zy`, …). Los otros dos son estas dos celdas, que pasan de
+`ERR` a `ERR` con el texto de Rust.
+
+### Qué lo sujeta
+
+`syntax-io/execute-without-a-path` y `syntax-lexer/unterminated-execute-expression`,
+en verde.
