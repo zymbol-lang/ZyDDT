@@ -4920,3 +4920,23 @@ decidir si un literal negativo, y un paréntesis, pueden ser un patrón.
 
 `runtime-match-patterns/match-arm-with-a-negative-literal`, sin `expect`: solo
 pregunta si los motores coinciden, hasta que se decida.
+
+---
+
+## GLB-063 — Una función en una variable, llamada con otro número de argumentos
+
+**Estado:** **corregido el 2026-09-25** (paso P4.6)
+**Encontrado por:** la celda `runtime-functions-hof/lambda-expects-arguments-got`, al medir sus formas vecinas
+
+| programa | `zytw` | `zyvm`, `zyjs`, antes |
+|---|---|---|
+| `f = (a, b) -> a + b`, `f(1)` | `lambda expects 2 arguments, got 1` | el error sale luego, en la suma |
+| `f = (a) -> a`, `f(1, 2)` | `lambda expects 1 arguments, got 2` | **imprime `1`** |
+| `f = () -> 1`, `f(5)` | `lambda expects 0 arguments, got 1` | **imprime `1`** |
+| `h = g` (función con nombre), `h(1)` | `lambda expects 2 arguments, got 1` | el error sale luego, en la suma |
+
+La celda solo miraba la primera fila. En las otras, la VM y `zyjs` **daban un resultado**
+sin avisar, y la VM además copiaba el argumento de más encima de los registros que
+la lambda había capturado. Ahora `CallDynamic` en la VM, y `checkCallArity` en `zyjs`,
+lo refusan con el texto del TW antes de llamar. Tres celdas nuevas en
+`runtime-functions-hof`. La forma vecina de un HOF quedó en [`ZYJS-039`](zyjs.md).

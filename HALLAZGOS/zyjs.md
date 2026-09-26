@@ -2260,3 +2260,28 @@ de esa razón está esta divergencia: una exclusión cuya razón ya no es la ver
 ### Qué lo sujeta
 
 `runtime-match-patterns/match-arm-with-a-value-and-a-block`, roja.
+
+---
+
+## ZYJS-039 — `zyjs` no comprueba cuántos parámetros tiene la lambda de `$>` y de `$|`
+
+**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Encontrado por:** paso P4.6, midiendo las llamadas a un valor con otro número de argumentos
+
+```zymbol
+f = (a, b) -> a + b
+r = [1, 2]$> f
+>> r ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | antes de ejecutar: `map lambda must have exactly 1 parameter, got 2` |
+| `zyjs` | en ejecución, dentro de la lambda: `+ is arithmetic only — …` |
+
+El analizador de Rust lo comprueba para `$>`, `$|` y `$<` (`type_check.rs`), y `zyjs`
+solo para `$<`, en ejecución y con otro texto.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/map-with-a-two-parameter-lambda`, roja.

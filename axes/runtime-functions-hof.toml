@@ -410,3 +410,49 @@ t(v) {
 }
 >> t(5) ¶
 """
+
+# ── A callable value called with the wrong number of arguments (step P4.6) ──
+#
+# The tree-walker refused it; the VM and zyjs ran it — a missing argument came
+# in as Unit and failed later, somewhere else, and an extra one was dropped (in
+# the VM, copied over the callee's captured registers).
+
+[[cell]]
+id     = "lambda-called-with-an-extra-argument"
+expect = "error"
+what   = "`(a) -> a` called with two arguments"
+src    = """
+f = (a) -> a
+>> f(1, 2) ¶
+"""
+
+[[cell]]
+id     = "lambda-without-parameters-called-with-one"
+expect = "error"
+what   = "`() -> 1` called with one argument"
+src    = """
+f = () -> 1
+>> f(5) ¶
+"""
+
+[[cell]]
+id     = "named-function-called-through-a-variable-with-too-few"
+expect = "error"
+what   = "a named function held in a variable, called with one argument of two"
+src    = """
+g(a, b) { <~ a + b }
+h = g
+>> h(1) ¶
+"""
+
+[[cell]]
+id     = "map-with-a-two-parameter-lambda"
+expect = "error"
+what   = "map lambda must have exactly 1 parameter, got {}"
+# ZYJS-039, open: both Rust engines refuse it before running; zyjs has no such
+# check and fails later, inside the lambda, with another error.
+src    = """
+f = (a, b) -> a + b
+r = [1, 2]$> f
+>> r ¶
+"""
