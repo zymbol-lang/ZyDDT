@@ -2079,7 +2079,7 @@ refuso sale de allí.
 
 ## ZYJS-034 — `zyjs` no sabe que el iterador de un rango es un Int
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.4)
 **Encontrado por:** preparando la decisión de GLB-043 (caso Unit), 2026-09-25
 
 ```zymbol
@@ -2103,6 +2103,13 @@ seis formas y no esta.
 
 `type-change/loop-iterator`, roja (`WRONG`: `zyjs` no llega a `warn`).
 
+
+### Corregido el 2026-09-25 (paso P4.4)
+
+El `Checker` declara el iterador de un rango con `infType = 'Int'`. Medido en 511
+ficheros del corpus, de `reject/` y de ZyDDT con condiciones, rangos o `##_`: el
+número de avisos de cambio de tipo y de condición es igual en `zyjs` y en Rust en
+todos. La celda pasa a verde.
 ---
 
 ## ZYJS-035 — `？ x > 1 {` se refusa con otro texto
@@ -2135,7 +2142,7 @@ cuando exista esta ficha probablemente se cierre con ella.
 
 ## ZYJS-036 — `zyjs` no avisa de una condición que vale Unit
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.4)
 **Encontrado por:** midiendo las formas vecinas del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
 
 ```zymbol
@@ -2154,3 +2161,12 @@ x = ##_
 ### Qué lo sujeta
 
 `type-change/a-condition-on-an-emptied-variable`, roja.
+
+
+### Corregido el 2026-09-25 (paso P4.4)
+
+`staticTypeName` lee el tipo de la **última** asignación (`infType`), como el
+entorno de tipos de Rust, y no el registro de literales que coinciden
+(`litType`). Ese registro se borraba con `x = 1` seguido de `x = ##_`, y la condición
+callaba. Misma medida que ZYJS-034: los 511 ficheros cuentan igual. La celda pasa a
+verde.

@@ -2939,7 +2939,7 @@ mismo programa de dos maneras. `##Type` es lo que D1 manda.
 
 ## GLB-035 — `°x` indexado: los dos motores Rust hablan del prefijo y `zyjs` de la asignación indexada
 
-**Estado:** **corregido el 2026-09-23 (paso G5.1)** en sus dos mitades; queda una tercera forma, `°x` suelto en `zyjs`
+**Estado:** **corregido el 2026-09-23 (paso G5.1)** en sus dos mitades; la tercera forma, `°x` suelto en `zyjs`, el 2026-09-25 (paso P4.4)
 **Encontrado por:** paso 3.6, 2026-09-19, barriendo las formas vecinas de `GLB-027`
 **Familia:** `GLB-027` (el nombre caliente indexado), pero el prefijo, no el sufijo
 
@@ -3008,6 +3008,20 @@ sigue roja por eso, y ahora se sabe dónde hay que mirar.
 ### Qué lo sujeta
 
 Nada todavía: no hay celda. Las formas están medidas en los tres motores.
+
+### `°x` suelto — corregido el 2026-09-25 (paso P4.4)
+
+El guarda está ahora en `_parseStmt`, donde **entra** el centinela: `°x` lexea a un
+`IDENT` vacío marcado `hot` seguido del nombre, y el parser lo leía como **dos**
+sentencias. El error llegaba después, como `undefined variable`, desde una pasada
+que ya no veía el `°`. Con el guarda, si detrás del nombre no viene un operador de
+asignación ni un `[`, `zyjs` refusa con el texto y la ayuda de Rust. Barrido de
+parseo de los 2926 `.zy`: cambia un solo fichero, el de la celda. Siguen funcionando
+`°t += i`, `°t = i` y `°t++`, y `°x[1] = 5` dice lo mismo que `x[1] = 5`.
+
+Al medir apareció una forma que ninguna decisión cubre todavía: `y = °x + 1`, un
+`°` prefijo en una lectura dentro de una expresión. Los tres motores la aceptan e
+imprimen `2`. Queda para el autor.
 
 ---
 
