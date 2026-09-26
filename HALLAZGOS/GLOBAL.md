@@ -5075,3 +5075,22 @@ Ahora, si `x` es un alias de módulo, se llama al módulo, como antes. Si no, `x
 como cualquier valor, con los errores que ya da su lectura, y el resultado se llama
 (`call_evaluated`, compartido con la rama de «cualquier otra expresión»). Los módulos siguen
 funcionando con `.` y con `::`. Al medir apareció también [`ZYJS-040`](zyjs.md).
+
+---
+
+## GLB-067 — Insertar en la posición 0 o en una negativa (E4)
+
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4-3, E4)
+**Encontrado por:** la celda `runtime-collection-ops/insert-index-must-be-positive-1-based`
+
+**Decidido:** el texto del TW, `$+[i] index must be positive (1-based, use 1 to insert at the
+beginning), got 0`, que nombra la operación, da la regla y dice cómo insertar al principio.
+La VM decía `$+[0] index out of bounds for array of length 2`, y `zyjs` `index 0 is invalid —
+Zymbol uses 1-based indexing (…)`.
+
+**Al medir, el negativo**: el TW y la VM refusaban `$+[-1]`, y `zyjs` lo aceptaba e
+insertaba delante del último (`[1, 9, 2]`). El texto elegido ya fija la regla («must be
+positive»), así que `zyjs` pasa a refusarlo. Corregido en la VM y en `zyjs` con un guarda antes
+de la comprobación de límites. Doce formas iguales en los tres, en lista y en cadena: 0,
+`-1`, `-5`, el final, pasado el final y un decimal. Una celda nueva para el negativo; el eje
+queda 117 de 117.
