@@ -125,9 +125,10 @@ src  = """
 [[cell]]
 id   = "fullwidth-question-mark"
 what = "`？` (U+FF1F) where `?` belongs: a name to the lexer, so the refusal falls later"
-# ZYJS-035, open: both Rust engines say `unexpected token: '{'`, zyjs
-# `expected expression, found '>'`. Neither names the character; that belongs to
-# the rule on confusable characters the author is writing in SYMBOLS.md § 2.
+# ZYJS-035, fixed 2026-09-26: both Rust engines said `unexpected token: '{'`,
+# zyjs `expected expression, found '>'` — it could not read `x > 1` as a
+# statement. Neither names the character: the editor does, as a warning
+# (`confusable-character`, decided 2026-09-25), and the engines never will.
 src  = """
 x = 5
 ？ x > 1 {

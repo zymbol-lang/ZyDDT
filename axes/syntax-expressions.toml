@@ -198,3 +198,49 @@ x = 1
     >> "si" ¶
 }
 """
+
+# ZYJS-035, decided 2026-09-26: an expression that opens with a name is one
+# statement, valid, and it warns `this statement does nothing` — the way a bare
+# `x` already did. zyjs refused `x > 1` at the `>` and ran `x + 1` as `x` and
+# then `+1`; both Rust engines accepted either in silence.
+
+[[cell]]
+id     = "bare-comparison-is-a-statement-that-does-nothing"
+expect = "warn"
+what   = "`x > 1` alone on a line runs, and warns that its value is discarded"
+src    = """
+x = 5
+x > 1
+>> x ¶
+"""
+
+[[cell]]
+id     = "bare-arithmetic-continues-across-a-line"
+expect = "warn"
+what   = "`x` and then `- 1` on the next line is one statement: no binary operator starts one"
+src    = """
+x = 5
+x
+- 1
+>> x ¶
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-sign"
+what = "`-x` starts no statement, like a literal does not"
+# After a block, not after `x = 5`: an assignment's value continues onto the
+# next line, so `x = 5` and then `-x` is `x = 5 - x`.
+src  = """
+x = 5
+? x > 1 { >> x ¶ }
+-x
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-brace"
+what = "a bare block `{ … }` starts no statement"
+src  = """
+{
+    >> "a" ¶
+}
+"""

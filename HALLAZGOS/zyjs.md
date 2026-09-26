@@ -2138,7 +2138,7 @@ todos. La celda pasa a verde.
 
 ## ZYJS-035 — `？ x > 1 {` se refusa con otro texto
 
-**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-26**: la raíz era la gramática de la sentencia, no el texto
 **Encontrado por:** preparando la decisión de los caracteres confundibles, 2026-09-25
 
 ```zymbol
@@ -2158,9 +2158,44 @@ más tarde y en sitios distintos. Ninguno de los dos nombra el carácter; eso le
 toca a la regla de confundibles que el autor escribe en `SYMBOLS.md` §2, y
 cuando exista esta ficha probablemente se cierre con ella.
 
+### La raíz
+
+No era el texto. `zyjs` no sabía leer `x > 1` como sentencia: tras el nombre
+paraba en el postfijo, así que refusaba `x > 1` en el `>` y partía `x + 1` en `x`
+y `+1`. Los dos motores de Rust leían la expresión entera y la aceptaban callados.
+
+| sentencia | `zytw`, `zyvm` antes | `zyjs` antes |
+|---|---|---|
+| `x > 1` | corre, sin aviso | `expected expression, found '>'` |
+| `x + 1` | corre, sin aviso | `x` (avisa) y luego `+1` |
+| `-x`, `!b`, `+x` | `unexpected token` | corre |
+| `{ … }` suelto | `unexpected token: '{'` | `expected expression, found '{'` |
+
+### Decisión del autor (2026-09-26)
+
+Una expresión que empieza por un nombre es **válida y avisa**, igual que ya avisaba
+`x` suelto: `this statement does nothing: `>` computes a value and it is discarded`.
+El aviso solo salta si la expresión está hecha de nombres, literales y operadores
+aritméticos, de comparación o lógicos: una llamada dentro puede estar ahí por su
+efecto. En una comparación o una lógica, la ayuda propone `? condition { … }`.
+
+Medido antes de implementarlo: ningún `.zy` del workspace (2926) dispara el aviso,
+y el barrido del parser de `zyjs` sin posiciones solo cambia en esta celda.
+
+### Qué se cambió
+
+- `zymbol-semantic`: `pure_statement_op` y el aviso.
+- `zyjs`: la sentencia que empieza por un nombre se relee con la gramática completa
+  cuando la sigue un operador binario, también en la línea siguiente, como en Rust.
+  El Checker da el mismo aviso. `-`, `+`, `!` y `{` no empiezan una sentencia, y
+  una llamada seguida de un operador se refusa aunque este esté en otra línea.
+
 ### Qué lo sujeta
 
-`refusal/fullwidth-question-mark`, roja (`WORDING`).
+`refusal/fullwidth-question-mark`, en verde. También cuatro celdas de
+`syntax-expressions`: `bare-comparison-is-a-statement-that-does-nothing`,
+`bare-arithmetic-continues-across-a-line`, `statement-opening-with-a-sign` y
+`statement-opening-with-a-brace`.
 
 ---
 
