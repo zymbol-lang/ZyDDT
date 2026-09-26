@@ -459,7 +459,7 @@ a sitios muertos — `range bounds…` nombraba una celda inexistente y
 
 ## ZYTW-007 — Llamar a una lambda destruida dice `undefined function`
 
-**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.7)
 **Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
 
 ```zymbol
@@ -479,3 +479,9 @@ no mira antes si la variable se destruyó.
 ### Qué lo sujeta
 
 `lifetime/call-a-destroyed-lambda`, roja (`WORDING`).
+
+### Corregido el 2026-09-25 (paso P4.7)
+
+Antes de buscar la función por nombre, la llamada comprueba con
+`check_variable_alive` si el nombre es una variable destruida. Solo lo hace cuando
+no hay una función con ese nombre. `lifetime` queda 24 de 24.

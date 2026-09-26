@@ -4695,7 +4695,7 @@ fichas abiertas.
 
 ## GLB-056 — Rust avisa `unused variable` sobre una constante usada de iterador
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.7)
 **Encontrado por:** paso G5.3, 2026-09-25, midiendo las formas de escribir en una constante
 
 ```zymbol
@@ -4718,6 +4718,14 @@ nueva que tapa la constante.
 
 `isolation/const-refuses-to-be-an-iterator`, roja (`DIVERGE`: un aviso es parte
 de la forma).
+
+### Corregido el 2026-09-25 (paso P4.7)
+
+El análisis de variables no declara el iterador cuando nombra una constante, por la
+misma razón por la que `ConstDecl` se salta una segunda declaración: el comprobador
+de tipos refusa ese bucle, así que el iterador nunca llega a existir. Declararlo
+retiraba la constante y la daba por no usada. La celda pasa a verde. Una constante
+que de verdad nadie lee sigue avisando, que es [`GLB-061`](GLOBAL.md).
 
 ---
 
@@ -4770,7 +4778,7 @@ idiomas.
 
 ## GLB-058 — Rust compara la variable local de una función con la del fichero
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.7)
 **Encontrado por:** midiendo los ámbitos del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
 
 ```zymbol
@@ -4796,6 +4804,14 @@ caso Unit: sin ningún `##_` de por medio avisa igual.
 ### Qué lo sujeta
 
 `type-change/a-function-local-is-not-the-file-name`, roja.
+
+### Corregido el 2026-09-25 (paso P4.7)
+
+El aviso de cambio de tipo pregunta primero `crosses_strong_boundary`, el mismo
+predicado de MEM-2. Si el nombre está al otro lado de la frontera de la función, la
+asignación crea un local y no hay tipo anterior con que comparar. Siguen avisando un
+cambio dentro de la propia función, uno en el fichero y la escritura del estado de un
+módulo (MEM-4). `type-change` queda 16 de 16.
 
 ---
 
@@ -4940,3 +4956,21 @@ sin avisar, y la VM además copiaba el argumento de más encima de los registros
 la lambda había capturado. Ahora `CallDynamic` en la VM, y `checkCallArity` en `zyjs`,
 lo refusan con el texto del TW antes de llamar. Tres celdas nuevas en
 `runtime-functions-hof`. La forma vecina de un HOF quedó en [`ZYJS-039`](zyjs.md).
+
+---
+
+## GLB-064 — Un error de módulo en el TW: sin línea, y otra frase en `_err`
+
+**Estado:** **corregido el 2026-09-25** (paso P4.7)
+**Encontrado por:** las celdas `modularity/undeclared-item-does-not-leave` y
+`runtime-modules-scripts/unexported-function-as-an-error-value`
+
+Al llamar a una función que el módulo no exporta, el TW imprimía `module 'Z' does not
+export function 'privada'` **sin** la línea `-->` que dan la VM y `zyjs`. Y, capturado
+con `!?`, su `_err` decía **otra frase**, `function 'privada' not exported from module
+'Z'`: dos textos para un mismo fallo dentro del mismo motor. La causa era una variante
+propia, `FunctionNotExported`, que `locate` no sabía situar y que tenía su propia
+redacción para `_err`. Ahora el error es un `Generic` con la frase que se imprime.
+`ConstantNotExported`, que no se construía en ningún sitio, se retira con ella. Las
+dos celdas pasan a verde, y salen tres frases de un solo lado de la línea base de
+mensajes (588 → 585).
