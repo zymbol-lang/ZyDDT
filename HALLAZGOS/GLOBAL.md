@@ -5117,3 +5117,37 @@ arnés `run_one.mjs`. Si falla por otra razón, se conserva el texto del sistema
 frase entera vive ahora en `zymbol.js`: antes el motor decía `no terminal` y el resto venía
 del arnés, así que no emparejaba en el inventario de mensajes. `tui/` (un pty de verdad) sigue
 3 de 3. El golden `corpus/manual/tui/06_tui_block.expected` se editó a mano.
+
+---
+
+## GLB-069 — Un módulo que exporta una variable: cuatro respuestas (E6)
+
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4-3, E6)
+**Encontrado por:** la celda `modularity/module-state-is-not-exportable`
+
+Un módulo con `#> { n }`, donde `n = 0` es una **variable**, tenía cuatro respuestas:
+
+| dónde | qué decía |
+|---|---|
+| `zymbol check` | `E005: Item 'n' not found in module`, sobre el módulo. **Falso**: `n` existe |
+| `run`, TW y `zyjs` | `Module 'E' has no constant 'n'. Available constants: none`, en ejecución, donde se lee |
+| `run`, VM | el mismo texto, antes de ejecutar |
+
+**Decidido:** se refusa en el bloque `#>` del propio módulo, antes de ejecutar, en los tres:
+`'n' is a variable: a module exports constants and functions`, con la ayuda `declare it
+with ':=' if it never changes, or export a function that returns it`.
+
+**Corregido:**
+
+- Rust: `check_exported_variables` en `TypeChecker`, que es el análisis que corren sobre un
+  módulo la carga del TW, el compilador de la VM, `zymbol check` y el LSP. `modules.rs` ya
+  no dice `E005` cuando el nombre es una variable.
+- `zyjs`: la misma regla en el `ModuleBlock` del `Checker`, con el código `E_EXPORT_VAR` y
+  su entrada en inglés y en español. El parser guarda ahora la línea y la columna de cada
+  nombre exportado, para señalarlo en 2:10 como Rust. Barrido de parseo quitando las
+  posiciones: idéntico.
+
+En `run`, los tres lo refusan al cargar el módulo, con la forma de cualquier error
+semántico de un módulo (`failed to parse module: 1 semantic error(s) in …`). Siguen
+exportándose una constante y una función, y se refusan una variable privada (`_n`) y dos
+variables a la vez.
