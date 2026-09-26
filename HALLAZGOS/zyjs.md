@@ -1194,6 +1194,13 @@ Cada forma, con el texto y la ayuda de los Rust, en `web/src/zymbol/zymbol.js`:
   `` `x `` y un espacio de ancho cero (Rust: parte del nombre; `zyjs`: no están), o
   `€` (Rust: identificador; `zyjs`: error). Necesita decisión: `GLB-026`.
 
+### El `~` suelto — corregido el 2026-09-25 (paso P4.5)
+
+El lexer emite ahora un token `TILDE`, como `TokenKind::Tilde` en Rust. El parser lo
+consume detrás del nombre de un parámetro (`a~`) y, al principio de una sentencia,
+lo refusa con el texto de Rust: `unexpected token: '~'`. `1 ~ 2` ya no imprime `12`.
+Barrido de parseo: cambia un solo fichero, el de la celda. `refusal/lone-tilde`,
+verde.
 
 ---
 
@@ -1394,6 +1401,15 @@ Registrado por el camino: `x[1] 5` —sin `°`— ejecuta el `5` suelto en `zyjs
 `axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15),
 `axes/syntax-control-flow.toml` (7), `axes/syntax-index-nav.toml` (8),
 `axes/syntax-io.toml` (12) y `axes/syntax-variables.toml` (8).
+
+### El literal suelto — corregido el 2026-09-25 (paso P4.5)
+
+Un literal (número, cadena, carácter o booleano) no empieza una sentencia: `x[1] 5`
+es `x[1]` y luego un `5` que no empieza nada. `zyjs` lo refusa como Rust,
+`unexpected token: '5'`, con la misma ayuda. El primer intento **rompía
+`GoL/εκκίνηση.zy`**, un programa válido. Eso destapó [`ZYJS-037`](zyjs.md), y
+este refuso solo entró cuando ZYJS-037 estuvo arreglado. `refusal/stray-literal-statement`,
+verde.
 
 ---
 
@@ -2170,3 +2186,41 @@ entorno de tipos de Rust, y no el registro de literales que coinciden
 (`litType`). Ese registro se borraba con `x = 1` seguido de `x = ##_`, y la condición
 callaba. Misma medida que ZYJS-034: los 511 ficheros cuentan igual. La celda pasa a
 verde.
+---
+
+## ZYJS-037 — Una salida `>>` en varias líneas perdía el resto en silencio
+
+**Estado:** **decidido y corregido el 2026-09-25** (paso P4.5)
+**Encontrado por:** el barrido de parseo del paso P4.5, al romper `GoL/εκκίνηση.zy`
+
+```zymbol
+x = 5
+>> "valor: " x
+   " unidades" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `valor: 5 unidades` |
+| `zyjs` | `valor: 5` |
+
+`zyjs` terminaba la salida al final de la línea, y la continuación quedaba como una
+sentencia suelta que no hacía nada. `GoL` la usa en `εκκίνηση.zy` y en
+`μέτρηση/όλα.zy`, así que en el playground salía cortado. Ningún diferencial lo veía,
+porque el corpus no tenía ninguna salida en varias líneas.
+
+### Decidido por el autor
+
+**La regla de Rust** (`parse_output`): el salto de línea no termina una salida.
+Termina en `¶`, `\\`, `}`, `;`, otro `>>`, o ante lo que empieza una sentencia: una
+palabra de sentencia o un nombre al que se asigna. El autor aceptó también lo que
+esa regla trae consigo: una llamada en la línea siguiente de un `>>` sin `¶` entra en
+la salida, y se imprime su valor.
+
+### Corregido
+
+`parseOutput` corta por token y no por línea: `OUTPUT_END` más `Parser.ASSIGNING`.
+El refuso de una comparación dentro de la salida vale ahora en cualquier línea,
+también como en Rust. Barrido de parseo: cambian los dos ficheros de GoL, y ninguno
+más. Tres celdas en `syntax-io`: la continuación, la llamada absorbida y el corte
+ante una asignación.
