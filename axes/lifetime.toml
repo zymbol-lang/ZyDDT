@@ -334,3 +334,21 @@ g = () -> 1
 \\g
 >> g() ¶
 """
+
+[[cell]]
+id     = "read-a-block-local-destroyed-inside-a-function"
+expect = "error"
+what   = "a name ended in a function's `?` block and read in that block"
+# ZYJS-030: the mark lives in the block's frame; zyjs looked for it only at the
+# function boundary and said "'y' is undefined — did you mean 'y°'".
+src    = """
+f() {
+    ? #1 {
+        y = 1
+        \\y
+        >> y ¶
+    }
+    <~ 0
+}
+>> f() ¶
+"""
