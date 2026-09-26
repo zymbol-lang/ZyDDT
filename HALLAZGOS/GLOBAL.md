@@ -4889,7 +4889,7 @@ que ya no avisan y dos que sí.
 
 ## GLB-061 — Una constante sin usar: Rust avisa «unused variable», `zyjs` calla
 
-**Estado:** abierto — **pide decisión**; registrado el 2026-09-25
+**Estado:** **decidido y corregido el 2026-09-26**
 **Encontrado por:** paso P4.3, al quedar roja `isolation/const-refuses-to-be-destructured-into` por otra causa
 
 ```zymbol
@@ -4909,6 +4909,27 @@ nadie lee avisa, y si el aviso la llama *variable*.
 
 `isolation/an-unused-constant` (`expect = "ok"`, roja en los dos Rust) y
 `isolation/const-refuses-to-be-destructured-into`.
+
+### Decidido y corregido el 2026-09-26
+
+**Medido:** en todo el workspace hay una sola constante sin usar, en el test del corpus
+escrito para esto (`analysis/unused_variable.zy`). Los ejemplos están en
+`scratchpad/decisiones/p4/1_constante_sin_usar/`.
+
+**Decidido:** avisan los tres, y la llaman constante: `unused constant 'K'`, con la ayuda
+`consider removing this constant`.
+
+**Corregido:**
+
+- Rust (`variable_analysis.rs`): una constante que nadie lee da ese aviso. Cubre también
+  la rama de «asignada pero nunca leída», porque asignar a una constante ya es un error.
+- `zyjs`: la rama nueva, con el código propio `W_UNUSED_CONST` y su entrada en inglés y en
+  español. Además, los cuatro sitios que refusan escribir en una constante (asignación,
+  `<<`, iterador y desestructuración) la consultaban con `lookup`, que la **marcaba como
+  usada**, así que nunca avisaba. Ahora usan `peekVar`.
+
+Medido en 13 formas: igual en los dos analizadores. `K += 2` y `K++` no avisan en
+ninguno, porque leen la constante. `isolation` queda 45 de 45.
 
 ---
 
