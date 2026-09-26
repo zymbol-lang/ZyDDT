@@ -1937,7 +1937,7 @@ nota final de `ZYVM-005` ya anunciaba para los locales de `zyjs`.
 
 ## ZYJS-031 — El playground traduce por código, y dos códigos los comparten textos distintos
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **decidido y corregido el 2026-09-25**
 **Encontrado por:** [`GLB-055`](GLOBAL.md), 2026-09-25, al elegir el código de los diagnósticos nuevos
 
 `src/playground/problems.js` no enseña el `message` del motor: si el catálogo
@@ -1966,6 +1966,28 @@ panel de problemas del playground dice otra cosa. Ninguna prueba lo ve, porque
 
 ¿Un código por fallo (con su entrada en el catálogo inglés y español), o que el
 panel use el catálogo sólo cuando la plantilla inglesa coincide con el `message`?
+
+### Decidido y corregido el 2026-09-25
+
+**Un código por fallo, y una prueba que impide volver atrás.** Antes se midió el
+motor entero: de los 6 códigos que emiten más de una frase, solo `E_SCOPE` y
+`E_CONST` tenían entrada en el catálogo (los otros 4, sin entrada, enseñan el texto
+del motor, que es correcto). Y salió un tercero del mismo tipo: `E_HOT_OUTPUT`
+tenía en el catálogo `>> x ¶` con una `x` fija, y el motor le pasaba el nombre
+vacío. Con `>> °cuenta ¶` el motor decía `>> cuenta ¶` y el panel, `>> x ¶`.
+
+- `'x' is read from outside this function` pasa a `E_SCOPE_FN`, y `constant 'K'
+  already declared` a `E_CONST_REDECL`, los dos con su entrada y su ayuda en
+  inglés y en español.
+- `E_HOT_OUTPUT` pasa el nombre, y el catálogo dice `>> {name} ¶`.
+- `problems.js` pasa los parámetros también a la ayuda, que ahora puede nombrar lo
+  que nombra el mensaje (`pasa 'x' como parámetro`).
+- `test_i18n_playground.mjs`, sección *one code, one sentence*: un código con
+  entrada en el catálogo tiene que emitirse con una sola frase, y los tres casos
+  se pintan con el catálogo y se comparan con el mensaje del motor. Comprobado
+  que falla al deshacer el arreglo.
+
+Los ficheros que lo enseñan están en `scratchpad/decisiones/3_playground/`.
 
 ---
 
