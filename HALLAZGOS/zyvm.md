@@ -536,3 +536,20 @@ diferencia de fase que tenía GLB-069 antes de corregirse.
 ### Qué lo sujeta
 
 `runtime-modules-scripts/dot-read-of-a-constant-the-module-does-not-have`, roja.
+
+---
+
+## ZYVM-009 — Un brazo `patrón => valor { bloque }`: la VM se saltaba el bloque
+
+**Estado:** **corregido el 2026-09-26** (paso P4.8)
+**Encontrado por:** midiendo [`ZYJS-038`](zyjs.md)
+
+El compilador del `??` escribía `if valor { … } else if bloque { … }`, así que, con un valor,
+el bloque no se compilaba nunca, en el brazo normal y en el comodín. Con
+`90..100 => 'A' { >> "bien" ¶ }`, el TW imprimía `bien` y devolvía `A`, y la VM devolvía `A`
+sin imprimir nada. Ahora son dos pasos: el valor a `dst` y después el bloque.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-arm-with-a-value-and-a-block` y
+`match-arm-value-comes-before-its-block`, verdes.

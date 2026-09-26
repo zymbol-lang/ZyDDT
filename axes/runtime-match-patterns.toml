@@ -124,9 +124,9 @@ r = ?? x { -1 => "menos uno"  _ => "otro" }
 id     = "match-arm-with-a-value-and-a-block"
 expect = "ok"
 what   = "`pattern => value { block }`: an arm with a value and a side-effect block"
-# ZYJS-038, open: both Rust engines run it (interpreter/examples/phase11 uses
-# it); zyjs refuses the `{`. The exclusion of corpus/scope04_match_block.zy
-# gives another reason (ANSI_FORMAT) and hides this.
+# ZYJS-038, kept by the author on 2026-09-26: the value first, then the block,
+# and the arm gives the value. zyjs did not parse it, and the VM compiled the
+# value and dropped the block (ZYVM-009); both fixed.
 src    = """
 g = ?? 92 {
     90..100 => 'A' { >> "bien" ¶ }
@@ -194,4 +194,32 @@ src    = """
 x = [9.9, 2]
 r = ?? x { [1.5, 2] => "no debe"  _ => "otro" }
 >> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-value-comes-before-its-block"
+expect = "ok"
+what   = "`x + 1 { … x = 5 }`: the value is computed first, the block then runs, and the arm gives the value"
+src    = """
+x = 0
+g = ?? 92 {
+    90..100 => x + 1 { >> "bloque, x=" x ¶
+    x = 5 }
+    _ => 0 { >> "otro" ¶ }
+}
+>> g " " x ¶
+"""
+
+[[cell]]
+id     = "match-block-arm-is-analysed-even-when-it-does-not-run"
+expect = "error"
+what   = "an undefined name inside a block arm that never runs is refused before running"
+# zyjs never analysed a block arm: `>> nada` there failed only at run time, or
+# not at all when the arm did not run (step P4.8).
+src    = """
+x = 2
+?? x {
+    1 => { >> nada ¶ }
+    _ => { >> "otro" ¶ }
+}
 """
