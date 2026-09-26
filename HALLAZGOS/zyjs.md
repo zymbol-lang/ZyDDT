@@ -2265,7 +2265,7 @@ de esa razón está esta divergencia: una exclusión cuya razón ya no es la ver
 
 ## ZYJS-039 — `zyjs` no comprueba cuántos parámetros tiene la lambda de `$>` y de `$|`
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-26** (paso P4.8)
 **Encontrado por:** paso P4.6, midiendo las llamadas a un valor con otro número de argumentos
 
 ```zymbol
@@ -2286,11 +2286,26 @@ solo para `$<`, en ejecución y con otro texto.
 
 `runtime-functions-hof/map-with-a-two-parameter-lambda`, roja.
 
+### Corregido el 2026-09-26 (paso P4.8)
+
+`checkHofArity` en el `Checker`, con los tres textos de Rust. Se decide sobre una lambda
+escrita en el sitio o sobre una variable que guarda una: una asignación anota ahora
+`lambdaArity`. Una función con nombre no se comprueba, igual que en Rust. El código
+`E_HOF_ARITY` agrupa tres frases, así que va en la lista `ENGINE_WORDS` de
+`test_i18n_playground` (el panel muestra el texto del motor), no en el catálogo.
+
+Al medir salió la forma hermana de [`GLB-063`](GLOBAL.md): una **función con nombre** de dos
+parámetros pasada a `$>`. El TW la refusaba (`lambda expects 2 arguments, got 1`). La VM y
+`zyjs` la llamaban con un argumento de menos y fallaban después. Ahora cuentan los
+argumentos `call_callable` (la VM, en todas las llamadas de `$>`, `$|`, `$<` y `$^`) y
+`callFunc` (`zyjs`, en todas las llamadas a una función de usuario, `|>` incluido). Las
+siete aplicaciones corridas en el TW y `zyjs`, antes y después: idénticas.
+
 ---
 
 ## ZYJS-040 — `m.nada()` sobre un módulo: `zyjs` lee el punto como una constante
 
-**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Estado:** **corregido el 2026-09-26** (paso P4.8)
 **Encontrado por:** midiendo [`GLB-066`](GLOBAL.md)
 
 ```zymbol
@@ -2306,3 +2321,10 @@ solo para `$<`, en ejecución y con otro texto.
 ### Qué lo sujeta
 
 `runtime-modules-scripts/dot-call-of-a-function-the-module-does-not-export`, roja.
+
+### Corregido el 2026-09-26 (paso P4.8)
+
+En `CallExpr`, un `alias.f` sobre un alias de módulo se evalúa como `alias::f`, porque la
+llamada pide una función. Es lo mismo que decide el TW desde GLB-066. La lectura `m.nada`
+sigue diciendo `has no constant` en los tres. Al medirla salió que la VM la refusa antes
+de ejecutar y los otros dos en ejecución: [`ZYVM-008`](zyvm.md).
