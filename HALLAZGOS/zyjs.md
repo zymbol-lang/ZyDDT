@@ -1920,7 +1920,7 @@ constante los refusa ahora el `Checker` antes de ejecutar ([`GLB-055`](GLOBAL.md
 
 ## ZYJS-030 — Leer un parámetro destruido dice `is undefined — did you mean 'p°'`
 
-**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido el 2026-09-25** (paso P4.2)
 **Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
 
 ```zymbol
@@ -1946,6 +1946,18 @@ nota final de `ZYVM-005` ya anunciaba para los locales de `zyjs`.
 `lifetime/read-a-destroyed-parameter` y
 `lifetime/read-a-lambda-copy-after-destroying-it`, rojas (`WORDING`).
 
+
+### Corregido el 2026-09-25 (paso P4.2)
+
+La marca de `\` queda en el entorno donde vivía el nombre: la función, una lambda
+o un bloque. `Env.get` la busca ahora en **cada** nivel que atraviesa, y no solo
+en la raíz. Al medirlo salió una tercera forma, un local destruido dentro de un
+`?` de la función, que con arreglar solo la frontera seguía diciendo `undefined`.
+Las formas que no deben fallar siguen igual: revivir un nombre, llamar dos veces
+o destruir en una rama que no corre.
+
+Las dos celdas pasan a verde, y hay una nueva:
+`lifetime/read-a-block-local-destroyed-inside-a-function`.
 ---
 
 ## ZYJS-031 — El playground traduce por código, y dos códigos los comparten textos distintos
