@@ -111,12 +111,10 @@ t(v) {
 """
 
 [[cell]]
-id   = "match-arm-with-a-negative-literal"
-what = "`-1 => …` as a match pattern"
-# GLB-062, open — a decision, so no `expect`: this cell only asks that the
-# engines agree. Both Rust engines refuse `-` as the start of a pattern
-# (`expected pattern, found '-'`); zyjs accepts it and matches.
-src  = """
+id     = "match-arm-with-a-negative-literal"
+expect = "ok"
+what   = "`-1 => …` is a pattern: a negative number is a literal (GLB-062, decided 2026-09-26)"
+src    = """
 x = -1
 r = ?? x { -1 => "menos uno"  _ => "otro" }
 >> r ¶
@@ -135,4 +133,65 @@ g = ?? 92 {
     _       => '?' { >> "otro" ¶ }
 }
 >> g ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-negative-decimal"
+expect = "ok"
+what   = "`-1.5 => …` — and a decimal pattern at all, which the VM never matched (ZYVM-007)"
+src    = """
+x = -1.5
+r = ?? x { -1.5 => "menos uno y medio"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-negative-range"
+expect = "ok"
+what   = "`-5..-1 => …`, both ends negative"
+src    = """
+x = -3
+r = ?? x { -5..-1 => "entre"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-in-parentheses-is-not-a-pattern"
+expect = "error"
+what   = "`(3) => …` is refused in all three: a pattern is not an expression (GLB-062)"
+src    = """
+x = 3
+r = ?? x { (3) => "tres"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-sign-before-a-name-is-not-a-pattern"
+expect = "error"
+what   = "`-y => …`: only a sign in front of a number makes a pattern"
+src    = """
+y = 1
+x = -1
+r = ?? x { -y => "menos y"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-an-integer-beyond-32-bits"
+expect = "ok"
+what   = "`3000000000 => …` matches only itself — the VM truncated it to 32 bits (ZYVM-007)"
+src    = """
+x = -1294967296
+r = ?? x { 3000000000 => "falso"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-list-with-a-decimal-element"
+expect = "ok"
+what   = "a decimal element of a list pattern is compared — the VM let it match anything (ZYVM-007)"
+src    = """
+x = [9.9, 2]
+r = ?? x { [1.5, 2] => "no debe"  _ => "otro" }
+>> r ¶
 """

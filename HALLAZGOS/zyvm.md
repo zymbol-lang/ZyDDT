@@ -485,3 +485,34 @@ llamada destruía otra vez la global.
 `lifetime/a-function-that-destroys-its-parameter-called-twice`,
 `lifetime/a-lambda-that-reads-then-destroys-called-twice` y
 `lifetime/a-lambda-destroys-its-own-copy`, verdes.
+
+---
+
+## ZYVM-007 — Patrones numéricos en la VM: el decimal nunca empareja y el entero grande se trunca
+
+**Estado:** **corregido el 2026-09-26** (paso P4-2, con permiso del autor)
+**Encontrado por:** midiendo `-1.5 =>` para [`GLB-062`](GLOBAL.md)
+
+| programa | `zytw`, `zyjs` | `zyvm`, antes |
+|---|---|---|
+| `x = 1.5`, `?? x { 1.5 => … }` | empareja | **no empareja** |
+| `x = -1294967296`, `?? x { 3000000000 => … }` | no empareja | **empareja** |
+| `x = 3000000000`, `?? x { 3000000000 => … }` | empareja | **no empareja** |
+| `x = [9.9, 2]`, `?? x { [1.5, 2] => … }` | no empareja | **empareja** |
+
+Tres sitios del compilador emparejan un literal: el patrón suelto, el elemento de un
+patrón de lista y la pertenencia. En los tres:
+
+- un **decimal** caía en una rama de «no soportado». En el patrón suelto y en la
+  pertenencia saltaba siempre, y en la lista **no se comparaba**, así que emparejaba con
+  cualquier valor;
+- un **entero** se comparaba con `CmpEqImm(*n as i32)`, que **trunca** un literal que no
+  cabe en 32 bits.
+
+### Corregido
+
+`emit_int_eq` usa la forma inmediata solo si el número cabe. Si no, lo carga entero
+(`LoadInt`) y compara con `CmpEq`. El decimal se carga con `LoadFloat` y se compara igual,
+en los tres sitios. Todas las formas quedan iguales en los tres motores. Tres celdas en
+`runtime-match-patterns`: decimal negativo, entero de más de 32 bits y decimal dentro de una
+lista.
