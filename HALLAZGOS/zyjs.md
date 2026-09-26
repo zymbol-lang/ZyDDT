@@ -2237,7 +2237,7 @@ ante una asignación.
 
 ## ZYJS-038 — Un brazo con valor y bloque (`patrón => valor { … }`) no se parsea
 
-**Estado:** abierto — registrado el 2026-09-25 sin tocarlo
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4.8)
 **Encontrado por:** el barrido de parseo del paso P4.5
 
 ```zymbol
@@ -2260,6 +2260,26 @@ de esa razón está esta divergencia: una exclusión cuya razón ya no es la ver
 ### Qué lo sujeta
 
 `runtime-match-patterns/match-arm-with-a-value-and-a-block`, roja.
+
+### Decidido y corregido el 2026-09-26 (paso P4.8)
+
+**Medido:** la forma solo funcionaba entera en el TW. La VM se saltaba el bloque en silencio
+([`ZYVM-009`](zyvm.md)) y `zyjs` ni la parseaba. `GUIDE.md` no la documenta, y en todo el
+workspace la usaban dos ficheros.
+
+**Decidido por el autor:** se mantiene en los tres, porque el AST de Rust la modela a
+propósito (`MatchCase` tiene `value` y `block`) y permite algo que no tiene otra forma: dar
+un valor **y** hacer un efecto en el mismo brazo. El orden es el del TW: primero el valor,
+luego el bloque, y el brazo devuelve el valor. Documentarla en `GUIDE.md` le toca al autor.
+
+**Corregido:** el parser de `zyjs` lee el bloque de efecto después del valor, y el intérprete
+lo ejecuta en los dos caminos, como sentencia y como expresión. Al tocar el `Checker` salió
+una **zona ciega**: esperaba el cuerpo de un brazo como un array, y el parser lo guarda como
+`{type, …}`, así que **un brazo con bloque no se revisaba nunca antes de ejecutar**. Un
+`>> nada` en un brazo que no corre pasaba sin error, donde Rust lo refusa. Ahora el `Checker`
+revisa el bloque, el valor y el bloque de efecto. Barrido de parseo: cambian exactamente los
+dos ficheros que usan la forma, que ahora parsean. Al quitar el refuso de `>>|` sin terminal
+(GLB-068) caducó la exclusión de `manual/tui/06_tui_block.zy` para `zyjs`, y se retiró.
 
 ---
 
