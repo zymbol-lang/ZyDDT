@@ -1567,3 +1567,14 @@ t(n) {
 }
 >> t(-1) ¶
 """
+
+[[cell]]
+id     = "insert-index-negative-is-refused"
+expect = "error"
+what   = "`$+[-1] 9`: a position to insert at is 1 or more — zyjs inserted before the last element"
+src    = """
+t(v) {
+    <~ [1, 2]$+[v] 9
+}
+>> t(-1) ¶
+"""
