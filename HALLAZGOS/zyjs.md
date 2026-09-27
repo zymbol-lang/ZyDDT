@@ -2424,3 +2424,61 @@ y todos son programas con un subscript válido (`vscode/syntax_test.zy`,
 
 `syntax-io/execute-without-a-path` y `syntax-lexer/unterminated-execute-expression`,
 en verde.
+
+---
+
+## ZYJS-042 — Una desestructuración en un bloque crea nombres nuevos en vez de escribir los de fuera
+
+**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Encontrado por:** renombrando la variable de la nave de Klingon Galaxy (GLB-070): `zyjs`
+avisaba `unused variable` en `hov_veS.zy:169` y `zymbol check` no
+
+```zymbol
+f(a, b) { <~ (a, b) }
+x = [1]
+n = 0
+@ 2 {
+    ? #1 {
+        (x, n) = f(x, n)
+    }
+    >> x n ¶
+}
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | sin avisos |
+| `zyjs` | `unused variable 'x'` y `unused variable 'n'` |
+
+La salida es la misma en los tres: solo cambian los avisos. El Checker registra los
+nombres de la desestructuración con `define` en el marco del bloque, y así crea una
+sombra que muere sin leerse. La asignación simple (`x = …`) tenía el mismo fallo, y lo
+corrigió `defineOrKeep`.
+
+### Qué lo sujeta
+
+`syntax-variables/destructure-in-a-block-onto-outer-names-warns-nothing`, roja.
+
+---
+
+## ZYJS-043 — Una función que nadie llama: `unused variable`
+
+**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Encontrado por:** al reducir ZYJS-042
+
+```zymbol
+g(a) { <~ a }
+>> 1 ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | sin avisos |
+| `zyjs` | `unused variable 'g'` |
+
+Hay dos diferencias. Rust no avisa de una función sin llamar, y aunque avisara, `g` no
+es una variable.
+
+### Qué lo sujeta
+
+`syntax-variables/a-function-never-called-is-not-an-unused-variable`, roja.
