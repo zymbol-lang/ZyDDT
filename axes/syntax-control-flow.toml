@@ -2,7 +2,8 @@
 #
 # `??` arms and patterns written wrong, and a `_?` with no condition: the
 # parser diagnostics no program provoked on 2026-09-14. Every cell expects
-# `error` and provokes its `help:` line.
+# `error` and provokes its `help:` line — except the three at the end, added
+# 2026-09-27 for code that cannot run (HLZ-016), which warn or stay quiet.
 #
 # Three lines have no cell (reasons in the queue): the for-each `:` check and
 # its help, because a loop is only parsed as for-each once `name:` has been
@@ -75,4 +76,60 @@ src  = """
 } _? {
     >> "b" ¶
 }
+"""
+
+# ── Code that cannot run (HLZ-016, decided and built 2026-09-27) ────────────
+#
+# Decided without running anything: a statement after `<~`/`@!`/`@>`, a
+# statement after a `? … _ { }` whose every branch leaves, and a branch or a
+# `@ cond` loop whose condition is made of literals only. The third cell is the
+# control: the scope-block idiom `? #1 { }`, an infinite loop with its exit
+# inside, and a conditional exit must all stay quiet.
+
+[[cell]]
+id     = "unreachable-after-an-exit"
+expect = "warn"
+what   = "a statement after `<~`, and one after a `? … _ { }` whose branches all leave, warn and the program runs"
+src    = """
+f(x) {
+    <~ x
+    >> "nunca" ¶
+}
+g(x) {
+    ? x > 0 { <~ 1 } _ { <~ 2 }
+    >> "nunca" ¶
+}
+>> f(1) g(1) ¶
+"""
+
+[[cell]]
+id     = "unreachable-constant-condition"
+expect = "warn"
+what   = "`? #0`, `? 1 == 2`, the `_` after a `? #1`, and `@ #0` each warn that the code never runs"
+src    = """
+? #0 { >> "nunca" ¶ }
+? 1 == 2 { >> "nunca" ¶ }
+? #1 { >> "a" ¶ } _ { >> "nunca" ¶ }
+@ #0 { >> "nunca" ¶ }
+"""
+
+[[cell]]
+id     = "reachable-code-is-quiet"
+expect = "ok"
+what   = "`? #1 { }` as a scope block, `@ #1 { }` with an exit inside, and a conditional `<~` say nothing"
+src    = """
+listo() { <~ #1 }
+f(x) {
+    ? x == 0 { <~ 0 }
+    >> "sigue" ¶
+    <~ 1
+}
+? #1 {
+    _tmp = 2
+    >> _tmp ¶
+}
+@ #1 {
+    ? listo() { @! }
+}
+>> f(1) ¶
 """

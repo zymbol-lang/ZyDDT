@@ -190,9 +190,13 @@ x = 1
 id     = "prefix-hot-read-in-an-else-if"
 expect = "ok"
 what   = "the same read in the condition of `_?`"
+# 2026-09-27: `? #0` became `? x == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
 src    = """
 x = 1
-? #0 {
+? x == 0 {
     >> "no" ¶
 } _? °x > 0 {
     >> "si" ¶

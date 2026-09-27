@@ -391,10 +391,14 @@ tag = (s -> { log = "{log}{s}"  <~ log })
 id     = "local-destroyed-in-a-branch-not-taken"
 expect = "ok"
 what   = "a function-local destroyed only in a branch that does not run is still readable afterwards, as at file level — the VM refuses the read (found in step 2.15, 2026-09-15; ZYVM-005)"
+# 2026-09-27: `? #0` became `? y == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
 src    = """
 f() {
     y = 2
-    ? #0 { \\ y }
+    ? y == 0 { \\ y }
     <~ y
 }
 >> f() ¶

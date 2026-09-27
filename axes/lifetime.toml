@@ -89,9 +89,13 @@ what   = "a `\\` that never runs destroys nothing"
 # refuses the program. A static check with no flow analysis cannot tell a
 # destruction that happened from one that was merely written down, so the
 # run-time answer is not the late one, it is the only correct one.
+# 2026-09-27: `? #0` became `? x == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
 src    = """
 x = 1
-? #0 { \\ x }
+? x == 0 { \\ x }
 >> x ¶
 """
 
@@ -169,9 +173,13 @@ x = 1
 id     = "destroy-after-a-destruction-that-did-not-run"
 expect = "ok"
 what   = "why the double `\\` is a run-time error: a `\\` in a branch not taken destroyed nothing"
+# 2026-09-27: `? #0` became `? x == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
 src    = """
 x = 1
-? #0 { \\x }
+? x == 0 { \\x }
 \\x
 >> "fin" ¶
 """
