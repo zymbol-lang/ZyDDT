@@ -136,3 +136,48 @@ src    = """
 g(a) { <~ a }
 >> 1 ¶
 """
+
+[[cell]]
+id     = "prefix-hot-read-of-a-loop-variable-warns-nothing"
+expect = "ok"
+what   = "`v = °m` inside a block reads the loop's `m`: nothing is unused"
+# ZYJS-044, fixed 2026-09-26: zyjs defined `m` again at the boundary and warned
+# `unused variable 'm'` (ZyBank, verificación_almacén.zy:387).
+src    = """
+xs = [1, 2]
+v = 0
+@ m:xs {
+    ? m > 1 { v = °m }
+}
+>> v ¶
+"""
+
+[[cell]]
+id     = "prefix-hot-accumulator-nobody-reads-warns"
+expect = "warn"
+what   = "`s = °s i` in a loop and `s` never read: `unused variable 's'`"
+# ZYJS-046, open: both Rust engines warn; zyjs says nothing.
+src    = """
+total = 0
+@ i:1..3 {
+    s = °s i
+    total = total + i
+}
+>> total ¶
+"""
+
+[[cell]]
+id     = "underscore-name-in-a-loop-header-is-read-where-the-loop-stands"
+expect = "warn"   # `1.._n` warns that its direction is decided at runtime
+what   = "`_xs = [1, 2]` then `@ x:_xs { … }`: the header is read in the scope that declared `_xs`"
+# ZYJS-047, fixed 2026-09-26: zyjs checked the header inside the loop's frame
+# and refused `cannot access underscore variable '_xs' from inner scope`.
+src    = """
+_xs = [1, 2]
+@ x:_xs { >> x ¶ }
+f() {
+    _n = 2
+    @ i:1.._n { >> i ¶ }
+}
+f()
+"""

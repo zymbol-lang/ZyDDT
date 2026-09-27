@@ -2493,3 +2493,99 @@ es una variable.
 
 `pop()` ya no avisa de un registro de función (`isFn`), como no avisaba de un alias ni
 de un parámetro de lambda.
+
+---
+
+## ZYJS-044 — `v = °m` sobre la variable del bucle: `unused variable 'm'`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV: `ZyBank/pruebas/verificación_almacén.zy:387`
+
+```zymbol
+xs = [1, 2]
+v = 0
+@ m:xs {
+    ? m > 1 { v = °m }
+}
+>> v ¶
+```
+
+Rust no avisa de nada; `zyjs` avisaba `unused variable 'm'`. El Checker definía `m` otra
+vez en la frontera cada vez que veía el `°` prefijo, aunque `m` ya estuviera a la vista. El
+intérprete solo lo define si no existe (`if (!exists)`), y ahora el Checker hace lo mismo.
+
+### Qué lo sujeta
+
+`syntax-variables/prefix-hot-read-of-a-loop-variable-warns-nothing`, en verde.
+
+---
+
+## ZYJS-045 — El aviso de dirección del rango, sin fichero ni columna
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV: los tres ficheros de Zofia que divergían entre
+`zytw` y `zyjs` (`matmul.zy`, `perdida_mse.zy`, `tensor_ops.zy`)
+
+`@ i:1..n` con `n` que no se lee en el fuente avisa en los tres motores. Rust dice
+`--> matmul.zy:6:9`, y `zyjs` decía `--> line 6`. Un literal no guarda su posición en
+`zyjs`, así que el parser anota ahora en el bucle dónde empieza el rango (`rangeAt`), en
+la forma con etiqueta y en la forma sin ella.
+
+### Qué lo sujeta
+
+`diagnostic/range-direction-warning-points-at-the-range`, en verde.
+
+---
+
+## ZYJS-046 — Un acumulador `°s` que nadie lee: `zyjs` no avisa
+
+**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Encontrado por:** el programa de control de ZYJS-044
+
+```zymbol
+total = 0
+@ i:1..3 {
+    s = °s i
+    total = total + i
+}
+>> total ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `unused variable 's'` |
+| `zyjs` | nada |
+
+Es el caso contrario de ZYJS-044: aquí el nombre no existía, así que el `°` sí lo define,
+pero el Checker cuenta como lectura el `s` del lado derecho.
+
+### Qué lo sujeta
+
+`syntax-variables/prefix-hot-accumulator-nobody-reads-warns`, roja.
+
+---
+
+## ZYJS-047 — Un nombre `_` en la cabecera de un bucle: `cannot access underscore variable`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV. Los tres ficheros de Zofia que divergían no
+lo hacían por la columna del aviso (ZYJS-045), que era lo que se veía primero, sino por esto:
+`produc_punto` declara `_n = a$#` y recorre `@ i:1.._n`.
+
+```zymbol
+_xs = [1, 2]
+@ x:_xs { >> x ¶ }
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `1`, `2` |
+| `zyjs` | `cannot access underscore variable '_xs' from inner scope`, antes de ejecutar |
+
+El Checker abría el marco del bucle antes de revisar su cabecera, así que el iterable, los
+límites del rango y la condición se leían «desde dentro». Ahora solo el cuerpo está dentro,
+como en los dos motores de Rust.
+
+### Qué lo sujeta
+
+`syntax-variables/underscore-name-in-a-loop-header-is-read-where-the-loop-stands`, en verde.

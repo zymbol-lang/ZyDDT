@@ -92,3 +92,16 @@ what = "a base prefix at the very end of the expression"
 src  = """
 >> 0x ¶
 """
+
+[[cell]]
+id     = "range-direction-warning-points-at-the-range"
+expect = "warn"
+what   = "the runtime-direction warning of `@ i:1..n` says file, line and column"
+# ZYJS-045, fixed 2026-09-26: zyjs gave the line alone, which is what made the
+# three Zofia suites that use such a loop diverge.
+src    = """
+n = 2
+@ i:1..n {
+    >> i ¶
+}
+"""
