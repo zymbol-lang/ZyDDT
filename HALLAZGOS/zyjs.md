@@ -2539,7 +2539,7 @@ la forma con etiqueta y en la forma sin ella.
 
 ## ZYJS-046 — Un acumulador `°s` que nadie lee: `zyjs` no avisa
 
-**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Estado:** **corregido el 2026-09-27**
 **Encontrado por:** el programa de control de ZYJS-044
 
 ```zymbol
@@ -2561,7 +2561,15 @@ pero el Checker cuenta como lectura el `s` del lado derecho.
 
 ### Qué lo sujeta
 
-`syntax-variables/prefix-hot-accumulator-nobody-reads-warns`, roja.
+`syntax-variables/prefix-hot-accumulator-nobody-reads-warns`, en verde.
+
+### Corregido el 2026-09-27
+
+Cuando una asignación `s = °s …` da origen al acumulador, el Checker lo define en la propia
+sentencia y, al terminarla, deja su marca de «usado» como estaba: ni el `s` del lado derecho
+ni la asignación cuentan como lectura, y una lectura posterior sí. El aviso sale donde lo pone
+Rust, en la asignación (`3:5`). Programas de control: con `>> total s ¶` después del bucle no
+avisa, y la forma `c = °c + 1` avisa igual que en Rust.
 
 ---
 
