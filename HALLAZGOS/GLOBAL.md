@@ -5220,35 +5220,64 @@ el refuso llega después, del motor.
 Es la mitad de `.` de un caso que `zyjs` ya corrigió para `::` (`duj::bIj` en
 zyKlingonGalaxy, donde una variable `duj` tapaba el módulo). Decidir qué gana es del autor.
 
-### Decisión del autor (2026-09-26)
+### Decisión del autor (2026-09-26): opción C
 
-**Tras un `.` gana la variable**, como en `zyjs`: la función es su propio entorno. Tras `::`
-se nombra siempre el módulo, tenga el ámbito lo que tenga.
+Se le presentaron tres salidas (`scratchpad/decisiones/las10/LEEME.md` § 3):
 
-El alcance lo fija esa misma razón: la variable gana **cuando es de una función**. Una
-variable del fichero vive en el mismo entorno que el `<#`, y ahí el `.` sigue siendo del
-módulo. Eso ya lo fijaba el corpus
-(`modules_scope/alias_shadowed_by_variable.zy`, con `s = 10` y `s.LIMITE`), que la primera
-versión del arreglo rompió. `zyjs` lo cumplía a medias: con un Int en la variable recurría
-al módulo, y con un diccionario leía el diccionario.
+- **A**, la que se implementó primero: en una función gana la variable y en el fichero el
+  módulo. Así `m.K` significaba dos cosas según dónde estuviera: con `m = #(K: 5)` en el
+  fichero daba `1`.
+- **B**: tras un `.` gana siempre la variable.
+- **C**: MEM-7 alcanza también al alias.
 
-Al corregirlo salió la mitad que faltaba en `zyjs`: `m.g(1)` con un `m` local seguía
-tratándose como llamada al módulo, por el arreglo de ZYJS-040, que forzaba `::` sin
-mirar qué contenía el nombre.
+**Eligió C.** Dentro de un entorno fuerte un nombre designa una sola cosa, y el fichero
+(o el módulo) es uno, así que ahí una variable, una constante o una función no puede
+llamarse como un alias. Se refusa antes de ejecutar, una vez por nombre y en su primer
+enlace, con este texto:
+
+    'm' is both a module alias and a variable in this file
+      = help: a file is one strong environment and a name designates one thing in it
+        (the import is at line 1) — rename the variable; inside a function the name is free
+
+Dentro de una función, o en los parámetros de una lambda, el nombre queda libre, y allí la
+variable tapa al alias tras un `.`. Tras `::` se nombra siempre el módulo.
+
+### Lo que costó
+
+- `klingon_galaxy/hov_veS.zy`: `duj` era a la vez el alias del módulo de la nave y su
+  posición, dentro del bucle principal del fichero. Se renombró la variable a `duj_Daq`
+  (18 apariciones; el alias y sus dos `duj::` quedan igual), se probó una partida en un
+  pty en los dos motores y se regeneró `web/examples/games/arcade/klingon_galaxy.zyp`. La
+  primera medida, hecha con una expresión regular, lo había descartado como ruido por la
+  escritura pIqaD: el barrido con `zymbol check` lo encontró.
+- `GO/集計.zy:136`: la variable del bucle `道` tiene el nombre del alias `道` de la línea
+  36. No se toca: es del autor.
+- `corpus/modules_scope/alias_shadowed_by_variable.zy` se reescribió con la variable
+  dentro de una función, que es la forma permitida. La forma del fichero pasó a
+  `reject/modules/05_file_variable_takes_an_alias_name.zy`.
 
 ### Qué se cambió
 
-- TW: `variable_hides_alias`, que vale para una variable del marco de la función en curso,
-  en la lectura y en la llamada con `.`.
-- VM: `local_hides_alias` en el compilador, para un registro de una función y no de
-  `<main>`, en la lectura y en los dos caminos de llamada.
-- `zyjs`: `Env.hidesAlias`, para una variable ligada bajo la frontera de una función, en la
-  lectura y en la llamada con `.`.
-- Los dos comprobadores (Rust y `zyjs`) solo consideran la sombra tras `.`.
+- Rust: `check_alias_name` en el comprobador de tipos, llamado en cada enlace del nivel
+  del fichero (asignación, constante, `<<`, `><`, `<<|`, variable y patrón de bucle,
+  desestructuración, nombre de función).
+- `zyjs`: `refuseAliasName`, desde `define` y `defineOrKeep`, con el código `E_NAME`.
+- TW: `variable_hides_alias` pasa a ser cualquier variable visible con ese nombre. En el
+  fichero ya no puede haberla, y así cubre también el parámetro de una lambda: `p5`, que el
+  TW leía del módulo.
+- VM: `local_hides_alias`, en la lectura y en los dos caminos de llamada.
+- `zyjs`: `Env.hidesAlias`. Además se quitó el recurso al módulo que hacía la lectura con
+  `.` cuando el módulo tenía el campo: con una variable local `m` y la clave `K`, `m.K`
+  daba el `K` del módulo.
 
 ### Qué lo sujeta
 
-`runtime-modules-scripts/variable-that-shares-an-alias-name-is-not-a-module`,
+`runtime-modules-scripts/`: `variable-that-shares-an-alias-name-is-not-a-module`,
 `variable-that-shares-an-alias-name-calls-its-own-lambda`,
-`scope-operator-reaches-the-module-through-a-shadowing-variable` y
-`file-variable-that-shares-an-alias-name-leaves-the-dot-to-the-module`, en verde.
+`scope-operator-reaches-the-module-through-a-shadowing-variable`,
+`function-variable-hides-a-constant-the-module-does-have`,
+`file-variable-cannot-take-an-alias-name` y `lambda-parameter-hides-an-alias-of-its-name`,
+todas en verde, y la forma de `reject/`.
+
+De paso salieron [`ZYJS-042`](zyjs.md) y [`ZYJS-043`](zyjs.md), dos avisos que solo da
+`zyjs`. Están registrados y sin tocar.

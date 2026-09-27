@@ -103,3 +103,36 @@ src  = """
     acc°[1]
 }
 """
+
+# Found 2026-09-26 while renaming Klingon Galaxy's ship variable (GLB-070): two
+# warnings zyjs gives and the Rust engines do not. Registered, not fixed.
+
+[[cell]]
+id     = "destructure-in-a-block-onto-outer-names-warns-nothing"
+expect = "ok"
+what   = "`(x, n) = f(x, n)` inside a `?` block writes the outer `x` and `n`: nothing is unused"
+# ZYJS-042, open: zyjs warns `unused variable 'x'` and `'n'` — the
+# destructuring defines new names in the block frame instead of keeping the
+# visible ones, as `x = …` did before `defineOrKeep`.
+src    = """
+f(a, b) { <~ (a, b) }
+x = [1]
+n = 0
+@ 2 {
+    ? #1 {
+        (x, n) = f(x, n)
+    }
+    >> x n ¶
+}
+"""
+
+[[cell]]
+id     = "a-function-never-called-is-not-an-unused-variable"
+expect = "ok"
+what   = "a declared function nobody calls: no `unused variable` warning"
+# ZYJS-043, open: zyjs warns `unused variable 'g'`; neither Rust engine warns
+# about an uncalled function, and a function is not a variable in any case.
+src    = """
+g(a) { <~ a }
+>> 1 ¶
+"""

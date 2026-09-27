@@ -458,12 +458,11 @@ f() {
 """
 
 [[cell]]
-id     = "file-variable-that-shares-an-alias-name-leaves-the-dot-to-the-module"
-expect = "ok"
-what   = "at file level `m = #(K: 5)` lives where the `<#` does: `m.K` still reads the module"
-# GLB-070: the variable hides the alias only inside a function, its own strong
-# environment. corpus/modules_scope/alias_shadowed_by_variable.zy holds the same
-# rule with an Int.
+id     = "file-variable-cannot-take-an-alias-name"
+expect = "error"
+what   = "at file level `m = #(K: 5)` after `<# … => m` is refused: one name, one thing (MEM-7)"
+# GLB-070, decided 2026-09-26 (option C). It used to run, and `m.K` read the
+# module — 1 — right after the line that wrote `K: 5`.
 src    = """
 <# ./m/k => m
 m = #(K: 5)
@@ -491,6 +490,25 @@ f() {
     <~ m.K
 }
 >> f() ¶
+"""
+[cell.files]
+"m/k.zy" = """
+# k {
+    #> { K }
+    K := 1
+}
+"""
+
+[[cell]]
+id     = "lambda-parameter-hides-an-alias-of-its-name"
+expect = "ok"
+what   = "a lambda of the file whose parameter is `m`: `m.K` reads the argument, not the module"
+# GLB-070. The tree-walker read the module here: its rule asked for a
+# function's call depth, and a lambda does not raise it.
+src    = """
+<# ./m/k => m
+f = (m) -> m.K
+>> f(#(K: 9)) ¶
 """
 [cell.files]
 "m/k.zy" = """
