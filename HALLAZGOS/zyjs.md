@@ -2429,7 +2429,7 @@ en verde.
 
 ## ZYJS-042 — Una desestructuración en un bloque crea nombres nuevos en vez de escribir los de fuera
 
-**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Estado:** **corregido el 2026-09-26**
 **Encontrado por:** renombrando la variable de la nave de Klingon Galaxy (GLB-070): `zyjs`
 avisaba `unused variable` en `hov_veS.zy:169` y `zymbol check` no
 
@@ -2457,13 +2457,19 @@ corrigió `defineOrKeep`.
 
 ### Qué lo sujeta
 
-`syntax-variables/destructure-in-a-block-onto-outer-names-warns-nothing`, roja.
+`syntax-variables/destructure-in-a-block-onto-outer-names-warns-nothing`, en verde.
+
+### Corregido el 2026-09-26
+
+El Checker registraba los nombres de la desestructuración con `define`; ahora usa
+`defineOrKeep`, como la asignación simple: un nombre que ya se ve se escribe, no se tapa.
+Desaparece también el aviso de Klingon Galaxy (`hov_veS.zy:169`).
 
 ---
 
 ## ZYJS-043 — Una función que nadie llama: `unused variable`
 
-**Estado:** abierto — registrado el 2026-09-26 sin tocarlo
+**Estado:** **corregido el 2026-09-26**
 **Encontrado por:** al reducir ZYJS-042
 
 ```zymbol
@@ -2481,4 +2487,9 @@ es una variable.
 
 ### Qué lo sujeta
 
-`syntax-variables/a-function-never-called-is-not-an-unused-variable`, roja.
+`syntax-variables/a-function-never-called-is-not-an-unused-variable`, en verde.
+
+### Corregido el 2026-09-26
+
+`pop()` ya no avisa de un registro de función (`isFn`), como no avisaba de un alias ni
+de un parámetro de lambda.
