@@ -517,3 +517,53 @@ f = (m) -> m.K
     K := 1
 }
 """
+
+# ── An import nobody uses (HLZ-015, decided and built 2026-09-27) ───────────
+#
+# In 囲碁 the frozen v2 engine was imported, offered on the menu and never
+# called: choosing v2 played v3 and no engine said a word (GO/Depurando_GO.md
+# DG-02). The warning is the pair below; the second cell is its control — the
+# three ways an alias is used without an ordinary call, which must stay quiet.
+
+[[cell]]
+id     = "unused-import-warns"
+expect = "warn"
+what   = "an alias the file never names again warns `import 'b' is never used`, and the program still runs"
+src    = """
+<# ./m/uno => a
+<# ./m/uno => b
+>> a::f() ¶
+"""
+[cell.files]
+"m/uno.zy" = """
+# uno {
+    #> { f, K }
+    K := 2
+    f() { <~ 1 }
+}
+"""
+
+[[cell]]
+id     = "import-used-without-a-call-is-used"
+expect = "ok"
+what   = "a constant read as `a.K`, a `std/` constant, and an alias used only by a re-export are all uses: no warning"
+src    = """
+<# ./m/uno => a
+<# ./m/capa => c
+<# std/math => mat
+>> a.K " " c::g() " " (mat.PI > 3) ¶
+"""
+[cell.files]
+"m/uno.zy" = """
+# uno {
+    #> { f, K }
+    K := 2
+    f() { <~ 1 }
+}
+"""
+"m/capa.zy" = """
+# capa {
+    <# ./uno => u
+    #> { u::f => g }
+}
+"""
