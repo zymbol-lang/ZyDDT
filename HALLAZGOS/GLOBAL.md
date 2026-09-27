@@ -5281,3 +5281,38 @@ todas en verde, y la forma de `reject/`.
 
 De paso salieron [`ZYJS-042`](zyjs.md) y [`ZYJS-043`](zyjs.md), dos avisos que solo da
 `zyjs`. Están registrados y sin tocar.
+
+---
+
+## GLB-071 — `#|texto|` se tipaba como Float: un índice correcto se refusaba antes de ejecutar
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV tras GLB-070: `GO/集計.zy` seguía refusado
+con ocho `array index must be Int, got Float` después de renombrar su variable
+
+```zymbol
+a = [10, 20, 30]
+s = "2"
+>> a[#|s|] ¶
+```
+
+| motor | antes |
+|---|---|
+| `zytw`, `zyvm` | `array index must be Int, got Float`, antes de ejecutar |
+| `zyjs` | `20` |
+
+`#|s|` da un Int o un Float según lo que diga el texto, y eso solo se sabe al ejecutar. El
+analizador de Rust lo tipaba siempre como `Float`, y además no miraba el operando: un
+nombre sin definir dentro de `#|…|` no se refusaba (la cuarta aparición de la zona ciega
+de `infer_expr`).
+
+### Qué se cambió
+
+`Expr::NumericEval` se infiere como `Number`, que es el tipo que ya existía para «numérico
+sin determinar», y su operando se infiere como cualquier otro. `GO/集計.zy` pasa `check`
+sin errores ni avisos.
+
+### Qué lo sujeta
+
+`runtime-format-convert/numeric-eval-of-text-is-a-valid-index` y
+`numeric-eval-of-an-undefined-name`, en verde.

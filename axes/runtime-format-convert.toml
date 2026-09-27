@@ -426,3 +426,24 @@ t(v) {
 }
 >> t("1234.5") ¶
 """
+
+# GLB-071, fixed 2026-09-26: `#|text|` is an Int or a Float depending on the
+# text, known only when it runs. The Rust analyser typed it Float and refused
+# it as an index; it also never looked at the operand.
+
+[[cell]]
+id     = "numeric-eval-of-text-is-a-valid-index"
+expect = "ok"
+what   = "`a[#|\"2\"|]` reads the second element: the value is an Int when it runs"
+src    = """
+a = [10, 20, 30]
+s = "2"
+>> a[#|s|] ¶
+"""
+
+[[cell]]
+id   = "numeric-eval-of-an-undefined-name"
+what = "`#|nada|` on a name that does not exist is refused before running"
+src  = """
+>> #|nada| ¶
+"""
