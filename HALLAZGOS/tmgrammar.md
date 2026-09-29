@@ -12,6 +12,7 @@
 |---|---|---|
 | [`TM-001`](#tm-001--dos-escrituras-de-unicode-150-que-oniguruma-no-conoce-como-dígitos) | **corregido 2026-08-30** | Kawi y Nag Mundari no casaban `\p{Nd}` |
 | [`TM-002`](#tm-002--la-gramática-de-vs-code-no-marcaba-0xn-la-regla-de-enteros-unicode-se-comía-el-0) | **corregido 2026-09-14** | `0x\|n\|` sin marcar: `\p{Nd}+` se comía el `0` |
+| [`TM-003`](#tm-003--un-nombre-como-cuenta-de-decimales-vn-quedaba-sin-marcar) | **corregido 2026-09-29** | `#.v\|x\|` sin marcar: la cuenta sólo podía ser dígitos |
 
 ---
 
@@ -103,4 +104,47 @@ estaba delante de `#numbers` por la misma razón, escrita en su comentario.
 ### Arreglo
 
 Un grupo propio, `#base-conversions`, incluido antes de `#base-literals`.
+
+---
+
+## TM-003 — Un nombre como cuenta de decimales (`#.v|x|`) quedaba sin marcar
+
+**Estado:** **corregido 2026-09-29**
+**Encontrado por:** las cuatro celdas `runtime-format-convert/decimal-count-must-*`,
+al buscar por qué `zyddt suite` daba RED con todas sus celdas y chinchetas en
+AGREE — la tubería de `zyq suite` tapaba el código de `surfaces`, que era el 1.
+
+### Qué se observa
+
+```zymbol
+t(v) {
+    <~ #.v|1.23|
+}
+>> t(1.5) ¶
+```
+
+El `#`, y las dos barras, sin ámbito. El programa es válido: el lexer acepta un
+nombre como cuenta, y el resaltador del playground ya lo marcaba (su comentario lo
+dice: *«The count may be a NAME as well as digits»*). El corpus lo escribe en
+`casts/precision_en_ejecucion.zy`, que dejaba **24** tokens sin marcar — pero la
+superficie sólo barre las celdas de ZyDDT, así que nadie lo veía.
+
+### Causa
+
+`syntaxes/zymbol.tmGrammar.json`, `#format-expressions`: las cuatro reglas
+(`#^`, `#,`, `#.`, `#!`) escribían la cuenta como `[0-9]+`.
+
+### Arreglo
+
+La cuenta es `(?:[0-9]+|[\p{L}_][\p{L}_0-9]*)` en las cuatro, la misma regla que
+el resaltador. Medido sobre el corpus entero: 24 tokens sin marcar antes, **0**
+después, y ninguno nuevo en otro fichero.
+
+### Lo que queda, y no es este hallazgo
+
+`surfaces` sigue en RED con 14 (highlight) y 31 (tmgrammar), y **todos** están en
+celdas de programas que el lenguaje rechaza: `#,. 2|v|`, `#2`, `:! #Div`, un `#`
+suelto, un `'` sin cerrar. Si una superficie debe marcar lo inválido — o si
+`surfaces` debe excusar las celdas cuyo veredicto es un error estático — es una
+decisión sobre el arnés, pendiente del autor.
 
