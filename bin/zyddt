@@ -52,10 +52,11 @@ def _observe_all(cfg, engs, file: Path, phase: str, timeout: float,
     """Run every engine, except the ones a rule excuses from this case.
 
     An excluded engine is never invoked.  That is the point the exclusion table
-    exists to make: `<\\ shell \\>` in zyjs does not fail, it ANSWERS — with
-    `Date.now() * 1e6 + random()` from the stub in zymbol.js — so running it and
-    discarding the result is not the same as not asking.  A discarded answer is
-    one refactor away from being read.
+    exists to make: `<\\ shell \\>` in zyjs used to ANSWER rather than fail — a
+    random number from the stub in zymbol.js, until BUG-GOL-014 (2026-09-29) —
+    so running it and discarding the result was not the same as not asking.  It
+    refuses now, and the rule stands for every engine that might answer: a
+    discarded answer is one refactor away from being read.
     """
     out = []
     for e in engs:
@@ -119,6 +120,18 @@ def cmd_surfaces(args, cfg) -> int:
     as an absent engine. A driver that crashes on one file is reported and the
     sweep continues, because "this file breaks the driver" is itself a finding
     and stopping would hide the rest.
+
+    One thing is excused, and it is MEASURED rather than declared: a token on
+    the line a static refusal points at. A cell like `x = #,. 2|v|` exists to be
+    refused; there is no operator there for a surface to mark, and a surface
+    that marked it `invalid` would be blind for good — every unknown token would
+    become "invalid" and none would ever be reported again. So the tree-walker's
+    analyser is asked (`zymbol check`), and only the lines its errors name are
+    excused. The rest of a refused program is still graded, and so is every
+    line of a program that runs — including one that fails at run time, which
+    is a valid program (`#.v|x|` with a bad `v`). Decided by the author on
+    2026-09-29; before it, 45 such tokens kept `surfaces` RED with every
+    valid-program cell clean.
     """
     if not cfg.surfaces:
         print(R.dim("    none declared"))
@@ -127,9 +140,14 @@ def cmd_surfaces(args, cfg) -> int:
     root = Path(__file__).resolve().parents[1]
     files = sorted(set(root.glob("generated/**/*.zy")) | set(root.glob("cases/**/*.zy")))
     rc = GREEN
+    refused = _static_refusal_lines(cfg, files, args.timeout)
+    if refused is None:
+        print(R.dim("    no engine answers the static phase; nothing is excused"))
+        refused = {}
 
     for surf in cfg.surfaces:
         findings: list[tuple[str, str, str, str]] = []
+        on_refusal = 0
         try:
             proc = subprocess.run(surf.argv(files), capture_output=True, text=True,
                                   timeout=max(args.timeout, 120))
@@ -150,6 +168,9 @@ def cmd_surfaces(args, cfg) -> int:
             path, ln, col, text = parts
             if surf.excused(text):
                 continue
+            if ln.isdigit() and int(ln) in refused.get(Path(path).resolve(), ()):
+                on_refusal += 1
+                continue
             rel = Path(path)
             findings.append((str(rel.relative_to(root) if rel.is_relative_to(root) else rel),
                              ln, col, text))
@@ -159,6 +180,8 @@ def cmd_surfaces(args, cfg) -> int:
         print(f"  {R.bold(surf.id):<12} {head:<28} {R.dim(surf.desc)}")
         if surf.tolerate:
             print(f"  {'':<12} {R.dim('tolerates ' + surf.tolerate + ' — ' + surf.reason)}")
+        if on_refusal:
+            print(f"  {'':<12} {R.dim(f'{on_refusal} more on a line a static refusal points at — excused')}")
         for rel, ln, col, text in findings[: args.detail or 8]:
             print(f"      {R.dim(rel)}:{ln}:{col}  {R.bold(repr(text))}")
         if n > (args.detail or 8):
@@ -166,6 +189,29 @@ def cmd_surfaces(args, cfg) -> int:
         if n:
             rc = worse(rc, RED)
     return rc
+
+
+def _static_refusal_lines(cfg, files, timeout) -> dict[Path, set[int]] | None:
+    """For each file the analyser refuses, the lines its errors point at.
+
+    One engine is enough: the static phase is shared — `zytw` and `zyvm` run the
+    same analyser, and `zyjs` has none of its own to ask. None when no engine
+    answers `check`, so the caller can say so instead of excusing nothing
+    silently or everything by accident.
+    """
+    engs = [e for e in cfg.engines if e.argv("static", Path("x.zy")) is not None]
+    if not engs:
+        return None
+    eng = engs[0]
+    out: dict[Path, set[int]] = {}
+    for f in files:
+        obs = O.classify(E.run(eng, f, "static", timeout), cfg.normalise)
+        if obs.status != "error" or obs.kind != "static":
+            continue
+        lines = {d.line for d in obs.diags if d.severity == "error" and d.line is not None}
+        if lines:
+            out[Path(f).resolve()] = lines
+    return out
 
 
 # ── observe ──────────────────────────────────────────────────────────────────
