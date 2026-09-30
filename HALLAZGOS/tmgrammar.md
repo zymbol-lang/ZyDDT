@@ -144,7 +144,15 @@ después, y ninguno nuevo en otro fichero.
 
 `surfaces` sigue en RED con 14 (highlight) y 31 (tmgrammar), y **todos** están en
 celdas de programas que el lenguaje rechaza: `#,. 2|v|`, `#2`, `:! #Div`, un `#`
-suelto, un `'` sin cerrar. Si una superficie debe marcar lo inválido — o si
-`surfaces` debe excusar las celdas cuyo veredicto es un error estático — es una
-decisión sobre el arnés, pendiente del autor.
+suelto, un `'` sin cerrar.
+
+**Decidido por el autor el 2026-09-29:** `surfaces` excusa un token sin marcar
+**sólo en la línea a la que apunta un rechazo estático**, medido preguntando al
+analizador del tree-walker (`zymbol check`), no declarado en el eje — `expect =
+"error"` no distingue un rechazo estático de un error en ejecución, y
+`#.v|x|` con una `v` mala es un programa válido que falla al correr. Marcar lo
+inválido con una clase propia se descartó: dejaría ciega a la superficie, porque
+todo token desconocido pasaría a ser «inválido». Las 45 caían en esas líneas.
+Control: con la gramática anterior a este hallazgo, las 12 de las celdas válidas
+vuelven a salir y `surfaces` da RED.
 

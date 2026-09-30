@@ -16,7 +16,9 @@
 # cell had landed on the one command the stub happens to get right.
 #
 # That is worse than an engine that cannot do a thing: it is an engine that
-# answers anyway.  A cell chosen badly here would have made a green row out of
+# answers anyway.  (Since 2026-09-29 the stub refuses every command it has no
+# stand-in for — BUG-GOL-014 — so zyjs now fails where it used to answer; the
+# exclusion stays, because failing is still not running the command.)  A cell chosen badly here would have made a green row out of
 # a capability that does not exist.  Each cell below is chosen so the stub
 # cannot coincide with the real answer.
 #
@@ -59,4 +61,28 @@ what = "an echo whose text is not literal"
 src  = '''
 v = <\ "echo $((2 + 3))" \>
 >> v
+'''
+
+[[cell]]
+id   = "shell-exit-status"
+what = "a status other than 0 is a soft ##IO error that carries it (GAP-GOL-011, D2); 0 is the output as before"
+src  = '''
+ver(r) {
+    <~ ?? r {
+        ##IO(m) => ("##IO: " m)
+        _       => ("ok: " r)
+    }
+}
+>> ver(<\ "echo hola" \>) ¶
+>> ver(<\ "exit 3" \>) ¶
+'''
+
+[[cell]]
+id   = "shell-failure-says-stderr"
+what = "a failed command's message is its stderr, or its stdout when stderr is empty"
+src  = '''
+a = <\ "echo por stderr >&2; exit 2" \>
+b = <\ "echo por stdout; exit 4" \>
+>> a ¶
+>> b ¶
 '''

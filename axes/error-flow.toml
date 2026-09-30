@@ -678,3 +678,99 @@ src  = """
 }
 >> "sigue" ¶
 """
+
+# ── Building an error: `##Kind("message")` is a value, not a raise ──────────
+#
+# GAP-GOL-003, decided 2026-09-29 (D3): a program builds the same soft error
+# std/io, std/net, std/db and std/time return. So it travels as a VALUE — `$!`
+# sees it, `$!!` propagates it, and no `:!` meets it, because nothing was
+# thrown. What IS thrown is the failure to build one: a message that is not
+# text is a ##Type error, refused before running when the analyser knows the
+# type. No oracle in this block: Python has no soft error value, and returning
+# an exception object — the nearest thing — prints differently and answers a
+# different question.
+
+[[cell]]
+id   = "a-built-error-is-a-value"
+what = "`##Parse(\"…\")` builds an error value: it prints as it is written, `$!` is #1, `#?` reads the kind back"
+src  = """
+e = ##Parse("regla vacía")
+>> e ¶
+>> e$! ¶
+>> e#? ¶
+"""
+
+[[cell]]
+id   = "a-built-error-is-not-thrown"
+what = "building an error inside `!?` raises nothing: the body goes on and the `:!` does not run"
+src  = """
+!? {
+    x = ##IO("no lanzado")
+    >> "sigue: " x ¶
+} :! {
+    >> "capturado" ¶
+}
+"""
+
+[[cell]]
+id     = "a-built-error-propagates-to-the-system"
+expect = "error"
+what   = "`$!!` on a built error at the top level ends the program, naming the error"
+src    = """
+x = ##Parse("mala")
+x$!!
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "an-error-message-is-text"
+expect = "error"
+what   = "`##Parse(42)` is refused before running: an error's message is a String"
+src    = """
+e = ##Parse(42)
+>> e ¶
+"""
+
+[[cell]]
+id   = "a-message-known-only-at-run-time-is-a-type-error"
+what = "a message that turns out not to be text raises ##Type, and THAT is thrown, so `:! ##Type` meets it"
+src  = """
+hacer(x) {
+    <~ ##Parse(x)
+}
+!? {
+    >> hacer(42) ¶
+} :! ##Type {
+    >> "tipo" ¶
+}
+"""
+
+[[cell]]
+id   = "an-error-pattern-reads-the-message"
+what = "`##Kind(m) =>` matches an error of that kind and puts its message in `m`; `##Kind(_)` and `##Kind` match the kind alone (GAP-GOL-016, D7)"
+src  = """
+leer(r) {
+    <~ ?? r {
+        ##Parse(msg) => ("mensaje: " msg)
+        ##IO(_)      => "io"
+        ##Div        => "div"
+        _            => "valor"
+    }
+}
+>> leer(##Parse("mala")) ¶
+>> leer(##IO("x")) ¶
+>> leer(##Div("x")) ¶
+>> leer(7) ¶
+"""
+
+[[cell]]
+id   = "an-error-pattern-assigns-a-visible-name"
+what = "the binding is a birth like `m = …`: a name already visible is assigned, never shadowed (MEM-7)"
+src  = """
+m = "fuera"
+?? ##A("dentro") {
+    ##A(m) => { >> m ¶ }
+    _      => { >> "otro" ¶ }
+}
+>> m ¶
+"""
