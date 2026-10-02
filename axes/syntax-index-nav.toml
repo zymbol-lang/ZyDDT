@@ -85,3 +85,19 @@ m = [[1, 2], [3, 4]]
 a = 1
 >> m[1>1 ¶
 """
+
+# ── An edit on a ranged path (2026-10-02) ───────────────────────────────────
+#
+# Reading `m[1..2>1]` is a form of the language and agrees in all three. As the
+# receiver of an edit it is refused by all three, for two different reasons
+# (GLB-077) — and the parser's own help for it, RANGE_IN_PATH, is never shown.
+
+[[cell]]
+id   = "edit-on-a-ranged-path"
+what = "`m[1..2>1]$+ 5`: an edit cannot write into a range"
+src  = """
+m = [[1, 2], [3, 4]]
+m[1..2>1]$+ 5
+>> m ¶
+"""
+open_finding = "GLB-077"

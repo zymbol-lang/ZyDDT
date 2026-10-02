@@ -497,3 +497,24 @@ g(a, b) { <~ a + b }
 r = [1, 2]$> g
 >> r ¶
 """
+
+# ── The kind of that refusal (added 2026-10-02) ─────────────────────────────
+#
+# `sort-comparator-that-is-not-a-bool` holds the refusal and is green. What was
+# decided with it — the refusal is a `##Type` (GLB-024, 2026-09-15) — it does
+# not ask, and all three engines still raise `##_`. A `!?` with ONLY a
+# `:! ##Type` asks it with `expect` alone: the program ends well exactly when
+# the kind is the decided one, and the error escapes when it is not.
+
+[[cell]]
+id     = "sort-comparator-not-a-bool-is-a-type-error"
+what   = "a comparator that answers a number is refused as a ##Type, as decided: a `:! ##Type` catches it"
+expect = "ok"
+src    = """
+!? {
+    >> ([3, 1, 2]$^ (a, b -> a - b)) ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+open_finding = "GLB-024"

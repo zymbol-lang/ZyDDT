@@ -25,26 +25,20 @@ función declarada dentro de un bloque, y el del navegador sí.
 
 ---
 
-## Abiertos
+## Estado
 
-| | | |
-|---|---|---|
-| [`GLB-006`](#glb-006--hay-un-tercer-resaltador-y-nadie-lo-mira) | abierto | el curso lleva su propia copia, 1798 líneas sin marcar |
-| [`GLB-007`](#glb-007--un-rechazo-dentro-de-un-bloque-de-una-línea-se-lleva-por-delante-la-llave-que-lo-cierra) | **corregido 2026-09-07** | `skip_statement` produce la cascada que fue escrito para evitar |
+No se lleva a mano. La tabla que había aquí se paró en `GLB-007` con 77 fichas
+archivadas, y seis fichas siguieron diciendo «abierto» semanas después de
+corregida su última parte. El estado de cada una es su propia línea
+**Estado**, y el índice se calcula de ella:
 
-## Cerrados
+```bash
+./bin/zyddt findings      # abiertas, qué las sujeta, cerradas; también dentro de `suite`
+```
 
-| | | |
-|---|---|---|
-| [`GLB-001`](#glb-001--el-analizador-no-mira-dentro-del-operando-de-un-operador-) | **corregido 2026-08-30** | los dos motores Rust no comprobaban nada escrito dentro de un operando `$` |
-| [`GLB-002`](#glb-002--el-acumulador-yuxtapuesto-sin-declarar-tres-motores-tres-respuestas) | **corregido 2026-08-30** | `s = °s "x"` sin declarar `s`: rechazo, `0xxx` y `0` |
-| [`GLB-003`](#glb-003--dos-bucles-que-reutilizan-el-nombre-del-iterador-un-aviso-o-dos) | **corregido 2026-08-30** | un aviso por sitio, no por nombre |
-| [`GLB-004`](#glb-004--seis-ficheros-del-corpus-escritos-en-una-forma-que-el-lenguaje-no-tiene) | **corregido 2026-08-30** | reescritos; cuatro módulos vuelven al gate |
-| [`GLB-005`](#glb-005--check-rechaza-un-programa-que-los-tres-motores-ejecutan) | **corregido 2026-08-30** | la convención la exigen los cuatro |
-
-| | | |
-|---|---|---|
-| [`GLOBAL-001`](#global-001--los-tres-motores-redactan-el-mismo-rechazo-de-tres-maneras-28-celdas) | **corregido 2026-08-30** | la comparación imposible se rechazaba con tres redacciones — 28 celdas |
+Dice qué celda — o qué caso de `zyquality/cost/` — sujeta cada abierta, nombra las
+que no vigila nada, y pone en rojo la contradicción de una ficha cerrada que
+todavía se declara como deuda (`VERDICTS.md` § 12).
 
 ---
 
@@ -1194,7 +1188,7 @@ verdes, 26 rojas.
 
 ## GLB-013 — Conversiones y formatos con un valor inválido: `zyjs` inventa un número, y el kind vuelve a ser `##_` contra `##Type`
 
-**Estado:** abierto — **A corregido en `zyjs` el 2026-09-15** (paso 2.8); la parte del kind decidida (`##Type`), pendiente en 4.1
+**Estado:** **cerrado** — A corregido en `zyjs` el 2026-09-15 (paso 2.8); el kind de B, `##Type`, con el paso 4.1. Verificado el 2026-10-02: `###` sobre una cadena y `#.2||` sobre un Bool se capturan con `:! ##Type` en los tres motores. Hasta esa fecha esta línea seguía diciendo «abierto»
 **Encontrado por:** `axes/runtime-format-convert.toml`, paso C5 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1247,7 +1241,7 @@ ejemplo usaba `0x|"…"|`.
 
 ## GLB-014 — Rangos, pasos y `@~` con valores inválidos: la VM entra en bucle infinito con paso 0, y el bucle que desestructura un rango sólo existe en el TW
 
-**Estado:** abierto — **A, B, E, F y H corregidos el 2026-09-15** (pasos 1.3, 1.4, 2.7 y 2.8); C, D y G **decididos** (error estático; `##Type`), pendientes en F4/F5
+**Estado:** **cerrado** — A, B, E, F y H corregidos el 2026-09-15 (pasos 1.3, 1.4, 2.7 y 2.8); C y D (D4) y G (D1) implementados con F4/F5. Verificado el 2026-10-02: `@ (a, b):1..v` y `x = v..3` son error estático en los tres motores con el mismo texto, y `@~ "x"` se captura con `:! ##Type` en los tres. Hasta esa fecha esta línea seguía diciendo «abierto»
 **Encontrado por:** `axes/runtime-loops-ranges.toml`, paso C6 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** alta por la parte A: un bucle infinito donde los otros dos motores fallan
 
@@ -1378,7 +1372,7 @@ límite variable es cierto y no es lo que preguntan.
 
 ## GLB-015 — Llamadas y funciones de orden superior con algo que no es lo que necesitan: kinds `##_` contra `##Type`, y un `$<` con lambda de un parámetro que la VM y `zyjs` aceptan
 
-**Estado:** abierto — la parte del kind **decidida el 2026-09-15** (`##Type`); **A y B corregidos el 2026-09-15** (pasos 1.10 y 2.10); el kind, pendiente en 4.1
+**Estado:** **cerrado** — A y B corregidos el 2026-09-15 (pasos 1.10 y 2.10); el kind (C) y los textos (D) con el paso 4.1. Verificado el 2026-10-02: `$>` con algo que no es una función se captura con `:! ##Type` en los tres motores, y `runtime-functions-hof` no tiene ninguna división de redacción. Hasta esa fecha esta línea seguía diciendo «abierto»
 **Encontrado por:** `axes/runtime-functions-hof.toml`, paso C7 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1437,7 +1431,7 @@ lambda, o llamar a algo que no es función.
 
 ## GLB-016 — Un `??` sin brazo que case: el TW aborta, la VM y `zyjs` devuelven `##_` en silencio
 
-**Estado:** abierto — sin decisión pendiente: `LLM.md` dice *«an unmatched `??` aborts»*. **corregido el 2026-09-15** en los tres motores (pasos 1.1, 1.2 y 2.6)
+**Estado:** **cerrado** — corregido el 2026-09-15 en los tres motores (pasos 1.1, 1.2 y 2.6); `LLM.md` ya decía *«an unmatched `??` aborts»*, así que no hubo decisión. Hasta el 2026-10-02 esta línea seguía diciendo «abierto»
 **Encontrado por:** `axes/runtime-match-patterns.toml`, paso C8 del plan de cobertura de diagnósticos, 2026-09-14
 **Gravedad:** **alta**: un valor que nadie calculó sigue su camino por el programa, sin error ni aviso
 
@@ -1500,7 +1494,7 @@ de desestructuración del mismo paso coinciden en los tres motores.
 
 ## GLB-017 — Módulos, subscripts y shell: la VM pasa una función al shell, el TW enseña un `Located { … }` de Rust, y cada motor cuenta distinto un módulo que no compila
 
-**Estado:** abierto — **A y G corregidos el 2026-09-15** (pasos 1.5 y 1.5b); **B corregido el 2026-09-16** (paso 3.3); **C e I decididos y corregidos el 2026-09-26**; D–F abiertos
+**Estado:** **cerrado** — A y G corregidos el 2026-09-15 (pasos 1.5 y 1.5b); B el 2026-09-16 (paso 3.3); C e I decididos y corregidos el 2026-09-26. D, E y F, que esta línea daba por abiertos, verificados el 2026-10-02: D coincide en su celda (`module-with-lexer-errors`); E dejó de existir con ZYVM-008 (2026-09-26), porque la llamada a una función no exportada se rechaza antes de ejecutar y ya no hay `_err` que comparar; F responde lo mismo en los tres — `the dot reaches a dictionary key, and this is Int` — y gana una celda, `runtime-modules-scripts/dot-call-on-a-number`, porque no la sujetaba ninguna
 **Encontrado por:** `axes/runtime-modules-scripts.toml`, paso C9 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -1652,7 +1646,7 @@ sentencia y no hay `!?` que la rodee.
 
 ## GLB-018 — Entrada y salida: la VM y `zyjs` no interpolan el prompt de `<<`, ignoran un hueco inválido de `>>~`, y `zyjs` abre `>>|` sin terminal
 
-**Estado:** abierto — **A decidido y corregido en los tres motores el 2026-09-15** (paso 1.6); **B y C corregidos el 2026-09-15** (pasos 1.7 y 2.11); **H decidido y corregido el 2026-09-15** (paso 1.11)
+**Estado:** **cerrado** — A decidido y corregido en los tres motores (paso 1.6), B y C (pasos 1.7 y 2.11) y H (paso 1.11), todo el 2026-09-15; `runtime-io` en verde. Hasta el 2026-10-02 esta línea seguía diciendo «abierto»
 **Encontrado por:** `axes/runtime-io.toml`, paso C12 del plan de cobertura de diagnósticos, 2026-09-14
 
 ### Qué se observa
@@ -2064,7 +2058,7 @@ pasa a `AGREE`.
 
 ## GLB-024 — Un comparador de `$^` que no devuelve un Bool: nadie da error y cada motor ordena distinto
 
-**Estado:** abierto — **decidido el 2026-09-15**: error `##Type` en los tres motores. **Corregido en los tres motores el 2026-09-15** (pasos 1.12 y 2.13); queda el kind (4.1)
+**Estado:** **abierto** — sólo el kind. Decidido el 2026-09-15: un comparador que no responde un Bool es `##Type`. El rechazo se corrigió ese día en los tres motores (pasos 1.12 y 2.13), pero el kind no: medido el 2026-10-02, los tres lanzan `##_(sort comparator must return a Bool, got Int)`, que `:! ##Type` no captura. La celda que sujetaba esta ficha comprobaba la categoría del rechazo y no su kind, así que estaba en verde sobre la parte que falta
 **Encontrado por:** leyendo `ArraySort` de la VM en el paso 1.10, 2026-09-15
 **Gravedad:** media-alta: un programa mal escrito ordena, sin aviso, de una forma que depende del motor
 **Familia:** las reglas de la v0.0.9 sin truthiness (`GUIDE.md`: *«There is no truthiness in Zymbol»*)
@@ -2122,10 +2116,16 @@ mismo barrido de cinco casos da la misma salida en los tres motores.
 
 ### Qué lo sujeta
 
-`runtime-functions-hof/sort-comparator-that-is-not-a-bool`, roja. Vecina, por el
-mismo camino: `syntax-collection-ops/sort-comparator-from-a-variable`. Los Rust
-rechazan `a$^ f` con `f` una lambda en una variable (el comparador tiene que ir
-escrito en línea), y `zyjs` ordena con ella (`ZYJS-021`).
+`runtime-functions-hof/sort-comparator-that-is-not-a-bool`, en verde desde el 2026-09-15:
+sujeta el rechazo, no su kind. Vecina, por el mismo camino:
+`syntax-collection-ops/sort-comparator-from-a-variable`. Los Rust rechazan `a$^ f` con `f`
+una lambda en una variable (el comparador tiene que ir escrito en línea), y `zyjs` ordenaba
+con ella (`ZYJS-021`).
+
+**El kind, desde el 2026-10-02:** `runtime-functions-hof/sort-comparator-not-a-bool-is-a-type-error`,
+un `!?` con un único `:! ##Type` y `expect = "ok"` — termina bien sólo si el rechazo es del
+kind decidido, y escapa del `!?` si no. Hoy escapa en los tres, así que lleva
+`open_finding = "GLB-024"` y sale KNOWN; el día que pase, DEBT PAID cierra esta ficha.
 
 ---
 
@@ -2382,8 +2382,7 @@ project, fmt y guide en línea base; barrido de parseo de `zyjs` idéntico sobre
 
 ## GLB-028 — Los parsers Rust añaden errores falsos en cascada y enseñan sus tokens internos
 
-**Estado:** **la cascada corregida 2026-09-19 (paso 3.7); los nombres de token,
-decididos y corregidos el 2026-09-25 (paso G5.5), y el operador en ejecución (paso G5.6)**
+**Estado:** **corregido** — la cascada el 2026-09-19 (paso 3.7); los nombres de token, decididos y corregidos el 2026-09-25 (paso G5.5), y el operador en ejecución (paso G5.6)
 **Encontrado por:** pasos 2.1 y 2.3, 2026-09-15
 **Gravedad:** media: el lector recibe dos errores donde hay uno, y el segundo nombra el lexer por dentro
 **Decisión del autor (2026-09-19):** las tres causas, sólo la cascada.
@@ -5362,3 +5361,213 @@ La lección es la que vale la chincheta: una excepción tallada para proteger un
 
 [`GLB-072_accion_sobre_cadena.zy`](../cases/pin/GLB-072_accion_sobre_cadena.zy), y en
 ZyQuality `reject/collections/15`.
+
+---
+
+## GLB-073 — Empates en `$^`: cada motor deja los elementos iguales en un orden distinto, y el lenguaje no dice cuál
+
+**Estado:** **abierto** — pendiente de decisión del autor: ¿es `$^` estable?
+**Encontrado por:** reescribir el fósil `corpus/collections/22_sort_named.zy` (2026-10-02):
+llevaba sin ejecutarse en ningún motor desde la importación del corpus, tapado para `zyjs`
+por una exclusión `ANSI_FORMAT`, y la primera ejecución real divergió
+
+```zymbol
+p = [#(n: "Zara", s: 88), #(n: "Inti", s: 72), #(n: "Luna", s: 95),
+     #(n: "Omar", s: 72), #(n: "Mia", s: 60)]
+q = p$^ (a, b -> a.s > b.s)
+>> q[3].n " " q[4].n ¶
+```
+
+| motor | empate a 72 |
+|---|---|
+| `zytw`, `zyvm` | `Inti Omar` — el orden de entrada |
+| `zyjs` | `Omar Inti` |
+
+### Causa
+
+Los dos algoritmos intercambian una pareja cuando el comparador responde `#0`, y con un
+comparador estricto (`>`) un empate responde `#0` en los dos sentidos. Qué empate acaba
+delante depende entonces del algoritmo: burbuja en el TW
+(`zymbol-interpreter/src/collection_ops.rs:942`, cuyo comentario dice *«stable»* y con esa
+regla de intercambio no lo es) e inserción en `zyjs` (`web/src/zymbol/zymbol.js`, `case
+'$^'`). Con tres elementos los dos coinciden por casualidad; con estos cinco, no.
+
+`GUIDE.md` § Sort dice que el comparador responde `#1` si el primero va antes, y nada de los
+empates. `REFERENCE.md`, `COLLECTIONS.md` y `LLM.md` tampoco.
+
+### Arreglo propuesto
+
+Decidir que `$^` es **estable** — es lo que el comentario del TW ya afirma y lo que garantiza
+`Array.prototype.sort` desde ES2019 — y que los tres motores intercambien sólo cuando el
+segundo debe ir antes que el primero, no cuando el primero no debe ir antes. Propuesta, no
+decisión.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/sort-ties-under-a-strict-comparator`, con
+`open_finding = "GLB-073"`: KNOWN mientras diverja; el día que coincidan sale DEBT PAID, y
+entonces la celda pasa a afirmar el orden decidido. El fichero del corpus perdió sus empates
+a propósito: un fichero pregunta sólo lo que el lenguaje ha decidido.
+
+---
+
+## GLB-074 — Los motores Rust avisan `unused variable` de una variable que se lee, si un parámetro de lambda se llama igual
+
+**Estado:** **abierto** — sin decisión pendiente: es un falso positivo
+**Encontrado por:** el cruce del 2026-10-01 de las exclusiones `ANSI_FORMAT` de ZyQuality con
+`zyddt ask`: `corpus/memory_correct_01_lambdas.zy` divergía en el aviso
+
+```zymbol
+base = 100
+f = (base, x) -> base + x
+>> f(base, 2) ¶          // imprime 102: `base` se lee
+```
+
+| motor | avisa |
+|---|---|
+| `zytw`, `zyvm`, `zymbol check` | `unused variable 'base'` en la línea 1 |
+| `zyjs` | nada — y tiene razón |
+
+Con el parámetro renombrado (`(b, x) -> b + x`) ninguno avisa.
+
+### Causa
+
+Sin localizar. Es la forma de [`GLB-003`](GLOBAL.md) — declaraciones indexadas por NOMBRE, de
+modo que la segunda pisa a la primera —, aquí con el parámetro de la lambda pisando a la
+variable de fuera: la lectura de la línea 3 no se le acredita a la primera `base`.
+Pendiente de comprobar si `zymbol-semantic/src/last_use.rs`, que decide cuándo se libera un
+valor, comparte la confusión: un `Int` no lo enseñaría.
+
+### Alcance
+
+`corpus/memory_correct_01_lambdas.expected` graba el aviso falso como correcto. Cuando se
+corrija, ese golden saldrá STALE, que es lo que tiene que pasar.
+
+### Qué lo sujeta
+
+`unused/lambda-parameter-shadowing-a-read-variable`, con
+`open_finding = { zytw = "GLB-074", zyvm = "GLB-074" }`, y las celdas de control del mismo
+eje, en verde.
+
+---
+
+## GLB-075 — `<\ ls \>`: cuatro respuestas para un nombre sin definir dentro de una orden de shell
+
+**Estado:** **abierto** — sin decisión pendiente: `GLB-004` ya fijó que cada argumento de
+`<\ … \>` es una expresión
+**Encontrado por:** el análisis de los arneses del 2026-10-01, al ver por qué seis ficheros
+`i18n/test_*` del corpus no parseaban en el CLI y sí en `zyjs`
+
+```zymbol
+_x = <\ ls \>
+>> "fin" ¶
+```
+
+| camino | respuesta |
+|---|---|
+| `zymbol check` | nada |
+| `zytw` | error **de ejecución**: `'ls' is undefined — did you mean 'ls°' (hot definition)?` |
+| `zyvm` | error **estático**: `undefined variable 'ls'` |
+| `zyjs` | error de ejecución: `cannot run 'ls'` — lo toma como texto de shell |
+
+`_x = ls`, fuera de `<\ … \>`, es el mismo error estático en los cuatro. Y
+`_x = <\ ls | wc -l \>` lo rechazan al parsear los motores Rust (`expected expression,
+found '|'`) mientras `zyjs` lo parsea y falla al ejecutar: la dirección permisiva del
+navegador.
+
+### Causa
+
+- **Rust:** `zymbol-semantic/src/type_check.rs:3520` responde `String` para
+  `Expr::Execute(_) | Expr::BashExec(_)` sin inferir los argumentos, así que ninguna
+  comprobación entra ahí. Es la **quinta** aparición de la zona ciega de `infer_expr` (los
+  operandos de `$`, el cuerpo de bloque de una lambda, `#|…|` en [`GLB-071`](GLOBAL.md), …).
+  La VM lo ve porque su compilador resuelve el nombre al compilar.
+- **zyjs:** su lexer captura `<\ … \>` como **un** token de texto (`zymbol.js`, línea ~800),
+  sin parsear expresiones: una palabra suelta es texto y `|` no es un error.
+
+### Arreglo propuesto
+
+Inferir cada argumento en `type_check` como cualquier otra expresión, y que `zyjs` lexee el
+contenido como expresiones, como dice el comentario de `BashExecExpr` en `zymbol-ast`.
+
+### Qué lo sujeta
+
+`environment/bare-word-is-a-variable` y `environment/bare-word-pipe-does-not-parse`, con
+`open_finding = "GLB-075"`. No se llaman `shell-*` a propósito: esa regla de
+`exclusions.toml` excusa a `zyjs`, y aquí `zyjs` es la mitad de la pregunta.
+
+---
+
+## GLB-076 — Un `(…)` o un `[…]` suelto tras una expresión completa: los motores Rust lo rechazan al parsear, `zyjs` lo lee como otra cosa
+
+**Estado:** **abierto** — pendiente de decisión del autor sobre la regla, y la ayuda de Rust
+habla de desestructurar, que no es lo que el programa intentaba
+**Encontrado por:** los fósiles `corpus/collections/22_sort_named.zy` y
+`corpus/strings/09_length.zy`, el 2026-10-02: eran los únicos ficheros que provocaban estos
+diagnósticos, y su exclusión `ANSI_FORMAT` tapaba la divergencia desde la importación
+
+```zymbol
+x = [3, 1]$^+ (1)        // forma antigua: $^+ con comparador
+t = s$++[1:"x"]          // forma antigua: inserción en una cadena
+```
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `x = [3, 1]$^+ (1)` | estático: `unexpected '(' at statement level` · help `use '(a, b) = expr' for tuple destructuring` | **ejecución**: `expression is not callable` |
+| `t = s$++[1:"x"]` | estático: `unexpected '[' at statement level` · help `use '[a, b] = expr' for array destructuring` | estático: `expected ']' after index` · help `array indexing must use brackets…` |
+
+### Arreglo propuesto
+
+Que la expresión de una sentencia termine donde termina en Rust, y que `zyjs` lo refuse al
+parsear con el mismo texto; y que la ayuda deje de proponer desestructurar cuando lo que hay
+delante del grupo no es un nombre. Propuesta, no decisión.
+
+### Qué lo sujeta
+
+`syntax-expressions/stray-group-after-an-expression` y
+`syntax-expressions/stray-bracket-after-an-expression`, con `open_finding = "GLB-076"`. Son
+también lo único que provoca esos cuatro diagnósticos desde que los fósiles se reescribieron
+(`zyquality/messages/reach.py`).
+
+---
+
+## GLB-077 — Una edición sobre un camino con rango: Rust la refusa por una razón y `zyjs` por otra; y dos ayudas del parser no se muestran nunca
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** buscar qué provoca las ayudas `CHAINED_BRACKETS` y `RANGE_IN_PATH`, que
+`reach.py` lista como no provocadas (2026-10-02)
+
+```zymbol
+m = [[1, 2], [3, 4]]
+m[1..2>1]$+ 5
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm` | `this edit has nothing to write into` · help `this edits what the expression produced, and nothing holds it — assign the result to a name first` |
+| `zyjs` | `expected ']' after index` (columna 6): no parsea la forma |
+
+La **lectura** `>> m[1..2>1] ¶` funciona en los tres (`[1, 3]`); es la sentencia de edición
+la que diverge. `m[1>1..2]$+ 5` da lo mismo, y `m[1..2>1]$~ 9` da en Rust
+`collection update ($~) requires a place to write` y en `zyjs` el mismo error de parseo.
+
+### Las dos ayudas que nadie ve
+
+`zymbol-parser/src/lib.rs:1974-1975` define `CHAINED_BRACKETS` («a bracket after a bracket is
+what the navigator is for…») y `RANGE_IN_PATH` («a write reaches one place, so its path has
+no ranges») como ayuda de `this edit has nothing to write into`. Ninguna sale:
+
+- una cadena `d["x"]["y"]` se rechaza ya al **leerla** desde [`GLB-072`](GLOBAL.md), antes de
+  que `flatten_receiver` la vea;
+- los caminos con rango probados llegan a la ayuda `NO_NAME`, no a `RANGE_IN_PATH`.
+
+### Arreglo propuesto
+
+Decidir si una edición sobre un camino con rango debe nombrar el rango — es lo que el parser
+quería decir con `RANGE_IN_PATH` — y encaminarla ahí, o borrar las dos constantes; y que
+`zyjs` parsee la forma y la refuse con la misma regla. Propuesta, no decisión.
+
+### Qué lo sujeta
+
+`syntax-index-nav/edit-on-a-ranged-path`, con `open_finding = "GLB-077"`. Las dos ayudas
+siguen en la lista de `reach.py` como no provocadas, que es lo cierto.

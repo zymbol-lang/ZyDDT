@@ -2597,3 +2597,48 @@ como en los dos motores de Rust.
 ### Qué lo sujeta
 
 `syntax-variables/underscore-name-in-a-loop-header-is-read-where-the-loop-stands`, en verde.
+
+---
+
+## ZYJS-048 — Sin inferencia de tipos de parámetro: `zyjs` ejecuta, con sus efectos, lo que los motores Rust rechazan antes de empezar
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** el cruce del 2026-10-01 de las exclusiones `ANSI_FORMAT` de ZyQuality con
+`zyddt ask`: `corpus/memory02_function_isolation.zy` divergía (concatenaba cadenas con `+`,
+un fósil; se reescribió el 2026-10-02 y con él desapareció lo único que lo preguntaba)
+
+```zymbol
+f(v) {
+    <~ v + 1
+}
+>> "antes" ¶
+>> f("a") ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm`, `zymbol check` | estático: `argument 1 has type String, but function 'f' expects Number` — no imprime nada |
+| `zyjs` | imprime `antes` y falla **en ejecución**: `+ is arithmetic only — use juxtaposition…` |
+
+### Causa
+
+El analizador de Rust infiere el tipo de un parámetro por su uso en el cuerpo (`v + 1` ⇒
+`Number`) y comprueba cada llamada contra él. `checkSource` de `zyjs` no tiene esa
+inferencia — es la misma ausencia que ya obliga a la entrada aceptada de la aridad,
+`expected signature: g(Number, Number)` ([`GLOBAL.md`](GLOBAL.md)) —, así que la llamada
+pasa el análisis y el programa corre hasta el `+`.
+
+Es la dirección permisiva del navegador: lo escrito en el playground **hace cosas** —
+imprime, escribe — antes de fallar, y en el CLI no empieza.
+
+### Arreglo propuesto
+
+Portar a `checkSource` la inferencia de parámetros del analizador de Rust, o decidir que el
+lenguaje no la exige estáticamente y que el rechazo temprano de Rust es una cortesía. Lo
+primero es lo coherente con que `check` sea la frontera. Propuesta, no decisión.
+
+### Qué lo sujeta
+
+`refusal/argument-type-inferred-from-the-body`, con `open_finding = "ZYJS-048"`. Es además lo
+único que provoca hoy el diagnóstico `argument {} has type {}, but function '{}' expects {}`
+(`zyquality/messages/reach.py`).

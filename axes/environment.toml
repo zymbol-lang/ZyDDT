@@ -86,3 +86,30 @@ b = <\ "echo por stdout; exit 4" \>
 >> a ¶
 >> b ¶
 '''
+
+# ── A bare word inside `<\ … \>` (added 2026-10-02) ─────────────────────────
+#
+# Not `shell-*`, on purpose: that rule in exclusions.toml excuses zyjs, and here
+# zyjs is half of the question. Neither program runs a command in a Rust engine
+# — each argument is an expression (GLB-004), so `ls` is a name to look up and
+# `|` is not an operator — which is what makes them askable in a browser.
+
+[[cell]]
+id     = "bare-word-is-a-variable"
+expect = "error"
+what   = "`<\\ ls \\>` with no `ls` defined: an undefined name, refused like `_x = ls`"
+src    = '''
+_x = <\ ls \>
+>> "fin" ¶
+'''
+open_finding = "GLB-075"
+
+[[cell]]
+id     = "bare-word-pipe-does-not-parse"
+expect = "error"
+what   = "`<\\ ls | wc -l \\>`: `|` between two expressions is not an operator"
+src    = '''
+_x = <\ ls | wc -l \>
+>> "fin" ¶
+'''
+open_finding = "GLB-075"

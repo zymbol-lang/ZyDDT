@@ -1578,3 +1578,19 @@ t(v) {
 }
 >> t(-1) ¶
 """
+
+# ── Ties under `$^` (added 2026-10-02) ──────────────────────────────────────
+#
+# No `expect`: which tied element goes first is exactly what nobody has decided
+# (GLB-073), and an assertion here would be inventing it. The cell asks the
+# engines alike, diverges today, and carries the debt until the decision lands.
+
+[[cell]]
+id   = "sort-ties-under-a-strict-comparator"
+what = "two elements a strict comparator calls equal: which one `$^` leaves first"
+src  = """
+p = [#(n: "Zara", s: 88), #(n: "Inti", s: 72), #(n: "Luna", s: 95), #(n: "Omar", s: 72), #(n: "Mia", s: 60)]
+q = p$^ (a, b -> a.s > b.s)
+>> q[3].n " " q[4].n ¶
+"""
+open_finding = "GLB-073"

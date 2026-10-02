@@ -373,3 +373,21 @@ what = "`@` where a match pattern belongs — refused with the pattern's words i
 src  = """
 ?? 3 { @ => 1 }
 """
+
+# ── A parameter's type, inferred from the body (2026-10-02) ────────────────
+#
+# The Rust analyser refuses the call before anything runs; zyjs has no
+# parameter inference, prints `antes` and fails at the `+` (ZYJS-048). Every
+# engine refuses, so `expect` holds in all three — what diverges is WHEN.
+
+[[cell]]
+id   = "argument-type-inferred-from-the-body"
+what = "a String passed where the body made the parameter a Number"
+src  = """
+f(v) {
+    <~ v + 1
+}
+>> "antes" ¶
+>> f("a") ¶
+"""
+open_finding = "ZYJS-048"

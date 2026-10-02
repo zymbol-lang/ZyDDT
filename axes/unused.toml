@@ -1,0 +1,68 @@
+# The unused axis — when a name is reported as never read.
+#
+# ── Why this axis exists ────────────────────────────────────────────────────
+#
+# A warning is half of a verdict (VERDICTS.md § 1): a program that keeps its
+# output and loses a warning, or gains one, has changed. The unused-variable
+# analysis has been wrong in the same shape four times, and every time it was a
+# single program that found it:
+#
+#   · GLB-003   two loops reusing an iterator name: one warning, not two — the
+#               declarations were kept in a map keyed by NAME;
+#   · ZYJS-043  an uncalled function reported as an unused variable;
+#   · GLB-061   an unused constant (decided: it warns);
+#   · GLB-074   a lambda parameter with the name of a variable that IS read
+#               later: the Rust engines report the variable as unused. Same
+#               shape as GLB-003 — a second declaration of a name displacing
+#               the first.
+#
+# A family is an axis (CHARTER § 3.3). This one starts small, at the finding
+# that declared it and the controls that keep its debt honest: with the
+# lambda-parameter cell KNOWN, the three cells around it are what would turn red
+# if the same analysis broke somewhere else.
+#
+# `expect` is per cell: `ok` asserts that NO warning is given, and `warn` that
+# one is. Both are claims about the program, not about the wording.
+
+id      = "unused"
+what    = "a name is reported unused exactly when nothing reads it"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "read-variable-is-not-unused"
+what   = "a variable read once is not reported"
+expect = "ok"
+src    = """
+base = 100
+>> base ¶
+"""
+
+[[cell]]
+id     = "never-read-variable-warns"
+what   = "a variable nothing reads is reported"
+expect = "warn"
+src    = """
+base = 100
+>> 1 ¶
+"""
+
+[[cell]]
+id     = "lambda-parameter-shadowing-an-unread-variable"
+what   = "a lambda parameter named like a variable nothing reads: the variable is still reported"
+expect = "warn"
+src    = """
+base = 100
+f = (base, x) -> base + x
+>> f(1, 2) ¶
+"""
+
+[[cell]]
+id     = "lambda-parameter-shadowing-a-read-variable"
+what   = "a lambda parameter named like a variable that IS read later: nothing to report"
+expect = "ok"
+src    = """
+base = 100
+f = (base, x) -> base + x
+>> f(base, 2) ¶
+"""
+open_finding = { zytw = "GLB-074", zyvm = "GLB-074" }

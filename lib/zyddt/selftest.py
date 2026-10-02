@@ -434,6 +434,18 @@ def _():
     assert C.debt(d, True, frozenset({"zyvm"})) == (C.PAID, ["zytw"])
 
 
+@case("findings/estado-forms-the-fichas-use",
+      "«decidido y corregido» is closed; a status nobody can read is `other`, not open")
+def _():
+    from zyddt import findings as Fi
+    assert Fi.state_of("abierto — pendiente de decisión") == "open"
+    assert Fi.state_of("**corregido el 2026-09-26**") == "closed"
+    assert Fi.state_of("**decidido y corregido el 2026-09-25** (paso P1)") == "closed"
+    assert Fi.state_of("**cerrado** — verificado") == "closed"
+    assert Fi.state_of("desestimado") == "dismissed"
+    assert Fi.state_of("**la cascada corregida…") == "other"
+
+
 @case("debt/no-declaration-changes-nothing", "a cell with no open_finding is judged as before")
 def _():
     assert C.debt(None, True, frozenset({"zyjs"})) == (None, [])
@@ -626,6 +638,7 @@ SMOKE: list[tuple[str, list[str]]] = [
     # longer runs — did not name it.
     ("premises", []),
     ("pins", []),
+    ("findings", []),
 ]
 
 
