@@ -64,6 +64,8 @@
 # a watch. The axis is not registered in `zyquality/suites.toml` while they are
 # red, so the shared gate keeps its green baseline; registering it is the
 # author's call and belongs with the decision on premise 2.
+#   [Corrected 2026-10-02: it never was outside the gate. `zyddt suite` runs every
+#   axis, and has been in zyquality/suites.toml since 2026-09-09.]
 #
 # ── What is NOT here ────────────────────────────────────────────────────────
 #
@@ -74,6 +76,9 @@
 # `cases/pin/` or they are untested. Today they are untested, and saying so here
 # is the point: an axis that quietly covers less than its name claims is the
 # failure this layer exists to prevent.
+#   [Corrected 2026-10-02: the runner emits siblings (`[cell.files]`), and MEM-3
+#   and MEM-4 have two cells each; `zyddt premises` reports no premise without
+#   one.]
 
 id      = "isolation"
 what    = "which names a body may reach across a boundary, and which it may not"
