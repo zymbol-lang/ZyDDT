@@ -143,3 +143,40 @@ def offenders(obs: list[Observation], expect: str) -> list[Observation]:
     """
     return [o for o in obs
             if o.status not in ("BLOCKED", "EXCLUDED") and o.status != expect]
+
+
+# ── Declared debt ────────────────────────────────────────────────────────────
+
+KNOWN, PAID = "KNOWN", "PAID"
+
+
+def debt(declared, red: bool, offenders_: frozenset[str]) -> tuple[str | None, list[str]]:
+    """What a cell's `open_finding` makes of its outcome.
+
+    → (verdict, engines whose declared debt is paid)
+
+      KNOWN  the red is the debt that was declared: reported, not a regression
+      PAID   the cell passes — or an engine the table names now complies — so
+             the finding looks fixed and the declaration must go. Red.
+      None   nothing declared, or the red is not the one declared: it stays red
+
+    `declared` is a finding id (any red of the cell is that finding) or a table
+    {engine: id} (a WRONG is covered only when EVERY offender is in it — one
+    more engine failing the same cell is a regression, not the old debt).
+
+    The direction nobody builds is the second one. `zyquality/cost/` reported a
+    passing `open_finding` in green and moved on, so the marker could outlive
+    the fix and cover the next failure in silence; `@reject-pending` (PROMOTE)
+    and `wording.baseline` (STALE WORDING) had already made it red. This is the
+    same rule.
+    """
+    if declared is None:
+        return None, []
+    if isinstance(declared, str):
+        return (KNOWN if red else PAID), []
+    paid = sorted(e for e in declared if e not in offenders_)
+    if paid:
+        return PAID, paid
+    if red and offenders_ and offenders_ <= set(declared):
+        return KNOWN, []
+    return None, []

@@ -551,3 +551,51 @@ Every engine reaching the required category and still disagreeing about *how* �
 three different error messages, say — is still a `DIVERGE`, and it routes to
 `HALLAZGOS/GLOBAL.md` rather than to any one engine's file. The report says so
 on the line.
+
+---
+
+## 12. Declared debt — `open_finding`
+
+Decided by the author on 2026-10-02. A finding that is filed and open has two
+bad options without this: a cell that is red until the engine is fixed, which
+makes a permanently red gate (and a red that is always there stops meaning
+regression), or no cell at all, which leaves the finding watched by nobody —
+six open findings were in that state when this was written.
+
+A cell may declare the finding it is red for:
+
+```toml
+[[cell]]
+id = "lambda-parameter-shadowing-is-not-unused"
+expect = "ok"
+src = '''
+base = 100
+f = (base, x) -> base + x
+>> f(base, 2) ¶
+'''
+open_finding = { zytw = "GLB-074", zyvm = "GLB-074" }
+```
+
+| declared | covers | when the cell passes |
+|---|---|---|
+| `"ID"` | any red of the cell | `DEBT PAID`, red |
+| `{ engine = "ID" }` | a `WRONG` whose offenders are **all** in the table — needs an `expect`, since only an `expect` names an engine | `DEBT PAID` for each engine that now complies, red |
+
+What it covers is printed as `KNOWN` on every run, with the file the finding is
+filed in, and counted in the `known` column — it does not turn the gate red.
+Everything else stays red: one more engine failing a per-engine debt is a
+regression, not the old debt.
+
+**The direction that matters is the second one.** A passing cell that still
+declares a debt is red, because a marker that outlives its fix covers the next
+failure of the same cell in silence. That is the rule `@reject-pending`
+(`PROMOTE`), `wording.baseline` (`STALE WORDING`, GLB-040) and
+`--audit-exclusions` already follow; `zyquality/cost/`, where `open_finding` was
+born, reported the paid debt in green until the same day, and now follows it
+too.
+
+A debt must name a finding that is a heading in `HALLAZGOS/`, and engines that
+`engines.toml` declares. One that does not is `VOID DEBT` — red, and it covers
+nothing — because a debt nobody filed is an exclusion with no reason. And it is
+declared on a `[[cell]]`, never on a `[matrix]`: it is a claim about one
+program, and it has to be readable beside that program.
