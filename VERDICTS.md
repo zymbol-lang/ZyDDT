@@ -157,7 +157,8 @@ complementary: a message no test reaches is invisible here and visible there.
 ## 5. The outcomes of asking
 
 `zyddt ask` and `zyddt axis` both end in exactly one of these. Only the first two
-are a pass.
+are a pass. `KNOWN` exits 0 and is not one either: it is a red somebody filed and
+declared, reported on every run until the finding is closed.
 
 | outcome | meaning | exit |
 |---|---|---|
@@ -172,6 +173,9 @@ are a pass.
 | `PARTIAL` | the answering engines agreed; not all of them answered | 2 |
 | `NO VERDICT` | fewer than two engines answered. An agreement of one is not an agreement | 2 |
 | `DEAD RULE` | an exclusion matched no case, so the list has stopped describing anything | 2 |
+| `KNOWN` | red, and the cell declares the filed, open finding it is red for (§ 12) | 0 |
+| `DEBT PAID` | the cell declares a debt and passes: close the finding, drop the declaration (§ 12) | 1 |
+| `VOID DEBT` | the declared debt names no filed finding, or an engine that does not exist (§ 12) | 1 |
 
 Exit codes are the contract every other repository's wrapper already honours:
 **0** green, **1** red, **2** no verdict.
@@ -442,9 +446,9 @@ consensus numbers — a reversed argv and a missing module resolver — both
 broken runner does not announce itself. It announces the engines.
 
 ```console
-$ zyddt selftest
-  cold  29/29 ok   classifier, parser, comparator, globs, config
-  cmd    6/6  ok   every subcommand survives being called
+$ zyddt selftest                        # as on 2026-10-02
+  cold  51/51 ok   classifier, parser, comparator, globs, config
+  cmd   10/10 ok   every subcommand survives being called
   live   3/3  ok   every engine runs the seed and answers it right
 ```
 

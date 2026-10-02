@@ -5,7 +5,7 @@
 > one got right that must survive the move.
 >
 > **What it is not.** Not the migration plan — [`MIGRATION.md`](MIGRATION.md) is
-> that. Not the validation method — `interpreter/LDV.md` is that, and this
+> that. Not the validation method — `zymbol-design/LDV.md` is that, and this
 > document is the layer LDV's decalogue points 7 and 8 ask for by name.
 >
 > **Method.** Every claim of a defect below is one that was actually found and
@@ -32,7 +32,7 @@
 
 ## 1. The two layers
 
-`interpreter/LDV.md` § 2 sets Language-Driven Validation against TDD and gets the
+`zymbol-design/LDV.md` § 2 sets Language-Driven Validation against TDD and gets the
 distinction right: LDV's unit under test is the language, its test is a whole
 application, its cycle is a release, and what it finds is **unknown-unknowns** —
 the case nobody could think of until a real domain forced it.
@@ -170,7 +170,12 @@ The rule makes size a **consequence** rather than a decision:
   matrix, by construction. If two cells are the same test, the axes are wrong,
   and that is a bug in the declaration, fixable in one place.
 - A pin cannot be redundant with another pin — each names a different finding.
-  Two pins with the same ID is a duplicate, and it is mechanically detectable.
+  What is mechanically checked, by `zyddt pins` since 2026-10-02, is that a
+  pin's name and first line carry the same id and that the id is a filed
+  finding; until then nothing checked it, and two pins of an undeclared `ZYQ-`
+  series had got in. Two pins may share an id when one finding has two faces
+  that cannot share a file — a refusal stops the run before the other face is
+  asked (`ZYVM-001`) — and the report lists them.
 - Therefore *"hundreds of thousands of repetitive tests"* is not a risk that has
   to be resisted by discipline. It is unreachable: there is no way to add a file
   that is neither a cell of some axis nor a pin of some finding.
@@ -246,8 +251,9 @@ Three sources, in descending order of how much they are worth:
 2. **A place where two engines disagree.** A divergence is evidence that the
    axis was never covered — if it had been, it would have failed on the day it
    was introduced.
-3. **A reading of the language's own definition.** `SYMBOLS.md`'s operator table
-   and `REFERENCE.md` § 21 are axes already written down in prose. Crossing them
+3. **A reading of the language's own definition.** `SYMBOLS.md`'s register of
+   occupied combinations (§ 18) and `REFERENCE.md` § 21 are axes already written
+   down in prose. Crossing them
    with the type table is mechanical, and it is the cheapest coverage there is.
 
 ---
@@ -362,7 +368,15 @@ One command, one verdict, as before. What changes is what it is allowed to be
 green about:
 
 - **Green** means every declared cell agrees across every surface it applies to,
-  every pin still reproduces its finding as fixed, and no baseline rose.
+  every pin still answers alike in every engine, and no baseline rose — except
+  a cell that declares the open finding it is red for (`open_finding`,
+  VERDICTS.md § 12, decided 2026-10-02): that red is reported as KNOWN, names
+  its ficha, and does not turn the run red; the day it passes, it does.
+
+  A pin is asked differentially, by `ask`: it holds that the engines agree on
+  the program its finding was about, not the recorded answer — `check` and its
+  `.observed` goldens exist and nothing in `suite` uses them yet. A regression
+  all three engines shared would pass a pin.
 - **Green does not mean correct.** It means nothing regressed in what has been
   declared. The undeclared axes are named in the report with their `?`, so the
   verdict never implies coverage it does not have.
@@ -380,7 +394,7 @@ Every decision about the language, and about what this layer grades, originates 
 controlled by its author. ZyDDT is built with **[Claude Code](https://claude.ai/code)**
 (Anthropic) as the engineering team, under the author's direction — as the interpreter is
 (`interpreter/README.md` § Authorship & AI Collaboration) and as the LDV applications are
-(`interpreter/LDV.md` § 7). The use of AI is transparent and intentional; it is not concealed
+(`zymbol-design/LDV.md` § 7). The use of AI is transparent and intentional; it is not concealed
 or minimized.
 
 The disclosure belongs in this charter and not only in a README, because a **test** layer
@@ -424,7 +438,7 @@ wherever it can be:
 - Where a cell must assert — a golden, a rejected form — the assertion is recorded from a
   **run** and reviewed as a diff, never written by hand from what someone expects.
 - A **pin** asserts, but it inherits its assertion from a finding that a real domain produced
-  (`interpreter/LDV.md` § 7.2: an unknown-unknown is unknown to the assistant too).
+  (`zymbol-design/LDV.md` § 7.2: an unknown-unknown is unknown to the assistant too).
 
 Stated as a rule: **prefer a question all surfaces must answer alike over a claim about what
 the answer is.** A shared misunderstanding survives the second form and dies in the first.
@@ -435,8 +449,8 @@ the answer is.** A shared misunderstanding survives the second form and dies in 
 
 | Document | Answers |
 |---|---|
-| `interpreter/LDV.md` | The validation method, and the decalogue this layer discharges |
+| `zymbol-design/LDV.md` | The validation method, and the decalogue this layer discharges |
 | [`MIGRATION.md`](MIGRATION.md) | What crosses over from the 661-file corpus, and what does not |
 | `zyquality/GOVERNANCE.md` | The layer being superseded — its rule is § 5 here |
-| `interpreter/SYMBOLS.md` § 17 | The operator table: an axis already written in prose |
+| `zymbol-design/SYMBOLS.md` § 18 | The occupied-combination register: an axis already written in prose |
 | `interpreter/REFERENCE.md` § 21 | The symbol reference: the other half of that axis |

@@ -14,6 +14,15 @@
 
 ---
 
+> **El estado vivo no está en este documento.** Lo calcula `./bin/zyddt findings`
+> —también dentro de `suite`— a partir de la línea **Estado** de cada ficha: qué
+> está abierto, qué celda o qué caso de `zyquality/cost/` lo sujeta, qué no vigila
+> nada, y en rojo la ficha cerrada que todavía se declara como deuda. Las
+> secciones «Estado — fecha» de abajo son la historia de cada día, con sus cifras.
+> Las tablas que se llevaban a mano se pudrieron: la de `GLOBAL.md` se paró en
+> `GLB-007`, y seis fichas siguieron diciendo «abierto» con todas sus partes
+> corregidas (revisado el 2026-10-02).
+
 ## 0. Estado — 2026-08-30
 
 **Los nueve hallazgos abiertos están corregidos.** Los ejes declarados van
@@ -269,11 +278,20 @@ verde en una línea base con seis rojos permanentes, y un rojo que siempre está
 deja de significar «regresión». Registrarlo va con la decisión sobre la premisa 2
 y es del autor.
 
+> **Corregido el 2026-10-02:** el párrafo de arriba nunca fue cierto. `zyddt suite`
+> corre **todos** los ejes de `axes/`, y está en `zyquality/suites.toml` desde el
+> 2026-09-09 (zyquality `a322389`): `isolation`, escrito el 2026-09-12, estuvo en
+> el gate desde el día en que se escribió. Hoy tiene 47 celdas, todas en verde.
+
 Lo que el eje **no** cubre, y hay que decirlo aquí: las premisas 3 y 4 —un módulo
 es dueño de su entorno, y su estado sólo se alcanza por sus propias funciones
 (`E005`)— necesitan un segundo fichero, porque un módulo **es** un fichero, y una
 celda generada es un fichero. Hasta que el runner sepa emitir un hermano, o van
 como chinchetas o no están probadas. Hoy no están probadas.
+
+> **Corregido el 2026-10-02:** el runner sabe emitir hermanos —`[cell.files]`, que
+> usan `modularity`, `syntax-modules` y `runtime-modules-scripts`— y MEM-3 y MEM-4
+> tienen dos celdas cada una (`zyddt premises`: ninguna premisa sin celda).
 
 ---
 

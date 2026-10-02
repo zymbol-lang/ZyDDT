@@ -23,7 +23,7 @@ and what does not.
 
 | | asks | finds | cost |
 |---|---|---|---|
-| **LDV** (`interpreter/LDV.md`) | can the language express this domain? | unknown-unknowns | a release |
+| **LDV** (`zymbol-design/LDV.md`) | can the language express this domain? | unknown-unknowns | a release |
 | **ZyDDT** (here) | do all engines still answer the same, correctly? | regressions in what we already know | milliseconds |
 
 LDV is the microscope; ZyDDT is the alarm. LDV's decalogue already says this —
@@ -38,21 +38,23 @@ did. ZyDDT is the one that names the rule.
 
 ## Status
 
-**The runner exists; the corpus does not.** That order is deliberate — the point
-was to decide what earns a place *before* copying anything, not to fork 661 files
-and sort them afterwards. What runs today is the machinery for asking, eight
-declared axes — three of them crossed matrices — and five pins. Not one file has
-been copied over from ZyQuality yet, and the axes have produced ten findings the
-661-file corpus could not see. **All ten are closed.**
+Measured on 2026-10-02: **45 axes, 1363 cells and 12 pins**, run by every engine
+in about two minutes; `zyq suite` runs the whole layer as one of its suites. Not
+one file has been copied over from ZyQuality: the migration's triage
+([`MIGRATION.md`](MIGRATION.md)) has not started, and the first files ZyQuality
+retired instead of moving are recorded in `zyquality/dropped.tsv`.
 
 ```bash
-./bin/zyddt suite                  # the whole layer, one verdict — 394 cells, ~30 s
+./bin/zyddt suite                  # the whole layer, one verdict
+./bin/zyddt axis [AXIS…]           # generate, run, publish the denominator
+./bin/zyddt --detail N axis        # how many reds quote their output (default 8)
+./bin/zyddt findings               # HALLAZGOS/: open, closed, what holds each open one
+./bin/zyddt premises               # zymbol-design/PREMISES.md against the cells
+./bin/zyddt pins                   # every pin names a filed finding
 ./bin/zyddt surfaces               # the two lexers: what did they leave unmarked
 ./bin/zyddt selftest               # grade the runner itself
 ./bin/zyddt engines                # what can run, and what cannot
 ./bin/zyddt gen                    # write every cell from axes/*.toml
-./bin/zyddt axis                   # generate, run, publish the denominator
-./bin/zyddt --detail N axis        # how many reds quote their output (default 8)
 ./bin/zyddt ask FILE...            # CELL: every engine must answer alike
 ./bin/zyddt check FILE...          # PIN: compare against the recorded .observed
 ./bin/zyddt observe FILE           # what each engine said, verbatim
@@ -92,55 +94,32 @@ routing comes out of the run rather than out of a reading.
 
 ### Where it stands, measured
 
-```text
-axis                 cells  agree  oracled  narrowed  wording  diverge  wrong
-arithmetic               6      6        4         0        0        0      0
-diagnostic               7      7        0         0        0        0      0
-environment              3      3        0         3        0        0      0
-integer-arithmetic      36     36       36         0        0        0      0
-numerals                69     69       69         0        0        0      0
-operator               252    252        0         0        0        0      0
-refusal                 13     12        0         0        1        0      0
-type-symbol             48     48        0         0        0        0      0
-verdict-shape            5      5        0         0        0        0      0
-pins                    11     11        —         0        —        0      —
-surfaces                 2      2        —         0        —        0      —
-selftest                50     50        —         —        —        —      —
-```
+The per-axis table is what `zyddt axis` prints at its foot, and it is not copied
+here: a copy is the thing that rots. The totals, on 2026-10-02:
 
-`surfaces` is the two lexers CHARTER § 4 declares and this layer did not grade:
-the playground's highlighter and the VS Code grammar. They never run a program,
-so they have no verdict to classify — they are asked what they left unmarked,
-over the same cells and pins the engines answer. Both are clean; both were not
-on the first run.
+| | cells | |
+|---|---:|---|
+| declared | 1363 | 45 axes; 12 pins beside them |
+| with an `expect` | 909 | the category each engine must reach is asserted |
+| with an oracle | 130 | agreement checked against an implementation that is not ours |
+| green by agreement alone | 345 | `operator` (252), `type-symbol` (48), `addressing` (23) above all: if one hides an error all three engines share, this layer cannot see it |
+| declared debt | 11 | `open_finding`: red cells of filed, open findings, reported as KNOWN ([`VERDICTS.md`](VERDICTS.md) § 12) |
 
-`oracled` is the honest count of cells where agreement is not the only evidence:
-**109 of 439**. `integer-arithmetic` exists to raise it where it was lowest —
-`operator` crosses the same six operators and asks only whether the three
-engines agreed, which is a weak question about a front end two of them share.
-Its oracle was verified by breaking it: flooring instead of truncating reports
-`WRONG ANSWER` on exactly the two mixed-sign pairs, which is what the operand
-pairs were chosen to separate.
+`known` is the newest column and the one to read first: each KNOWN names the
+ficha that owns it, and `zyddt findings` lists the open fichas nothing holds —
+six on that day.
+
 `narrowed` is agreement with a surface excused by a rule — `[2/3]` in the report,
 and it matters most for this pair: with `zyjs` excused, only `zytw` and `zyvm`
 remain, and they share the lexer, the parser and the semantic analyser, so the
 whole front-end question goes unasked.
 
-Nine axes and nine pins is not coverage either, and the table is written this
-way so it cannot be mistaken for any. An axis nobody has declared has no row
-here, and that absence is worth more than a green tick on a suite that never
-asked ([`CHARTER.md`](CHARTER.md) § 6). Of the 394 cells, 321 are green by
-agreement and nothing else: if one of those hides an error all three engines
-share, this layer cannot see it today.
+An axis nobody has declared has no row, and that absence is worth more than a
+green tick on a suite that never asked ([`CHARTER.md`](CHARTER.md) § 6). The
+sections below are dated: they are the history of how the layer got here, and
+their numbers are the numbers of their day.
 
-`numerals` and `type-symbol` are the first two axes generated from a **crossed
-matrix** rather than written point by point, and `numerals` is what the shape was
-for: `zyquality/corpus/i18n/numerals/` is 69 files that differ only in which
-digit block they substitute, and this is the same 69 as one declaration plus one
-template — with an oracle each, which the corpus's goldens could not have, since
-a golden records what the engines said and cannot disagree with them.
-
-### What the first crossing of `operator` found, and what it cost to close
+### What the first crossing of `operator` found, and what it cost to close (2026-08-29)
 
 14 operators × 18 type pairs is 252 questions nobody had asked, and **150 of them
 were red on the first run** (2026-08-29). That was not 150 findings: it was
@@ -198,10 +177,10 @@ parameter inference to build that with. Reproducing it means building one, which
 is a design decision and not a message fix. What was fixed in the same commit is
 that `zyjs` had no line on that diagnostic at all.
 
-### What only the LDV applications found
+### What only the LDV applications found (2026-08-30)
 
 394 green cells, a 661-file corpus and 222 examples did not see either of these.
-A real program did — which is [`LDV.md`](../interpreter/LDV.md) § 1 in two lines.
+A real program did — which is `zymbol-design/LDV.md` § 1 in two lines.
 
 - [`ZYJS-007`](HALLAZGOS/zyjs.md), **closed**: zyjs continued an identifier on
   ASCII digits where the Rust lexer uses `is_alphanumeric()`. Chaturanga is
@@ -231,9 +210,9 @@ A real program did — which is [`LDV.md`](../interpreter/LDV.md) § 1 in two li
   undeclared the three engines answered three different things, because the
   neutral value belongs to the OPERATOR and all three knew that only on the
   assignment path.
-- [`GLB-003`](HALLAZGOS/GLOBAL.md), **open**: two loops reusing an iterator name
-  warn once in Rust and twice in the browser. Nobody has decided which is right,
-  so nothing asserts it.
+- [`GLB-003`](HALLAZGOS/GLOBAL.md), **open** that day, closed the same evening:
+  two loops reusing an iterator name warned once in Rust and twice in the
+  browser — one warning per site was decided, and a pin holds it.
 
 All three say the same thing about the denominator: `zyquality/project/apps.toml`
 excludes `zyjs` from the application suites **on purpose** — they are
