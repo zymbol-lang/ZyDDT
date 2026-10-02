@@ -371,9 +371,33 @@ def cmd_axis(args, cfg) -> int:
     worst = GREEN
     rows = []
 
+    # A declared debt has to name a finding that is filed, and engines that
+    # exist. One that does not is an exclusion with no reason — it would turn a
+    # red into KNOWN on the word of nobody — so it is red itself and covers
+    # nothing.
+    filed, _ = _filed_findings(Path(__file__).resolve().parents[1])
+    engine_ids = {e.id for e in cfg.engines}
+    void_debt: set[str] = set()
+    for ax in axes:
+        for cell in ax.cells:
+            d = cell.open_finding
+            if d is None:
+                continue
+            ids = [d] if isinstance(d, str) else list(d.values())
+            unknown = [e for e in ([] if isinstance(d, str) else d) if e not in engine_ids]
+            unfiled = [i for i in ids if i not in filed]
+            if unknown or unfiled:
+                void_debt.add(f"{ax.id}/{cell.id}")
+                worst = worse(worst, RED)
+                why = (f"unknown engine(s) {unknown}" if unknown else "") + \
+                      ("; " if unknown and unfiled else "") + \
+                      (f"{', '.join(unfiled)} is not filed in HALLAZGOS/" if unfiled else "")
+                print(f"{R.red('VOID DEBT')}   {ax.id}/{cell.id}  {R.dim(why)}")
+
     for ax in axes:
         engs = cfg.by_id(ax.engines or None)
         agreed = diverged = worded = wrong = noverdict = narrowed = oracled = 0
+        known = 0
 
         # ── How much of a red gets printed ──────────────────────────────────
         # A matrix changes what a report has to survive.  One defect in `zyjs`
@@ -400,6 +424,27 @@ def cmd_axis(args, cfg) -> int:
 
         for cell in ax.cells:
             label = f"{ax.id}/{cell.id}"
+            debt = None if label in void_debt else cell.open_finding
+
+            def owe(verdict_d, paid) -> bool:
+                """Print what the declared debt made of a red. → True when the red
+                is the debt (KNOWN), so the caller does not count it red."""
+                nonlocal known, worst
+                if verdict_d == C.KNOWN:
+                    known += 1
+                    print(f"{R.yellow('KNOWN')}       {label}  "
+                          f"{R.dim(_debt_text(debt) + (' — ' + cell.what if cell.what else ''))}")
+                    print(R.dim(f"    declared debt: {_debt_where(debt, filed)} — "
+                                f"reported every run, not counted against the gate"))
+                    return True
+                if verdict_d == C.PAID:
+                    worst = worse(worst, RED)
+                    who = f" for {', '.join(paid)}" if paid else ""
+                    print(f"{R.red('DEBT PAID')}   {label}  {R.dim(_debt_text(debt))}")
+                    print(R.dim(f"    passes{who}: the finding looks fixed — close it in "
+                                f"{_debt_where(debt, filed)} and drop `open_finding`"))
+                return False
+
             if cell.skip:
                 # A skipped cell names the axis value it skips and why, so a
                 # hole in a matrix is visible AS a hole (CHARTER § 5).
@@ -427,6 +472,8 @@ def cmd_axis(args, cfg) -> int:
             required = cell.expect or ax.expect
             bad = C.offenders(obs, required) if required else []
             if bad:
+                if owe(*C.debt(debt, True, frozenset(o.engine for o in bad))):
+                    continue
                 wrong += 1
                 worst = worse(worst, RED)
                 print(f"{R.red('WRONG')}       {label}  {R.dim(cell.what)}")
@@ -449,6 +496,8 @@ def cmd_axis(args, cfg) -> int:
                 continue
 
             if con.outcome == C.DIVERGE:
+                if owe(*C.debt(debt, True, frozenset())):
+                    continue
                 diverged += 1
                 worst = worse(worst, RED)
                 if not detailed():
@@ -506,6 +555,8 @@ def cmd_axis(args, cfg) -> int:
                                 ' silence with oracle_literal_ok = "reason"'))
                     continue
                 if raw.stdout != v.out:
+                    if owe(*C.debt(debt, True, frozenset())):
+                        continue
                     wrong += 1
                     worst = worse(worst, RED)
                     print(f"{R.red('WRONG ANSWER')} {label}  "
@@ -523,13 +574,17 @@ def cmd_axis(args, cfg) -> int:
                 worded += 1
                 wording_now.add(label)
                 if label not in baseline:
+                    if owe(*C.debt(debt, True, frozenset())):
+                        continue
                     worst = worse(worst, RED)      # a NEW wording split is a red
                     print(f"{R.red('NEW WORDING')} {label}  "
                           f"{R.dim('not in wording.baseline')}")
                     if detailed():
                         _print_consensus(label, con)
-                elif args.verbose:
-                    _print_consensus(label, con)
+                else:
+                    owe(*C.debt(debt, False, frozenset()))   # baselined: green
+                    if args.verbose:
+                        _print_consensus(label, con)
                 continue
 
             if con.outcome == C.PARTIAL:
@@ -539,6 +594,7 @@ def cmd_axis(args, cfg) -> int:
                 continue
 
             agreed += 1
+            owe(*C.debt(debt, False, frozenset()))           # green: a debt is paid
             if args.verbose or not con.full:
                 cov = "" if con.full else R.dim(f"  [{con.coverage}]")
                 print(f"{R.green('AGREE')}       {label}  {R.verdict(v.verdict)}{cov}")
@@ -552,7 +608,7 @@ def cmd_axis(args, cfg) -> int:
                         f"none, `zyddt -v axis` for all, `zyddt observe FILE` "
                         f"for one"))
         rows.append((ax.id, len(ax.cells), agreed, worded, diverged, wrong,
-                     noverdict, narrowed, oracled))
+                     noverdict, narrowed, oracled, known))
 
     # Only over the axes that actually ran.  `zyddt axis environment` compared
     # the whole baseline against one axis's results and announced that three
@@ -577,17 +633,19 @@ def cmd_axis(args, cfg) -> int:
 
     print()
     print(f"  {'axis':<22}{'cells':>6}{'agree':>7}{'oracled':>9}{'narrowed':>10}"
-          f"{'wording':>9}{'diverge':>9}{'wrong':>7}{'no verdict':>12}")
-    for name, cells, ag, wd, dv, wr, nv, nr, orc in rows:
+          f"{'wording':>9}{'diverge':>9}{'wrong':>7}{'known':>7}{'no verdict':>12}")
+    for name, cells, ag, wd, dv, wr, nv, nr, orc, kn in rows:
         print(f"  {name:<22}{cells:>6}{ag:>7}"
               f"{(R.green(str(orc)) if orc else R.dim('0')):>9}"
               f"{(R.dim(str(nr)) if nr else '0'):>10}"
               f"{(R.yellow(str(wd)) if wd else '0'):>9}"
               f"{(R.red(str(dv)) if dv else '0'):>9}"
               f"{(R.red(str(wr)) if wr else '0'):>7}"
+              f"{(R.yellow(str(kn)) if kn else '0'):>7}"
               f"{(R.yellow(str(nv)) if nv else '0'):>12}")
     print(R.dim("  oracled  = agreed AND checked against an implementation that is not ours"))
     print(R.dim("  narrowed = agreed, but a rule excused an engine: fewer surfaces asked"))
+    print(R.dim("  known    = red, and the declared debt of a filed finding (open_finding)"))
     print(R.dim("  an axis that is not declared has no row, and that is the honest gap"))
 
     dead = table.dead_rules()
@@ -604,6 +662,17 @@ def cmd_axis(args, cfg) -> int:
                       f"{R.dim('matched no case')}")
             worst = worse(worst, NOVERDICT)
     return worst
+
+
+def _debt_text(debt) -> str:
+    if isinstance(debt, str):
+        return debt
+    return ", ".join(f"{e} {i}" for e, i in sorted(debt.items()))
+
+
+def _debt_where(debt, filed: dict[str, str]) -> str:
+    ids = [debt] if isinstance(debt, str) else sorted(set(debt.values()))
+    return ", ".join(f"{filed.get(i, 'HALLAZGOS/')} {i}" for i in ids)
 
 
 BASELINE = Path(__file__).resolve().parents[1] / "wording.baseline"

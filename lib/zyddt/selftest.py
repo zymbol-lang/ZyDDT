@@ -397,6 +397,74 @@ def _():
     assert C.worse(C.GREEN, C.GREEN) == C.GREEN
 
 
+# ── Declared debt ────────────────────────────────────────────────────────────
+#
+# `open_finding` decides whether a red is a regression, so a mistake here does
+# not fail loudly: it turns a regression KNOWN, or keeps a paid debt quiet.
+# Each branch is asked once, cold.
+
+@case("debt/a-finding-id-covers-any-red-of-its-cell",
+      "a cell declared as GLB-073 that turns red is KNOWN, not a regression")
+def _():
+    assert C.debt("GLB-073", True, frozenset()) == (C.KNOWN, [])
+    assert C.debt("GLB-073", True, frozenset({"zyjs"})) == (C.KNOWN, [])
+
+
+@case("debt/a-passing-cell-pays-its-debt",
+      "a declared cell that passes is red: the finding looks fixed, the marker goes")
+def _():
+    assert C.debt("GLB-073", False, frozenset()) == (C.PAID, [])
+    assert C.debt({"zytw": "GLB-074", "zyvm": "GLB-074"}, False, frozenset()) \
+        == (C.PAID, ["zytw", "zyvm"])
+
+
+@case("debt/per-engine-covers-only-the-engines-it-names",
+      "one more engine failing the same cell is a regression, not the old debt")
+def _():
+    d = {"zytw": "GLB-074", "zyvm": "GLB-074"}
+    assert C.debt(d, True, frozenset({"zytw", "zyvm"})) == (C.KNOWN, [])
+    assert C.debt(d, True, frozenset({"zytw", "zyvm", "zyjs"})) == (None, [])
+    assert C.debt({"zyvm": "X-1"}, True, frozenset({"zytw", "zyvm"})) == (None, [])
+
+
+@case("debt/one-engine-fixed-is-paid-for-that-engine",
+      "half a fix pays half the debt, and the table has to say so")
+def _():
+    d = {"zytw": "GLB-074", "zyvm": "GLB-074"}
+    assert C.debt(d, True, frozenset({"zyvm"})) == (C.PAID, ["zytw"])
+
+
+@case("debt/no-declaration-changes-nothing", "a cell with no open_finding is judged as before")
+def _():
+    assert C.debt(None, True, frozenset({"zyjs"})) == (None, [])
+    assert C.debt(None, False, frozenset()) == (None, [])
+
+
+@case("debt/per-engine-needs-an-expect-and-a-matrix-cannot-owe",
+      "only an expect names an engine; a debt is about one program, not a matrix")
+def _():
+    import tempfile
+    d = Path(tempfile.mkdtemp())
+    (d / "noexpect.toml").write_text(
+        'id = "n"\n[[cell]]\nid = "c"\nsrc = ">> 1 ¶"\n'
+        'open_finding = { zyjs = "ZYJS-001" }\n', encoding="utf-8")
+    try:
+        A.load_all_from(d)
+        raise AssertionError("a per-engine debt with no expect was accepted")
+    except SystemExit as e:
+        assert "needs an `expect`" in str(e), e
+    (d / "noexpect.toml").unlink()
+    (d / "m.toml").write_text(
+        'id = "m"\n[[dimension]]\nname = "a"\nvalues = ["p"]\n'
+        '[matrix]\nid = "«a»"\nsrc = ">> 1 ¶"\nopen_finding = "GLB-001"\n',
+        encoding="utf-8")
+    try:
+        A.load_all_from(d)
+        raise AssertionError("a matrix-wide debt was accepted")
+    except SystemExit as e:
+        assert "[[cell]]" in str(e), e
+
+
 # ── The matrix ───────────────────────────────────────────────────────────────
 #
 # The generator is the one part of this layer that can manufacture coverage that

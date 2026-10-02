@@ -66,6 +66,14 @@ class Cell:
     # own so that `<# ./m/est => E` inside `src` resolves the way it would in a
     # real project, with no rewriting of paths.
     files: dict[str, str] | None = None
+    # Declared debt (decided 2026-10-02, the mechanism of zyquality/cost/): a
+    # finding that is filed and open, which this cell turns red on. "ID" covers
+    # any red of the cell; {engine = "ID"} covers a WRONG whose offenders are all
+    # declared, and needs an `expect` to name them. A red it covers is KNOWN —
+    # reported every run, not a regression. A cell that PASSES while declaring
+    # it is red: the finding looks fixed and the declaration has to go, or it
+    # becomes an open door (VERDICTS.md § 12).
+    open_finding: str | dict[str, str] | None = None
 
     @property
     def path(self) -> Path:
@@ -204,6 +212,11 @@ def _matrix_cells(d: dict, stem: str, path: Path) -> list[Cell]:
         if required not in m:
             raise SystemExit(f"zyddt: {path.name}: [matrix] declares no `{required}`")
     skips = m.get("skip", [])
+    if "open_finding" in m:
+        # Debt is a claim about one program. A matrix point that needs it is
+        # declared as a [[cell]], where the claim can be read beside the source.
+        raise SystemExit(f"zyddt: {path.name}: [matrix] declares open_finding. "
+                         f"Declare the indebted point as a [[cell]] of its own")
     cells: list[Cell] = []
     for point in itertools.product(*(dim.values for dim in dims)):
         coords = {dim.name: v for dim, v in zip(dims, point)}
@@ -272,7 +285,7 @@ def load_all_from(where: Path, only: list[str] | None = None) -> list[Axis]:
         cells = [Cell(path.stem, c["id"], c.get("what", ""),
                       c["src"], c.get("skip"), _oracle_of(c, path),
                       c.get("expect"), c.get("oracle_literal_ok"),
-                      _files_of(c, path))
+                      _files_of(c, path), _debt_of(c, path, d.get("expect")))
                  for c in d.get("cell", [])]
         if "matrix" in d:
             cells += _matrix_cells(d, path.stem, path)
@@ -297,6 +310,34 @@ def load_all_from(where: Path, only: list[str] | None = None) -> list[Axis]:
             cells=cells,
         ))
     return out
+
+
+FINDING_ID = re.compile(r"^[A-Z]{2,6}-\d+$")
+
+
+def _debt_of(cell: dict, path: Path, axis_expect: str | None):
+    """`open_finding` — "ID", or {engine = "ID"}. The shape is checked here; that
+    the id is filed, and that each engine exists, is checked where the
+    HALLAZGOS/ index and engines.toml are at hand (`zyddt axis`)."""
+    d = cell.get("open_finding")
+    if d is None:
+        return None
+    where = f"zyddt: {path.name}: cell '{cell['id']}'"
+    if isinstance(d, str):
+        if not FINDING_ID.match(d):
+            raise SystemExit(f"{where}: open_finding {d!r} is not a finding id")
+        return d
+    if isinstance(d, dict) and d:
+        bad = [v for v in d.values() if not isinstance(v, str) or not FINDING_ID.match(v)]
+        if bad:
+            raise SystemExit(f"{where}: open_finding names {bad!r}, not finding ids")
+        if not (cell.get("expect") or axis_expect):
+            # Per engine means naming WHICH engine is out of compliance, and only
+            # an `expect` names one; a DIVERGE alone accuses a pair.
+            raise SystemExit(f"{where}: open_finding per engine needs an `expect`, "
+                             f"or it cannot name the engine it excuses")
+        return dict(d)
+    raise SystemExit(f"{where}: open_finding is a finding id or a table of them")
 
 
 def _files_of(cell: dict, path: Path) -> dict[str, str] | None:
