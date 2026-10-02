@@ -323,6 +323,40 @@ f() { <~ 2 }
 >> f() ¶
 """
 
+# ── MEM-7 and the loop iterator (ERROR-GOL-017, 2026-10-01) ─────────────────
+#
+# A block has no namespace of its own, so `@ m:…` over a visible `m` writes that
+# `m`: every engine leaves the last element in it. The analyser declared a
+# second `m` for the loop, and the outer one was reported `unused variable`
+# while the program read it — by zytw and zyvm when the read came after the
+# loop, by all three when it was inside the body. The first cell says nothing
+# may be said about that program; the second, that the change of type the same
+# loop can make is said, as `m = 5` after `m = "fuera"` says it.
+
+[[cell]]
+id      = "loop-iterator-assigns-a-visible-name"
+premise = "MEM-7"
+expect  = "ok"
+what    = "`@ m:…` over a visible `m` writes it, and nothing calls `m` unused"
+src     = """
+m = 0
+@ m:1..3 { >> m ¶ }
+>> m ¶
+n = 0
+@ n:[5, 6] { >> n ¶ }
+"""
+
+[[cell]]
+id      = "loop-iterator-changes-the-type"
+premise = "MEM-7"
+expect  = "warn"
+what    = "`@ m:[1, 2]` after `m = \"fuera\"` changes `m` from String to Int, and says so"
+src     = """
+m = "fuera"
+@ m:[1, 2] { >> m ¶ }
+>> m ¶
+"""
+
 
 # ── The lambda, after MEM-6 was settled on 2026-09-13 ───────────────────────
 #
