@@ -87,6 +87,15 @@ def _case_id(file: Path) -> str:
     return str(f.with_suffix("").name)
 
 
+def _shown(file: Path) -> str:
+    """How a file is named in a report: relative to this repository when it is
+    inside it, wherever the caller stands. `zyq suite` runs this layer from
+    zyquality/, and every pin used to be printed by its absolute path."""
+    f = Path(file).resolve()
+    root = Path(__file__).resolve().parents[1]
+    return str(f.relative_to(root)) if f.is_relative_to(root) else str(file)
+
+
 def _indent(text: str, pad: str = "      ") -> str:
     return "\n".join(pad + l for l in text.rstrip("\n").splitlines())
 
@@ -270,12 +279,12 @@ def cmd_ask(args, cfg) -> int:
         con = C.consensus(obs, cfg.normalise.compare_column)
         if con.outcome == C.AGREE:
             cov = "" if con.full else R.dim(f"  [{con.coverage}]")
-            print(f"{R.green('AGREE')}       {file}  {R.verdict(con.verdict)}{cov}")
+            print(f"{R.green('AGREE')}       {_shown(file)}  {R.verdict(con.verdict)}{cov}")
             for o in con.excluded:
                 print(f"    {o.engine:<8} {R.dim('excluded')}  "
                       f"{R.dim(o.excluded.tag + ': ' + o.excluded.reason)}")
             continue
-        _print_consensus(str(file), con)
+        _print_consensus(_shown(file), con)
         worst = worse(worst, RED if con.outcome == C.DIVERGE else NOVERDICT)
     return worst
 
@@ -810,6 +819,7 @@ def cmd_premises(args, cfg) -> int:
                         f"cells nobody wrote down is a premise nobody is keeping"))
             rc = RED
             continue
+        broken = False                     # this premise's own crossing
         for glob in p["held"]:
             hit = fnmatch.filter(known, glob)
             if not hit:
@@ -817,7 +827,7 @@ def cmd_premises(args, cfg) -> int:
                 # which reads as covered and is not.
                 print(R.red(f"  DEAD REF    {pid} names `{glob}`, "
                             f"which matches no cell"))
-                rc = RED
+                broken = True
                 continue
             # premise → cell: every cell it names must name it back.
             for cell in hit:
@@ -825,9 +835,16 @@ def cmd_premises(args, cfg) -> int:
                     got = ", ".join(sorted(declared.get(cell, set()))) or "nothing"
                     print(R.red(f"  ONE-SIDED   {pid} names `{cell}`, "
                                 f"which declares {got}"))
-                    rc = RED
-        if rc == GREEN or True:
-            n = sum(len(fnmatch.filter(known, g)) for g in p["held"])
+                    broken = True
+        # Its line is green only when its own crossing held. It used to be
+        # printed green unconditionally (`if rc == GREEN or True`), so a premise
+        # was listed as kept on the line right under the error that said it was
+        # not.
+        n = sum(len(fnmatch.filter(known, g)) for g in p["held"])
+        if broken:
+            rc = RED
+            print(f"  {R.red(pid)}  {n} cell(s)  " + R.dim(p["what"]))
+        else:
             print(f"  {R.green(pid)}  {n} cell(s)  " + R.dim(p["what"]))
 
     print()
@@ -840,6 +857,85 @@ def cmd_premises(args, cfg) -> int:
     if holes:
         print(R.dim("    a premise with no cell is a hole that names itself; "
                     "it is not a pass and not a failure"))
+    return rc
+
+
+# ── pins — every pin names a finding that is filed ───────────────────────────
+#
+# CHARTER § 3: a pin is "one minimal reproduction of a named finding, carrying
+# the ID it came from", and "a pin with no ID is a file nobody can explain".
+# Nothing checked it. Two pins carried an id of a series nobody had declared
+# (`ZYQ-`): one of them said GLB-005 in its own first line and ZYQ-001 in its
+# name, and the other named a finding that had never been filed anywhere.
+#
+# Three rules, each one a way a pin stops explaining itself:
+#   · its name starts with the id                      → UNNAMED
+#   · its first line is `// PIN <that id>`             → MISNAMED
+#   · the id is a heading in HALLAZGOS/, or in
+#     Divergente_ES/ for the DM series                 → UNFILED
+#
+# Two pins may share an id: ZYVM-001 has two faces that cannot share a file,
+# because a refusal stops the run before the second is asked. That is reported,
+# not refused — the header of each says why it is separate.
+
+PIN_NAME = re.compile(r"^([A-Z]{2,6}-\d+)_")
+PIN_HEAD = re.compile(r"^//\s*PIN\s+([A-Z]{2,6}-\d+)\b")
+FINDING_HEAD = re.compile(r"^#{1,4}\s+(?:~~)?([A-Z]{2,6}-\d+)(?:~~)?\b", re.M)
+
+
+def _filed_findings(root: Path) -> tuple[dict[str, str], bool]:
+    """→ ({id: where it is filed}, whether Divergente_ES could be read)."""
+    out: dict[str, str] = {}
+    for f in sorted((root / "HALLAZGOS").glob("*.md")):
+        if f.name == "INDICE.md":
+            continue
+        for m in FINDING_HEAD.finditer(f.read_text(encoding="utf-8")):
+            out.setdefault(m.group(1), f"HALLAZGOS/{f.name}")
+    div = Path(os.environ.get("ZYDDT_DIVERGENTE", root.parent / "Divergente_ES"))
+    if not div.is_dir():
+        return out, False
+    for f in sorted(div.glob("*.md")):
+        for m in FINDING_HEAD.finditer(f.read_text(encoding="utf-8")):
+            out.setdefault(m.group(1), f"Divergente_ES/{f.name}")
+    return out, True
+
+
+def cmd_pins(args, cfg) -> int:
+    """Every pin names a filed finding, in its name and in its first line."""
+    root = Path(__file__).resolve().parents[1]
+    filed, have_div = _filed_findings(root)
+    rc, seen = GREEN, {}
+    for pin in sorted((root / "cases" / "pin").glob("*.zy")):
+        name = PIN_NAME.match(pin.name)
+        if not name:
+            print(R.red(f"  UNNAMED     {pin.name} — a pin's name starts with the id it pins"))
+            rc = worse(rc, RED)
+            continue
+        pid = name.group(1)
+        seen.setdefault(pid, []).append(pin.name)
+        first = pin.read_text(encoding="utf-8").splitlines()[:1]
+        head = PIN_HEAD.match(first[0]) if first else None
+        if not head or head.group(1) != pid:
+            said = head.group(1) if head else "no `// PIN <id>` line"
+            print(R.red(f"  MISNAMED    {pin.name} — named {pid}, its first line says {said}"))
+            rc = worse(rc, RED)
+            continue
+        if pid in filed:
+            continue
+        if pid.startswith("DM-") and not have_div:
+            print(R.yellow(f"  UNVERIFIED  {pin.name} — {pid} is a Divergente_ES id, and "
+                           f"that repository is not cloned beside this one"))
+            rc = worse(rc, NOVERDICT)
+            continue
+        print(R.red(f"  UNFILED     {pin.name} — no finding called {pid} in HALLAZGOS/"
+                    + ("" if not pid.startswith("DM-") else " or Divergente_ES/")))
+        rc = worse(rc, RED)
+    shared = {k: v for k, v in seen.items() if len(v) > 1}
+    for pid, names in sorted(shared.items()):
+        print(R.dim(f"  shared      {pid}: {', '.join(names)}"))
+    n = sum(len(v) for v in seen.values())
+    print(f"  {n} pin(s), {len(seen)} finding(s)" +
+          ("" if rc != GREEN else R.dim(" — every one named and filed")))
     return rc
 
 
@@ -891,17 +987,20 @@ def cmd_suite(args, cfg) -> int:
     pins = sorted((Path(__file__).resolve().parents[1] / "cases" / "pin").glob("*.zy"))
     print(R.bold("\n  pins") + R.dim(f"   ({len(pins)} named finding{'' if len(pins) == 1 else 's'})"))
     if pins:
-        args.files = [q.relative_to(Path.cwd()) if q.is_relative_to(Path.cwd())
-                      else q for q in pins]
+        rc = worse(rc, cmd_pins(args, cfg))
+        args.files = pins
         rc = worse(rc, cmd_ask(args, cfg))
     else:
         print(R.dim("    none recorded yet"))
 
     print()
     if rc == GREEN:
+        # It used to end "see the undeclared axes above", and nothing above
+        # listed any: an undeclared axis has no row, which is the only honest
+        # way this report can show it (CHARTER § 6).
         print("  " + R.green(R.bold("GREEN")) + R.dim(
             " — nothing regressed in what has been declared."
-            "  It does not mean correct: see the undeclared axes above."))
+            "  It does not mean correct: an axis nobody declared has no row above."))
     elif rc == RED:
         print("  " + R.red(R.bold("RED")) + " — a regression, not noise.")
     else:
@@ -934,6 +1033,8 @@ def main() -> int:
     sub.add_parser("surfaces", help="the two lexers: what did they leave unmarked")
     sub.add_parser("premises", help="the declared premises, against the cells "
                                     "that hold them")
+    sub.add_parser("pins", help="every pin names a filed finding, in its name "
+                                "and in its first line")
     sub.add_parser("suite", help="the whole layer, one verdict")
     for name, help_ in (("gen", "write every cell from axes/*.toml"),
                         ("axis", "generate, run, and publish the denominator")):
@@ -960,7 +1061,8 @@ def main() -> int:
     return {"engines": cmd_engines, "observe": cmd_observe, "ask": cmd_ask,
             "check": cmd_check, "gen": cmd_gen, "axis": cmd_axis,
             "suite": cmd_suite, "selftest": cmd_selftest,
-            "surfaces": cmd_surfaces, "premises": cmd_premises}[args.cmd](args, cfg)
+            "surfaces": cmd_surfaces, "premises": cmd_premises,
+            "pins": cmd_pins}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":
