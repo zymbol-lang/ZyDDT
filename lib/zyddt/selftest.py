@@ -553,6 +553,11 @@ SMOKE: list[tuple[str, list[str]]] = [
     ("ask", ["generated/verdict/ok.zy"]),
     ("check", ["--regen", "cases/seed/hello.zy"]),
     ("surfaces", []),
+    # Added 2026-10-02: the command existed since 2026-09-12 and runs inside
+    # every `suite`, and this list — the one that catches a command body that no
+    # longer runs — did not name it.
+    ("premises", []),
+    ("pins", []),
 ]
 
 

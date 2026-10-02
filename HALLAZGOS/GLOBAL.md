@@ -486,7 +486,7 @@ Con la convención aplicada en los cuatro sitios, `zyq suite --only lsp` va a
 
 ### Qué lo sujeta
 
-[`ZYQ-001_convencion_de_nombre.zy`](../cases/pin/ZYQ-001_convencion_de_nombre.zy).
+[`GLB-005_convencion_de_nombre.zy`](../cases/pin/GLB-005_convencion_de_nombre.zy).
 
 ---
 
@@ -5316,3 +5316,49 @@ sin errores ni avisos.
 
 `runtime-format-convert/numeric-eval-of-text-is-a-valid-index` y
 `numeric-eval-of-an-undefined-name`, en verde.
+
+---
+
+## GLB-072 — Una excepción hecha para conservar un mensaje abrió un hueco en la regla: `arr[1][1] $~ 0` devolvía la fila cambiada
+
+**Estado:** **corregido el 2026-09-07** — archivado el 2026-10-02, con retraso: hasta entonces
+sólo existía su chincheta, con el id `ZYQ-002`, de una serie que nadie declaró
+**Encontrado por:** el cierre de `arr[i][j]` (2026-09-06), al cruzar receptor × acción en
+`axes/chained-index.toml` y `axes/addressing.toml`
+
+### Qué se observa
+
+`arr[i][j]` se cerró el 2026-09-06. El primer corte dejaba pasar `$~`, para que
+`d["x"]["y"]$~ 9` siguiera imprimiendo la redacción ya grabada en ZyQuality
+(`reject/collections/11`, «this edit has nothing to write into»). Esa excepción abrió
+dos puertas, y son las dos formas que **sí** tienen dónde poner su resultado — por eso
+ninguna llegaba al rechazo de la edición que debía pararlas:
+
+```zymbol
+arr = [[1,2,3],[4,5,6],[7,8,9]]
+arr[1][1] $~ 0            // la sentencia
+x = arr[1][1] $~ 0        // reject/collections/15 en ZyQuality
+```
+
+| motor | antes |
+|---|---|
+| `zytw`, `zyvm`, `zyjs` | `[0, 2, 3]` — la fila 1 con su primer elemento cambiado —, salida 0, sin diagnóstico |
+
+Un valor plausible por una forma que no existe. Ningún diferencial podía verlo: los tres
+motores coincidían perfectamente, que es la clase que § 3 de `INDICE.md` reserva a este
+fichero.
+
+### Qué se cambió
+
+Se retiró la excepción: la cadena se rechaza en cuanto se **lee**, siga lo que siga al
+grupo. `d["x"]["y"]$~ 9` informa ahora de la cadena, que es su primera causa;
+`f()[1]$~ 5` conserva su redacción, porque ahí no hay cadena sino una llamada que nada
+sujeta.
+
+La lección es la que vale la chincheta: una excepción tallada para proteger un
+**mensaje** es una excepción en la **regla**.
+
+### Qué lo sujeta
+
+[`GLB-072_accion_sobre_cadena.zy`](../cases/pin/GLB-072_accion_sobre_cadena.zy), y en
+ZyQuality `reject/collections/15`.
