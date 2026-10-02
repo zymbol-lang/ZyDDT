@@ -113,3 +113,19 @@ _x = <\ ls | wc -l \>
 >> "fin" ¶
 '''
 open_finding = "GLB-075"
+
+# ── Interpolating a text variable into the command (added 2026-10-02) ──────
+#
+# The question six files of ZyQuality's corpus asked — `<\ cat {archivo} \>` —
+# in a form the language does not have (GLB-004, GLB-075), so none of them ever
+# ran. Retired from the corpus on 2026-10-02 (zyquality/dropped.tsv); this is
+# the point of the matrix they were asking about, written once.
+
+[[cell]]
+id   = "shell-interpolates-a-text-variable"
+what = "a Zymbol text variable interpolated into the command reaches the shell as its text"
+src  = '''
+nombre = "zymbol"
+r = <\ "echo hola {nombre}" \>
+>> r
+'''

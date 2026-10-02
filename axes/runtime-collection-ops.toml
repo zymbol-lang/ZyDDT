@@ -1594,3 +1594,26 @@ q = p$^ (a, b -> a.s > b.s)
 >> q[3].n " " q[4].n ¶
 """
 open_finding = "GLB-073"
+
+# ── The empty pattern (added 2026-10-02) ────────────────────────────────────
+#
+# Two of the eight cases ZyQuality seeded on 2026-08-07 for an oracle phase that
+# was never built (zyquality/cases/). Nothing ran that directory, and both still
+# diverged on the day it was retired. No `expect`: what the empty string is
+# found at, or split into, is not decided (GLB-078, GLB-079).
+
+[[cell]]
+id   = "find-all-of-the-empty-string"
+what = "every position of the empty string in a text"
+src  = """
+>> ("hello"$?? "") ¶
+"""
+open_finding = "GLB-078"
+
+[[cell]]
+id   = "split-by-the-empty-string"
+what = "a text split by the empty string"
+src  = """
+>> ("hello" $/ "") ¶
+"""
+open_finding = "GLB-079"

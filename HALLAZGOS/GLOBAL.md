@@ -5571,3 +5571,68 @@ quería decir con `RANGE_IN_PATH` — y encaminarla ahí, o borrar las dos const
 
 `syntax-index-nav/edit-on-a-ranged-path`, con `open_finding = "GLB-077"`. Las dos ayudas
 siguen en la lista de `reach.py` como no provocadas, que es lo cierto.
+
+---
+
+## GLB-078 — Buscar todas las posiciones de la cadena vacía: el TW no encuentra ninguna, la VM y `zyjs` seis
+
+**Estado:** **abierto** — pendiente de decisión del autor: ¿dónde está la cadena vacía?
+**Encontrado por:** el análisis de los arneses del 2026-10-02, al leer
+`zyquality/cases/collect/findall_empty_pattern.zy`: uno de los ocho casos sembrados el
+2026-08-07 para unos oráculos que nunca se construyeron. Nada ejecutaba `cases/`, así que
+esta divergencia lleva viva desde ese día sin que nada la pregunte
+
+```zymbol
+>> ("hello"$?? "") ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw` | `[]` |
+| `zyvm`, `zyjs` | `[1, 2, 3, 4, 5, 6]` |
+
+### Qué hay que decidir
+
+Hay tres respuestas defendibles: ninguna posición (la cadena vacía no es algo que se
+encuentre), todas (antes de cada carácter y al final: seis, que es lo que da casi cualquier
+lenguaje), o un error (un patrón vacío no es una búsqueda). Ningún documento lo dice. El
+caso hermano es [`GLB-079`](GLOBAL.md), y conviene decidir los dos juntos.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/find-all-of-the-empty-string`, con `open_finding = "GLB-078"`, sin
+`expect`: mientras no haya decisión, la celda sólo pregunta si coinciden.
+
+---
+
+## GLB-079 — Partir una cadena por la cadena vacía: los motores Rust dejan una cadena vacía en cada extremo, `zyjs` no
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** el mismo caso abandonado que [`GLB-078`](GLOBAL.md),
+`zyquality/cases/collect/split_empty_separator.zy`, del 2026-08-07
+
+```zymbol
+>> ("hello" $/ "") ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm` | `[, h, e, l, l, o, ]` |
+| `zyjs` | `[h, e, l, l, o]` |
+
+### Causa
+
+Cada motor responde lo que responde la biblioteca de su anfitrión: el `split("")` de Rust
+produce una cadena vacía al principio y otra al final, y el de JavaScript, no. Es la clase
+que el proyecto ya ha visto otras veces: el lenguaje anfitrión decidiendo por Zymbol.
+
+### Qué hay que decidir
+
+Los caracteres sin extremos vacíos (lo que la mayoría espera, y lo que da `zyjs`), los
+extremos (lo que da Rust), o un error, como en [`GLB-078`](GLOBAL.md). Ningún documento lo
+dice.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/split-by-the-empty-string`, con `open_finding = "GLB-079"`, sin
+`expect`.
