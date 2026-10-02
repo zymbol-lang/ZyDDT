@@ -9,8 +9,9 @@
 | [`ZYVM-002`](#zyvm-002--el-diagnóstico-de---nombra-al-operador--10-celdas) | **corregido 2026-08-30** | el rechazo de `-` citaba al operador `+` |
 | [`ZYVM-003`](#zyvm-003--acumular-en-el-estado-de-un-módulo-es-on-en-la-vm-y-on-en-el-tree-walker) | **abierto** | acumular en el estado de un módulo es cuadrático: 3,3 s donde el TW tarda 0,013 s |
 | [`ZYVM-004`](#zyvm-004--una-función-llamada-por----o--corre-en-un-segundo-intérprete-que-se-salta-49-instrucciones) | **corregido 2026-09-14** | una función llamada por `$>`, `$|` o `$<` corría en un segundo intérprete que se saltaba 49 instrucciones |
+| [`ZYVM-010`](#zyvm-010--soltar-valores-cuesta-entre-el-11-y-el-17--del-tiempo-de-la-vm) | **abierto** | soltar el valor viejo en cada escritura de registro, y desmontar marcos que nunca reutilizan un temporal: 11–17 % del tiempo |
 
-**Uno abierto: `ZYVM-003`.**
+**Dos abiertos: `ZYVM-003` y `ZYVM-010`.**
 
 Las chinchetas que los sujetan:
 
@@ -597,3 +598,89 @@ sin imprimir nada. Ahora son dos pasos: el valor a `dst` y después el bloque.
 
 `runtime-match-patterns/match-arm-with-a-value-and-a-block` y
 `match-arm-value-comes-before-its-block`, verdes.
+
+---
+
+## ZYVM-010 — Soltar valores cuesta entre el 11 y el 17 % del tiempo de la VM
+
+**Estado:** abierto — propuesta, no decisión
+**Encontrado por:** el perfil de [`IDEA-GOL-007`](../../GoL/HALLAZGOS.md) (el
+coste de una llamada por celda), el 2026-10-01, **no por una celda**
+**Familia:** ninguna con nombre todavía. Es coste, no semántica: los tres
+motores dan la misma salida
+
+### Qué se observa
+
+`zyquality/cost/casos/llamada_por_celda.zy.in` y su control `en_linea.zy.in`
+con lado 160 (256 000 llamadas), `perf` sobre un binario de release compilado
+aparte con símbolos y punteros de marco:
+
+| | en línea | con llamada |
+|---|---:|---:|
+| tiempo | 606 ms | 705 ms |
+| instrucciones de máquina | 5 136 M | 5 620 M |
+| tiempo en `drop_glue<Value>` | ~11 % | ~17 % |
+| muestras de liberación | 511 | 730 |
+
+Quién llama a la liberación:
+
+| línea | en línea | con llamada | qué es |
+|---|---:|---:|---|
+| `lib.rs:1394` `wreg!` | 321 | 354 | escribir un registro suelta el valor anterior |
+| `lib.rs:4601` `reg_set` | 114 | 155 | lo mismo, por el auxiliar |
+| `mod.rs:823` `drop_in_place` | 8 | **90** | desmontar el marco del llamado al volver (`truncate`) |
+| `result.rs:835` | 48 | 97 | liberaciones dentro de caminos de `Result` |
+
+Dos lecturas, y la segunda es la que da nombre a la ficha:
+
+1. **La llamada.** Cada una cuesta ~1 900 instrucciones de máquina y ~1 500
+   ciclos más que el mismo trabajo en línea, y desmontar el marco es la partida
+   mayor que crece. El marco de `vecinos` — cinco parámetros, cinco locales —
+   tiene **34 registros**, porque el compilador nunca reutiliza un temporal:
+   `alloc_temp` sólo avanza `next_reg`. Cada llamada hace `resize` de 34 `Unit`
+   al entrar y suelta 34 valores al salir.
+2. **Todo programa.** Sin llamada alguna, la VM pasa ~11 % de su tiempo en
+   `drop_glue<Value>`, y casi todo viene de **escribir un registro**: la
+   asignación suelta el valor anterior por una función fuera de línea.
+
+### Causa
+
+`crates/zymbol-vm/src/lib.rs` — `wreg!` y `reg_set` escriben con `*slot = v`,
+que llama a la liberación del valor viejo; `Instruction::Return` hace
+`value_stack.truncate(base)`, que la llama una vez por registro del marco. Y
+`crates/zymbol-compiler/src/lib.rs`, `alloc_temp`, que hace los marcos tan
+grandes como el número de temporales de la función entera.
+
+**Sin separar todavía:** qué parte de esas liberaciones es de valores que no
+poseen nada (`Int`, `Float`, `Bool`, `Char`, `Unit`) y qué parte decrementa un
+`Rc` de verdad (una fila del tablero, el propio `m`). El perfil dice dónde se
+llama, no qué se suelta.
+
+### Alcance
+
+Toda ejecución en la VM, que es el futuro motor por defecto. No lo ve nada:
+`zyq consensus` compara salidas, `bench/` compara cada programa consigo mismo
+contra su línea base, y la celda `call/function-in-hot-loop` sólo sujeta la
+diferencia entre llamar y no llamar — no el 11 % que pagan los dos.
+
+### Arreglo propuesto
+
+Dos, independientes, y ninguno decidido:
+
+- **En la VM:** no soltar cuando el valor viejo no posee nada — mirar la
+  variante antes de escribir y, si es escalar, sobrescribir sin liberación; y lo
+  mismo al desmontar el marco. No cambia la semántica; toca el bucle más
+  caliente del intérprete.
+- **En el compilador:** reutilizar los temporales cuando la sentencia que los
+  pidió termina, para que el marco mida lo que la función necesita a la vez y no
+  todo lo que pidió alguna vez. Más invasivo: hace falta saber qué registro
+  sigue vivo, y reutilizar uno que lo está es un bug de valores silencioso.
+
+Antes de cualquiera de los dos: separar escalares de `Rc` en las muestras, que
+dice cuánto hay que ganar con el primero.
+
+### Qué lo sujeta
+
+Nada todavía. La celda `call/function-in-hot-loop` (`time-ratio`, límite 1,30)
+vigila la llamada; el coste de soltar en cada escritura no tiene celda.
+
