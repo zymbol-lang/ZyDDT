@@ -248,3 +248,28 @@ src  = """
     >> "a" ¶
 }
 """
+
+# ── A group or a bracket left after a complete expression (2026-10-02) ──────
+#
+# The forms two fossils of the ZyQuality corpus were written in, and the only
+# programs that provoked these four diagnostics until the fossils were rewritten
+# (`zyquality/messages/reach.py`). zyjs reads both differently (GLB-076).
+
+[[cell]]
+id   = "stray-group-after-an-expression"
+what = "`[3, 1]$^+ (1)`: a group after a complete expression, and its help"
+src  = """
+x = [3, 1]$^+ (1)
+>> x ¶
+"""
+open_finding = "GLB-076"
+
+[[cell]]
+id   = "stray-bracket-after-an-expression"
+what = "`s$++[1:\"x\"]`: a bracket after a complete expression, and its help"
+src  = """
+s = "abc"
+t = s$++[1:"x"]
+>> t ¶
+"""
+open_finding = "GLB-076"

@@ -33,3 +33,40 @@ src  = """
     >> "c" ¶
 }
 """
+
+# ── The error kind, written as one word (added 2026-10-02) ──────────────────
+#
+# The `##Kind("…")` constructor and the `##Kind(m)` pattern arrived with GoL's
+# decisions (2026-09-29) with five diagnostics and nothing to provoke them —
+# `zyquality/messages/reach.py` listed them the day after, and it was not in the
+# gate to say so. One cell per diagnostic family, each with its help.
+
+[[cell]]
+id   = "error-kind-written-apart"
+what = "a pattern whose `##` and kind are separated by a space — the kind is written together"
+src  = """
+r = ##Parse("x")
+?? r {
+    ## Parse => >> "p" ¶
+    _ => >> "o" ¶
+}
+"""
+
+[[cell]]
+id   = "error-pattern-left-open"
+what = "an error pattern whose parenthesis is never closed — and its help, ##Kind(message)"
+src  = """
+r = ##Parse("x")
+?? r {
+    ##Parse(m => >> m ¶
+    _ => >> "o" ¶
+}
+"""
+
+[[cell]]
+id   = "error-value-left-open"
+what = "an error value whose message is never closed — and its help, ##Kind(\"message\")"
+src  = """
+e = ##Parse("x"
+>> e ¶
+"""

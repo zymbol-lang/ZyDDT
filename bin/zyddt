@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from zyddt import axes as A            # noqa: E402
 from zyddt import compare as C         # noqa: E402
 from zyddt import engines as E          # noqa: E402
+from zyddt import findings as F         # noqa: E402
 from zyddt import exclude as X         # noqa: E402
 from zyddt import observe as O          # noqa: E402
 from zyddt import report as R           # noqa: E402
@@ -571,17 +572,18 @@ def cmd_axis(args, cfg) -> int:
                 narrowed += 1
 
             if con.outcome == C.WORDING:
-                worded += 1
                 wording_now.add(label)
                 if label not in baseline:
                     if owe(*C.debt(debt, True, frozenset())):
-                        continue
+                        continue                   # counted once, as known
+                    worded += 1
                     worst = worse(worst, RED)      # a NEW wording split is a red
                     print(f"{R.red('NEW WORDING')} {label}  "
                           f"{R.dim('not in wording.baseline')}")
                     if detailed():
                         _print_consensus(label, con)
                 else:
+                    worded += 1
                     owe(*C.debt(debt, False, frozenset()))   # baselined: green
                     if args.verbose:
                         _print_consensus(label, con)
@@ -1008,6 +1010,88 @@ def cmd_pins(args, cfg) -> int:
     return rc
 
 
+# ── findings — the index of HALLAZGOS/, read from the fichas themselves ──────
+#
+# HALLAZGOS/ had two hand-kept indexes, and both rotted: the table atop GLOBAL.md
+# stopped at GLB-007 with 77 fichas filed, and INDICE.md § 0 counted the state
+# of 2026-08-30. Five fichas kept saying «abierto» weeks after their last part
+# was fixed. The state of a finding is its own **Estado** line, so the index is
+# computed from that, and what holds an open one is computed from the
+# declarations that name it.
+
+ESTADO, _state_of = F.ESTADO, F.state_of
+
+
+def _fichas(root: Path) -> list[tuple[str, str, str, str]]:
+    """→ [(file, id, title, state)] for every `## ID — title` with an Estado."""
+    out = []
+    for f in sorted((root / "HALLAZGOS").glob("*.md")):
+        if f.name == "INDICE.md":
+            continue
+        text = f.read_text(encoding="utf-8")
+        heads = list(re.finditer(r"^##\s+([A-Z]{2,6}-\d+)\s+—\s+(.*)$", text, re.M))
+        for i, m in enumerate(heads):
+            body = text[m.end(): heads[i + 1].start() if i + 1 < len(heads) else len(text)]
+            e = ESTADO.search(body)
+            out.append((f.name, m.group(1), m.group(2).strip(),
+                        _state_of(e.group(1)) if e else "other"))
+    return out
+
+
+def _held(root: Path) -> dict[str, list[str]]:
+    """→ {finding id: [what declares it as debt]} — ZyDDT cells, and
+    zyquality/cost/ cases when that repository is cloned beside this one."""
+    held: dict[str, list[str]] = {}
+    for ax in A.load_all():
+        for c in ax.cells:
+            d = c.open_finding
+            for fid in sorted({d} if isinstance(d, str) else set((d or {}).values())):
+                held.setdefault(fid, []).append(f"{ax.id}/{c.id}")
+    cost = root.parent / "zyquality" / "cost" / "cost.toml"
+    if cost.is_file():
+        for case in tomllib.loads(cost.read_text(encoding="utf-8")).get("case", []):
+            for fid in (case.get("open_finding") or {}).values():
+                held.setdefault(fid, []).append(f"zyquality/cost {case.get('id', '?')}")
+    return held
+
+
+def cmd_findings(args, cfg) -> int:
+    """Open and closed fichas, what holds each open one, and the contradictions."""
+    root = Path(__file__).resolve().parents[1]
+    fichas, held = _fichas(root), _held(root)
+    rc = GREEN
+    by_file: dict[str, dict[str, int]] = {}
+    for fname, fid, title, state in fichas:
+        by_file.setdefault(fname, {}).setdefault(state, 0)
+        by_file[fname][state] += 1
+        if state == "open":
+            if fid in held:
+                print(f"  {R.yellow('open')}      {fid:<9} {R.dim(title[:70])}")
+                print(R.dim(f"            held by {', '.join(held[fid])}"))
+            else:
+                print(f"  {R.yellow('open')}      {fid:<9} {R.dim(title[:70])}")
+                print(f"            {R.yellow('watched by nothing')}")
+        elif state in ("closed", "dismissed") and fid in held:
+            # The ficha says it is over and a declaration still owes it: one of
+            # the two is wrong, and the gate cannot tell which.
+            print(R.red(f"  CONTRADICTION  {fid} is {state} in HALLAZGOS/{fname} and "
+                        f"still declared as debt by {', '.join(held[fid])}"))
+            rc = worse(rc, RED)
+        elif state == "other":
+            print(R.dim(f"  ?         {fid:<9} no Estado this index can read, in {fname}"))
+    filed = {fid for _, fid, _, _ in fichas}
+    for fid in sorted(set(held) - filed):
+        print(R.red(f"  UNFILED   {fid} is declared as debt by {', '.join(held[fid])} "
+                    f"and has no ficha"))
+        rc = worse(rc, RED)
+    print()
+    print(f"  {'file':<16}{'open':>6}{'closed':>8}{'other':>7}")
+    for fname, n in sorted(by_file.items()):
+        other = sum(v for k, v in n.items() if k not in ("open", "closed"))
+        print(f"  {fname:<16}{n.get('open', 0):>6}{n.get('closed', 0):>8}{other:>7}")
+    return rc
+
+
 def cmd_suite(args, cfg) -> int:
     """What every other repository's wrapper delegates to.
 
@@ -1062,6 +1146,9 @@ def cmd_suite(args, cfg) -> int:
     else:
         print(R.dim("    none recorded yet"))
 
+    print(R.bold("\n  findings") + R.dim("   (HALLAZGOS/, read from each ficha's Estado)"))
+    rc = worse(rc, cmd_findings(args, cfg))
+
     print()
     if rc == GREEN:
         # It used to end "see the undeclared axes above", and nothing above
@@ -1104,6 +1191,8 @@ def main() -> int:
                                     "that hold them")
     sub.add_parser("pins", help="every pin names a filed finding, in its name "
                                 "and in its first line")
+    sub.add_parser("findings", help="the fichas of HALLAZGOS/: open, closed, and "
+                                    "what holds each open one")
     sub.add_parser("suite", help="the whole layer, one verdict")
     for name, help_ in (("gen", "write every cell from axes/*.toml"),
                         ("axis", "generate, run, and publish the denominator")):
@@ -1131,7 +1220,7 @@ def main() -> int:
             "check": cmd_check, "gen": cmd_gen, "axis": cmd_axis,
             "suite": cmd_suite, "selftest": cmd_selftest,
             "surfaces": cmd_surfaces, "premises": cmd_premises,
-            "pins": cmd_pins}[args.cmd](args, cfg)
+            "pins": cmd_pins, "findings": cmd_findings}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

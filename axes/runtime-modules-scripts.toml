@@ -567,3 +567,18 @@ src    = """
     #> { u::f => g }
 }
 """
+
+# ── GLB-017 F, which nothing held (added 2026-10-02) ─────────────────────────
+#
+# `v.f(1)` on a number: the tree-walker used to say `undefined module alias` and
+# the other two `the dot reaches a dictionary key`. All three say the second
+# now, and no cell asked — so the ficha kept calling it open.
+
+[[cell]]
+id     = "dot-call-on-a-number"
+expect = "error"
+what   = "`v.f(1)` with `v` a number: the dot reaches a dictionary key, and this is an Int"
+src    = """
+v = 5
+>> v.f(1) ¶
+"""
