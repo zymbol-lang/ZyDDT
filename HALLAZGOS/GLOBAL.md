@@ -5413,7 +5413,7 @@ a propósito: un fichero pregunta sólo lo que el lenguaje ha decidido.
 
 ## GLB-074 — Los motores Rust avisan `unused variable` de una variable que se lee, si un parámetro de lambda se llama igual
 
-**Estado:** **abierto** — sin decisión pendiente: es un falso positivo
+**Estado:** **corregido 2026-10-02 (paso P1.1)** — era un falso positivo, sin decisión pendiente
 **Encontrado por:** el cruce del 2026-10-01 de las exclusiones `ANSI_FORMAT` de ZyQuality con
 `zyddt ask`: `corpus/memory_correct_01_lambdas.zy` divergía en el aviso
 
@@ -5432,22 +5432,25 @@ Con el parámetro renombrado (`(b, x) -> b + x`) ninguno avisa.
 
 ### Causa
 
-Sin localizar. Es la forma de [`GLB-003`](GLOBAL.md) — declaraciones indexadas por NOMBRE, de
+`variable_analysis.rs`, brazo `Expr::Lambda`: el parámetro se declaraba en `variables`
+(indexado por nombre) y se quedaba allí al salir de la lambda, así que la lectura posterior
+`f(base, 2)` se acreditaba al parámetro. Ahora se aparta la entrada de fuera y se repone al
+salir. Es la forma de [`GLB-003`](GLOBAL.md) — declaraciones indexadas por NOMBRE, de
 modo que la segunda pisa a la primera —, aquí con el parámetro de la lambda pisando a la
 variable de fuera: la lectura de la línea 3 no se le acredita a la primera `base`.
-Pendiente de comprobar si `zymbol-semantic/src/last_use.rs`, que decide cuándo se libera un
-valor, comparte la confusión: un `Int` no lo enseñaría.
+Medido con una colección (`base = [1, 2, 3]`, `base$#` en la lambda): `last_use.rs` NO
+comparte la confusión; `base` sigue vivo y se imprime tras la llamada, en `zytw` y `zyvm`.
 
 ### Alcance
 
-`corpus/memory_correct_01_lambdas.expected` graba el aviso falso como correcto. Cuando se
-corrija, ese golden saldrá STALE, que es lo que tiene que pasar.
+`corpus/memory_correct_01_lambdas.expected` graba el aviso falso como correcto. Al corregirlo,
+ese golden salió STALE y se regrabó: sólo se fue el aviso.
 
 ### Qué lo sujeta
 
-`unused/lambda-parameter-shadowing-a-read-variable`, con
-`open_finding = { zytw = "GLB-074", zyvm = "GLB-074" }`, y las celdas de control del mismo
-eje, en verde.
+`unused/lambda-parameter-shadowing-a-read-variable`, sin
+`open_finding` desde la corrección, más las celdas de colección y de lambda de bloque y las
+de control del mismo eje.
 
 ---
 
