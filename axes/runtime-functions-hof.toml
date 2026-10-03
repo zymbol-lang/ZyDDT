@@ -520,12 +520,13 @@ src    = """
 
 # ── The neighbour of the sort comparator (added 2026-10-03) ─────────────────
 #
-# Measured while closing GLB-024: a `$|` predicate that answers an Int is a
-# `##Type` in the tree-walker and plain truthiness in the VM and zyjs.
+# Measured while closing GLB-024: a `$|` predicate that answers an Int was a
+# `##Type` in the tree-walker and plain truthiness in the VM and zyjs. Decided
+# 2026-10-03 (GLB-080): a ##Type in all three.
 
 [[cell]]
 id     = "filter-predicate-not-a-bool-is-a-type-error"
-what   = "a `$|` predicate that answers a number: the tree-walker refuses it as a ##Type, the VM and zyjs filter by truthiness (GLB-080)"
+what   = "a `$|` predicate that answers a number is refused as a ##Type, as a sort comparator is (GLB-080, decided 2026-10-03); before, the VM and zyjs filtered by truthiness"
 expect = "ok"
 src    = """
 !? {
@@ -537,4 +538,16 @@ src    = """
     >> "Type" ¶
 }
 """
-open_finding = { zyvm = "GLB-080", zyjs = "GLB-080" }
+
+[[cell]]
+id     = "filter-after-split-predicate-not-a-bool-is-a-type-error"
+what   = "the same refusal on the path where the VM fuses the split and the filter: `s$/ \",\"$| f`"
+expect = "ok"
+src    = """
+!? {
+    _q = "a,b,c"$/ ","$| (x -> 1)
+    >> [1][5] ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""

@@ -5658,7 +5658,7 @@ dice.
 
 ## GLB-080 — Un predicado de `$|` que no devuelve un Bool: el TW lo rechaza como `##Type`, la VM y `zyjs` lo leen como verdadero o falso
 
-**Estado:** **abierto** — pendiente de decisión del autor; la propuesta es la de [`GLB-024`](GLOBAL.md): error `##Type`
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-080)** — decidido por el autor: error `##Type` en los tres, como [`GLB-024`](GLOBAL.md)
 **Encontrado por:** al medir las formas vecinas de `GLB-024` (paso P1.3, 2026-10-03)
 **Familia:** las reglas de la v0.0.9 sin truthiness
 
@@ -5684,7 +5684,16 @@ a = [3, 1, 2]
 Los dos Rust y `check` avisan en tiempo de análisis (`filter lambda should return Bool, got
 Int`), pero la VM sigue ejecutando con truthiness.
 
-### Qué hay que decidir
+### Decidido el 2026-10-03
+
+Opción 1 de tres (error `##Type`; las otras eran truthiness en los tres y aviso sin error).
+La VM tenía dos sitios de filtro con `is_truthy()` — el de colección y el fusionado
+`s$/ sep$| f` —, y `zyjs` uno con `truthy()`; los tres lanzan ya `filter lambda must return
+boolean, got {tipo}`, el texto del TW. Barrido 4 colecciones (array, tupla, cadena,
+diccionario) × 7 predicados (`1`, `0`, `1.5`, `""`, `[]`, `#1`, `x > 1`): iguales en los
+tres. Ningún programa del workspace usaba un predicado que no fuera Bool.
+
+### La pregunta, tal como se planteó
 
 Si `$|` sigue a `$^` (error `##Type` en los tres, que es lo que ya hace el TW) o si un
 predicado tiene otro significado. Ningún documento lo dice para `$|`; la regla general de
@@ -5692,5 +5701,6 @@ v0.0.9 («sin truthiness») apunta a lo primero.
 
 ### Qué lo sujeta
 
-`runtime-functions-hof/filter-predicate-not-a-bool-is-a-type-error`, con
-`open_finding = { zyvm = "GLB-080", zyjs = "GLB-080" }` y `expect = "ok"`.
+`runtime-functions-hof/filter-predicate-not-a-bool-is-a-type-error`, sin
+`open_finding` desde la corrección, y `filter-after-split-predicate-not-a-bool-is-a-type-error`
+para el camino fusionado de la VM.
