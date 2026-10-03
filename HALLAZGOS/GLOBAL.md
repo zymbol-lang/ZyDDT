@@ -5372,7 +5372,7 @@ ZyQuality `reject/collections/15`.
 
 ## GLB-073 — Empates en `$^`: cada motor deja los elementos iguales en un orden distinto, y el lenguaje no dice cuál
 
-**Estado:** **abierto** — pendiente de decisión del autor: ¿es `$^` estable?
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-073)** — decidido por el autor: `$^` es estable
 **Encontrado por:** reescribir el fósil `corpus/collections/22_sort_named.zy` (2026-10-02):
 llevaba sin ejecutarse en ningún motor desde la importación del corpus, tapado para `zyjs`
 por una exclusión `ANSI_FORMAT`, y la primera ejecución real divergió
@@ -5401,7 +5401,34 @@ regla de intercambio no lo es) e inserción en `zyjs` (`web/src/zymbol/zymbol.js
 `GUIDE.md` § Sort dice que el comparador responde `#1` si el primero va antes, y nada de los
 empates. `REFERENCE.md`, `COLLECTIONS.md` y `LLM.md` tampoco.
 
-### Arreglo propuesto
+### Lo que midió la decisión (2026-10-03)
+
+El ejemplo de cinco elementos coincidía por casualidad. Con nueve y tres grupos de empates
+(`a`…`i`, claves 2,1,2,1,2,1,3,1,2), **ningún** motor era estable con un comparador
+estricto — el TW daba `giacehfdb` donde lo estable es `gaceibdfh`, mezclando los empates, no
+conservándolos —, y **los tres** lo eran ya con uno no estricto (`>=`, `<=`). Los 13
+comparadores que escriben los seis programas del workspace que usan `$^` son estrictos, y
+`GUIDE.md` sólo muestra estrictos.
+
+Tres reglas simuladas contra `sorted` de Python, 300 arrays de 9 elementos:
+
+| regla | estricto | no estricto |
+|---|---|---|
+| la de antes: intercambiar si el primero no va antes | 0/300 | 300/300 |
+| A: intercambiar si el segundo va antes | 300/300 | 0/300 — invierte los empates |
+| B: intercambiar si el primero no va antes **y** el segundo sí | 300/300 | 300/300 |
+
+### Decidido: regla B, en los tres
+
+Opción 1 de tres (las otras: regla A, más barata, que rompía los comparadores no estrictos;
+y unificar el algoritmo sin garantizar nada sobre los empates). El TW y la VM preguntan al
+comparador la segunda vez sólo cuando la primera responde `#0`; `zyjs` dejó su ordenación por
+inserción y corre la misma burbuja, llamada por llamada. Medido: los cuatro comparadores
+(`>`, `>=`, `<`, `<=`) dan el orden de `sorted` en los tres; un comparador que imprime
+imprime lo mismo en los tres; `[]`, un elemento, cadenas y Float, iguales; el comparador que no
+responde un Bool sigue siendo `##Type`. `GUIDE.md` § Sort documenta la garantía.
+
+### La propuesta, tal como estaba
 
 Decidir que `$^` es **estable** — es lo que el comentario del TW ya afirma y lo que garantiza
 `Array.prototype.sort` desde ES2019 — y que los tres motores intercambien sólo cuando el
@@ -5410,9 +5437,12 @@ decisión.
 
 ### Qué lo sujeta
 
-`runtime-collection-ops/sort-ties-under-a-strict-comparator`, con
-`open_finding = "GLB-073"`: KNOWN mientras diverja; el día que coincidan sale DEBT PAID, y
-entonces la celda pasa a afirmar el orden decidido. El fichero del corpus perdió sus empates
+`runtime-collection-ops/sort-ties-under-a-strict-comparator`, ya sin `open_finding` y con un
+oráculo (`sorted` de Python es estable), más `sort-many-ties-under-a-strict-comparator`,
+`sort-many-ties-under-a-non-strict-comparator` (los dos con oráculo) y
+`sort-comparator-calls-in-the-same-order`. Antes de la decisión la sujetaba, con
+`open_finding = "GLB-073"`, en KNOWN hasta el 2026-10-03, cuando salió DEBT PAID y pasó a
+afirmar el orden decidido. El fichero del corpus perdió sus empates
 a propósito: un fichero pregunta sólo lo que el lenguaje ha decidido.
 
 ---
