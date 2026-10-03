@@ -5623,7 +5623,7 @@ siguen en la lista de `reach.py` como no provocadas, que es lo cierto.
 
 ## GLB-078 — Buscar todas las posiciones de la cadena vacía: el TW no encuentra ninguna, la VM y `zyjs` seis
 
-**Estado:** **abierto** — pendiente de decisión del autor: ¿dónde está la cadena vacía?
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-078/079)** — decidido por el autor: un patrón vacío es error `##Index`
 **Encontrado por:** el análisis de los arneses del 2026-10-02, al leer
 `zyquality/cases/collect/findall_empty_pattern.zy`: uno de los ocho casos sembrados el
 2026-08-07 para unos oráculos que nunca se construyeron. Nada ejecutaba `cases/`, así que
@@ -5647,14 +5647,51 @@ caso hermano es [`GLB-079`](GLOBAL.md), y conviene decidir los dos juntos.
 
 ### Qué lo sujeta
 
-`runtime-collection-ops/find-all-of-the-empty-string`, con `open_finding = "GLB-078"`, sin
-`expect`: mientras no haya decisión, la celda sólo pregunta si coinciden.
+`runtime-collection-ops/find-all-of-the-empty-string`, que hasta la decisión llevaba
+`open_finding = "GLB-078"` sin `expect` y sólo preguntaba si coincidían; ahora afirma el
+rechazo (abajo).
+
+
+### Decidido el 2026-10-03, junto con [`GLB-079`](GLOBAL.md)
+
+Medido antes de decidir, con las formas vecinas (cada una, un programa `>> (…) ¶`):
+
+| expresión | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `"hello"$?? ""` | `[]` | `[1, 2, 3, 4, 5, 6]` | `[1, 2, 3, 4, 5, 6]` |
+| `""$?? ""` | `[]` | `[1]` | `[1]` |
+| `"hello" $/ ""` | `[, h, e, l, l, o, ]` | `[, h, e, l, l, o, ]` | `[h, e, l, l, o]` |
+| `"" $/ ""` | dos cadenas vacías | dos cadenas vacías | `[]` |
+| `"hello"$~~["":"X"]` | `hello` | `XhXeXlXlXoX` | **no termina** |
+| `"hello"$~~["":"X":1]` | `hello` | `Xhello` | `Xhello` |
+| `"hello"$? ""` | `#1` | `#1` | `#1` |
+| `"hello"$- ""`, `$-- ""` | `hello` | `hello` | `hello` |
+
+Ningún programa del workspace usa un patrón vacío, ni literal ni por una variable.
+
+Opción 1 de tres: **error `##Index`** (tipo correcto, valor que no sirve: D1) en los tres
+operadores que *localizan* apariciones — `$??` (`$?? pattern must not be empty`), `$/`
+(`$/ delimiter must not be empty`) y `$~~` (`$~~ pattern must not be empty`). Las otras eran
+«el vacío está en cada frontera» (la respuesta de la VM) y «caracteres sin extremos, ninguna
+posición». Se quedan como estaban, porque su respuesta no depende de cómo se lea el vacío:
+`$? ""` es `#1` y `$-`/`$--` con `""` no quitan nada.
+
+Implementado en los tres; en la VM, en `StrSplit` y en sus cuatro fusiones (`Count`, `Map`,
+`Filter`, `Reduce`). El cuelgue de `zyjs` con `$~~` desaparece con el rechazo:
+`indexOf('', i)` es siempre `i`, y el bucle volvía a encontrar el vacío delante del mismo
+carácter. Con una cuenta negativa y un patrón vacío, los tres nombran primero la cuenta.
+
+Lo sujetan, en `runtime-collection-ops`: `find-all-of-the-empty-string`,
+`split-by-the-empty-string`, `replace-the-empty-string`, `replace-the-empty-string-first-n`,
+`split-by-the-empty-string-then-count` (un `!?` con un único `:! ##Index`; el camino que no
+rechaza llega a `1 / 0`, un `##Div` que escapa) y `the-empty-string-is-contained`, con oráculo.
+Al medir salieron cuatro más: [`GLB-081`](GLOBAL.md) a [`GLB-084`](GLOBAL.md).
 
 ---
 
 ## GLB-079 — Partir una cadena por la cadena vacía: los motores Rust dejan una cadena vacía en cada extremo, `zyjs` no
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-078/079)** — decidido por el autor: un separador vacío es error `##Index`
 **Encontrado por:** el mismo caso abandonado que [`GLB-078`](GLOBAL.md),
 `zyquality/cases/collect/split_empty_separator.zy`, del 2026-08-07
 
@@ -5681,8 +5718,13 @@ dice.
 
 ### Qué lo sujeta
 
-`runtime-collection-ops/split-by-the-empty-string`, con `open_finding = "GLB-079"`, sin
-`expect`.
+`runtime-collection-ops/split-by-the-empty-string`, que hasta la decisión llevaba
+`open_finding = "GLB-079"` sin `expect`; ahora afirma el rechazo.
+
+### Decidido el 2026-10-03
+
+Con [`GLB-078`](GLOBAL.md), donde están la medición, las opciones y las celdas: un separador
+vacío es error `##Index` (`$/ delimiter must not be empty`).
 
 ---
 
@@ -5734,3 +5776,75 @@ v0.0.9 («sin truthiness») apunta a lo primero.
 `runtime-functions-hof/filter-predicate-not-a-bool-is-a-type-error`, sin
 `open_finding` desde la corrección, y `filter-after-split-predicate-not-a-bool-is-a-type-error`
 para el camino fusionado de la VM.
+
+---
+
+## GLB-081 — Coincidencias solapadas en `$??`: la VM las saltaba
+
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-078/079)** — decidido por el autor: solapadas
+**Encontrado por:** al medir las vecinas de `GLB-078`
+
+```zymbol
+>> ("aaa"$?? "aa") ¶
+>> ("aaaa"$?? "aa") ¶
+```
+
+| | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `"aaa"$?? "aa"` | `[1, 2]` | `[1]` | `[1, 2]` |
+| `"aaaa"$?? "aa"` | `[1, 2, 3]` | `[1, 3]` | `[1, 2, 3]` |
+
+La VM usaba `match_indices` de Rust, que no solapa. Decidido: **cada posición donde empieza el
+patrón** — la lectura literal de *«all positions of a pattern»* (`GUIDE.md`) y lo que ya hacían
+el TW y `zyjs`; la otra opción era no solapar, como cuenta `$~~`. La VM recorre ahora ventanas
+(`windows`) sobre bytes en ASCII y sobre caracteres si no. Lo sujeta
+`runtime-collection-ops/find-all-overlapping`, con oráculo.
+
+---
+
+## GLB-082 — `$??` con un patrón más largo que la cadena: el TW entraba en pánico
+
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-078/079)** — sin decisión: la VM y `zyjs` ya daban `[]`
+**Encontrado por:** leyendo `eval_collection_find_all` del TW al medir `GLB-078`
+
+```zymbol
+>> ("ab"$?? "abc") ¶
+```
+
+`thread 'zymbol-program' panicked … range end index 3 out of range for slice of length 2`.
+`saturating_sub` daba 0 y el bucle cortaba `string_chars[0..3]`. Ahora un patrón más largo que
+la cadena no está en ninguna parte. Lo sujeta
+`runtime-collection-ops/find-all-of-a-pattern-longer-than-the-text`, con oráculo.
+
+---
+
+## GLB-083 — `$??` de un carácter en un texto no ASCII: la VM numeraba las coincidencias
+
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-078/079)** — sin decisión
+**Encontrado por:** leyendo `StrFindPos` de la VM al medir `GLB-078`
+
+```zymbol
+>> ("ñaña"$?? 'a') ¶
+```
+
+La VM daba `[1, 2]` —el ordinal de cada coincidencia: `.filter().enumerate()`— donde el TW y
+`zyjs` dan `[2, 4]`. Sólo en el camino no ASCII con un carácter como patrón; el de cadena ya
+convertía bytes a posiciones. Lo sujeta
+`runtime-collection-ops/find-all-of-a-char-in-a-non-ascii-text`, con oráculo.
+
+---
+
+## GLB-084 — `$~~[p:r:N]` en el TW volvía a buscar desde el principio y reemplazaba lo que acababa de escribir
+
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-078/079)** — sin decisión: la VM y `zyjs` ya acertaban
+**Encontrado por:** leyendo `eval_string_replace` del TW al tocarlo para `GLB-078`
+
+```zymbol
+>> ("hello"$~~["l":"Ll":2]) ¶
+```
+
+El TW daba `heLLllo`; la VM y `zyjs`, `heLlLlo`. Tras cada reemplazo buscaba desde el inicio de
+la cadena ya modificada, así que encontraba la `l` del reemplazo. Si el reemplazo no contiene el
+patrón (`"l"` → `"L"`) no se nota, y por eso nadie lo vio. Ahora usa `str::replacen`, de
+izquierda a derecha y sin volver sobre lo escrito. Lo sujeta
+`runtime-collection-ops/replace-first-n-does-not-look-at-what-it-wrote`, con oráculo.
