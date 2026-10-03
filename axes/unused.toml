@@ -11,7 +11,7 @@
 #               declarations were kept in a map keyed by NAME;
 #   · ZYJS-043  an uncalled function reported as an unused variable;
 #   · GLB-061   an unused constant (decided: it warns);
-#   · GLB-074   a lambda parameter with the name of a variable that IS read
+#   · GLB-074   (corrected 2026-10-02) a lambda parameter with the name of a variable that IS read
 #               later: the Rust engines report the variable as unused. Same
 #               shape as GLB-003 — a second declaration of a name displacing
 #               the first.
@@ -65,4 +65,26 @@ base = 100
 f = (base, x) -> base + x
 >> f(base, 2) ¶
 """
-open_finding = { zytw = "GLB-074", zyvm = "GLB-074" }
+
+[[cell]]
+id     = "lambda-parameter-shadowing-a-read-collection"
+what   = "the same with a collection: the outer value is still alive after the call, and nothing is reported"
+expect = "ok"
+src    = """
+base = [1, 2, 3]
+f = (base, x) -> base$# + x
+>> f(base, 2) ¶
+>> base ¶
+"""
+
+[[cell]]
+id     = "block-lambda-parameter-shadowing-a-read-variable"
+what   = "a block lambda whose parameter has the name of a variable that IS read later: nothing to report"
+expect = "ok"
+src    = """
+base = [1, 2, 3]
+f = (base, x) -> {
+    <~ base$# + x
+}
+>> f(base, 2) ¶
+"""
