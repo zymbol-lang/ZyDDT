@@ -5456,8 +5456,8 @@ de control del mismo eje.
 
 ## GLB-075 — `<\ ls \>`: cuatro respuestas para un nombre sin definir dentro de una orden de shell
 
-**Estado:** **abierto** — sin decisión pendiente: `GLB-004` ya fijó que cada argumento de
-`<\ … \>` es una expresión
+**Estado:** **corregido 2026-10-02 (paso P1.2)** — sin decisión pendiente: `GLB-004` ya fijó
+que cada argumento de `<\ … \>` es una expresión
 **Encontrado por:** el análisis de los arneses del 2026-10-01, al ver por qué seis ficheros
 `i18n/test_*` del corpus no parseaban en el CLI y sí en `zyjs`
 
@@ -5488,15 +5488,23 @@ navegador.
 - **zyjs:** su lexer captura `<\ … \>` como **un** token de texto (`zymbol.js`, línea ~800),
   sin parsear expresiones: una palabra suelta es texto y `|` no es un error.
 
-### Arreglo propuesto
+### Arreglo
 
-Inferir cada argumento en `type_check` como cualquier otra expresión, y que `zyjs` lexee el
-contenido como expresiones, como dice el comentario de `BashExecExpr` en `zymbol-ast`.
+Hecho: `type_check` infiere cada argumento como cualquier otra expresión, y el lexer de
+`zyjs` emite `BASHOPEN`/`BASHCLOSE` y lexea el contenido normalmente; el intérprete evalúa y
+concatena los argumentos (`expr.args`), y las sustituciones del navegador (`date`, `echo`)
+se reconocen sobre el resultado. Barrido de parseo de los 3107 `.zy` antes y después: el
+estado sólo cambia en `bare-word-pipe-does-not-parse` (OK → ERR, que es lo buscado).
+`check` de todos los ficheros con `<\`: sólo rechaza los de las celdas y
+`corpus/i18n/matematicas/http.zy`, que tenía `'%{http_code}'` — una interpolación de una
+variable inexistente en una función que nadie llama —; escapado a `%\{http_code\}`.
+Con `<\ cmd \>` y `cmd` definida, `zyjs` ya da el valor, no el texto «cmd».
 
 ### Qué lo sujeta
 
-`environment/bare-word-is-a-variable` y `environment/bare-word-pipe-does-not-parse`, con
-`open_finding = "GLB-075"`. No se llaman `shell-*` a propósito: esa regla de
+`environment/bare-word-is-a-variable` y `environment/bare-word-pipe-does-not-parse`, ya sin
+`open_finding`, y tres celdas nuevas: `bare-word-call-arity-is-checked`,
+`bare-word-call-output-mark-is-checked` y `bare-word-defined-variable-is-its-value`. No se llaman `shell-*` a propósito: esa regla de
 `exclusions.toml` excusa a `zyjs`, y aquí `zyjs` es la mitad de la pregunta.
 
 ---
