@@ -1585,15 +1585,64 @@ t(v) {
 # (GLB-073), and an assertion here would be inventing it. The cell asks the
 # engines alike, diverges today, and carries the debt until the decision lands.
 
+# `$^` is stable — decided 2026-10-03 (GLB-073). A pair is swapped only when the
+# first does NOT go before the second AND the second goes before the first, so
+# a strict comparator (`>`, the form every program in the workspace writes)
+# keeps its ties in input order, and a non-strict one (`>=`) still does. Python's
+# `sorted` is documented stable, and the oracle sorts by the same key.
+
 [[cell]]
 id   = "sort-ties-under-a-strict-comparator"
-what = "two elements a strict comparator calls equal: which one `$^` leaves first"
+what = "two elements a strict comparator calls equal stay in their input order: `$^` is stable (GLB-073)"
 src  = """
 p = [#(n: "Zara", s: 88), #(n: "Inti", s: 72), #(n: "Luna", s: 95), #(n: "Omar", s: 72), #(n: "Mia", s: 60)]
 q = p$^ (a, b -> a.s > b.s)
 >> q[3].n " " q[4].n ¶
 """
-open_finding = "GLB-073"
+oracle.py = """
+p = [("Zara", 88), ("Inti", 72), ("Luna", 95), ("Omar", 72), ("Mia", 60)]
+q = sorted(p, key=lambda t: -t[1])
+print(q[2][0] + " " + q[3][0])
+"""
+
+[[cell]]
+id   = "sort-many-ties-under-a-strict-comparator"
+what = "nine elements in three tie groups, a strict comparator: every group keeps its input order — five elements happened to agree before, nine did not"
+src  = """
+p = [#(n: "a", s: 2), #(n: "b", s: 1), #(n: "c", s: 2), #(n: "d", s: 1), #(n: "e", s: 2), #(n: "f", s: 1), #(n: "g", s: 3), #(n: "h", s: 1), #(n: "i", s: 2)]
+q = p$^ (x, y -> x.s < y.s)
+>> q[1].n q[2].n q[3].n q[4].n q[5].n q[6].n q[7].n q[8].n q[9].n ¶
+"""
+oracle.py = """
+p = [("a", 2), ("b", 1), ("c", 2), ("d", 1), ("e", 2), ("f", 1), ("g", 3), ("h", 1), ("i", 2)]
+print("".join(n for n, s in sorted(p, key=lambda t: t[1])))
+"""
+
+[[cell]]
+id   = "sort-many-ties-under-a-non-strict-comparator"
+what = "the same with `>=`: a non-strict comparator was already stable, and must stay so — the cheaper rule (swap when the second goes before) would reverse these ties"
+src  = """
+p = [#(n: "a", s: 2), #(n: "b", s: 1), #(n: "c", s: 2), #(n: "d", s: 1), #(n: "e", s: 2), #(n: "f", s: 1), #(n: "g", s: 3), #(n: "h", s: 1), #(n: "i", s: 2)]
+q = p$^ (x, y -> x.s >= y.s)
+>> q[1].n q[2].n q[3].n q[4].n q[5].n q[6].n q[7].n q[8].n q[9].n ¶
+"""
+oracle.py = """
+p = [("a", 2), ("b", 1), ("c", 2), ("d", 1), ("e", 2), ("f", 1), ("g", 3), ("h", 1), ("i", 2)]
+print("".join(n for n, s in sorted(p, key=lambda t: -t[1])))
+"""
+
+[[cell]]
+id   = "sort-comparator-calls-in-the-same-order"
+what = "a comparator that prints: the three engines ask it the same pairs in the same order (zyjs ran an insertion sort until GLB-073)"
+src  = """
+v = [3, 1, 2, 1]
+q = v$^ (a, b -> {
+    >> a b " "
+    <~ a < b
+})
+>> ¶
+>> q ¶
+"""
 
 # ── The empty pattern (added 2026-10-02) ────────────────────────────────────
 #
