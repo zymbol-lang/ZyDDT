@@ -2058,7 +2058,7 @@ pasa a `AGREE`.
 
 ## GLB-024 — Un comparador de `$^` que no devuelve un Bool: nadie da error y cada motor ordena distinto
 
-**Estado:** **abierto** — sólo el kind. Decidido el 2026-09-15: un comparador que no responde un Bool es `##Type`. El rechazo se corrigió ese día en los tres motores (pasos 1.12 y 2.13), pero el kind no: medido el 2026-10-02, los tres lanzan `##_(sort comparator must return a Bool, got Int)`, que `:! ##Type` no captura. La celda que sujetaba esta ficha comprobaba la categoría del rechazo y no su kind, así que estaba en verde sobre la parte que falta
+**Estado:** **corregido 2026-10-03 (paso P1.3)** — era sólo el kind. Decidido el 2026-09-15: un comparador que no responde un Bool es `##Type`. El rechazo se corrigió ese día en los tres motores (pasos 1.12 y 2.13), pero el kind no: medido el 2026-10-02, los tres lanzan `##_(sort comparator must return a Bool, got Int)`, que `:! ##Type` no captura. La celda que sujetaba esta ficha comprobaba la categoría del rechazo y no su kind, así que estaba en verde sobre la parte que falta
 **Encontrado por:** leyendo `ArraySort` de la VM en el paso 1.10, 2026-09-15
 **Gravedad:** media-alta: un programa mal escrito ordena, sin aviso, de una forma que depende del motor
 **Familia:** las reglas de la v0.0.9 sin truthiness (`GUIDE.md`: *«There is no truthiness in Zymbol»*)
@@ -2124,8 +2124,14 @@ con ella (`ZYJS-021`).
 
 **El kind, desde el 2026-10-02:** `runtime-functions-hof/sort-comparator-not-a-bool-is-a-type-error`,
 un `!?` con un único `:! ##Type` y `expect = "ok"` — termina bien sólo si el rechazo es del
-kind decidido, y escapa del `!?` si no. Hoy escapa en los tres, así que lleva
-`open_finding = "GLB-024"` y sale KNOWN; el día que pase, DEBT PAID cierra esta ficha.
+kind decidido, y escapa del `!?` si no. Pasó el 2026-10-03: `RuntimeError::kinded("Type", …)`
+en el TW (`collection_ops.rs`), `VmError::TypeMsg` en la VM y `ZyRuntimeError(…, '##Type', line)`
+en `zyjs`; el texto no cambia. Medido con Int y con String en los tres. Se quitó el
+`open_finding`.
+
+Lo vecino, medido el mismo día: un predicado de `$|` que no devuelve un Bool es `##Type` en
+el TW (`filter lambda must return boolean, got Int`) y **truthiness silenciosa** en la VM y
+`zyjs`. Es otro hallazgo: [`GLB-080`](GLOBAL.md).
 
 ---
 
@@ -5647,3 +5653,44 @@ dice.
 
 `runtime-collection-ops/split-by-the-empty-string`, con `open_finding = "GLB-079"`, sin
 `expect`.
+
+---
+
+## GLB-080 — Un predicado de `$|` que no devuelve un Bool: el TW lo rechaza como `##Type`, la VM y `zyjs` lo leen como verdadero o falso
+
+**Estado:** **abierto** — pendiente de decisión del autor; la propuesta es la de [`GLB-024`](GLOBAL.md): error `##Type`
+**Encontrado por:** al medir las formas vecinas de `GLB-024` (paso P1.3, 2026-10-03)
+**Familia:** las reglas de la v0.0.9 sin truthiness
+
+```zymbol
+a = [3, 1, 2]
+!? {
+    >> (a$| (x -> x + 1)) ¶
+} :! ##Type {
+    >> "Type" ¶
+} :! {
+    >> "otro" ¶
+}
+```
+
+| predicado | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `x -> x + 1` (Int) | `##Type`: `filter lambda must return boolean, got Int` | `[3, 1, 2]` | `[3, 1, 2]` |
+| `x -> 0` | `##Type` | `[]` | `[]` |
+| `x -> "si"` / `x -> ""` | `##Type` | todo / nada | todo / nada |
+| `x -> [1]` / `x -> []` | `##Type` | todo | todo |
+| `x -> #1` (Bool) | `[3, 1, 2]` | `[3, 1, 2]` | `[3, 1, 2]` |
+
+Los dos Rust y `check` avisan en tiempo de análisis (`filter lambda should return Bool, got
+Int`), pero la VM sigue ejecutando con truthiness.
+
+### Qué hay que decidir
+
+Si `$|` sigue a `$^` (error `##Type` en los tres, que es lo que ya hace el TW) o si un
+predicado tiene otro significado. Ningún documento lo dice para `$|`; la regla general de
+v0.0.9 («sin truthiness») apunta a lo primero.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/filter-predicate-not-a-bool-is-a-type-error`, con
+`open_finding = { zyvm = "GLB-080", zyjs = "GLB-080" }` y `expect = "ok"`.
