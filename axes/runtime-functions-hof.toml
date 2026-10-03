@@ -517,4 +517,24 @@ src    = """
     >> "Type" ¶
 }
 """
-open_finding = "GLB-024"
+
+# ── The neighbour of the sort comparator (added 2026-10-03) ─────────────────
+#
+# Measured while closing GLB-024: a `$|` predicate that answers an Int is a
+# `##Type` in the tree-walker and plain truthiness in the VM and zyjs.
+
+[[cell]]
+id     = "filter-predicate-not-a-bool-is-a-type-error"
+what   = "a `$|` predicate that answers a number: the tree-walker refuses it as a ##Type, the VM and zyjs filter by truthiness (GLB-080)"
+expect = "ok"
+src    = """
+!? {
+    _q = [3, 1, 2]$| (x -> x + 1)
+    // reached only when the filter did not refuse: an ##Index no `:! ##Type`
+    // catches, so a silent filter ends the program in an error
+    >> [1][5] ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+open_finding = { zyvm = "GLB-080", zyjs = "GLB-080" }
