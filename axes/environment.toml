@@ -102,7 +102,6 @@ src    = '''
 _x = <\ ls \>
 >> "fin" ¶
 '''
-open_finding = "GLB-075"
 
 [[cell]]
 id     = "bare-word-pipe-does-not-parse"
@@ -112,7 +111,42 @@ src    = '''
 _x = <\ ls | wc -l \>
 >> "fin" ¶
 '''
-open_finding = "GLB-075"
+
+# GLB-075 closed (2026-10-02): the arguments of `<\ … \>` are expressions in
+# every engine, so each class of check `infer_expr` carries applies inside it.
+# The three cells below ask the classes the first two did not: a call's arity,
+# a call's `<~` mark, and the plain case of a variable that IS defined.
+# (The cells above are named without `shell-`, which would excuse zyjs.)
+
+[[cell]]
+id     = "bare-word-call-arity-is-checked"
+expect = "error"
+what   = "a call with too few arguments inside `<\\ … \\>` is refused before anything runs"
+src    = '''
+g(a, b) { <~ a + b }
+_x = <\ "echo " g(1) \>
+>> "fin" ¶
+'''
+
+[[cell]]
+id     = "bare-word-call-output-mark-is-checked"
+expect = "error"
+what   = "a call missing its `<~` mark inside `<\\ … \\>` is refused before anything runs"
+src    = '''
+sube(b<~) { b = b + 1 }
+y = 1
+_x = <\ "echo " sube(y) \>
+>> "fin" ¶
+'''
+
+[[cell]]
+id     = "bare-word-defined-variable-is-its-value"
+expect = "ok"
+what   = "`<\\ cmd ' ' \"hola\" \\>` with `cmd` defined: the variable's value, not the text `cmd`"
+src    = '''
+cmd = "echo"
+>> <\ cmd ' ' "hola" \> ¶
+'''
 
 # ── Interpolating a text variable into the command (added 2026-10-02) ──────
 #
