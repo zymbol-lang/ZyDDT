@@ -1644,25 +1644,173 @@ q = v$^ (a, b -> {
 >> q ¶
 """
 
-# ── The empty pattern (added 2026-10-02) ────────────────────────────────────
+# ── The empty pattern (added 2026-10-02, decided 2026-10-03) ───────────────
 #
 # Two of the eight cases ZyQuality seeded on 2026-08-07 for an oracle phase that
 # was never built (zyquality/cases/). Nothing ran that directory, and both still
-# diverged on the day it was retired. No `expect`: what the empty string is
-# found at, or split into, is not decided (GLB-078, GLB-079).
+# diverged on the day it was retired. Decided 2026-10-03 (GLB-078, GLB-079): an
+# empty pattern is a ##Index for the three operators that LOCATE occurrences —
+# `$??`, `$/`, `$~~`. Each defensible answer (every boundary, none, with or without
+# empty ends) was a host library deciding for Zymbol. `$? ""` (#1) and `$-`/`$--`
+# with "" (nothing removed) stay: their answer does not depend on the reading.
+#
+# Each cell is a `!?` with ONE `:! ##Index`: an engine that answers instead of
+# refusing reaches `1 / 0`, a ##Div that escapes, so it cannot pass by silence.
 
 [[cell]]
-id   = "find-all-of-the-empty-string"
-what = "every position of the empty string in a text"
-src  = """
+id     = "find-all-of-the-empty-string"
+what   = "every position of the empty string in a text: refused, a ##Index (GLB-078)"
+expect = "ok"
+src    = """
+!? {
+    _r = "hello"$?? ""
+    // reached only if nothing refused: a ##Div no `:! ##Index` catches
+    >> 1 / 0 ¶
+} :! ##Index {
+    >> "Index" ¶
+}
+"""
+
+[[cell]]
+id     = "split-by-the-empty-string"
+what   = "a text split by the empty string: refused, a ##Index (GLB-079)"
+expect = "ok"
+src    = """
+!? {
+    _r = "hello" $/ ""
+    // reached only if nothing refused: a ##Div no `:! ##Index` catches
+    >> 1 / 0 ¶
+} :! ##Index {
+    >> "Index" ¶
+}
+"""
+
+[[cell]]
+id     = "replace-the-empty-string"
+what   = "replacing the empty string: refused, a ##Index — zyjs never ended here (GLB-078/079)"
+expect = "ok"
+src    = """
+!? {
+    _r = "hello"$~~["":"X"]
+    // reached only if nothing refused: a ##Div no `:! ##Index` catches
+    >> 1 / 0 ¶
+} :! ##Index {
+    >> "Index" ¶
+}
+"""
+
+[[cell]]
+id     = "replace-the-empty-string-first-n"
+what   = "replacing the empty string a counted number of times: refused, a ##Index"
+expect = "ok"
+src    = """
+!? {
+    _r = "hello"$~~["":"X":1]
+    // reached only if nothing refused: a ##Div no `:! ##Index` catches
+    >> 1 / 0 ¶
+} :! ##Index {
+    >> "Index" ¶
+}
+"""
+
+[[cell]]
+id     = "split-by-the-empty-string-then-count"
+what   = "the VM's fused split-and-count: the same refusal on the fused path"
+expect = "ok"
+src    = """
+!? {
+    _r = ("hello" $/ "")$#
+    // reached only if nothing refused: a ##Div no `:! ##Index` catches
+    >> 1 / 0 ¶
+} :! ##Index {
+    >> "Index" ¶
+}
+"""
+
+[[cell]]
+id     = "find-all-of-the-empty-string-uncaught"
+what   = "the refusal of `$??` with an empty pattern, uncaught: what a program that meets it prints"
+expect = "error"
+src    = """
 >> ("hello"$?? "") ¶
 """
-open_finding = "GLB-078"
 
 [[cell]]
-id   = "split-by-the-empty-string"
-what = "a text split by the empty string"
-src  = """
+id     = "split-by-the-empty-string-uncaught"
+what   = "the refusal of `$/` with an empty pattern, uncaught: what a program that meets it prints"
+expect = "error"
+src    = """
 >> ("hello" $/ "") ¶
 """
-open_finding = "GLB-079"
+
+[[cell]]
+id     = "replace-the-empty-string-uncaught"
+what   = "the refusal of `$~~` with an empty pattern, uncaught: what a program that meets it prints"
+expect = "error"
+src    = """
+>> ("hello"$~~["":"X"]) ¶
+"""
+
+[[cell]]
+id     = "the-empty-string-is-contained"
+what   = "`$? \"\"` is #1 and `$-- \"\"` removes nothing — the neighbours that stay as they were (decided 2026-10-03)"
+expect = "ok"
+src    = """
+>> ("hello"$? "") ¶
+>> ("hello"$-- "")$# ¶
+"""
+oracle.py = """
+print("#1" if "" in "hello" else "#0")
+print(len("hello".replace("", "", 0)))
+"""
+
+# ── Where a pattern is found (added 2026-10-03) ─────────────────────────────
+#
+# Measured beside the empty pattern. Overlapping matches are DECIDED (GLB-081):
+# every position the pattern starts at, as "all positions of a pattern" reads.
+# The other three were plain bugs, one engine against the two that agreed.
+
+[[cell]]
+id   = "find-all-overlapping"
+what = "every position a pattern starts at, overlapping: `\"aaaa\"$?? \"aa\"` (GLB-081; the VM skipped the overlaps)"
+src  = """
+>> ("aaaa"$?? "aa") ¶
+"""
+oracle.py = """
+s, p = "aaaa", "aa"
+print("[" + ", ".join(str(i + 1) for i in range(len(s) - len(p) + 1) if s.startswith(p, i)) + "]")
+"""
+
+[[cell]]
+id   = "find-all-of-a-pattern-longer-than-the-text"
+what = "a pattern longer than the text is found nowhere — the tree-walker panicked (GLB-082)"
+src  = """
+>> ("ab"$?? "abc") ¶
+"""
+oracle.py = """
+s, p = "ab", "abc"
+print("[" + ", ".join(str(i + 1) for i in range(len(s) - len(p) + 1) if s.startswith(p, i)) + "]")
+"""
+
+[[cell]]
+id   = "find-all-of-a-char-in-a-non-ascii-text"
+what = "the positions of a char in a text that is not ASCII, not the ordinals of the matches (GLB-083)"
+src  = """
+>> ("ñaña"$?? 'a') ¶
+"""
+oracle.py = """
+s = "ñaña"
+print("[" + ", ".join(str(i + 1) for i, c in enumerate(s) if c == "a") + "]")
+"""
+
+[[cell]]
+id   = "replace-first-n-does-not-look-at-what-it-wrote"
+what = "replacing the first N never finds the text it has just written: `\"l\"` → `\"Ll\"` twice (GLB-084)"
+src  = """
+>> ("hello"$~~["l":"Ll":2]) ¶
+>> ("hello"$~~['l':"Ll":2]) ¶
+"""
+oracle.py = """
+print("hello".replace("l", "Ll", 2))
+print("hello".replace("l", "Ll", 2))
+"""
