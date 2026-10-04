@@ -6018,7 +6018,7 @@ como tras un literal.
 
 ## GLB-087 — `(m[1])[2]`: los motores Rust leen el índice tras un índice entre paréntesis, `zyjs` lo rechaza como cadena
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-087)** — decidido por el autor: se rechaza, como la cadena
 **Encontrado por:** al comprobar que la ayuda `CHAINED_BRACKETS` era inalcanzable (`GLB-077`, 2026-10-03)
 
 ```zymbol
@@ -6037,12 +6037,26 @@ lee: `reject_chained_index` no mira a través del grupo, y `zyjs` sí. A favor d
 paréntesis—, y `m[1]` es una expresión. A favor de rechazarla: `m[1>2]` es la forma, y los
 paréntesis son la segunda grafía de la misma navegación que `GLB-072` retiró.
 
-### Qué hay que decidir
+### La pregunta
 
 Si un índice detrás de un índice entre paréntesis es la lectura del resultado (Rust) o la cadena
 retirada (`zyjs`).
 
 ### Qué lo sujeta
 
-`runtime-index-nav/index-after-a-parenthesized-index`, con `open_finding = "GLB-087"`, sin
-`expect`.
+`runtime-index-nav/index-after-a-parenthesized-index`, que hasta la decisión llevaba
+`open_finding = "GLB-087"` sin `expect`; ahora `expect = "error"`, con
+`index-after-a-parenthesized-call-index` y el control `index-after-a-parenthesized-result`.
+
+### Decidido el 2026-10-03
+
+Opción 1 de dos: **se rechaza**, como lo hacía `zyjs`. Si lo que hay entre paréntesis es en sí un
+índice, es la cadena con un grupo alrededor de su primera mitad, y la regla de `COLLECTIONS.md` § 4
+gobierna *«how an element is addressed»*: una sola grafía, `m[1>2]`. Indexar el resultado de una
+operación, de una llamada o de un corte entre paréntesis sigue valiendo (`(a$^+)[1]`,
+`(f())[1]`, `(m[1..2])[1]`). La otra opción era leerlo, la letra de *«directly after»*.
+
+Rust: `reject_chained_index` mira a través del grupo (`unwrap_group`), y `index_root_name` también,
+para que el mensaje nombre `m`. Medido en los tres: `(m[1])[2]`, `((m[1]))[2]`, en asignación y en
+`>>`, `(f()[1])[2]`, `([[5, 6]][1])[2]` y `(m[1])[1>1]` se rechazan con el mismo texto; los
+controles, iguales. `check` de los 235 ficheros con `)[`: sólo rechaza los que ya rechazaba.
