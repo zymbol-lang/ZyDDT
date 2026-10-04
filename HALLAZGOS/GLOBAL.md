@@ -5928,7 +5928,7 @@ sobre un `Int` sería error, así que afirma que es texto) y `5 (1)`.
 
 ## GLB-086 — Un `(` tras un operador cuyo operando está completo: Rust termina la sentencia, `zyjs` llama al resultado
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-086)** — decidido por el autor: el `(` es una llamada, en todo contexto
 **Encontrado por:** al buscar si los diagnósticos de nivel de sentencia seguían siendo
 alcanzables tras `GLB-076` (2026-10-03)
 
@@ -5949,7 +5949,27 @@ Es la familia de `GLB-076`, pero con un operador que **sí** lleva operando, y q
 que se decidió allí. Que `a$+ 3 [1]` indexe el `3` y que `#1 (1)` concatene coincide en los
 tres; sólo diverge el `(` tras `$?` y `$-`.
 
-### Qué hay que decidir
+### Decidido el 2026-10-03
+
+Opción 1 de tres: un `(` en la misma línea tras una operación `$` es una **llamada sobre su
+resultado** en todo contexto — lo que ya hacían `>>` y `zyjs` —, y como un literal nunca se
+llama (`BUG-06`: `>> "label" (expr) ¶` es otro elemento), con `1` como operando lo que se llama es
+el resultado de `a$? 1`: `expression is not callable` en ejecución en los tres. Con un nombre como
+operando (`a$? f (2)`) la llamada sigue dentro del operando, como antes. Las otras opciones eran
+un error estático cuando lo llamado no puede ser una función (una comprobación nueva y más ancha,
+que tocaría formas que hoy coinciden) y conservar el corte de sentencia de Rust.
+
+En Rust, `Parser::parse_postfix` (`zymbol-parser/src/lib.rs`) tenía dos bucles —llamadas e
+índices, y después operadores `$`— y el segundo terminaba ante un `(`; ahora vuelven a alternar
+mientras siga un `(` en la misma línea tras algo que no es un literal. `zyjs` no cambia. Medido
+en los tres: `$?`, `$-`, `$--`, `$+`, `$??`, `$/`, `$+ (3)`, dentro y fuera de `>>`, iguales; los
+controles (`a$? f (2)`, `a$? (1)`, una desestructuración `(p, q) = …` en la línea siguiente,
+`$>` con lambda, `[3, 1]$^+ (1)` de `GLB-076`, `(1)` como sentencia y `5 (1)`) no cambian.
+
+Lo sujetan `stray-group-after-an-operand`, `stray-group-after-an-append` y el control
+`call-in-the-operand-of-a-dollar-operator`, en `syntax-expressions`.
+
+### La pregunta, tal como se planteó
 
 Si `(…)` tras el operando de un operador `$` es un error estático en los tres (lo que hace Rust
 en una asignación), una llamada sobre el operando (lo que hace `zyjs`), o una yuxtaposición
@@ -5957,4 +5977,5 @@ como tras un literal.
 
 ### Qué lo sujeta
 
-`syntax-expressions/stray-group-after-an-operand`, con `open_finding = "GLB-086"`.
+`syntax-expressions/stray-group-after-an-operand`, que hasta la decisión llevaba
+`open_finding = "GLB-086"`.

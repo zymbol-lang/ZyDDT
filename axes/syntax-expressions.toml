@@ -338,15 +338,41 @@ x = 1
 [x]
 """
 
+# GLB-086, decided 2026-10-03: a `(` on the same line after a `$` operation is a
+# call on its result in every context, as it already was inside `>>` and in
+# zyjs. A literal is never called (BUG-06), so with `1` as the operand the call
+# is on the result, which is not a function: a run-time error in all three.
+
 [[cell]]
 id   = "stray-group-after-an-operand"
-what = "`a$? 1 (2)`: a group after an operator whose operand is complete — Rust ends the statement, zyjs calls the result (GLB-086, undecided)"
+what = "`a$? 1 (2)`: a call on the result of `a$? 1`, which is not a function — Rust used to end the statement in an assignment (GLB-086)"
 src  = """
 a = [1]
 x = a$? 1 (2)
 >> x ¶
 """
-open_finding = "GLB-086"
+
+[[cell]]
+id   = "stray-group-after-an-append"
+what = "the same after `$+ 3`: a call on the result, refused at run time"
+src  = """
+a = [1, 2]
+x = a$+ 3 (2)
+>> x ¶
+"""
+
+[[cell]]
+id     = "call-in-the-operand-of-a-dollar-operator"
+what   = "the control: with a name as the operand, `f (2)` is a call inside the operand, in every engine"
+expect = "ok"
+src    = """
+a = [1, 2]
+f(n) { <~ n - 1 }
+x = a$? f (2)
+y = a$+ f (2)
+>> x ¶
+>> y ¶
+"""
 
 [[cell]]
 id     = "parenthesized-operation-is-indexed"
