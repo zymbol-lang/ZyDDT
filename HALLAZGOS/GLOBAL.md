@@ -5624,7 +5624,7 @@ Al medir salieron dos más: [`GLB-085`](GLOBAL.md) (un pánico de la VM, corregi
 
 ## GLB-077 — Una edición sobre un camino con rango: Rust la refusa por una razón y `zyjs` por otra; y dos ayudas del parser no se muestran nunca
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-077)** — decidido por el autor: rechazo en los tres con la razón del rango
 **Encontrado por:** buscar qué provoca las ayudas `CHAINED_BRACKETS` y `RANGE_IN_PATH`, que
 `reach.py` lista como no provocadas (2026-10-02)
 
@@ -5660,8 +5660,42 @@ quería decir con `RANGE_IN_PATH` — y encaminarla ahí, o borrar las dos const
 
 ### Qué lo sujeta
 
-`syntax-index-nav/edit-on-a-ranged-path`, con `open_finding = "GLB-077"`. Las dos ayudas
-siguen en la lista de `reach.py` como no provocadas, que es lo cierto.
+`syntax-index-nav/edit-on-a-ranged-path`, que hasta la decisión llevaba
+`open_finding = "GLB-077"`.
+
+### Lo que midió la decisión (2026-10-03)
+
+Por qué no salían las dos ayudas, en el código: el parser **nunca** construye un `DeepIndex` con
+rango — un paso con rango, simple (`a[1..2]`) o en un camino (`m[1..2>1]`), se vuelve un
+`FlatExtract` —, así que `flatten_receiver` caía en su brazo genérico y respondía `NO_NAME`
+(«asigna el resultado a un nombre primero», un consejo que lleva a editar una copia).
+`CHAINED_BRACKETS` era inalcanzable: la cadena se rechaza al **leerla** (`GLB-072`), y a nivel de
+sentencia `(m[1])[2]$~ 9` se rechaza antes por empezar con `(`. El rango simple estaba en el
+mismo caso que el del camino, y `zyjs` no parseaba ninguno de los dos como receptor.
+
+`COLLECTIONS.md` § 1 pone el corte `$[..]` entre los consultores (selecciona un subconjunto y
+construye) y dice que *«every editing `$` writes back at its receiver's path»*: un receptor con
+rango no es un camino a un lugar.
+
+### Decidido: la razón del rango (opción 1 de tres)
+
+Un receptor cuyo corchete tiene un rango se rechaza en los tres con la ayuda `a write reaches one
+place, so its path has no ranges`: la familia `$+`… con `this edit has nothing to write into`, y
+`$~` con su propio titular, `collection update ($~) requires a place to write`. `CHAINED_BRACKETS`
+se borró en Rust y su gemela `CHAINED` en `zyjs`. Las otras opciones eran borrar las dos ayudas y
+dejar `NO_NAME`, y que una edición sobre un rango escribiera en cada lugar (una funcionalidad que
+contradice `COLLECTIONS.md`).
+
+Rust: `is_ranged_path` en `zymbol-parser/src/lib.rs`, usado por `flatten_receiver` y por
+`parse_collection_update`. `zyjs`: `bracketHasRange` desvía la sentencia `name[…]` con rango al
+camino de expresión, que ya sabía leerlo, y `flatten` reconoce el `NavIndex` `flat` con rango.
+Medido en los tres: `$+` y `$~` con rango en camino y simple, iguales; las lecturas, las ediciones
+sin rango, las cadenas y `a[1:2]$+ 5`, sin cambios. Barrido de parseo de `zyjs`: sólo cambia la
+celda de este hallazgo (de un error de parseo al rechazo).
+
+Lo sujetan, en `syntax-index-nav`: `edit-on-a-ranged-path`, `update-on-a-ranged-path`,
+`edit-on-a-range`, `update-on-a-range` y el control `edit-on-one-place-of-a-path`. Al medir salió
+[`GLB-087`](GLOBAL.md).
 
 ---
 
@@ -5979,3 +6013,36 @@ como tras un literal.
 
 `syntax-expressions/stray-group-after-an-operand`, que hasta la decisión llevaba
 `open_finding = "GLB-086"`.
+
+---
+
+## GLB-087 — `(m[1])[2]`: los motores Rust leen el índice tras un índice entre paréntesis, `zyjs` lo rechaza como cadena
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al comprobar que la ayuda `CHAINED_BRACKETS` era inalcanzable (`GLB-077`, 2026-10-03)
+
+```zymbol
+m = [[1, 2], [3, 4]]
+>> (m[1])[2] ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm` | `2` |
+| `zyjs` | `chained index does not exist: 'm[…][…]' is not a form of Zymbol` |
+
+`GLB-072` cerró la lectura encadenada `m[1][2]`, y los tres la rechazan. Con paréntesis, Rust la
+lee: `reject_chained_index` no mira a través del grupo, y `zyjs` sí. A favor de leerla: en
+`GLB-076` la ayuda propone justamente `(c$^+)[i]` —indexar el resultado de una expresión entre
+paréntesis—, y `m[1]` es una expresión. A favor de rechazarla: `m[1>2]` es la forma, y los
+paréntesis son la segunda grafía de la misma navegación que `GLB-072` retiró.
+
+### Qué hay que decidir
+
+Si un índice detrás de un índice entre paréntesis es la lectura del resultado (Rust) o la cadena
+retirada (`zyjs`).
+
+### Qué lo sujeta
+
+`runtime-index-nav/index-after-a-parenthesized-index`, con `open_finding = "GLB-087"`, sin
+`expect`.

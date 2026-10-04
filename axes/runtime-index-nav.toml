@@ -673,3 +673,18 @@ t(v, k) {
 }
 >> t([#(a: 1)], 1.5) ¶
 """
+
+# ── A bracket after a parenthesized index (added 2026-10-03) ───────────────
+#
+# Measured while proving the CHAINED_BRACKETS help unreachable (GLB-077):
+# `(m[1])[2]` is read by the Rust engines (2) and refused by zyjs as a chained
+# index. No `expect`: which of the two is right is not decided (GLB-087).
+
+[[cell]]
+id   = "index-after-a-parenthesized-index"
+what = "`(m[1])[2]`: the Rust engines read it, zyjs refuses it as a chained index (GLB-087, undecided)"
+src  = """
+m = [[1, 2], [3, 4]]
+>> (m[1])[2] ¶
+"""
+open_finding = "GLB-087"
