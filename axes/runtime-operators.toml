@@ -213,3 +213,29 @@ C := 1
 }
 >> C ¶
 """
+
+
+# ── Juxtaposition with an Int literal on the right (added 2026-10-03) ───────
+#
+# `x = n 1` is the text "51": a juxtaposition, compiled as a Concat whose right
+# operand is an Int literal. The VM's immediate fast path took it and reached an
+# `unreachable!()` (GLB-085). `$#` asserts it is a String: on an Int it fails.
+
+[[cell]]
+id     = "juxtaposition-with-an-int-literal"
+what   = "`x = n 1` with `n = 5` is the text \"51\": the VM's compiler panicked (GLB-085)"
+expect = "ok"
+src    = """
+n = 5
+x = n 1
+y = 5 (1)
+>> x ¶
+>> x$# ¶
+>> y ¶
+"""
+oracle.py = """
+x = str(5) + str(1)
+print(x)
+print(len(x))
+print(str(5) + str(1))
+"""

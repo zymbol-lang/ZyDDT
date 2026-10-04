@@ -5547,8 +5547,8 @@ Con `<\ cmd \>` y `cmd` definida, `zyjs` ya da el valor, no el texto «cmd».
 
 ## GLB-076 — Un `(…)` o un `[…]` suelto tras una expresión completa: los motores Rust lo rechazan al parsear, `zyjs` lo lee como otra cosa
 
-**Estado:** **abierto** — pendiente de decisión del autor sobre la regla, y la ayuda de Rust
-habla de desestructurar, que no es lo que el programa intentaba
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-076)** — decidido por el autor: rechazo estático
+en todo contexto tras un operador sin operando
 **Encontrado por:** los fósiles `corpus/collections/22_sort_named.zy` y
 `corpus/strings/09_length.zy`, el 2026-10-02: eran los únicos ficheros que provocaban estos
 diagnósticos, y su exclusión `ANSI_FORMAT` tapaba la divergencia desde la importación
@@ -5572,9 +5572,53 @@ delante del grupo no es un nombre. Propuesta, no decisión.
 ### Qué lo sujeta
 
 `syntax-expressions/stray-group-after-an-expression` y
-`syntax-expressions/stray-bracket-after-an-expression`, con `open_finding = "GLB-076"`. Son
-también lo único que provoca esos cuatro diagnósticos desde que los fósiles se reescribieron
-(`zyquality/messages/reach.py`).
+`syntax-expressions/stray-bracket-after-an-expression`, que hasta la decisión llevaban
+`open_finding = "GLB-076"`.
+
+### Lo que midió la decisión (2026-10-03)
+
+La incoherencia estaba también **dentro** de Rust: en una asignación la sentencia terminaba tras
+el operador y el `(`/`[` sobrante se rechazaba; dentro de `>>` se llamaba o se indexaba el
+resultado.
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `x = [3, 1]$^+ (1)` | estático, ayuda de desestructurar | ejecución: `expression is not callable` |
+| `>> [3, 1]$^+ (1) ¶` | ejecución: `expression is not callable` | ídem |
+| `x = [3, 1]$^+ [1]` | estático | `1` |
+| `>> [3, 1]$^+ [1] ¶` | `1` | `1` |
+| `a = [3, 1]` · `x = a$# [1]` | estático | ejecución: `cannot index into Int` |
+
+Ningún programa del workspace escribía `(`/`[` tras `$#`, `$^+` o `$^-` (la única coincidencia
+era un comentario).
+
+### Decidido: rechazo estático (opción 1 de tres)
+
+Un `(` o un `[` en la misma línea justo después de un operador que **no lleva operando** —
+`$#`, `$^+`, `$^-`, y `$++` cuando no lleva ningún elemento (el segundo fósil; se incluyó por
+ser, sin elementos, un operador sin operando) — se rechaza al parsear, en todo contexto y en los
+tres motores, con un texto por caso y una ayuda que dice lo que el programa quería:
+`(c$^+)[i]` para indexar, `c$^ (a, b -> a < b)` para ordenar con comparador, `c$+[i] value`
+para insertar. Las otras opciones eran continuar la expresión en todas partes (la forma vieja
+`$^+ (comparador)` habría fallado sólo al ejecutar) y dejar cada contexto como estaba.
+
+Rust: `Parser::refuse_after_operandless` en `zymbol-parser/src/collection_ops.rs`, llamado desde
+`parse_collection_length`, `parse_collection_sort` y `parse_string_insert`; el camino en línea de
+`$#` en `lib.rs` pasó a llamar a `parse_collection_length`. `zyjs`: `refuseAfterOperandless`,
+con los mismos textos (`messages`: 499 → 506 en común). Barrido de parseo de `zyjs` sobre los
+3126 `.zy`: sólo cambian las dos celdas de este hallazgo. `check` de todo el workspace: los
+mensajes nuevos sólo salen en esas celdas.
+
+Los dos diagnósticos de nivel de sentencia (`unexpected '(' / '[' at statement level`) siguen
+siendo alcanzables — una sentencia que es sólo `(1)` o `[x]` — y tienen ahora celda propia
+(`statement-opening-with-a-group`, `statement-opening-with-a-bracket`). Lo sujetan además
+`stray-group-inside-output`, `stray-bracket-after-a-sort-ascending`,
+`stray-bracket-after-a-sort-descending`, `stray-group-after-a-sort-descending`,
+`stray-bracket-after-a-length`, `stray-group-after-a-length` y el control
+`parenthesized-operation-is-indexed`, con oráculo.
+
+Al medir salieron dos más: [`GLB-085`](GLOBAL.md) (un pánico de la VM, corregido) y
+[`GLB-086`](GLOBAL.md) (un `(` tras un operador **con** operando, abierto).
 
 ---
 
@@ -5848,3 +5892,69 @@ la cadena ya modificada, así que encontraba la `l` del reemplazo. Si el reempla
 patrón (`"l"` → `"L"`) no se nota, y por eso nadie lo vio. Ahora usa `str::replacen`, de
 izquierda a derecha y sin volver sobre lo escrito. Lo sujeta
 `runtime-collection-ops/replace-first-n-does-not-look-at-what-it-wrote`, con oráculo.
+
+---
+
+## GLB-085 — `x = n 1`: la VM entraba en pánico al compilar una yuxtaposición con un entero literal a la derecha
+
+**Estado:** **corregido 2026-10-03 (paso P2, GLB-076)** — sin decisión: el autor confirmó que es
+una yuxtaposición válida y que `x` es el texto `"51"`, lo que ya daban el TW y `zyjs`
+**Encontrado por:** al medir las vecinas de `GLB-076`
+
+```zymbol
+n = 5
+x = n 1
+>> x ¶
+```
+
+| | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `x = n 1`, `x = 5 1`, `x = 5 (1)` | `51` (String, `$#` 2) | `panicked … internal error: entered unreachable code` | `51` (String) |
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`: la yuxtaposición es un `BinaryOp::Concat`, y con un literal `Int`
+a la derecha tomaba la vía rápida de «inmediato», que sólo tiene instrucción para
+`+ - * / % ^` y las comparaciones; con `Concat` caía en el `unreachable!()`. Ahora esa vía sólo
+se toma para los operadores que conoce. Con un texto a la izquierda (`"v" n 1`) no pasaba,
+porque el registro no era `Int`.
+
+### Qué lo sujeta
+
+`runtime-operators/juxtaposition-with-an-int-literal`, con oráculo: imprime `x`, `x$#` (que
+sobre un `Int` sería error, así que afirma que es texto) y `5 (1)`.
+
+---
+
+## GLB-086 — Un `(` tras un operador cuyo operando está completo: Rust termina la sentencia, `zyjs` llama al resultado
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al buscar si los diagnósticos de nivel de sentencia seguían siendo
+alcanzables tras `GLB-076` (2026-10-03)
+
+```zymbol
+a = [1]
+x = a$? 1 (2)
+>> x ¶
+```
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `x = a$? 1 (2)` | estático: `unexpected '(' at statement level`, ayuda de desestructurar | ejecución: `expression is not callable` |
+| `x = a$- 1 (2)` | ídem | ídem |
+| `x = a$+ 3 [1]` | ejecución: `cannot index into Int` | ídem |
+| `x = #1 (1)` | `#11` (yuxtaposición) | `#11` |
+
+Es la familia de `GLB-076`, pero con un operador que **sí** lleva operando, y queda fuera de lo
+que se decidió allí. Que `a$+ 3 [1]` indexe el `3` y que `#1 (1)` concatene coincide en los
+tres; sólo diverge el `(` tras `$?` y `$-`.
+
+### Qué hay que decidir
+
+Si `(…)` tras el operando de un operador `$` es un error estático en los tres (lo que hace Rust
+en una asignación), una llamada sobre el operando (lo que hace `zyjs`), o una yuxtaposición
+como tras un literal.
+
+### Qué lo sujeta
+
+`syntax-expressions/stray-group-after-an-operand`, con `open_finding = "GLB-086"`.

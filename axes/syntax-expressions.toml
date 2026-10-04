@@ -251,25 +251,112 @@ src  = """
 
 # ── A group or a bracket left after a complete expression (2026-10-02) ──────
 #
-# The forms two fossils of the ZyQuality corpus were written in, and the only
-# programs that provoked these four diagnostics until the fossils were rewritten
-# (`zyquality/messages/reach.py`). zyjs reads both differently (GLB-076).
+# The forms two fossils of the ZyQuality corpus were written in (GLB-076).
+# Decided 2026-10-03: a `(` or `[` on the same line right after an operator that
+# takes no operand — `$#`, `$^+`, `$^-`, and `$++` with no item — is refused at
+# parse time in every context and every engine, with a help that says what the
+# program meant. Before, Rust ended the statement in an assignment and indexed
+# or called the result inside `>>`, and zyjs called or indexed it everywhere.
+# One cell per diagnostic, so `reach` sees each one provoked.
 
 [[cell]]
 id   = "stray-group-after-an-expression"
-what = "`[3, 1]$^+ (1)`: a group after a complete expression, and its help"
+what = "`[3, 1]$^+ (1)`: `$^+` takes no comparator, and the help names `$^` (GLB-076)"
 src  = """
 x = [3, 1]$^+ (1)
 >> x ¶
 """
-open_finding = "GLB-076"
 
 [[cell]]
 id   = "stray-bracket-after-an-expression"
-what = "`s$++[1:\"x\"]`: a bracket after a complete expression, and its help"
+what = "`s$++[1:\"x\"]`: `$++` with no item, then a bracket — not an insertion, and the help names `$+[i]` (GLB-076)"
 src  = """
 s = "abc"
 t = s$++[1:"x"]
 >> t ¶
 """
-open_finding = "GLB-076"
+
+[[cell]]
+id   = "stray-group-inside-output"
+what = "the same `(` after `$^+` inside `>>`, where it used to be called at run time (GLB-076)"
+src  = """
+>> [3, 1]$^+ (1) ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-a-sort-ascending"
+what = "`[3, 1]$^+ [1]`: to index the result it goes in parentheses — inside `>>` this indexed before (GLB-076)"
+src  = """
+>> [3, 1]$^+ [1] ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-a-sort-descending"
+what = "`[3, 1]$^- [1]`: the same after `$^-`"
+src  = """
+x = [3, 1]$^- [1]
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-group-after-a-sort-descending"
+what = "`[3, 1]$^- (1)`: `$^-` takes no comparator either"
+src  = """
+x = [3, 1]$^- (1)
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-a-length"
+what = "`a$# [1]`: zyjs indexed the Int and failed at run time (GLB-076)"
+src  = """
+a = [3, 1]
+x = a$# [1]
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-group-after-a-length"
+what = "`a$# (1)`: `$#` takes nothing"
+src  = """
+a = [3, 1]
+>> a$# (1) ¶
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-group"
+what = "a statement that is only `(1)`: not a destructuring, refused with the statement-level diagnostic"
+src  = """
+(1)
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-bracket"
+what = "a statement that is only `[x]`: not a destructuring, refused with the statement-level diagnostic"
+src  = """
+x = 1
+[x]
+"""
+
+[[cell]]
+id   = "stray-group-after-an-operand"
+what = "`a$? 1 (2)`: a group after an operator whose operand is complete — Rust ends the statement, zyjs calls the result (GLB-086, undecided)"
+src  = """
+a = [1]
+x = a$? 1 (2)
+>> x ¶
+"""
+open_finding = "GLB-086"
+
+[[cell]]
+id     = "parenthesized-operation-is-indexed"
+what   = "the control: the operation in parentheses is indexed, in every engine"
+expect = "ok"
+src    = """
+a = [3, 1]
+x = (a$^+)[1]
+>> x ¶
+"""
+oracle.py = """
+print(sorted([3, 1])[0])
+"""
