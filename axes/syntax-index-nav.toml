@@ -92,12 +92,54 @@ a = 1
 # receiver of an edit it is refused by all three, for two different reasons
 # (GLB-077) — and the parser's own help for it, RANGE_IN_PATH, is never shown.
 
+# Decided 2026-10-03 (GLB-077): a receiver whose bracket has a range — simple or
+# in a path — selects several places and a write reaches one, so the refusal
+# names the range (RANGE_IN_PATH), in the three engines and for `$~` too. zyjs
+# could not parse these at statement level until then.
+
 [[cell]]
 id   = "edit-on-a-ranged-path"
-what = "`m[1..2>1]$+ 5`: an edit cannot write into a range"
+what = "`m[1..2>1]$+ 5`: an edit cannot write into a range, and the help says so (GLB-077)"
 src  = """
 m = [[1, 2], [3, 4]]
 m[1..2>1]$+ 5
 >> m ¶
 """
-open_finding = "GLB-077"
+
+[[cell]]
+id   = "update-on-a-ranged-path"
+what = "`m[1..2>1]$~ 9`: `$~` keeps its own headline, with the range as the reason"
+src  = """
+m = [[1, 2], [3, 4]]
+m[1..2>1]$~ 9
+>> m ¶
+"""
+
+[[cell]]
+id   = "edit-on-a-range"
+what = "`a[1..2]$+ 5`: a simple range is the same refusal as one in a path"
+src  = """
+a = [1, 2, 3]
+a[1..2]$+ 5
+>> a ¶
+"""
+
+[[cell]]
+id   = "update-on-a-range"
+what = "`a[1..2]$~ 9`: and with `$~`"
+src  = """
+a = [1, 2, 3]
+a[1..2]$~ 9
+>> a ¶
+"""
+
+[[cell]]
+id     = "edit-on-one-place-of-a-path"
+what   = "the control: without a range the same path is one place, and it is written"
+expect = "ok"
+src    = """
+m = [[1, 2], [3, 4]]
+m[1>1]$~ 9
+m[2]$+ 5
+>> m ¶
+"""
