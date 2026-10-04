@@ -677,14 +677,39 @@ t(v, k) {
 # ── A bracket after a parenthesized index (added 2026-10-03) ───────────────
 #
 # Measured while proving the CHAINED_BRACKETS help unreachable (GLB-077):
-# `(m[1])[2]` is read by the Rust engines (2) and refused by zyjs as a chained
-# index. No `expect`: which of the two is right is not decided (GLB-087).
+# `(m[1])[2]` was read by the Rust engines (2) and refused by zyjs. Decided
+# 2026-10-03 (GLB-087): it is the chain with parentheses around its first half,
+# and refused like it. The result of an operation or a call in parentheses is
+# still indexed.
 
 [[cell]]
-id   = "index-after-a-parenthesized-index"
-what = "`(m[1])[2]`: the Rust engines read it, zyjs refuses it as a chained index (GLB-087, undecided)"
-src  = """
+id     = "index-after-a-parenthesized-index"
+what   = "`(m[1])[2]`: the navigator written twice, with parentheses — refused as the chain is (GLB-087)"
+expect = "error"
+src    = """
 m = [[1, 2], [3, 4]]
 >> (m[1])[2] ¶
 """
-open_finding = "GLB-087"
+
+[[cell]]
+id     = "index-after-a-parenthesized-call-index"
+what   = "`(f()[1])[2]`: the same through a call; `f()[1>2]` is the form"
+expect = "error"
+src    = """
+f() { <~ [[7, 8]] }
+>> (f()[1])[2] ¶
+"""
+
+[[cell]]
+id     = "index-after-a-parenthesized-result"
+what   = "the control: the result of an operation, a call or a slice in parentheses is still indexed"
+expect = "ok"
+src    = """
+m = [[1, 2], [3, 4]]
+a = [3, 1]
+f() { <~ [[7, 8]] }
+>> (a$^+)[1] ¶
+>> (f())[1] ¶
+>> (m[1..2])[1] ¶
+>> f()[1>2] ¶
+"""
