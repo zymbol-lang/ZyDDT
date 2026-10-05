@@ -486,7 +486,7 @@ Con la convención aplicada en los cuatro sitios, `zyq suite --only lsp` va a
 
 ## GLB-006 — Hay un tercer resaltador, y nadie lo mira
 
-**Estado:** **abierto** — pendiente de tu veredicto
+**Estado:** **corregido 2026-10-05 (paso P2, GLB-006)** — decidido por el autor: el curso carga el resaltador del playground
 **Clase:** ninguna de las tres. No discrepan los motores: hay una **superficie
 que el CHARTER no declara** y que por tanto ningún gate recorre.
 **Encontrado por:** buscar los ficheros de la superficie 4 para construirle una
@@ -539,10 +539,41 @@ midió.
 
 La 1 es la única que quita el problema en lugar de vigilarlo.
 
+### Qué lo sujetaba
+
+**Nada.** El repositorio del curso no estaba en el gate.
+
+### Medido antes de decidir (2026-10-05)
+
+La deriva había crecido: sobre los 675 ficheros del corpus, **2555** líneas con texto sin
+marcar (eran 1798) frente a **0** del playground; sobre los 57 ejemplos del propio curso, 450
+de 4161 frente a 0. El curso es un repositorio aparte (`zymbol-lang/aprende-zymbol`), un sitio
+Docsify que ya carga cuatro scripts de jsdelivr; el resaltador del playground es un módulo ES
+que importa del motor las funciones de dígitos, y el sitio publicado sirve los dos con
+`access-control-allow-origin: *`. El README del curso prometía *«Resaltado de sintaxis idéntico
+al del playground»*.
+
+### Decidido: el curso carga el del playground (opción 1 de tres)
+
+`aprende_zymbol/index.html` importa `highlightCode` de
+`https://zymbol-lang.org/src/playground/highlight.js` en un `<script type="module">`, lo deja en
+`window.zyHighlightCode` y vuelve a pintar la página al llegar (el módulo puede llegar después
+del primer render de Docsify). `zymbol-highlight.js` se borró. `style.css` añade `.t-br` y
+`.t-hot` con los colores del playground, claro y oscuro. Las otras opciones eran una copia
+generada y vigilada, y declarar una superficie 6 y reescribir la copia.
+
+Medido en Chrome headless sobre el curso servido en local: dos lecciones con código, 35 bloques y
+143 líneas, **0** líneas con texto sin marcar; con `zymbol-lang.org` bloqueado, los 22 bloques de
+una lección se muestran con su texto y sin color, y no se rompe nada.
+
 ### Qué lo sujeta
 
-**Nada.** El repositorio del curso no está en el gate, y añadirlo es parte de la
-decisión.
+La suite `course` de ZyQuality (`zyquality/docs/course_highlighter.py`, gate, con
+`needs = ["aprende_zymbol"]`, *skipped* si el curso no está clonado): que `index.html` importe
+`highlightCode` de la ruta publicada y que esa ruta sea un fichero del repositorio web que lo
+exporta; que ningún script del curso defina un resaltador propio; y que el CSS del curso dé estilo
+a cada clase `t-*` que el resaltador emite. Probada en rojo: con la copia restaurada y con
+`.t-hot` sin estilo.
 
 ---
 
