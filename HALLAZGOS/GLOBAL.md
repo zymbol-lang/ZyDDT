@@ -4952,7 +4952,7 @@ módulo (MEM-4). `type-change` queda 16 de 16.
 
 ## GLB-059 — `x + 1` con `x` vacía habla de concatenar cadenas
 
-**Estado:** abierto — texto; registrado el 2026-09-25 sin tocarlo
+**Estado:** **corregido 2026-10-05 (paso P3.2)** — decidido por el autor: el `+` nombra los tipos salvo cuando hay texto
 **Encontrado por:** midiendo las formas vecinas del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
 
 ```zymbol
