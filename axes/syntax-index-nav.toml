@@ -86,6 +86,54 @@ a = 1
 >> m[1>1 ¶
 """
 
+# GLB-036 (corrected 2026-10-05): which help an unclosed bracket gets is decided
+# the way `is_nav_index` decides it, by looking at what follows the `[` BEFORE it
+# is read — a navigation gets the navigator's help, a plain index the plain one,
+# and only a `;` makes it a flat extraction. zyjs used to give the navigator's
+# help to every unclosed index in an expression, and the flat-extraction text to
+# a range.
+
+[[cell]]
+id   = "index-left-open-without-a-path"
+what = "an unclosed index with no `>` in an expression: the plain help, not the navigator's (GLB-036)"
+src  = """
+x = [1, 2]
+>> x[1 = 2 ¶
+"""
+
+[[cell]]
+id   = "index-left-open-in-an-assignment"
+what = "the same on the right of an assignment"
+src  = """
+x = [1, 2]
+y = x[1 = 2
+"""
+
+[[cell]]
+id   = "range-left-open"
+what = "an unclosed range: a navigation, so the navigator's help — not the flat-extraction text, which needs a `;` (GLB-036)"
+src  = """
+x = [1, 2]
+>> x[1..2 ¶
+"""
+
+[[cell]]
+id   = "flat-extraction-of-atoms-left-open"
+what = "an unclosed `;` list that opens with a plain atom (`x[1;2`): the flat-extraction text, with no help"
+src  = """
+x = [1, 2]
+>> x[1;2 ¶
+"""
+
+[[cell]]
+id   = "index-left-open-after-an-expression-and-a-semicolon"
+what = "`x[a + 1 ; 2`: what follows the `[` is not a path atom, so it is a plain index whatever comes after"
+src  = """
+x = [1, 2]
+a = 1
+>> x[a + 1 ; 2 ¶
+"""
+
 # ── An edit on a ranged path (2026-10-02) ───────────────────────────────────
 #
 # Reading `m[1..2>1]` is a form of the language and agrees in all three. As the

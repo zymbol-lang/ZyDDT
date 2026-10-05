@@ -3108,7 +3108,7 @@ asignación cuando la condición empieza por el centinela. Tres celdas en
 
 ## GLB-036 — Un corchete de índice sin cerrar en posición de expresión: Rust y `zyjs` eligen distinta ayuda
 
-**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.6)
+**Estado:** **corregido 2026-10-05 (paso P3.1)** — sin decisión: la regla de Rust es la referencia
 **Encontrado por:** paso 3.6, 2026-09-19
 **Gravedad:** baja: el mismo texto, distinta ayuda; ninguna de las dos es falsa
 
@@ -3137,10 +3137,31 @@ Nada de diseño: es cuál de las dos reparte bien. Si la regla es la de Rust
 —ayuda del navegador sólo cuando el índice navega—, `closeNav` tiene que
 preguntar lo mismo que ya pregunta la rama de sentencia de `zyjs`.
 
+### Qué lo sujetaba
+
+Nada: `syntax-index-nav/navigation-left-open` sólo cubría el caso con `>`, que coincidía.
+
+### Corregido el 2026-10-05 (paso P3.1)
+
+Medido antes, en posición de expresión: `zyjs` daba la ayuda del navegador a **todo** índice sin
+cerrar (`>> x[1 = 2 ¶`, `y = x[1`, `>> x[1 2] ¶`, `f(x[1 = 2)`…), y a un rango sin cerrar
+(`>> x[1..2 ¶`) le daba el texto `expected ']' after flat extraction`, que en Rust sólo sale tras un
+`;`. Las rutas de sentencia ya coincidían.
+
+La causa: Rust decide con `is_nav_index` **antes** de leer el `[`, y `zyjs` decidía por lo que había
+parseado, y construye el mismo nodo `flat` para un rango que para una lista con `;`. Ahora
+`isNavIndexAhead` (`web/src/zymbol/zymbol.js`) es `is_nav_index` token a token —un `[` más, o un
+entero, un nombre o una cadena literal seguidos de `>`, `;` o `..`, un `-entero` igual, o un `(…)`
+seguido de `>`; un nombre caliente y una cadena con interpolación no son átomo, como en Rust—, y
+`closeNav` elige con esa respuesta. Medido en los tres: 17 formas iguales (sin `>`, con `>`,
+rango, `;`, `a + 1 ; 2`, paso calculado, clave literal, entero negativo, `Float`, doble corchete,
+y las de sentencia). Barrido de parseo: ningún fichero del workspace cambia de estado ni de texto.
+
 ### Qué lo sujeta
 
-Nada todavía: `syntax-index-nav/navigation-left-open` sólo cubre el caso con `>`,
-que coincide. Hace falta una celda para el caso sin `>` en posición de expresión.
+`syntax-index-nav/navigation-left-open` y cinco celdas nuevas: `index-left-open-without-a-path`,
+`index-left-open-in-an-assignment`, `range-left-open`, `flat-extraction-of-atoms-left-open` e
+`index-left-open-after-an-expression-and-a-semicolon`.
 
 ---
 
