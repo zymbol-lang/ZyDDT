@@ -6358,3 +6358,45 @@ que podría no ejecutarse. Toca a las dos clases de aviso a la vez.
 
 `runtime-operators/arithmetic-after-a-block-assigned-the-name` y
 `type-change/type-change-after-a-block-changed-it`, con `open_finding = "GLB-092"`, sin `expect`.
+
+---
+
+## GLB-093 — El aviso de cambio de tipo: `zyjs` no ve los cambios a o desde una colección ni los del estado de un módulo dentro de sus funciones, y Rust avisa de un array vacío
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir el alcance de [`GLB-092`](GLOBAL.md): en tres ficheros del workspace Rust da
+más avisos de cambio de tipo que `zyjs` (`interpreter/examples/phase1/reassign.zy`, 7 frente a 4;
+`ZyDDT/cases/pin/module_state/lib.zy`, 1 frente a 0; `zyquality/bench/stress_v2/bench_text.zy`, 1
+frente a 0), por tres causas distintas, ninguna la de `GLB-092` (paso P3, 2026-10-05)
+
+| cara | programa | `zymbol check` | `zyjs` |
+|---|---|---|---|
+| A | `x = 'c'` · `x = (1, 2)` | `'x' was Char but assigned (Int, Int)` | nada |
+| A | `x = [1]` · `x = #(k: 1)` / `x = 1` · `x = [1]` | avisa (`[Int]` → `#(k: Int)`, `Int` → `[Int]`) | nada |
+| B | en un módulo, `estado = #0` y dentro de `leer()`, `estado = "listo"` | `'estado' was Bool but assigned String` | nada |
+| C | `x = []` · `x = ["a"]` (también dentro de un bloque), y `x = [1]` · `x = []` | `was [Any] but assigned [String]`, y al revés | nada |
+
+- **A**: `inferType` de `zyjs`, que lee el aviso, sólo conoce tipos escalares; una colección es «no se
+  sabe» y no se compara.
+- **B**: `zyjs` no sigue el tipo del estado del módulo dentro de sus funciones.
+- **C**: Rust tipa `[]` como `[Any]` y su comparación de compatibilidad del aviso no trata ese `Any`
+  como «cualquiera». Un array vacío no tiene todavía tipo de elemento: parece un falso positivo de Rust.
+
+### Qué hay que decidir
+
+A y B: si `zyjs` tiene que avisar como Rust (la premisa del eje, `C-TYP-3`, dice que un cambio de tipo en
+un nombre es un aviso). C: si un array vacío reasignado con elementos es un cambio de tipo (Rust) o no
+(`zyjs`).
+
+### Qué lo sujeta
+
+- **A**: `type-change/type-change-to-a-collection`, con `open_finding = { zyjs = "GLB-093" }` (el eje
+  afirma `warn`).
+- **C**: `runtime-collection-ops/empty-array-reassigned-with-elements`, con `open_finding = "GLB-093"`,
+  sin `expect`.
+- **B**: **nada**, y no por olvido. Sólo `zymbol check` del propio fichero de módulo la ve: una celda
+  de ZyDDT ejecuta, un módulo no se puede ejecutar, y al ejecutar el script que lo importa ningún motor
+  muestra los avisos del módulo (medido: la celda salía `ok` en los tres). Lo que la sujetaría es
+  `web/tests/test_check.mjs`, que compara el checker de `zyjs` con `zymbol check` por fichero, con un
+  fichero de módulo nuevo en lo que recorre; eso cambia su línea base, y una línea base no se regraba
+  sin el autor.
