@@ -376,13 +376,19 @@ src  = """
 
 # ── A parameter's type, inferred from the body (2026-10-02) ────────────────
 #
-# The Rust analyser refuses the call before anything runs; zyjs has no
-# parameter inference, prints `antes` and fails at the `+` (ZYJS-048). Every
-# engine refuses, so `expect` holds in all three — what diverges is WHEN.
+# The Rust analyser refused the call before anything ran; zyjs had no parameter
+# inference, printed `antes` and failed at the `+` (ZYJS-048). Every engine
+# refused, so `expect` held in all three — what diverged was WHEN.
+
+# Decided 2026-10-05 (ZYJS-048, the argument-type half of C-TYP-2): the Rust
+# behaviour is the rule — what inference reaches is refused BEFORE the program
+# runs, in all three engines. `expect` only names the category; the static half
+# is held by the output, which is compared: `antes` is printed only by an engine
+# that ran the program before refusing it, and that engine diverges.
 
 [[cell]]
 id   = "argument-type-inferred-from-the-body"
-what = "a String passed where the body made the parameter a Number"
+what = "a String passed where the body made the parameter a Number — refused before `antes` is printed (ZYJS-048)"
 src  = """
 f(v) {
     <~ v + 1
@@ -390,4 +396,71 @@ f(v) {
 >> "antes" ¶
 >> f("a") ¶
 """
-open_finding = "ZYJS-048"
+
+[[cell]]
+id   = "argument-type-bool-from-a-logical-operator"
+what = "a parameter read by `&&` is a Bool: an Int passed to it is refused"
+src  = """
+f(v) { <~ v && #1 }
+>> "antes" ¶
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "argument-type-from-an-ordering-against-a-literal"
+what = "a parameter compared with `<` against an Int literal is an Int: a String is refused"
+src  = """
+f(v) { <~ v < 5 }
+>> "antes" ¶
+>> f("a") ¶
+"""
+
+[[cell]]
+id   = "argument-type-from-a-dictionary-key"
+what = "a parameter used as the key of a dictionary built in the body is a String: an Int is refused"
+src  = """
+f(k) {
+    d = #(a: 1)
+    <~ d[k]
+}
+>> "antes" ¶
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "argument-type-passed-on-to-another-function"
+what = "a parameter handed to a function declared before is that function's parameter type, and inside the body it is passed on with its own"
+src  = """
+g(n) { <~ n * 2 }
+f(v) { <~ g(v) }
+>> "antes" ¶
+>> f("a") ¶
+"""
+
+[[cell]]
+id   = "argument-type-of-an-inferred-parameter-passed-on"
+what = "inside `g`, `w` is a Number — passing it where a Bool is expected is refused, though nobody calls `g` with a wrong value"
+src  = """
+f(v) { <~ v && #1 }
+g(w) {
+    x = w + 1
+    <~ f(w)
+}
+>> "antes" ¶
+>> g(1) ¶
+"""
+
+[[cell]]
+id     = "argument-type-what-does-not-constrain"
+what   = "the controls: `==`, juxtaposition, a parenthesized use and a function declared later constrain nothing, so these calls run — the forms where a port would over-refuse"
+expect = "ok"
+src    = """
+igual(v) { <~ v == 5 }
+texto(v) { <~ "[" v "]" }
+grupo(v) { <~ (v + 1) }
+antes(v) { <~ despues(v) }
+despues(n) { <~ n }
+>> igual("a") ¶
+>> texto(1) ¶
+>> antes("a") ¶
+"""
