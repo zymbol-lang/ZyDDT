@@ -4936,11 +4936,27 @@ Los tres motores dicen `+ is arithmetic only — use juxtaposition to concatenat
 strings: "a" b "c"`. No hay ninguna cadena en el programa: el operando izquierdo es
 Unit. La guía es la de otro fallo, `"a" + "b"`, que comparte rama.
 
+### Qué lo sujetaba
+
+Nada: los tres decían lo mismo, así que una celda habría salido verde.
+
+### Decidido el 2026-10-05 (paso P3.2)
+
+Medido antes: el `+` daba la guía de concatenar cadenas con **cualquier** operando que no fuera
+número — Unit, Bool, un array, un Char —, mientras `-`, `*` y `%` ya nombraban los tipos
+(`arithmetic requires numeric operands: Unit, Int`). Opción 1 de tres: el `+` habla como su familia
+cuando **ningún** operando es texto, y la guía de la yuxtaposición se queda para el caso para el que
+se escribió, `"a" + b`. Las otras eran el texto de la familia también con cadenas (perdiendo la
+pista) y dejarlo.
+
+Los tres motores, el mismo día y en el mismo paso que el kind de [`GLB-088`](GLOBAL.md): TW
+`eval_add`, VM `arith_type_error`, `zyjs` `applyOp`. Barrido de 65 casos (seis operadores, cinco tipos
+no numéricos a cada lado, `s + s` y los unarios), idéntico en los tres.
+
 ### Qué lo sujeta
 
-Nada todavía: los tres dicen lo mismo, así que una celda saldría verde. Hace falta
-una redacción decidida (por ejemplo, la de la familia de GLB-033: `arithmetic
-requires numeric operands: Unit, Int`) para poder afirmarla con `expect`.
+El golden de `zyquality/corpus/errors/runtime/arithmetic_type_errors.zy`, que imprime `_err` de cada
+familia: el texto y el kind.
 
 ---
 
@@ -6130,7 +6146,7 @@ controles, iguales. `check` de los 235 ficheros con `)[`: sólo rechaza los que 
 
 ## GLB-088 — Los errores de tipo de la aritmética son `##_` en los tres motores, no `##Type`
 
-**Estado:** **abierto** — pendiente de confirmación del autor: D1 lo decide, pero el alcance es amplio
+**Estado:** **corregido 2026-10-05 (paso P3.2)** — confirmado por el autor: `##Type`, por D1
 **Encontrado por:** al medir las vecinas de [`GLB-059`](GLOBAL.md) (paso P3, 2026-10-05)
 
 ```zymbol
@@ -6157,10 +6173,21 @@ réplica en `zyjs`): «type» da `##Type`, y ninguno de estos mensajes la contie
 tipo equivocado es `##Type`. `:! ##_` atrapa cualquier clase, así que los cuatro programas del
 workspace que lo usan no cambiarían, y ningún golden graba hoy un `##_(…)` aritmético.
 
+### Corregido el 2026-10-05 (paso P3.2)
+
+El kind se declara donde se lanza el error, no se deduce de las palabras: TW
+`RuntimeError::kinded("Type", …)` en `arithmetic_ops.rs` y en el `-`/`+` unario de
+`expressions.rs`; VM `VmError::TypeMsg` en `ri2!`, `rf2!`, `ri_imm!`, `rn!`, el negativo de un Float
+y `Pos`; `zyjs` `ZyRuntimeError(…, '##Type')` en `applyOp` y en los unarios. Los textos no cambian
+por esto (salvo el `+` de [`GLB-059`](GLOBAL.md)). Barrido de 65 casos, idéntico en los tres, los 65
+`##Type`. Lo mismo en los operadores lógicos y en las comparaciones salió al medir y es otro
+hallazgo, [`GLB-091`](GLOBAL.md).
+
 ### Qué lo sujeta
 
 `runtime-operators/arithmetic-type-error-is-a-type-error` y
-`runtime-operators/plus-type-error-is-a-type-error`, con `open_finding = "GLB-088"`.
+`runtime-operators/plus-type-error-is-a-type-error`, que hasta la corrección llevaban
+`open_finding = "GLB-088"`, y el golden de `zyquality/corpus/errors/runtime/arithmetic_type_errors.zy`.
 
 ---
 
@@ -6193,3 +6220,60 @@ ejecución los tres rechazan igual.
 ### Qué lo sujeta
 
 `runtime-operators/arithmetic-on-a-name-holding-unit`, con `open_finding = "GLB-089"`, sin `expect`.
+
+---
+
+## GLB-090 — `x / 2` con `x` vacía habla de partir cadenas
+
+**Estado:** **abierto** — pendiente de decisión del autor; es la forma de [`GLB-059`](GLOBAL.md) en el `/`
+**Encontrado por:** al implementar `GLB-059` (paso P3.2, 2026-10-05)
+
+```zymbol
+id(v) { <~ v }
+x = id(##_)
+>> (x / 2) ¶
+```
+
+Los tres motores dicen `/ requires numeric operands — use $/ to split strings` con Unit, Bool, un
+array, un Char o un String a cualquier lado: la guía de partir cadenas sale aunque no haya ninguna.
+Es exactamente lo que `GLB-059` decidió para el `+`, en el operador vecino, y no se extendió sin
+preguntar.
+
+### Qué hay que decidir
+
+Si el `/` sigue la regla del `+` —nombrar los tipos (`arithmetic requires numeric operands: Unit,
+Int`) salvo cuando hay texto, que conserva la guía de `$/`— o se queda como está.
+
+### Qué lo sujeta
+
+El golden de `zyquality/corpus/errors/runtime/arithmetic_type_errors.zy` (`r11`), que graba el texto de
+hoy: los tres coinciden, así que una celda saldría verde.
+
+---
+
+## GLB-091 — Los errores de tipo de los operadores lógicos y de las comparaciones son `##_`, y las comparaciones nombran valores
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-088`](GLOBAL.md) (paso P3.2, 2026-10-05)
+
+| programa (con `n = 5`, `s = "a"`, `b = #1`, `x = ##_`, tipos escondidos tras `id`) | mensaje, igual en los tres | kind |
+|---|---|---|
+| `n && #1` | `logical AND requires boolean operands, got Int` | `##_` |
+| `!n` | `logical NOT requires boolean operand, got Int` | `##_` |
+| `n < s` | `cannot compare integer 5 with string 'a' using operator '<'` | `##_` |
+| `s > n` | `cannot compare string 'a' with integer 5 using operator '>'` | `##_` |
+| `b < n`, `x < n` | `cannot compare values with operator '<': Bool and Int` / `Unit and Int` | `##_` |
+
+Dos cosas: el kind (D1 dice `##Type` para un tipo equivocado, como en `GLB-088`), y que la
+comparación entre número y texto nombra los **valores** (`integer 5`, `string 'a'`), contra
+`GLB-033`, mientras la de Bool o Unit ya nombra los tipos.
+
+### Qué hay que decidir
+
+Si estos también son `##Type`, y si la comparación número–texto pasa a nombrar los tipos, como su
+vecina (`cannot compare values with operator '<': Int and String`).
+
+### Qué lo sujeta
+
+`runtime-operators/logical-type-error-is-a-type-error` y
+`runtime-operators/comparison-type-error-is-a-type-error`, con `open_finding = "GLB-091"`.
