@@ -3711,9 +3711,22 @@ Nada de diseño: es aplicar GLB-033 a `>>~ slot` y que la VM copie la redacción
 del TW, que es la regla («un mensaje se redacta como el TW redacta esa
 operación»).
 
+### Medido otra vez (2026-10-05)
+
+- **La parte 2 ya estaba corregida**: el commit `6159f04` del 2026-09-23 («vm: name what the reader
+  wrote…») cambió «ms» por «duration», y la ficha no se actualizó. Los tres dicen hoy
+  `@~ requires non-negative duration, got -5`. Ese mensaje nombra el valor, y está bien: es un
+  error de **valor** (el tipo es correcto), como `replacement count must be non-negative, got -1`.
+- **La parte 1 sigue en los tres**: `>>~ slot expects Int, got fila`, `got 2.5`, `got #1`,
+  `got [1]` — nombra el valor en un error de **tipo**. Los vecinos del mismo `@~` nombran el tipo:
+  `@~ requires integer milliseconds, got String` / `Float` / `Bool`.
+- **Y el kind es `##_`** en los tres: D1 dice `##Type` para un tipo equivocado. La celda
+  `positioned-output-slot-must-be-int-met` lo imprime, pero sólo pregunta si coinciden.
+
 ### Qué lo sujeta
 
-Nada: no hay celda para ninguna de las cuatro formas.
+`runtime-io/positioned-output-slot-is-a-type-error` (un único `:! ##Type`, `expect = "ok"`), con
+`open_finding = "GLB-042"`. El texto, cuando se decida, lo sujeta un golden.
 
 ---
 
@@ -6112,3 +6125,71 @@ Rust: `reject_chained_index` mira a través del grupo (`unwrap_group`), y `index
 para que el mensaje nombre `m`. Medido en los tres: `(m[1])[2]`, `((m[1]))[2]`, en asignación y en
 `>>`, `(f()[1])[2]`, `([[5, 6]][1])[2]` y `(m[1])[1>1]` se rechazan con el mismo texto; los
 controles, iguales. `check` de los 235 ficheros con `)[`: sólo rechaza los que ya rechazaba.
+
+---
+
+## GLB-088 — Los errores de tipo de la aritmética son `##_` en los tres motores, no `##Type`
+
+**Estado:** **abierto** — pendiente de confirmación del autor: D1 lo decide, pero el alcance es amplio
+**Encontrado por:** al medir las vecinas de [`GLB-059`](GLOBAL.md) (paso P3, 2026-10-05)
+
+```zymbol
+id(v) { <~ v }
+x = id(##_)
+!? {
+    >> (x - 1) ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+```
+
+(`id` sólo esconde el tipo a los analizadores, para que la pregunta sea el kind y no un aviso:
+con `x = ##_` escrito directamente, Rust avisa y `zyjs` no — [`GLB-089`](GLOBAL.md).)
+
+| operación | mensaje (igual en los tres) | kind |
+|---|---|---|
+| `x - 1`, `x * 2` con `x = ##_` | `arithmetic requires numeric operands: Unit, Int` | `##_` |
+| `#1 - 1`, `"a" - 1` | `… numeric operands: Bool, Int` / `String, Int` | `##_` |
+| `x + 1`, `#1 + 1`, `[1] + 1`, `'c' + 1`, `"a" + 1` | `+ is arithmetic only — use juxtaposition…` | `##_` |
+
+El kind se lee de las palabras del mensaje (`zymbol_common::errkind::error_kind_of_message` y su
+réplica en `zyjs`): «type» da `##Type`, y ninguno de estos mensajes la contiene. D1 dice que un
+tipo equivocado es `##Type`. `:! ##_` atrapa cualquier clase, así que los cuatro programas del
+workspace que lo usan no cambiarían, y ningún golden graba hoy un `##_(…)` aritmético.
+
+### Qué lo sujeta
+
+`runtime-operators/arithmetic-type-error-is-a-type-error` y
+`runtime-operators/plus-type-error-is-a-type-error`, con `open_finding = "GLB-088"`.
+
+---
+
+## GLB-089 — Una variable que guarda `##_`, en aritmética: el analizador de Rust avisa, el de `zyjs` no
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al construir la celda de [`GLB-088`](GLOBAL.md) (paso P3, 2026-10-05)
+
+```zymbol
+x = ##_
+>> (x - 1) ¶
+```
+
+| programa | `zymbol check` (y `zytw`, `zyvm`) | `zyjs` |
+|---|---|---|
+| `x = ##_` · `x - 1` | `warning: arithmetic operation on non-numeric type: Unit` | nada |
+| `##_ - 1` | el mismo aviso | el mismo aviso |
+| `x = #1` · `x - 1`, `x = "a"` · `x - 1`, `x = [1]` · `x - 1` | avisa (`Bool`, `String`, `[Int]`) | avisa, igual |
+| `x = ##_` · `x + 1`, `x = "a"` · `x + 1` | nada | nada |
+
+La diferencia está en cómo `zyjs` recuerda el tipo de una variable que recibió `##_`: por
+`GLB-043`, Unit no es un cambio de tipo, y el aviso aritmético de `zyjs` no lo lee de la variable.
+El `+` no avisa en ninguno de los dos, con ningún tipo: es otra rama del análisis.
+
+### Qué hay que decidir
+
+Si una variable que guarda `##_` avisa en aritmética como el literal (Rust), o no (`zyjs`). En
+ejecución los tres rechazan igual.
+
+### Qué lo sujeta
+
+`runtime-operators/arithmetic-on-a-name-holding-unit`, con `open_finding = "GLB-089"`, sin `expect`.

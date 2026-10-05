@@ -239,3 +239,59 @@ print(x)
 print(len(x))
 print(str(5) + str(1))
 """
+
+# ── The kind of an arithmetic type error (added 2026-10-05) ────────────────
+#
+# Measured beside GLB-059: every arithmetic operator refused for its operands'
+# types raises `##_` in the three engines, not `##Type` — the kind is read from
+# the message's words and neither `arithmetic requires numeric operands` nor
+# `+ is arithmetic only` contains one. D1 says a wrong type is a `##Type`
+# (GLB-088). One cell per operator family: `-` names the types, `+` does not.
+# The empty value comes through `id`, whose type no analyser knows, so neither
+# warns and the cell asks only the kind: with `x = ##_` directly, the Rust
+# analyser warns on `x - 1` and zyjs does not, which is GLB-089's question.
+
+[[cell]]
+id     = "arithmetic-type-error-is-a-type-error"
+expect = "ok"
+what   = "`x - 1` with `x` empty is caught by `:! ##Type` — today the three raise `##_` (GLB-088)"
+src    = """
+id(v) { <~ v }
+x = id(##_)
+!? {
+    >> (x - 1) ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+open_finding = "GLB-088"
+
+[[cell]]
+id     = "plus-type-error-is-a-type-error"
+expect = "ok"
+what   = "`x + 1` with `x` empty, the same — `+` has its own message and the same kind (GLB-088)"
+src    = """
+id(v) { <~ v }
+x = id(##_)
+!? {
+    >> (x + 1) ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+open_finding = "GLB-088"
+
+# ── A name holding `##_`, in arithmetic (added 2026-10-05) ──────────────────
+#
+# `##_ - 1`, `#1 - 1`, `"a" - 1` and `[1] - 1` are warned statically by both
+# analysers. With the empty value in a NAME — `x = ##_`, then `x - 1` — only the
+# Rust one warns. No `expect`: which one is right is not decided (GLB-089).
+
+[[cell]]
+id   = "arithmetic-on-a-name-holding-unit"
+what = "`x = ##_` then `x - 1`: the Rust analyser warns `arithmetic operation on non-numeric type: Unit`, zyjs does not (GLB-089, undecided)"
+src  = """
+x = ##_
+>> (x - 1) ¶
+"""
+open_finding = "GLB-089"
