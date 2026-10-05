@@ -2602,7 +2602,7 @@ como en los dos motores de Rust.
 
 ## ZYJS-048 — Sin inferencia de tipos de parámetro: `zyjs` ejecuta, con sus efectos, lo que los motores Rust rechazan antes de empezar
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-05 (paso P2, ZYJS-048)** — decidido por el autor: el rechazo estático de Rust es la regla
 **Encontrado por:** el cruce del 2026-10-01 de las exclusiones `ANSI_FORMAT` de ZyQuality con
 `zyddt ask`: `corpus/memory02_function_isolation.zy` divergía (concatenaba cadenas con `+`,
 un fósil; se reescribió el 2026-10-02 y con él desapareció lo único que lo preguntaba)
@@ -2639,6 +2639,39 @@ primero es lo coherente con que `check` sea la frontera. Propuesta, no decisión
 
 ### Qué lo sujeta
 
-`refusal/argument-type-inferred-from-the-body`, con `open_finding = "ZYJS-048"`. Es además lo
-único que provoca hoy el diagnóstico `argument {} has type {}, but function '{}' expects {}`
-(`zyquality/messages/reach.py`).
+`refusal/argument-type-inferred-from-the-body`, que hasta la decisión llevaba
+`open_finding = "ZYJS-048"`.
+
+### Decidido el 2026-10-05
+
+Es la segunda pregunta de `C-TYP-2` (`zymbol-design/CANDIDATES.md`): ¿el comportamiento de
+Rust es **la regla**, o *rechazado* es la regla y el momento una libertad de implementación?
+Opción 1 de tres: **Rust es la regla**, y `zyjs` era un hueco. Las otras eran aceptar *refused*
+como regla (y rechazar este hallazgo) y aplazarlo hasta `C-TYP-3`. Alcance medido antes: en las
+3126 fuentes del workspace sólo dos programas llegaban al diagnóstico, la celda y la sonda
+`C-TYP-2/p1`. La frase de la premisa (`TYP-2`) es del autor y va en su propio commit; esta
+corrección no toca `zymbol-design/`.
+
+`checkSource` de `zyjs` (`Checker` en `web/src/zymbol/zymbol.js`) infiere ahora la firma de cada
+función de nivel superior, en orden de declaración, con las reglas de `infer_function_signature` y
+`collect_constraints_*` de `type_check.rs`, incluido lo que **no** mira: un grupo entre
+paréntesis no se recorre, `==` y la yuxtaposición no restringen, una comparación sólo restringe
+contra un literal, una función declarada después no aporta nada, `x += v` y `v++` son una
+asignación de `v + …`, y un `??` restringe como sentencia y no como valor. Dentro del cuerpo, un
+parámetro tiene su tipo inferido, así que pasarlo donde se espera otro también se rechaza. El
+tipo del argumento lo da una función aparte (`argType`) para no tocar `inferType`, que lee el
+aviso de cambio de tipo. Código nuevo `E_ARG_TYPE`, con su entrada en el catálogo del playground
+en inglés y en español.
+
+Medido: 44 sondas con cada clase de restricción, idénticas a `zymbol check` salvo dos programas
+que ya son erróneos por otra causa (un elemento sin definir, que Rust nombra `[?]`, y un nombre
+que es variable y función a la vez). Barrido de los 3146 `.zy` del workspace, diagnóstico por
+diagnóstico: **idéntico** en los dos motores — sale en los mismos tres ficheros (la celda, la
+sonda y `zyV.zy` de la raíz) y en ningún otro. Ningún aviso de más.
+
+Lo sujetan, en `refusal`: `argument-type-inferred-from-the-body` y seis más —
+`…-bool-from-a-logical-operator`, `…-from-an-ordering-against-a-literal`,
+`…-from-a-dictionary-key`, `…-passed-on-to-another-function`,
+`…-of-an-inferred-parameter-passed-on`— y el control `argument-type-what-does-not-constrain`,
+con las formas donde un port avisaría de más. `expect` sólo afirma la categoría; lo estático lo
+sujeta la salida, que se compara: `antes` sólo lo imprime un motor que ejecutó antes de rechazar.
