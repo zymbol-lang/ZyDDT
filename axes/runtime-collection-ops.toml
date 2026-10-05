@@ -1814,3 +1814,19 @@ oracle.py = """
 print("hello".replace("l", "Ll", 2))
 print("hello".replace("l", "Ll", 2))
 """
+
+# ── An empty array, reassigned (added 2026-10-05) ───────────────────────────
+#
+# The Rust analyser types `[]` as `[Any]` and warns when the name then takes a
+# typed array — `[Any] but assigned [String]`, and back. zyjs does not. Whether
+# an empty array has an element type to change is not decided (GLB-093).
+
+[[cell]]
+id   = "empty-array-reassigned-with-elements"
+what = "`x = []` then `x = [\"a\"]`: Rust warns `was [Any] but assigned [String]`, zyjs does not (GLB-093, undecided)"
+src  = """
+x = []
+x = ["a"]
+>> x ¶
+"""
+open_finding = "GLB-093"

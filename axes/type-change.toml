@@ -226,3 +226,23 @@ x = 2.5
 >> x ¶
 """
 open_finding = "GLB-092"
+
+# ── Changes the browser engine does not see (added 2026-10-05) ──────────────
+#
+# Measured while sizing GLB-092: the type-change warning of zyjs reads only
+# scalar types, so a change to or from a collection passes in silence there.
+# The axis expects `warn`, which is C-TYP-3's statement, and zyjs is the
+# declared offender (GLB-093). Its other face — a module's own state changed
+# inside one of its functions — is visible only to `zymbol check` of the module
+# file itself, which a cell cannot ask: a cell runs, and a module cannot be run,
+# while running its importer shows neither engine's warnings for the module.
+
+[[cell]]
+id   = "type-change-to-a-collection"
+what = "`x = 'c'` then `x = (1, 2)`: a Char that becomes a tuple — Rust warns, zyjs does not (GLB-093)"
+src  = """
+x = 'c'
+x = (1, 2)
+>> x ¶
+"""
+open_finding = { zyjs = "GLB-093" }
