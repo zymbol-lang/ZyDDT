@@ -48,15 +48,16 @@ t(v) {
 }
 """
 
-# GLB-042 (2026-10-05): a slot that is not an Int is a wrong TYPE, so by D1 it
-# is a `##Type` — and the three engines raise `##_`, because the kind is read
-# from the words and the message has none of them. The cell above prints the
-# kind and only asks that the engines agree, which they do, on the wrong one.
+# GLB-042 (corrected 2026-10-05): a slot that is not an Int is a wrong TYPE, so
+# by D1 it is a `##Type`, and the message names the type (GLB-033). The three
+# engines raised `##_` and printed the value. The cell above prints the kind and
+# only asks that the engines agree; this one asserts it. The text is held by the
+# golden of zyquality/corpus/errors/runtime/output_slot_type.
 
 [[cell]]
 id     = "positioned-output-slot-is-a-type-error"
 expect = "ok"
-what   = "a `>>~` slot that is a String is caught by `:! ##Type` — today the three raise `##_` (GLB-042)"
+what   = "a `>>~` slot that is a String is caught by `:! ##Type`, as D1 says a wrong type is (GLB-042)"
 src    = """
 !? {
     >>~ ("fila", 1) > "A"
@@ -64,7 +65,6 @@ src    = """
     >> "Type" ¶
 }
 """
-open_finding = "GLB-042"
 
 [[cell]]
 id     = "end-of-input"

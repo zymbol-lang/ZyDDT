@@ -3683,7 +3683,7 @@ cualquier otro nombre tirado.
 
 ## GLB-042 — Los mensajes de `>>~` nombran el valor, y la VM llama «ms» a lo que los otros dos llaman «duration»
 
-**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.8)
+**Estado:** **corregido 2026-10-05 (paso P3.3)** — confirmado por el autor: el tipo y no el valor, y `##Type`
 **Encontrado por:** paso 3.8, 2026-09-19, midiendo las formas vecinas de `>>~` y `@~`
 **Familia:** `GLB-033` (los tipos en los mensajes), cerrado en el paso 3.5
 
@@ -3725,8 +3725,16 @@ operación»).
 
 ### Qué lo sujeta
 
-`runtime-io/positioned-output-slot-is-a-type-error` (un único `:! ##Type`, `expect = "ok"`), con
-`open_finding = "GLB-042"`. El texto, cuando se decida, lo sujeta un golden.
+`runtime-io/positioned-output-slot-is-a-type-error` (un único `:! ##Type`, `expect = "ok"`), que
+hasta la corrección llevaba `open_finding = "GLB-042"`, y el golden de
+`zyquality/corpus/errors/runtime/output_slot_type.zy`, que sujeta el texto.
+
+### Corregido el 2026-10-05 (paso P3.3)
+
+`>>~ slot expects Int, got String` (`Float`, `Bool`, `Array`, `Unit`, `Char`, `Tuple`, `Dict`) y kind
+`##Type` en los tres: TW `io.rs` con `type_ident()` y `kinded("Type")`, VM `OutputSlotCheck` con
+`type_name()` y `VmError::TypeMsg`, `zyjs` con `typeIdent` y `'##Type'`. Barrido de ocho tipos en las dos
+posiciones, 16 casos, idéntico en los tres.
 
 ---
 
