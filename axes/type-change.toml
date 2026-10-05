@@ -206,3 +206,23 @@ f() {
 >> f() ¶
 >> x ¶
 """
+
+# ── A type change inside a block, seen from after it (added 2026-10-05) ─────
+#
+# The same as runtime-operators/arithmetic-after-a-block-assigned-the-name, on
+# the type-change warning: after `? #1 { x = "a" }` the Rust analyser believes
+# `x` is an Int again, so `x = 2.5` is not a change to it; zyjs warns String →
+# Float. No `expect` (GLB-092).
+
+[[cell]]
+id   = "type-change-after-a-block-changed-it"
+what = "`x = 1`, `? #1 { x = \"a\" }`, `x = 2.5`: Rust warns once (Int → String), zyjs twice (and String → Float) (GLB-092, undecided)"
+src  = """
+x = 1
+? #1 {
+    x = "a"
+}
+x = 2.5
+>> x ¶
+"""
+open_finding = "GLB-092"

@@ -286,16 +286,59 @@ x = id(##_)
 #
 # `##_ - 1`, `#1 - 1`, `"a" - 1` and `[1] - 1` are warned statically by both
 # analysers. With the empty value in a NAME — `x = ##_`, then `x - 1` — only the
-# Rust one warns. No `expect`: which one is right is not decided (GLB-089).
+# Rust one warned. Decided 2026-10-05 (GLB-089): it warns — the name holds Unit
+# NOW, and the operation will fail. zyjs reads what the name holds now, and its
+# return-type inference descends into `!?` and a statement `??` as Rust's does,
+# which the control below needs: without that, a function returning from inside
+# `!?` was taken to return Unit and its result warned.
 
 [[cell]]
-id   = "arithmetic-on-a-name-holding-unit"
-what = "`x = ##_` then `x - 1`: the Rust analyser warns `arithmetic operation on non-numeric type: Unit`, zyjs does not (GLB-089, undecided)"
+id     = "arithmetic-on-a-name-holding-unit"
+expect = "warn"
+what   = "`x = ##_` then `x - 1`: the analysers warn `arithmetic operation on non-numeric type: Unit` (GLB-089); the run-time refusal is caught, so the warning is what the cell asserts"
+src    = """
+x = ##_
+!? {
+    >> (x - 1) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+
+[[cell]]
+id     = "arithmetic-on-a-result-returned-from-inside-a-try"
+expect = "ok"
+what   = "the control: a function that returns only from inside `!? … :!` is not taken to return Unit, so arithmetic on its result does not warn"
+src    = """
+primero(a) {
+    !? {
+        <~ a[1]
+    } :! {
+        <~ 0
+    }
+}
+x = primero([4, 5])
+>> (x * 10) ¶
+"""
+
+# ── An assignment inside a block, seen from after it (added 2026-10-05) ────
+#
+# The Rust analyser records an assignment inside a block in the block's own
+# scope, so after the block it forgets the type it gave an outer name: `x = ##_`,
+# `? #1 { x = 3 }`, `x - 1` still warns that `x` is Unit there. zyjs keeps the
+# assignment. No `expect`: which is right is not decided (GLB-092).
+
+[[cell]]
+id   = "arithmetic-after-a-block-assigned-the-name"
+what = "`x = ##_`, then `? #1 { x = 3 }`, then `x - 1`: Rust still warns Unit, zyjs does not (GLB-092, undecided)"
 src  = """
 x = ##_
+? #1 {
+    x = 3
+}
 >> (x - 1) ¶
 """
-open_finding = "GLB-089"
+open_finding = "GLB-092"
 
 # ── The kind of a logical or comparison type error (added 2026-10-05) ──────
 #

@@ -6201,7 +6201,7 @@ hallazgo, [`GLB-091`](GLOBAL.md).
 
 ## GLB-089 — Una variable que guarda `##_`, en aritmética: el analizador de Rust avisa, el de `zyjs` no
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-05 (paso P3.4)** — decidido por el autor: avisa, como Rust
 **Encontrado por:** al construir la celda de [`GLB-088`](GLOBAL.md) (paso P3, 2026-10-05)
 
 ```zymbol
@@ -6227,7 +6227,24 @@ ejecución los tres rechazan igual.
 
 ### Qué lo sujeta
 
-`runtime-operators/arithmetic-on-a-name-holding-unit`, con `open_finding = "GLB-089"`, sin `expect`.
+`runtime-operators/arithmetic-on-a-name-holding-unit`, que hasta la decisión llevaba
+`open_finding = "GLB-089"` sin `expect`; ahora `expect = "warn"`. Y el control
+`arithmetic-on-a-result-returned-from-inside-a-try`.
+
+### Decidido el 2026-10-05 (paso P3.4)
+
+Opción 1 de dos: el aviso es cierto —la operación fallará— y un nombre que guarda `##_` es Unit
+*ahora*; `GLB-043` dice que Unit no es un *cambio* de tipo, no que el nombre no tenga tipo. En
+`zyjs`, `operandTypeName` lee `infType` (lo que el nombre guarda ahora) cuando es Unit;
+`staticKind`, que leen otras comprobaciones, no se tocó.
+
+Al medirlo en el workspace salió un aviso de más en `zyquality/corpus/analysis/p3h_error_flows.zy`:
+`result = risky(arr, idx)` y `result * 10`, con `risky` devolviendo sólo desde dentro de
+`!? … :!`. La causa era la inferencia de retorno de `zyjs` (`funcReturnType`), que no entraba en
+el `!?` ni en un `??` escrito como sentencia, y daba Unit; la de Rust (`collect_return_types`) entra
+en los dos. Se replicó. Barrido de **todos** los diagnósticos de `zyjs` sobre los 3165 `.zy` del
+workspace, antes y después: el único que cambia es el de la celda. Queda una diferencia de
+analizador, que no se copió y es otro hallazgo: [`GLB-092`](GLOBAL.md).
 
 ---
 
@@ -6285,3 +6302,39 @@ vecina (`cannot compare values with operator '<': Int and String`).
 
 `runtime-operators/logical-type-error-is-a-type-error` y
 `runtime-operators/comparison-type-error-is-a-type-error`, con `open_finding = "GLB-091"`.
+
+---
+
+## GLB-092 — El analizador de Rust olvida, después de un bloque, el tipo que una asignación de dentro le dio a un nombre de fuera
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al implementar [`GLB-089`](GLOBAL.md) (paso P3.4, 2026-10-05)
+
+```zymbol
+x = ##_
+? #1 {
+    x = 3
+}
+>> (x - 1) ¶
+```
+
+| programa | `zymbol check` | `zyjs` |
+|---|---|---|
+| el de arriba | `warning: arithmetic operation on non-numeric type: Unit` | nada |
+| `x = 1`, `? #1 { x = "a" }`, `x = 2.5` | un aviso: `'x' was Int but assigned String` | dos: ése y `'x' was String but assigned Float` |
+
+En ejecución la `x` de fuera vale `3` (y `"a"`): una asignación dentro de un bloque escribe en el
+nombre de fuera (MEM-7, un nombre es una cosa). El analizador de Rust la registra en el ámbito del
+bloque (`define_var` en el ámbito actual), así que al salir del bloque vuelve a ver el tipo de
+antes. `zyjs` conserva la asignación.
+
+### Qué hay que decidir
+
+Si el analizador de Rust tiene que ver la asignación después del bloque —lo que hace `zyjs`, y lo que
+hace el programa—, o si lo que hay que mantener es lo de Rust, como lectura conservadora de un bloque
+que podría no ejecutarse. Toca a las dos clases de aviso a la vez.
+
+### Qué lo sujeta
+
+`runtime-operators/arithmetic-after-a-block-assigned-the-name` y
+`type-change/type-change-after-a-block-changed-it`, con `open_finding = "GLB-092"`, sin `expect`.
