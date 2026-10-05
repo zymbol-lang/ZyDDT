@@ -246,7 +246,10 @@ print(str(5) + str(1))
 # types raises `##_` in the three engines, not `##Type` — the kind is read from
 # the message's words and neither `arithmetic requires numeric operands` nor
 # `+ is arithmetic only` contains one. D1 says a wrong type is a `##Type`
-# (GLB-088). One cell per operator family: `-` names the types, `+` does not.
+# (GLB-088, corrected 2026-10-05: the kind is declared where the error is raised,
+# not read from the words). One cell per operator family: `-` names the types,
+# `+` names them too now when no operand is text (GLB-059). The texts are held
+# by the golden of zyquality/corpus/errors/runtime/arithmetic_type_errors.
 # The empty value comes through `id`, whose type no analyser knows, so neither
 # warns and the cell asks only the kind: with `x = ##_` directly, the Rust
 # analyser warns on `x - 1` and zyjs does not, which is GLB-089's question.
@@ -254,7 +257,7 @@ print(str(5) + str(1))
 [[cell]]
 id     = "arithmetic-type-error-is-a-type-error"
 expect = "ok"
-what   = "`x - 1` with `x` empty is caught by `:! ##Type` — today the three raise `##_` (GLB-088)"
+what   = "`x - 1` with `x` empty is caught by `:! ##Type`, as D1 says a wrong type is (GLB-088)"
 src    = """
 id(v) { <~ v }
 x = id(##_)
@@ -264,12 +267,11 @@ x = id(##_)
     >> "Type" ¶
 }
 """
-open_finding = "GLB-088"
 
 [[cell]]
 id     = "plus-type-error-is-a-type-error"
 expect = "ok"
-what   = "`x + 1` with `x` empty, the same — `+` has its own message and the same kind (GLB-088)"
+what   = "`x + 1` with `x` empty, the same kind (GLB-088)"
 src    = """
 id(v) { <~ v }
 x = id(##_)
@@ -279,7 +281,6 @@ x = id(##_)
     >> "Type" ¶
 }
 """
-open_finding = "GLB-088"
 
 # ── A name holding `##_`, in arithmetic (added 2026-10-05) ──────────────────
 #
@@ -295,3 +296,43 @@ x = ##_
 >> (x - 1) ¶
 """
 open_finding = "GLB-089"
+
+# ── The kind of a logical or comparison type error (added 2026-10-05) ──────
+#
+# Measured beside GLB-088: `&&`, `||`, `!` and an ordering between types that do
+# not compare also raise `##_` in the three engines, and the ordering messages
+# name the VALUES (`cannot compare integer 5 with string 'a'`). Not part of what
+# GLB-088 decided, so declared here as its own debt (GLB-091).
+
+[[cell]]
+id     = "logical-type-error-is-a-type-error"
+expect = "ok"
+what   = "`n && #1` with `n` an Int is caught by `:! ##Type` — today the three raise `##_` (GLB-091)"
+src    = """
+id(v) { <~ v }
+n = id(5)
+!? {
+    q = n && #1
+    >> q ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+open_finding = "GLB-091"
+
+[[cell]]
+id     = "comparison-type-error-is-a-type-error"
+expect = "ok"
+what   = "`n < s` between an Int and a String is caught by `:! ##Type` — today the three raise `##_` (GLB-091)"
+src    = """
+id(v) { <~ v }
+n = id(5)
+s = id("a")
+!? {
+    q = n < s
+    >> q ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+open_finding = "GLB-091"
