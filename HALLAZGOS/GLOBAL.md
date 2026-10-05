@@ -3167,7 +3167,7 @@ y las de sentencia). Barrido de parseo: ningún fichero del workspace cambia de 
 
 ## GLB-037 — El formateador sabe reimprimir `arr[i] = val`, una forma que ya no se puede construir
 
-**Estado:** abierto — sin decisión pendiente (F3, encontrado por el paso 3.6)
+**Estado:** **corregido 2026-10-05 (paso P3.5)** — decidido por el autor: se borran
 **Encontrado por:** paso 3.6, 2026-09-19, al borrar el desazucarado muerto
 **Gravedad:** baja: código inalcanzable, pero es la forma retirada escrita en un motor
 
@@ -3193,10 +3193,30 @@ Si se borran las dos variantes y sus cuatro lectores, o se quedan con una nota
 que diga que están muertas. Toca cinco crates, así que no se hizo dentro del
 paso 3.6.
 
+### Qué lo sujetaba
+
+Nada: no había forma de provocarlas. `zymbol fmt` sobre el corpus no las alcanzaba.
+
+### Borradas el 2026-10-05 (paso P3.5)
+
+La prueba de que nada las alcanzaba, antes de borrar: ninguna línea de ningún crate las
+**construía** —sólo la definición, dos brazos del formateador, un patrón del compilador y un
+comentario de `zymbol-bytecode`—, y `AssignSugar` no deriva `serde`, así que tampoco podían nacer
+de una deserialización. Se borraron las dos variantes (`zymbol-ast/src/variables.rs`, con una nota
+de por qué no están), los dos brazos de `zymbol-formatter/src/visitor.rs` y el patrón de
+`zymbol-compiler/src/lib.rs`, que queda en `matches!(sugar, AssignSugar::InPlaceEdit)`. Los
+comentarios del compilador y de `DeepSetInPlace` describían el mecanismo con la forma retirada
+`t[i] = val` y decían que el TW distinguía por `IndexedAssign`; ahora dicen `t[i]$~ val` escrito como
+sentencia y `InPlaceEdit`, que es lo que el TW lee (`variables.rs:94`).
+
+`cargo build` no da ningún aviso ni error: el compilador habría señalado cualquier construcción que
+quedara, y no queda ninguna referencia. La guarda de la tupla, lo único que pasaba por ese patrón,
+se midió igual en los tres: `u = t[1]$~ 9` da `(9, 2)`, la sentencia `t[1]$~ 9` se refusa y `t`
+sigue siendo `(1, 2)`.
+
 ### Qué lo sujeta
 
-Nada: no hay forma de provocarlas. `zymbol fmt` sobre el corpus no las alcanza —
-`zyq suite --only fmt` da P1–P4 sin fallos.
+El compilador de Rust: una variante borrada no se puede construir sin que el código deje de compilar.
 
 ---
 
