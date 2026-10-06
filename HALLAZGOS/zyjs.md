@@ -2808,3 +2808,43 @@ Las demás que empiezan por una marca las rechazan los dos (`5`, `"x"`, `(1 + 2)
 
 Ocho celdas de `refusal` (`*-as-a-statement`), con `open_finding = { zyjs = "ZYJS-050" }`. El subíndice no
 tiene celda: el navegador no puede correrlo, y su respuesta allí la cubre una exclusión de entorno.
+
+---
+
+## ZYJS-051 — Un `??` escrito como sentencia en el que no encaja ningún brazo: `zyjs` sigue, y los motores Rust fallan
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06)
+
+```zymbol
+f(v) {
+    ?? v {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+    <~ 99
+}
+>> f(1) ¶
+>> f(2) ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm` | `uno`, `99` y `Runtime error: no pattern matched in match expression` |
+| `zyjs` | `uno`, `99`, `99` |
+
+Como valor, `r = ?? 2 { 1 => "uno" }`, los tres fallan con el mismo error. Sólo la sentencia diverge:
+`zyjs` lanza `no pattern matched` al evaluar un `??` como expresión y no cuando lo ejecuta como sentencia.
+La GUIDE no dice qué pasa cuando no encaja ningún brazo, y el corpus no lo pregunta.
+
+### Qué hay que decidir
+
+- que `zyjs` falle como los motores Rust, y que la GUIDE lo diga (Recomendado);
+- que un `??` de sentencia sin brazo que encaje no haga nada, y cambien los motores Rust.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-statement-no-arm-matches` (`expect = "error"`), con
+`open_finding = { zyjs = "ZYJS-051" }`.
+

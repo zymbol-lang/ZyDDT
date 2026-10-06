@@ -6941,7 +6941,8 @@ celda se escribe con la decisión.
 
 ## GLB-101 — La inferencia de un parámetro junta las restricciones de todas las ramas, como si todas se ejecutaran
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.16)** — decidido por el autor el 2026-10-06: la opción A, una
+restricción sólo cuenta si está en todos los caminos
 **Encontrado por:** el autor, 2026-10-06, sobre TYP-2: «sigue siendo un sistema de tipo variante»
 
 ```zymbol
@@ -7001,8 +7002,101 @@ El mismo reparto por tipo se acepta escrito con `??` y se rechaza escrito con `?
 
 Las siete celdas de TYP-2 no cambian con A ni con B: todas usan el parámetro sin rama.
 
+### Corrección
+
+En los dos analizadores — `collect_constraints_from_block` en `crates/zymbol-semantic/src/type_check.rs`
+y su copia `collectConstraintsBlock` en `web/src/zymbol/zymbol.js` — cada camino guarda lo que evaluó, un
+`<~` lo cierra, y un parámetro queda obligado sólo a lo que exigen todos:
+
+- la condición del primer `?` vale en todos los caminos; la de un `_?`, sólo en los que llegan a ella; sin
+  `_`, un camino no entra en ninguna rama;
+- la cabecera de un `@` vale en todos; el cuerpo, sólo en los caminos que retornan dentro;
+- el escrutinio de un `??` vale en todos, y cada brazo es un camino. El valor de un brazo se lee y el camino
+  sigue: un `??` escrito como sentencia lo descarta. Un valor que no encaja en ningún brazo falla allí,
+  así que no es un camino;
+- nada bajo `!?` cuenta, y un `<~` en él cierra su camino.
+
+Sólo cambió cómo se combinan las restricciones, no lo que se lee: lo que el recolector no leía (`!?`, el
+brazo de bloque de un `??`) sigue sin aportar nada, y se recorre sólo para ver dónde acaban sus caminos.
+Por eso un camino nunca exige más de lo que se recogía antes, y la corrección sólo puede quitar un rechazo,
+nunca añadirlo.
+
+| forma | antes | ahora |
+|---|---|---|
+| `<~ v + 1` sin rama | rechaza | rechaza |
+| ramas por tipo, `?` y `_?` | rechaza | acepta |
+| `? c { <~ v + 1 } _ { <~ v * 2 }` | rechaza | rechaza |
+| guarda con `<~` temprano y después `<~ v + 1` | rechaza | acepta |
+| `@ c { <~ v + 1 }` y después `<~ v` | rechaza | acepta |
+| `? c { <~ 0 } _? v > 0 { <~ 1 }` | rechaza | acepta |
+| `!? { <~ v "x" } :! { … }` y después `<~ v + 1` | rechaza | acepta |
+| `?? v { 1 => v + 1  _ => (v "1") }` | rechaza | acepta |
+| `?? v { 1 => v + 1  _ => v * 2 }` | rechaza | rechaza |
+| una restricción de otra función, `g(v)`, dentro de una rama | rechaza | acepta |
+| `x = v + 1` al principio, o `v > 0` en la condición | rechaza | rechaza |
+
+Las 22 sondas dan lo mismo en Rust y en `zyjs`. Barridos de `zymbol check` y de `checkSource` sobre los
+3219 `.zy` del workspace, antes y después: desaparecen **tres** rechazos en cada analizador, los mismos, y
+no aparece ninguno. Son las dos celdas de este hallazgo y `zyV.zy`, el programa del autor.
+
+Una consecuencia buscada: `f(v) { @ i:1..3 { <~ v + 1 } <~ 0 }` se acepta y `f("a")` falla al ejecutar,
+porque el analizador no lee el rango y el cuerpo de un `@` puede no ejecutarse. Es la dirección de un
+sistema variante: deja correr lo que no puede probar que falla.
+
+### Lo que queda
+
+- El lado derecho de `&&` y `||` sigue contando: `f(a, b) { <~ a && b }` rechaza `f(#0, 5)` con `expects
+  Bool`, y al ejecutar da `#0`, porque los tres motores cortocircuitan y `b` no se evalúa. Es la misma
+  familia, pero no estaba en la opción A: queda para decisión del autor.
+- Al medir el `??` salieron dos más: [`GLB-102`](GLOBAL.md) y [`ZYJS-051`](zyjs.md).
+
 ### Qué lo sujeta
 
-`refusal/argument-type-not-from-one-branch` y `refusal/argument-type-not-from-a-loop-body`
-(`expect = "ok"`), con `open_finding` por motor en los tres: las dos formas que aceptan A, B y C.
+En `refusal`, de TYP-2: `argument-type-not-from-one-branch`, `argument-type-not-from-a-loop-body`,
+`argument-type-not-past-an-early-return`, `argument-type-not-from-a-later-condition`,
+`argument-type-not-past-a-return-under-try` (`expect = "ok"`) y `argument-type-not-from-one-arm`
+(`expect = "warn"`, por el valor descartado), que con los analizadores de antes dan WRONG; y
+`argument-type-from-both-branches` y `argument-type-from-every-arm`, los rechazos que todo camino sigue
+alcanzando.
+
+---
+
+## GLB-102 — Los analizadores toman los valores de un `??` escrito como sentencia por retornos, y los motores los descartan
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06)
+
+```zymbol
+f(v) {
+    ?? v {
+        1 => "a"
+        _ => "b"
+    }
+}
+x = f(1)
+>> (x - 1) ¶
+```
+
+`zymbol check` y `zyjs` avisan dos cosas: `match expression returns values but result is unused` y
+`arithmetic operation on non-numeric type: String`. Los tres motores fallan con `arithmetic requires
+numeric operands: Unit, Int`.
+
+Las dos cosas que dice el analizador no casan entre sí. La comprobación sabe que el valor de un `??` de
+sentencia se descarta, y por eso avisa. La inferencia del retorno — `collect_return_types` en Rust,
+`funcReturnType` en `zyjs` — toma esos valores por retornos (*«Match case values are implicit
+returns»*), así que `f` devuelve un String para el analizador y Unit al ejecutar. Medido en los tres
+motores: `f(v) { ?? v { 1 => v + 1  _ => v * 2 } <~ 99 }` devuelve `99`.
+
+La inferencia de parámetros (GLB-101) ya lee el `??` como lo ejecutan los motores.
+
+### Qué hay que decidir
+
+- que la inferencia del retorno lea el `??` de sentencia como lo ejecutan los motores: el valor de un
+  brazo no es un retorno (Recomendado);
+- que un brazo con valor de un `??` de sentencia sí retorne, y cambien los motores.
+
+### Qué lo sujeta
+
+Nada todavía: los dos analizadores dan el mismo aviso, así que una celda no vería nada. La celda se escribe
+con la decisión.
 
