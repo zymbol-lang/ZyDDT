@@ -472,6 +472,52 @@ despues(n) { <~ n }
 >> antes("a") ¶
 """
 
+# ── A use in one branch, or in a loop, does not reach the parameter (added 2026-10-06)
+#
+# The language is variant: a function may treat each type its own way, and its
+# returns already unify to `Any`. The inference collected the constraints of
+# every branch as if all of them ran, so a function that dispatches on the type
+# of its parameter refused the call it was written for — `f("a")` below runs and
+# answers `a1` (GLB-101, raised by the author 2026-10-06). The same dispatch
+# written with `??` was accepted. Both cells hold what every option under
+# decision accepts.
+
+[[cell]]
+id      = "argument-type-not-from-one-branch"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a function that treats each type in its own branch accepts both: `f(1)` is 2 and `f(\"a\")` is a1 (GLB-101)"
+src     = '''
+f(v) {
+    t = v#?
+    ? t[1] == "###" {
+        <~ v + 1
+    } _? t[1] == "##\"" {
+        <~ v "1"
+    }
+}
+>> f(1) ¶
+>> f("a") ¶
+'''
+open_finding = { zytw = "GLB-101", zyvm = "GLB-101", zyjs = "GLB-101" }
+
+[[cell]]
+id      = "argument-type-not-from-a-loop-body"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a use inside a `@` that may not run does not reach the parameter: `f(\"a\", #0)` answers a (GLB-101)"
+src     = '''
+f(v, c) {
+    @ c {
+        <~ v + 1
+    }
+    <~ v
+}
+>> f(1, #1) ¶
+>> f("a", #0) ¶
+'''
+open_finding = { zytw = "GLB-101", zyvm = "GLB-101", zyjs = "GLB-101" }
+
 # ── An expression that is not a statement (added 2026-10-06) ────────────────
 #
 # A statement begins with a mark (`>>`, `<<`, `?`, `??`, `@`, `!?`, `<~`, `¶`,
