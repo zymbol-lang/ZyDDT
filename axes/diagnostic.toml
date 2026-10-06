@@ -105,3 +105,21 @@ n = 2
     >> i ¶
 }
 """
+
+# ── A warning given twice (added 2026-10-05) ────────────────────────────────
+#
+# The Rust analyser reads an expression in a `<~` twice — once to check it, and
+# again to infer the return type — and keeps the warnings both times (it drops
+# the errors of the second pass, not its warnings). zyjs gives it once (GLB-095).
+
+[[cell]]
+id     = "warning-in-a-return-given-once"
+expect = "warn"
+what   = "`g() { <~ (\"a\" - 1) }`: one warning, not two — Rust prints `arithmetic operation on non-numeric type` twice (GLB-095)"
+src    = """
+g() {
+    <~ ("a" - 1)
+}
+>> "x" ¶
+"""
+open_finding = "GLB-095"

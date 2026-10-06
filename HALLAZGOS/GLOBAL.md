@@ -6353,7 +6353,7 @@ es la pregunta de `GLB-094`), que hasta la corrección llevaban `open_finding = 
 
 ## GLB-092 — El analizador de Rust olvida, después de un bloque, el tipo que una asignación de dentro le dio a un nombre de fuera
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-05 (paso P3.8)** — decidido por el autor: el analizador de Rust ve la asignación después del bloque
 **Encontrado por:** al implementar [`GLB-089`](GLOBAL.md) (paso P3.4, 2026-10-05)
 
 ```zymbol
@@ -6380,10 +6380,33 @@ Si el analizador de Rust tiene que ver la asignación después del bloque —lo 
 hace el programa—, o si lo que hay que mantener es lo de Rust, como lectura conservadora de un bloque
 que podría no ejecutarse. Toca a las dos clases de aviso a la vez.
 
+### Decidido el 2026-10-05 (paso P3.8)
+
+Opción 1 de dos: la asignación escribe el nombre que alcanza (MEM-7), así que su tipo cambia **donde
+el nombre nació**. En `zymbol-semantic/src/type_check.rs`, la asignación a un nombre visible —sin cruzar
+la frontera de una función (`crosses_strong_boundary`, que deja pasar el estado de un módulo, MEM-4) y
+sin bajar del ámbito de la lambda más interna (`lambda_floor`: lo que una lambda escribe no sale de
+ella, MEM-6)— da su tipo en el ámbito del nombre (`assign_var_at`, `note_real_type_at`); un nombre que
+no es visible nace en el ámbito actual, como antes.
+
+Al medir la lambda salió que `zyjs` hacía lo contrario: su tipo **sí** salía de la lambda (`x = 1`, una
+lambda con `x = "a"`, `x = 2.5` avisaba `String → Float`). MEM-6 lo decide, así que se corrigió en el
+mismo paso: el marco de la lambda queda marcado y una reasignación que cruza una lambda avisa contra el
+nombre de fuera —como Rust— pero se registra en una copia del marco actual, cuya lectura cuenta como uso
+del nombre de fuera.
+
+Barrido de **todos** los diagnósticos de `zymbol check` sobre los 3171 `.zy`, antes y después: sólo
+cambian las dos celdas de este hallazgo (y `zyV.zy`, editado por el autor entre las dos pasadas, que con
+el binario de antes da lo mismo). Ocho formas vecinas iguales en los dos analizadores: bloque, bloques
+anidados, bucle, `!?`, función (no cruza), nombre nuevo en un bloque, lambda (no sale) y parámetro de
+lambda. Salieron dos más, ajenos a éste: [`GLB-095`](GLOBAL.md) y [`GLB-096`](GLOBAL.md).
+
 ### Qué lo sujeta
 
-`runtime-operators/arithmetic-after-a-block-assigned-the-name` y
-`type-change/type-change-after-a-block-changed-it`, con `open_finding = "GLB-092"`, sin `expect`.
+`runtime-operators/arithmetic-after-a-block-assigned-the-name` (`expect = "ok"`),
+`type-change/type-change-after-a-block-changed-it` (dos avisos) y
+`type-change/type-change-inside-a-lambda-stays-in-it` (uno), que hasta la decisión llevaban
+`open_finding = "GLB-092"`.
 
 ---
 
@@ -6465,3 +6488,60 @@ tiene es una clase: sale `##_`.
 El golden de `zyquality/corpus/errors/runtime/logical_comparison_type_errors.zy` (`r7`, `r8`), que graba
 lo que los tres responden hoy. Los tres coinciden, así que una celda con `open_finding` saldría pagada
 el primer día: no hay nada que declarar como deuda hasta que se decida.
+
+---
+
+## GLB-095 — El analizador de Rust da dos veces el aviso de una expresión escrita en un `<~`
+
+**Estado:** **abierto** — sin decisión de diseño: un aviso es uno; pendiente de que el autor lo confirme
+**Encontrado por:** al medir las vecinas de [`GLB-092`](GLOBAL.md) (paso P3.8, 2026-10-05)
+
+```zymbol
+g() {
+    <~ ("a" - 1)
+}
+>> "x" ¶
+```
+
+`zymbol check` (y `zytw`, `zyvm`) dan **dos veces** `warning: arithmetic operation on non-numeric type:
+String` en la misma línea y columna; `zyjs`, una. Pasa en una función con nombre y en una lambda de
+bloque, sólo con lo que está en un `<~`: `y = ("a" - 1)` y `<~ y` avisa una vez. El binario de antes de
+hoy hacía lo mismo.
+
+### Causa
+
+La expresión de un `<~` se infiere dos veces: en la comprobación del cuerpo y otra vez para el tipo de
+retorno (`infer_return_type_from_block`). La segunda pasada descarta los **errores** que añade
+(`self.errors.truncate(errors_before)` en `infer_function_signature`) pero no los **avisos**, y la de
+la lambda no descarta nada.
+
+### Qué lo sujeta
+
+`diagnostic/warning-in-a-return-given-once` (`expect = "warn"`), con `open_finding = "GLB-095"`.
+
+---
+
+## GLB-096 — Para la aritmética, `zyjs` lee el tipo literal de un nombre y no el que guarda ahora
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-092`](GLOBAL.md) (paso P3.8, 2026-10-05)
+
+```zymbol
+x = 1
+x = "a"
+>> (x - 1) ¶
+```
+
+| programa | `zymbol check` | `zyjs` |
+|---|---|---|
+| `x = 1` · `x = "a"` · `x - 1` | `type mismatch` y `arithmetic operation on non-numeric type: String` | sólo `type mismatch` |
+| `x = "a"` · `x - 1` | `arithmetic operation on non-numeric type: String` | igual |
+
+El aviso aritmético de `zyjs` lee `staticKind`, que para un nombre es el tipo literal que recibió y pasa a
+«no se sabe» cuando cambia; Rust lee lo que el nombre guarda ahora. `GLB-089` decidió leer lo que el
+nombre guarda ahora **para Unit**; si eso se extiende a todos los tipos es la pregunta. Dentro de una
+lambda pasa lo mismo (`x = "a"` y `<~ (x - 1)`).
+
+### Qué lo sujeta
+
+`runtime-operators/arithmetic-on-a-name-that-changed-type`, con `open_finding = "GLB-096"`, sin `expect`.

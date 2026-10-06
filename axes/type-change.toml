@@ -210,13 +210,13 @@ f() {
 # ── A type change inside a block, seen from after it (added 2026-10-05) ─────
 #
 # The same as runtime-operators/arithmetic-after-a-block-assigned-the-name, on
-# the type-change warning: after `? #1 { x = "a" }` the Rust analyser believes
-# `x` is an Int again, so `x = 2.5` is not a change to it; zyjs warns String →
-# Float. No `expect` (GLB-092).
+# the type-change warning: after `? #1 { x = "a" }` the Rust analyser believed
+# `x` was an Int again. Decided 2026-10-05 (GLB-092): both changes warn. And
+# through a lambda, which writes a copy (MEM-6), the name outside keeps its type.
 
 [[cell]]
 id   = "type-change-after-a-block-changed-it"
-what = "`x = 1`, `? #1 { x = \"a\" }`, `x = 2.5`: Rust warns once (Int → String), zyjs twice (and String → Float) (GLB-092, undecided)"
+what = "`x = 1`, `? #1 { x = \"a\" }`, `x = 2.5`: two changes, two warnings (Int → String, String → Float) (GLB-092)"
 src  = """
 x = 1
 ? #1 {
@@ -225,7 +225,19 @@ x = 1
 x = 2.5
 >> x ¶
 """
-open_finding = "GLB-092"
+
+[[cell]]
+id   = "type-change-inside-a-lambda-stays-in-it"
+what = "`x = 1`, a lambda that does `x = \"a\"`, then `x = 2.5`: one warning — the lambda changed a copy, so `x` outside is still an Int (GLB-092, MEM-6)"
+src  = """
+x = 1
+f = () -> {
+    x = "a"
+    <~ x
+}
+x = 2.5
+>> f() x ¶
+"""
 
 # ── Changes the browser engine does not see (added 2026-10-05) ──────────────
 #

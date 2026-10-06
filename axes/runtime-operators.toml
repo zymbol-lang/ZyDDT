@@ -323,22 +323,45 @@ x = primero([4, 5])
 
 # ── An assignment inside a block, seen from after it (added 2026-10-05) ────
 #
-# The Rust analyser records an assignment inside a block in the block's own
-# scope, so after the block it forgets the type it gave an outer name: `x = ##_`,
-# `? #1 { x = 3 }`, `x - 1` still warns that `x` is Unit there. zyjs keeps the
-# assignment. No `expect`: which is right is not decided (GLB-092).
+# The Rust analyser recorded an assignment inside a block in the block's own
+# scope, so after the block it forgot the type it gave an outer name. Decided
+# 2026-10-05 (GLB-092): an assignment writes the name it reaches, and its type
+# changes where the name was born — but not through a lambda, whose writes stay
+# in it (MEM-6).
 
 [[cell]]
-id   = "arithmetic-after-a-block-assigned-the-name"
-what = "`x = ##_`, then `? #1 { x = 3 }`, then `x - 1`: Rust still warns Unit, zyjs does not (GLB-092, undecided)"
-src  = """
+id     = "arithmetic-after-a-block-assigned-the-name"
+expect = "ok"
+what   = "`x = ##_`, then `? #1 { x = 3 }`, then `x - 1`: after the block `x` is an Int, and nothing warns (GLB-092)"
+src    = """
 x = ##_
 ? #1 {
     x = 3
 }
 >> (x - 1) ¶
 """
-open_finding = "GLB-092"
+
+# ── A type the analysers read from a name (added 2026-10-05) ────────────────
+#
+# For arithmetic, zyjs reads the LITERAL type a name was given, which becomes
+# "cannot tell" once the name changes type; the Rust analyser reads what the
+# name holds now. So `x = 1`, `x = "a"`, `x - 1` warns in Rust only. The
+# decision of GLB-089 (read what the name holds now) was for Unit; whether it
+# extends to every type is GLB-096's question.
+
+[[cell]]
+id   = "arithmetic-on-a-name-that-changed-type"
+what = "`x = 1`, `x = \"a\"`, then `x - 1`: Rust warns `non-numeric type: String`, zyjs does not (GLB-096, undecided)"
+src  = """
+x = 1
+x = "a"
+!? {
+    >> (x - 1) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+open_finding = "GLB-096"
 
 # ── The kind of a logical or comparison type error (added 2026-10-05) ──────
 #
