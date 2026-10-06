@@ -6516,7 +6516,7 @@ el primer día: no hay nada que declarar como deuda hasta que se decida.
 
 ## GLB-095 — El analizador de Rust da dos veces el aviso de una expresión escrita en un `<~`
 
-**Estado:** **abierto** — sin decisión de diseño: un aviso es uno; pendiente de que el autor lo confirme
+**Estado:** **corregido 2026-10-06 (paso P3.10)**
 **Encontrado por:** al medir las vecinas de [`GLB-092`](GLOBAL.md) (paso P3.8, 2026-10-05)
 
 ```zymbol
@@ -6538,9 +6538,35 @@ retorno (`infer_return_type_from_block`). La segunda pasada descarta los **error
 (`self.errors.truncate(errors_before)` en `infer_function_signature`) pero no los **avisos**, y la de
 la lambda no descarta nada.
 
+Al medir antes de corregir salió la otra mitad: en una lambda de bloque también los **errores** salían
+dos veces. `_f = () -> { <~ nada }` daba `error: undefined variable 'nada'` dos veces en `zymbol
+check`; en una función con nombre, una.
+
+| programa | antes | ahora | `zyjs` |
+|---|---|---|---|
+| función con nombre, `<~ ("a" - 1)` | 2 avisos | 1 | 1 |
+| función con nombre, `<~` dentro de un `?` | 2 avisos | 1 | 1 |
+| función con nombre, `<~ nada` | 1 error | 1 | 1 |
+| lambda de bloque, `<~ ("a" - 1)` | 2 avisos | 1 | 1 |
+| lambda de bloque, `<~ (r && #1)` | 2 avisos | 1 | 1 |
+| lambda de bloque, `<~ nada` | 2 errores | 1 | 1 |
+
+### Corrección
+
+Las dos segundas pasadas descartan lo que encuentran: `infer_function_signature` recorta también
+`self.warnings`, y el brazo `LambdaBody::Block` de `Expr::Lambda` recorta errores y avisos después de
+`infer_return_type_from_block` (`crates/zymbol-semantic/src/type_check.rs`). El cuerpo ya se comprobó
+en la pasada que vale; la segunda sólo se lee para el tipo.
+
+Barrido de `zymbol check` sobre los 3175 `.zy` del workspace, binario de antes contra el de ahora: cambia
+**un** fichero, la propia celda, y lo que cambia es el aviso repetido que desaparece. Ningún diagnóstico
+nuevo y ninguno perdido.
+
 ### Qué lo sujeta
 
-`diagnostic/warning-in-a-return-given-once` (`expect = "warn"`), con `open_finding = "GLB-095"`.
+`diagnostic/warning-in-a-return-given-once`, `diagnostic/warning-in-a-lambda-return-given-once`
+(`expect = "warn"`) y `diagnostic/error-in-a-lambda-return-given-once` (`expect = "error"`). Con el
+binario de antes las tres dan DIVERGE.
 
 ---
 
