@@ -6770,7 +6770,8 @@ que recibe el `:!`.
 
 ## GLB-098 — El analizador de Rust tipa toda entrada `<<` como String, aunque lleve una marca de tipo
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.14)** — decidido por el autor el 2026-10-06: el tipo que lee la
+marca; `#|…|`, «no se sabe»
 **Encontrado por:** al medir las vecinas de [`GLB-096`](GLOBAL.md) (paso P3.12, 2026-10-06): era el único
 aviso de operador que daba sólo Rust en todo el workspace (`zyquality/corpus/input/08_numeric_float.zy`)
 
@@ -6810,11 +6811,32 @@ Float, `##'` Char, `##"` String). Para `#|…|`, el valor lo decide la entrada:
 - `Number`: lo que el programa espera; pero cuando la línea no es un número el nombre guarda el texto, y un
   programa que mira cuál de los dos le llegó recibiría avisos que no tocan.
 
+### Corrección
+
+`Statement::Input` en `crates/zymbol-semantic/src/type_check.rs` define el nombre con el tipo que lee su
+marca, según `InputCast`: `<<` y `##"` String, `###` Int, `##.` Float, `##'` Char, y `#|…|` `Any`.
+
+| entrada | `x * 2` / `x - 1`, antes | ahora |
+|---|---|---|
+| `<< #\|f\|` | `String`, de más | nada |
+| `<< ###(4) "E: " n`, `<< ### k` (también `-k`) | `String`, de más | nada |
+| `<< ##. g`, `<< ##.(5,2) "D: " m` | `String`, de más | nada |
+| `<< ##' "C: " c` | `String` | `Char` |
+| `<< ##"(20) "T: " s`, `<< f` | `String` | `String` |
+
+Barrido de `zymbol check` sobre los 3213 `.zy` del workspace, binario de antes contra el de ahora:
+desaparecen **cuatro** avisos y no aparece ninguno. Tres son los de las celdas de este hallazgo y el
+cuarto es el de `zyquality/corpus/input/08_numeric_float.zy`, el aviso de más por el que se encontró.
+
+Una vecina queda distinta: la **expresión** `v = #|s|` el analizador la tipa `Number`
+(`Expr::NumericEval`), y la entrada `<< #|v|` ahora `Any`. Las dos callan en la aritmética, y con
+`Number`, `v$#` tampoco avisa. Igualarlas es decisión del autor.
+
 ### Qué lo sujeta
 
-`runtime-io/numeric-input-in-arithmetic`, `runtime-io/typed-integer-input-in-arithmetic` y
-`runtime-io/typed-float-input-in-arithmetic` (`expect = "ok"`), con
-`open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }`.
+`runtime-io/numeric-input-in-arithmetic`, `typed-integer-input-in-arithmetic` y
+`typed-float-input-in-arithmetic` (`expect = "ok"`), sin `open_finding`: con el binario de antes dan WRONG.
+`typed-char-input-in-arithmetic` (`expect = "warn"`) lleva la deuda de `zyjs` ([`ZYJS-049`](zyjs.md)).
 
 ---
 
