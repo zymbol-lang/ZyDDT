@@ -343,16 +343,19 @@ x = ##_
 
 # ── A type the analysers read from a name (added 2026-10-05) ────────────────
 #
-# For arithmetic, zyjs reads the LITERAL type a name was given, which becomes
-# "cannot tell" once the name changes type; the Rust analyser reads what the
-# name holds now. So `x = 1`, `x = "a"`, `x - 1` warns in Rust only. The
-# decision of GLB-089 (read what the name holds now) was for Unit; whether it
-# extends to every type is GLB-096's question.
+# For an operator's operand, zyjs read the LITERAL type a name was given, which
+# becomes "cannot tell" once the name changes type; the Rust analyser reads what
+# the name holds now. So `x = 1`, `x = "a"`, `x - 1` warned in Rust only. GLB-089
+# decided to read what the name holds now for Unit; GLB-096 (decided 2026-10-06)
+# extends it to every type, for arithmetic, logical and unary operators alike.
+# A name can now hold a `Number` — a parameter inferred numeric — which is
+# numeric, as in Rust: the control below.
 
 [[cell]]
-id   = "arithmetic-on-a-name-that-changed-type"
-what = "`x = 1`, `x = \"a\"`, then `x - 1`: Rust warns `non-numeric type: String`, zyjs does not (GLB-096, undecided)"
-src  = """
+id     = "arithmetic-on-a-name-that-changed-type"
+expect = "warn"
+what   = "`x = 1`, `x = \"a\"`, then `x - 1`: both analysers warn `non-numeric type: String` — zyjs did not (GLB-096)"
+src    = """
 x = 1
 x = "a"
 !? {
@@ -361,7 +364,104 @@ x = "a"
     >> "refused" ¶
 }
 """
-open_finding = "GLB-096"
+[[cell]]
+id     = "logical-on-a-name-that-changed-type"
+expect = "warn"
+what   = "`x = #1`, `x = 5`, then `x && #1`: both analysers warn `logical operation on non-boolean type: Int` (GLB-096)"
+src    = """
+x = #1
+x = 5
+!? {
+    >> (x && #1) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+
+[[cell]]
+id     = "unary-on-a-name-that-changed-type"
+expect = "warn"
+what   = "`x = 1`, `x = \"a\"`, then `-x`: both analysers warn `unary - on non-numeric type: String` (GLB-096)"
+src    = """
+x = 1
+x = "a"
+!? {
+    >> (-x) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+
+[[cell]]
+id     = "arithmetic-on-a-name-holding-an-inferred-number"
+expect = "ok"
+what   = "the control: a name given a parameter inferred numeric holds a `Number`, which is numeric — `x = a`, then `x - 1`, warns nothing"
+src    = """
+g(a) {
+    y = a * 2
+    x = a
+    <~ (x - 1) + y
+}
+>> g(3) ¶
+"""
+
+# ── Two operands Rust can name and zyjs cannot (added 2026-10-06) ────────────
+#
+# Measured beside GLB-096: an empty array literal, which Rust calls `[Any]`; the
+# iterator of an `@` whose name is new, which Rust gives the element's type; and
+# a name holding a lambda, `() -> Int`. zyjs says "cannot tell" for all three and
+# stays silent (ZYJS-049, undecided). The fourth operand of that finding, a name
+# read by `<<`, is in runtime-io.
+
+[[cell]]
+id     = "arithmetic-on-an-empty-array-literal"
+expect = "warn"
+what   = "`[] - 1`: Rust warns `arithmetic operation on non-numeric type: [Any]`, zyjs does not (ZYJS-049)"
+src    = """
+!? {
+    >> ([] - 1) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+open_finding = { zyjs = "ZYJS-049" }
+
+[[cell]]
+id     = "arithmetic-on-a-new-iterator"
+expect = "warn"
+what   = "`@ c:\"ab\" { c - 1 }`: Rust warns `non-numeric type: Char`, zyjs does not — the new iterator has no type there (ZYJS-049)"
+# Inside a function, where neither analyser gives the loop's lifetime warning:
+# with it, zyjs would answer `warn` for another reason, and the cell would be a
+# DIVERGE that a per-engine debt does not cover.
+src    = """
+f() {
+    @ c:"ab" {
+        !? {
+            >> (c - 1) ¶
+        } :! {
+            >> "refused" ¶
+        }
+    }
+}
+f()
+"""
+open_finding = { zyjs = "ZYJS-049" }
+
+[[cell]]
+id     = "arithmetic-on-a-name-holding-a-lambda"
+expect = "warn"
+what   = "`x = 1`, `x = () -> 1`, then `x - 1`: Rust warns the change of type and `non-numeric type: () -> Int`, zyjs neither — it cannot name a lambda's type (ZYJS-049)"
+src    = """
+x = 1
+x = () -> 1
+!? {
+    >> (x - 1) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+open_finding = { zyjs = "ZYJS-049" }
+
 
 # ── The kind of a logical or comparison type error (added 2026-10-05) ──────
 #

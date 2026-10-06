@@ -155,3 +155,70 @@ x = "dato"
 \\ x
 >> "leo {x}" ¶
 """
+
+# ── The type of a name read by `<<` (added 2026-10-06) ──────────────────────
+#
+# Measured beside GLB-096. `<< n` reads text, a String; `<< ### n` an Int and
+# `<< ##. n` a Float (the table of GUIDE § Input `<<`); `<< #|n|` a number when
+# the line is one and text when it is not, so what that name holds is decided
+# by the input. The Rust analyser types every one of them as String — "Input
+# always produces a string" — and warns on arithmetic that runs (GLB-098). zyjs
+# types none, and is silent on all (ZYJS-049). Without a line to read, the `<<`
+# fails at its end of input, which the `!?` meets: the warning is what each cell
+# asserts.
+
+[[cell]]
+id     = "numeric-input-in-arithmetic"
+expect = "ok"
+what   = "`<< #|f|` then `f * 2` is the program `#|…|` exists for: no `non-numeric type: String` — the Rust analyser types every input as a String (GLB-098)"
+src    = """
+!? {
+    << #|f|
+    >> (f * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }
+
+[[cell]]
+id     = "typed-integer-input-in-arithmetic"
+expect = "ok"
+what   = "`<< ### n` reads an Int — the marker validates it — so `n * 2` warns nothing; Rust says `non-numeric type: String` (GLB-098)"
+src    = """
+!? {
+    << ### n
+    >> (n * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }
+
+[[cell]]
+id     = "typed-float-input-in-arithmetic"
+expect = "ok"
+what   = "`<< ##. g` reads a Float, so `g * 2` warns nothing; Rust says `non-numeric type: String` (GLB-098)"
+src    = """
+!? {
+    << ##. g
+    >> (g * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }
+
+[[cell]]
+id     = "text-input-in-arithmetic"
+expect = "warn"
+what   = "`<< f` then `f * 2`: Rust warns `non-numeric type: String`, zyjs does not — a name read by `<<` has no type there (ZYJS-049)"
+src    = """
+!? {
+    << f
+    >> (f * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+open_finding = { zyjs = "ZYJS-049" }
