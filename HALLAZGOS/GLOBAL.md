@@ -6304,7 +6304,7 @@ de la familia) y `r14`, añadido (`/` con texto, la guía de `$/`).
 
 ## GLB-091 — Los errores de tipo de los operadores lógicos y de las comparaciones son `##_`, y las comparaciones nombran valores
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-05 (paso P3.7)** — decidido por el autor: `##Type`; la comparación número–texto pasó a [`GLB-094`](GLOBAL.md)
 **Encontrado por:** al medir las vecinas de [`GLB-088`](GLOBAL.md) (paso P3.2, 2026-10-05)
 
 | programa (con `n = 5`, `s = "a"`, `b = #1`, `x = ##_`, tipos escondidos tras `id`) | mensaje, igual en los tres | kind |
@@ -6324,10 +6324,30 @@ comparación entre número y texto nombra los **valores** (`integer 5`, `string 
 Si estos también son `##Type`, y si la comparación número–texto pasa a nombrar los tipos, como su
 vecina (`cannot compare values with operator '<': Int and String`).
 
+### Corregido el 2026-10-05 (paso P3.7)
+
+Al implementarlo apareció que la propuesta para la comparación número–texto se apoyaba en una lectura
+incompleta: un texto **sí** se compara con un número cuando el texto es un número (`"5" < 10` da `#1`,
+`"2.5" < 10` también), así que `"a" < 10` falla por el **valor** del texto, no por su tipo. Nombrar el
+valor es ahí lo correcto —como en `@~ … got -5`—, y esa parte no se cambió: su kind es una pregunta
+aparte, [`GLB-094`](GLOBAL.md).
+
+Lo que sí es un tipo equivocado es ahora `##Type` en los tres, con el mismo texto que antes:
+- `&&`, `||` y `!` sobre algo que no es un Bool — TW, en el camino de cortocircuito de
+  `expressions.rs` (el que se ejecuta) y en los brazos de `eval_binary`; VM, `rb2!`, `RequireBool` y
+  `Not`; `zyjs`, el `&&`/`||` y el `!` unario. El cortocircuito se conserva: `#0 && n` es `#0`.
+- una ordenación entre dos tipos que nunca se comparan (`cannot compare values with operator '<': Bool
+  and Int`, `Unit and Int`, `Array and Array`) — TW `compare_values`, VM `cmp_order_error`, que ahora
+  devuelve el error con su clase, `zyjs` `applyOp`.
+
+Medido en los tres: 14 formas, idénticas.
+
 ### Qué lo sujeta
 
 `runtime-operators/logical-type-error-is-a-type-error` y
-`runtime-operators/comparison-type-error-is-a-type-error`, con `open_finding = "GLB-091"`.
+`runtime-operators/comparison-type-error-is-a-type-error` (ahora con `#1 < n`; antes usaba `n < "a"`, que
+es la pregunta de `GLB-094`), que hasta la corrección llevaban `open_finding = "GLB-091"`, y el golden de
+`zyquality/corpus/errors/runtime/logical_comparison_type_errors.zy`.
 
 ---
 
@@ -6406,3 +6426,42 @@ un nombre es un aviso). C: si un array vacío reasignado con elementos es un cam
   `web/tests/test_check.mjs`, que compara el checker de `zyjs` con `zymbol check` por fichero, con un
   fichero de módulo nuevo en lo que recorre; eso cambia su línea base, y una línea base no se regraba
   sin el autor.
+
+---
+
+## GLB-094 — El kind de comparar un número con un texto que no es un número
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al implementar [`GLB-091`](GLOBAL.md) (paso P3.7, 2026-10-05)
+
+```zymbol
+id(v) { <~ v }
+n = id(10)
+!? {
+    >> (id("a") < n) ¶
+} :! {
+    >> _err ¶
+}
+>> (id("5") < n) ¶
+```
+
+| programa | los tres motores |
+|---|---|
+| `"5" < 10`, `10 > "5"`, `"2.5" < 10` | `#1` — el texto es un número y se compara |
+| `"a" < 10`, `10 < "a"`, `"a" < 1.5` | `##_(cannot compare string 'a' with integer 10 using operator '<')` |
+
+El fallo depende del **valor** del texto, no de su tipo: un String se compara con un número cuando es un
+número. Por eso el mensaje nombra el valor, y está bien (`GLB-033` es para los errores de tipo). Lo que no
+tiene es una clase: sale `##_`.
+
+### Qué hay que decidir
+
+- `##Index` — D1: el tipo es correcto y el **valor** no;
+- `##Parse` — lo que falla es leer el texto como número, como en `cannot parse '12x'`;
+- `##_` — dejarlo como está.
+
+### Qué lo sujeta
+
+El golden de `zyquality/corpus/errors/runtime/logical_comparison_type_errors.zy` (`r7`, `r8`), que graba
+lo que los tres responden hoy. Los tres coinciden, así que una celda con `open_finding` saldría pagada
+el primer día: no hay nada que declarar como deuda hasta que se decida.

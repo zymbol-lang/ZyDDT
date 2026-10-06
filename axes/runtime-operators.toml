@@ -343,14 +343,15 @@ open_finding = "GLB-092"
 # ── The kind of a logical or comparison type error (added 2026-10-05) ──────
 #
 # Measured beside GLB-088: `&&`, `||`, `!` and an ordering between types that do
-# not compare also raise `##_` in the three engines, and the ordering messages
-# name the VALUES (`cannot compare integer 5 with string 'a'`). Not part of what
-# GLB-088 decided, so declared here as its own debt (GLB-091).
+# not compare raised `##_` in the three engines. Decided 2026-10-05 (GLB-091): a
+# `##Type`. A string against a number is not one of them — `"5" < 10` compares —
+# and its kind is its own question (GLB-094). Texts held by the golden of
+# zyquality/corpus/errors/runtime/logical_comparison_type_errors.
 
 [[cell]]
 id     = "logical-type-error-is-a-type-error"
 expect = "ok"
-what   = "`n && #1` with `n` an Int is caught by `:! ##Type` — today the three raise `##_` (GLB-091)"
+what   = "`n && #1` with `n` an Int is caught by `:! ##Type`, as D1 says a wrong type is (GLB-091)"
 src    = """
 id(v) { <~ v }
 n = id(5)
@@ -361,21 +362,19 @@ n = id(5)
     >> "Type" ¶
 }
 """
-open_finding = "GLB-091"
 
 [[cell]]
 id     = "comparison-type-error-is-a-type-error"
 expect = "ok"
-what   = "`n < s` between an Int and a String is caught by `:! ##Type` — today the three raise `##_` (GLB-091)"
+what   = "`b < n` between a Bool and an Int, two types that never compare, is caught by `:! ##Type` (GLB-091)"
 src    = """
 id(v) { <~ v }
 n = id(5)
-s = id("a")
+b = id(#1)
 !? {
-    q = n < s
+    q = b < n
     >> q ¶
 } :! ##Type {
     >> "Type" ¶
 }
 """
-open_finding = "GLB-091"
