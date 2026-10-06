@@ -6937,3 +6937,72 @@ celda de ZyDDT.
 Nada todavía: los tres coinciden, así que una celda con `open_finding` saldría pagada el primer día. La
 celda se escribe con la decisión.
 
+---
+
+## GLB-101 — La inferencia de un parámetro junta las restricciones de todas las ramas, como si todas se ejecutaran
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** el autor, 2026-10-06, sobre TYP-2: «sigue siendo un sistema de tipo variante»
+
+```zymbol
+f(v) {
+    t = v#?
+    ? t[1] == "###"
+    {
+        <~v + 1
+    }
+    _? t[1] == "##\""
+    {
+        <~v '1'
+    }
+}
+>> "antes" ¶
+>>f(1)¶
+>> f("a") ¶
+```
+
+Los tres motores lo rechazan antes de ejecutar: `argument 1 has type String, but function 'f' expects
+Number`. Con el tipo del argumento oculto (`f(id("a"))`) imprimen `2` y `a1`: el programa es correcto, y
+la función está escrita para tratar cada tipo a su manera.
+
+### Causa
+
+`collect_constraints_from_statement` (`crates/zymbol-semantic/src/type_check.rs`) recoge las restricciones
+de la condición, de la rama `?`, de cada `_?` y del `_`, del cuerpo de un `@` y de los casos de un `??`
+escrito como sentencia, todas en el mismo conjunto. Las une `TypeConstraint::unify`, que no avisa de un
+conflicto: gana una por prioridad (`Exact`, Numeric, Boolean, la primera `CompatibleWith`) y las demás se
+pierden. `zyjs` hace lo mismo desde [`ZYJS-048`](zyjs.md), que portó esta inferencia.
+
+Los retornos ya son variantes: `unify_types_static` une dos `<~` de tipos distintos en `Any`. Lo que
+rechaza es sólo el lado del parámetro.
+
+| forma | al ejecutar, con el tipo oculto | `check` hoy, en Rust y `zyjs` |
+|---|---|---|
+| `<~ v + 1` sin condición | falla en `+` | rechaza |
+| ramas por tipo (el programa de arriba) | `2`, `a1` | rechaza, de más |
+| `? c { <~ v + 1 } _ { <~ v * 2 }` | falla en `+` | rechaza |
+| una guarda con `<~` temprano y después `<~ v + 1` | `2`, `a1` | rechaza, de más |
+| `@ c { <~ v + 1 }` y después `<~ v`, con `c` falso | `a` | rechaza, de más |
+| `!? { <~ v + 1 } :! { <~ v "1" }` | `2`, `a1` | acepta: el recolector no entra en `!?` |
+| `r = ?? t[1] { "###" => v + 1  _ => (v "1") }` | `2`, `a1` | acepta: no entra en los brazos de `??` |
+| `x = v + 1` al principio y después una rama | falla en `+` | rechaza |
+| `? v > 0 { <~ 1 }` y después `<~ 0` | falla en `>` | rechaza |
+
+El mismo reparto por tipo se acepta escrito con `??` y se rechaza escrito con `?`.
+
+### Qué hay que decidir
+
+- **A**: una restricción sólo cuenta si está en todos los caminos — `?` y `_` a la vez, lo que va antes de
+  cualquier `<~` temprano, la condición del primer `?` —; no una rama sola, ni el cuerpo de un `@`, ni lo
+  que está bajo `!?`, ni un brazo de `??` salvo que lo estén todos (Recomendado);
+- **B**: sólo cuenta lo escrito en el nivel superior del cuerpo; la guarda con `<~` temprano seguiría
+  rechazada de más;
+- **C**: ninguna inferencia rechaza, y todo se decide al ejecutar: retira TYP-2.
+
+Las siete celdas de TYP-2 no cambian con A ni con B: todas usan el parámetro sin rama.
+
+### Qué lo sujeta
+
+`refusal/argument-type-not-from-one-branch` y `refusal/argument-type-not-from-a-loop-body`
+(`expect = "ok"`), con `open_finding` por motor en los tres: las dos formas que aceptan A, B y C.
+
