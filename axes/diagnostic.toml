@@ -106,20 +106,42 @@ n = 2
 }
 """
 
-# ── A warning given twice (added 2026-10-05) ────────────────────────────────
+# ── A diagnostic given twice (added 2026-10-05) ─────────────────────────────
 #
 # The Rust analyser reads an expression in a `<~` twice — once to check it, and
-# again to infer the return type — and keeps the warnings both times (it drops
-# the errors of the second pass, not its warnings). zyjs gives it once (GLB-095).
+# again to infer the return type. For a named function the second pass dropped
+# its errors but kept its warnings; for a block lambda it dropped neither, so an
+# error in a lambda's `<~` was given twice as well. zyjs gives each once.
+# GLB-095, fixed 2026-10-06: both second passes drop what they find.
 
 [[cell]]
 id     = "warning-in-a-return-given-once"
 expect = "warn"
-what   = "`g() { <~ (\"a\" - 1) }`: one warning, not two — Rust prints `arithmetic operation on non-numeric type` twice (GLB-095)"
+what   = "`g() { <~ (\"a\" - 1) }`: one warning, not two — Rust printed `arithmetic operation on non-numeric type` twice (GLB-095)"
 src    = """
 g() {
     <~ ("a" - 1)
 }
 >> "x" ¶
 """
-open_finding = "GLB-095"
+
+[[cell]]
+id     = "warning-in-a-lambda-return-given-once"
+expect = "warn"
+what   = "the same warning in a block lambda's `<~` is given once (GLB-095)"
+src    = """
+_f = () -> {
+    <~ ("a" - 1)
+}
+>> "x" ¶
+"""
+
+[[cell]]
+id     = "error-in-a-lambda-return-given-once"
+what   = "an error in a block lambda's `<~` is given once — Rust printed `undefined variable` twice (GLB-095)"
+src    = """
+_f = () -> {
+    <~ nada
+}
+>> "x" ¶
+"""
