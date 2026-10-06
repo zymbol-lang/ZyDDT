@@ -163,9 +163,13 @@ v$!!
 #
 # An error that does not declare its kind gets it from the words of its message
 # (`zymbol_common::errkind`; `errorKindOfMessage` in zyjs). When the message
-# carries a value of the program — a text, a key, the keys there are — the
-# value's words count as much as the engine's: `u["overflow"]` is a `##Range` in
-# the Rust engines, and `#.2|"index"|` an `##Index` in all three (GLB-097).
+# carried a value of the program — a text, a key, the keys there are — the
+# value's words counted as much as the engine's: `u["overflow"]` was a `##Range`
+# in the Rust engines, and `#.2|"index"|` an `##Index` in all three. GLB-097,
+# corrected 2026-10-06: those sites declare their kind where they raise — an
+# absent key is a `##Key`, and a text read as a number that it is not is a
+# `##Parse`, by base conversion, rounding or truncation. One cell per way an
+# absent key is reached: each is its own raise site in each engine.
 
 [[cell]]
 id     = "missing-key-is-a-key-whatever-its-name"
@@ -180,7 +184,61 @@ u = #(nombre: "x", edad: 3)
     >> "Key" ¶
 }
 """
-open_finding = { zytw = "GLB-097", zyvm = "GLB-097" }
+
+[[cell]]
+id     = "missing-key-through-the-dot-is-a-key"
+expect = "ok"
+what   = "`u.overflow`, through the dot: a `##Key` (GLB-097)"
+src    = """
+u = #(nombre: "x", edad: 3)
+!? {
+    >> u.overflow ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-removed-is-a-key"
+expect = "ok"
+what   = "`u$-[\"overflow\"]`, removing a key that is not there: a `##Key` (GLB-097)"
+src    = """
+id(v) { <~ v }
+u = #(nombre: "x", edad: 3)
+!? {
+    e = u$-[id("overflow")]
+    >> e ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-in-a-navigation-is-a-key"
+expect = "ok"
+what   = "`m[\"a\">\"overflow\"]`, a key missing one step down: a `##Key` (GLB-097)"
+src    = """
+m = #(a: #(b: 1))
+!? {
+    >> m["a">"overflow"] ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-in-a-pattern-is-a-key"
+expect = "ok"
+what   = "`#(overflow: n) = u`, a pattern naming a key that is not there: a `##Key` (GLB-097)"
+src    = """
+u = #(nombre: "x", edad: 3)
+!? {
+    #(overflow: n) = u
+    >> n ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
 
 [[cell]]
 id     = "missing-key-is-a-key-whatever-the-other-keys-are"
@@ -195,7 +253,6 @@ w = #(overflow: 1)
     >> "Key" ¶
 }
 """
-open_finding = { zytw = "GLB-097", zyvm = "GLB-097" }
 
 [[cell]]
 id     = "base-conversion-failure-is-a-parse-whatever-the-text"
@@ -209,20 +266,121 @@ id(v) { <~ v }
     >> "Parse" ¶
 }
 """
-open_finding = { zytw = "GLB-097", zyvm = "GLB-097", zyjs = "GLB-097" }
 
 [[cell]]
-id     = "rounding-a-word-is-not-an-index"
+id     = "rounding-a-text-is-a-parse-error"
 expect = "ok"
-what   = "`#.2|\"index\"|` is refused, and not as an `##Index`: which kind it is is undecided (GLB-097), but it is not the one the words of the text give"
+what   = "`#.2|\"abc\"|` reads a text as a number and it is not one: a `##Parse` (GLB-097, decided 2026-10-06; it was a `##_`)"
+src    = """
+id(v) { <~ v }
+!? {
+    >> #.2|id("abc")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "rounding-a-word-is-a-parse-error"
+expect = "ok"
+what   = "`#.2|\"index\"|` is a `##Parse` too — not the `##Index` the words of the text gave (GLB-097)"
 src    = """
 id(v) { <~ v }
 !? {
     >> #.2|id("index")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "truncating-a-word-is-a-parse-error"
+expect = "ok"
+what   = "`#!2|\"overflow\"|` is a `##Parse` — not the `##Range` the words of the text gave (GLB-097)"
+src    = """
+id(v) { <~ v }
+!? {
+    >> #!2|id("overflow")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+# ── The kind of an error that carries a NAME (added 2026-10-06) ─────────────
+#
+# The same rule as GLB-097, with a name of the program in the message instead of
+# a value. Four of them reach run time in a program `check` accepts, and all
+# four take the family of the name's words: `t.index` on a positional tuple is
+# an `##Index`, `t.zz` a `##_`. Their kind is undecided (GLB-099), so the cells
+# assert only that it is not the one the words give.
+
+[[cell]]
+id     = "positional-tuple-read-by-a-name-is-not-an-index"
+expect = "ok"
+what   = "`t.index` on a positional tuple is refused, and not as an `##Index` — which kind it is is GLB-099's question"
+src    = """
+id(v) { <~ v }
+t = id((1, 2))
+!? {
+    >> t.index ¶
 } :! ##Index {
     >> (1 / id(0)) ¶
 } :! {
     >> "refused" ¶
 }
 """
-open_finding = { zytw = "GLB-097", zyvm = "GLB-097", zyjs = "GLB-097" }
+open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
+
+[[cell]]
+id     = "dot-on-a-non-dictionary-is-not-an-index"
+expect = "ok"
+what   = "`x.index` with `x` an Int is refused, and not as an `##Index` — the word is in the guidance, `use d.index` (GLB-099)"
+src    = """
+id(v) { <~ v }
+x = id(5)
+!? {
+    >> x.index ¶
+} :! ##Index {
+    >> (1 / id(0)) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
+
+[[cell]]
+id     = "use-after-destruction-is-not-an-index"
+expect = "ok"
+what   = "a name called `index` read after `\\ index` is refused, and not as an `##Index` (GLB-099)"
+src    = """
+id(v) { <~ v }
+index = 5
+>> index ¶
+\\ index
+!? {
+    >> index ¶
+} :! ##Index {
+    >> (1 / id(0)) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
+
+[[cell]]
+id     = "missing-subscript-is-not-an-index"
+expect = "ok"
+what   = "`</ index_type.zy />`, a subscript that is not there, is refused, and not as an `##Index` — the word is in the path (GLB-099)"
+src    = """
+id(v) { <~ v }
+!? {
+    r = </ index_type.zy />
+    >> r ¶
+} :! ##Index {
+    >> (1 / id(0)) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
+

@@ -471,3 +471,99 @@ despues(n) { <~ n }
 >> texto(1) ¶
 >> antes("a") ¶
 """
+
+# ── An expression that is not a statement (added 2026-10-06) ────────────────
+#
+# A statement begins with a mark (`>>`, `<<`, `?`, `??`, `@`, `!?`, `<~`, `¶`,
+# `\`) or with a name, and the Rust parser refuses anything else at the start of
+# a line: `unexpected token`. zyjs parses these as statements, runs the program
+# and discards the value (ZYJS-050, measured beside GLB-097). The ninth form,
+# `</ file.zy />`, has no cell: the browser cannot run a subscript at all.
+
+[[cell]]
+id   = "unit-as-a-statement"
+what = "`##_` alone on a line"
+src  = """
+x = 3
+>> x ¶
+##_
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "error-value-as-a-statement"
+what = "`##Parse(\"x\")`, an error value nobody keeps"
+src  = """
+x = 3
+>> x ¶
+##Parse("x")
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "numeric-eval-as-a-statement"
+what = "`#|\"5\"|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#|"5"|
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "rounding-as-a-statement"
+what = "`#.2|5|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#.2|5|
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "truncation-as-a-statement"
+what = "`#!2|5|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#!2|5|
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "format-as-a-statement"
+what = "`#,|5|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#,|5|
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "base-conversion-as-a-statement"
+what = "`0x|255|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+0x|255|
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "text-base-conversion-as-a-statement"
+what = "`0d|\"65\"|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+0d|"65"|
+>> "sigue" ¶
+"""
+open_finding = { zyjs = "ZYJS-050" }
