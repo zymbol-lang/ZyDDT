@@ -368,7 +368,7 @@ open_finding = "GLB-096"
 # Measured beside GLB-088: `&&`, `||`, `!` and an ordering between types that do
 # not compare raised `##_` in the three engines. Decided 2026-10-05 (GLB-091): a
 # `##Type`. A string against a number is not one of them — `"5" < 10` compares —
-# and its kind is its own question (GLB-094). Texts held by the golden of
+# and its kind is GLB-094's, below. Texts held by the golden of
 # zyquality/corpus/errors/runtime/logical_comparison_type_errors.
 
 [[cell]]
@@ -399,5 +399,74 @@ b = id(#1)
     >> q ¶
 } :! ##Type {
     >> "Type" ¶
+}
+"""
+
+# ── A text compared with a number, when it is not one (added 2026-10-06) ─────
+#
+# `"5" < 10` compares — the text is a number. `"a" < 10` fails on the text's
+# VALUE: reading it as a number is what failed, so it is a `##Parse` (GLB-094,
+# decided 2026-10-06). The kind is declared where the error is raised. It used
+# to be read from the words of the message, and the message carries the text,
+# so `"index" < 10` was an `##Index` in the three engines. One cell per arm:
+# they are four raise sites in each engine.
+
+[[cell]]
+id     = "text-against-an-integer-is-a-parse-error"
+expect = "ok"
+what   = "`\"a\" < n` with `n` an Int is caught by `:! ##Parse` — the text is not a number (GLB-094)"
+src    = """
+id(v) { <~ v }
+n = id(10)
+!? {
+    q = id("a") < n
+    >> q ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "integer-against-a-text-is-a-parse-error"
+expect = "ok"
+what   = "`n > \"type\"`, the other order, is a `##Parse` — not the `##Type` the words of the text gave (GLB-094)"
+src    = """
+id(v) { <~ v }
+n = id(10)
+!? {
+    q = n > id("type")
+    >> q ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "text-against-a-float-is-a-parse-error"
+expect = "ok"
+what   = "`\"index\" < f` with `f` a Float is a `##Parse` — not the `##Index` the words of the text gave (GLB-094)"
+src    = """
+id(v) { <~ v }
+f = id(1.5)
+!? {
+    q = id("index") < f
+    >> q ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "float-against-a-text-is-a-parse-error"
+expect = "ok"
+what   = "`f >= \"division\"` is a `##Parse` — not the `##Div` the words of the text gave (GLB-094)"
+src    = """
+id(v) { <~ v }
+f = id(1.5)
+!? {
+    q = f >= id("division")
+    >> q ¶
+} :! ##Parse {
+    >> "Parse" ¶
 }
 """

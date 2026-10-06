@@ -6477,7 +6477,7 @@ de tipo coinciden en los dos analizadores.
 
 ## GLB-094 — El kind de comparar un número con un texto que no es un número
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.11)** — decidido por el autor el 2026-10-06: `##Parse`
 **Encontrado por:** al implementar [`GLB-091`](GLOBAL.md) (paso P3.7, 2026-10-05)
 
 ```zymbol
@@ -6500,17 +6500,47 @@ El fallo depende del **valor** del texto, no de su tipo: un String se compara co
 número. Por eso el mensaje nombra el valor, y está bien (`GLB-033` es para los errores de tipo). Lo que no
 tiene es una clase: sale `##_`.
 
-### Qué hay que decidir
+### Qué había que decidir
 
 - `##Index` — D1: el tipo es correcto y el **valor** no;
 - `##Parse` — lo que falla es leer el texto como número, como en `cannot parse '12x'`;
 - `##_` — dejarlo como está.
 
+### Lo que salió al medir
+
+Los tres motores sacaban la clase de las **palabras del mensaje** (`zymbol_common::errkind` en Rust,
+`errorKindOfMessage` en `zyjs`), y el mensaje lleva el texto del programa. Así que la clase dependía de lo
+que dijera el texto:
+
+| programa | los tres motores, antes |
+|---|---|
+| `"a" < 10`, `"12x" < 10` | `##_` |
+| `"index" < 10`, `"index" < 1.5` | `##Index` |
+| `"type" < 10`, `10 > "type"` | `##Type` |
+| `"overflow" < 10` | `##Range` |
+| `"no key" < 10` | `##Key` |
+| `"division" < 10`, `1.5 >= "division"` | `##Div` |
+| `"parse" < 10` | `##Parse` |
+
+La misma regla alcanza a otros errores que llevan un valor en el mensaje: es [`GLB-097`](GLOBAL.md).
+
+### Corrección
+
+`##Parse`, **declarado en el sitio que lanza**, en los cuatro brazos (texto e Int, Int y texto, texto y
+Float, Float y texto) de los tres motores: `RuntimeError::kinded("Parse", …)` en
+`crates/zymbol-interpreter/src/arithmetic_ops.rs`, una variante nueva `VmError::ParseMsg` que
+`vm_error_kind` lleva a `Parse` en `crates/zymbol-vm/src/lib.rs`, y `ZyRuntimeError(…, '##Parse')` en
+`web/src/zymbol/zymbol.js`. El mensaje no cambia. Ahora los once casos de la tabla dan `##Parse` en los
+tres motores.
+
 ### Qué lo sujeta
 
-El golden de `zyquality/corpus/errors/runtime/logical_comparison_type_errors.zy` (`r7`, `r8`), que graba
-lo que los tres responden hoy. Los tres coinciden, así que una celda con `open_finding` saldría pagada
-el primer día: no hay nada que declarar como deuda hasta que se decida.
+- El golden de `zyquality/corpus/errors/runtime/logical_comparison_type_errors.zy`: `r7` a `r10`, un brazo
+  cada uno, y `r11` con el texto `"index"`.
+- `runtime-operators/text-against-an-integer-is-a-parse-error`, `integer-against-a-text-…`,
+  `text-against-a-float-…` y `float-against-a-text-…` (`:! ##Parse`, `expect = "ok"`; tres de ellas con
+  un texto cuyas palabras daban otra clase). Con el binario de antes, WRONG en `zytw` y `zyvm`.
+- `runtime-operators/cannot-compare-*-with-*-met`, que imprimen la clase que recibe el `:!`.
 
 ---
 
@@ -6594,3 +6624,72 @@ lambda pasa lo mismo (`x = "a"` y `<~ (x - 1)`).
 ### Qué lo sujeta
 
 `runtime-operators/arithmetic-on-a-name-that-changed-type`, con `open_finding = "GLB-096"`, sin `expect`.
+
+---
+
+## GLB-097 — La clase de un error cuyo mensaje lleva un valor del programa sale de las palabras de ese valor
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-094`](GLOBAL.md) (paso P3.11, 2026-10-06)
+
+```zymbol
+id(v) { <~ v }
+u = #(nombre: "x", edad: 3)
+!? {
+    >> u[id("overflow")] ¶
+} :! ##Key {
+    >> "no está" ¶
+}
+```
+
+`zyjs` imprime `no está`. `zytw` y `zyvm`, no: el error sale sin capturar, como un `##Range`.
+
+Un error que no declara su clase al lanzarse la recibe de las palabras de su mensaje
+(`zymbol_common::errkind::error_kind_of_message` en Rust, `errorKindOfMessage` en `zyjs`, en este orden):
+`overflow` u `out of range` → `##Range`, `no key` → `##Key`, `index` → `##Index`, `type` → `##Type`,
+`division` → `##Div`, `parse` → `##Parse`. La regla se escribió para las palabras del motor. Cuando el
+mensaje lleva un valor del programa — el texto que no se pudo leer, la clave que falta, las claves que
+hay — las palabras del valor cuentan igual que las del motor.
+
+| programa | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `#.2\|"abc"\|` | `##_` | `##_` | `##_` |
+| `#.2\|"index"\|` | `##Index` | `##Index` | `##Index` |
+| `#!2\|"overflow"\|` | `##Range` | `##Range` | `##Range` |
+| `0d\|"abc"\|` | `##Parse` | `##Parse` | `##Parse` |
+| `0d\|"type"\|` | `##Type` | `##Type` | `##Type` |
+| `u["zz"]`, que falta | `##Key` | `##Key` | `##Key` |
+| `u["overflow"]`, que falta | `##Range` | `##Range` | `##Key` |
+| `#(overflow: 1)["zz"]`, que falta | `##Range` | `##Range` | `##Key` |
+
+La clave que falta es además una divergencia que el gate no ve: los tres imprimen el mismo texto, y sólo
+un `:!` que filtra por clase los separa. `zyjs` lanza ese error con su clase y Rust la lee de las palabras,
+que incluyen la clave que se pidió y las que hay.
+
+La comparación era el cuarto caso (`"index" < 10` daba `##Index` en los tres) y lo cerró `GLB-094`, que
+declara `##Parse` en el sitio que lanza.
+
+También pasa con los mensajes que llevan un **nombre** del programa (`undefined function: '…'`,
+`module '…' does not export function '…'`): una función que se llame `index_of` cambia la clase del error.
+No están medidos uno a uno, y casi todos los rechaza el analizador antes de ejecutar.
+
+### Qué hay que decidir
+
+1. **La corrección.** Que cada sitio cuyo mensaje lleva un valor declare su clase al lanzar, como ya
+   hacen `##Type` (`GLB-088`, `GLB-091`) y la comparación (`GLB-094`). En la clave que falta y en
+   `0d|…|` no hay nada más que decidir: la GUIDE dice que una clave que no está es `##Key`, y `0d|"abc"|`
+   ya es `##Parse` para todo texto que no tenga una de esas palabras.
+2. **El redondeo y el truncado de un texto que no es un número** (`#.2|"abc"|`, `#!2|"abc"|`): hoy
+   `##_`. Es el mismo fallo que `GLB-094` (leer el texto como número) y `0d|"abc"|` ya da `##Parse`:
+   - `##Parse`, como la comparación y como `0d|…|` (Recomendado);
+   - `##_`, como hoy, sólo que sin las palabras del valor.
+
+### Qué lo sujeta
+
+Las celdas de `runtime-errors` con `open_finding` por motor:
+
+- `missing-key-is-a-key-whatever-its-name` (`zytw`, `zyvm`);
+- `missing-key-is-a-key-whatever-the-other-keys-are` (`zytw`, `zyvm`);
+- `base-conversion-failure-is-a-parse-whatever-the-text` (los tres);
+- `rounding-a-word-is-not-an-index` (los tres): sólo afirma que no es `##Index`, porque la clase queda por
+  decidir (punto 2).
