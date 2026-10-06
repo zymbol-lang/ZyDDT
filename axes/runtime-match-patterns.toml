@@ -223,3 +223,29 @@ x = 2
     _ => { >> "otro" ¶ }
 }
 """
+
+# ── A `??` statement no arm matches (added 2026-10-06) ──────────────────────
+#
+# Measured beside GLB-101: as a value (`r = ?? 2 { 1 => "uno" }`) all three
+# engines fail with `no pattern matched in match expression`; written as a
+# statement, zyjs goes on to the next line, and only the Rust engines fail
+# (ZYJS-051, undecided). A block arm, so nothing warns about a discarded value.
+
+[[cell]]
+id     = "match-statement-no-arm-matches"
+expect = "error"
+what   = "a `??` statement whose value no arm matches fails, as the same `??` does as a value — zyjs went on (ZYJS-051)"
+src    = """
+f(v) {
+    ?? v {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+    <~ 99
+}
+>> f(1) ¶
+>> f(2) ¶
+"""
+open_finding = { zyjs = "ZYJS-051" }
+

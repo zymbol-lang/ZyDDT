@@ -479,8 +479,10 @@ despues(n) { <~ n }
 # every branch as if all of them ran, so a function that dispatches on the type
 # of its parameter refused the call it was written for — `f("a")` below runs and
 # answers `a1` (GLB-101, raised by the author 2026-10-06). The same dispatch
-# written with `??` was accepted. Both cells hold what every option under
-# decision accepts.
+# written with `??` was accepted. Decided the same day (option A): a use
+# requires something only when every path through the body goes through it.
+# The cells below hold each way a path can avoid a use, and the two refusals
+# that every path still reaches.
 
 [[cell]]
 id      = "argument-type-not-from-one-branch"
@@ -499,7 +501,6 @@ f(v) {
 >> f(1) ¶
 >> f("a") ¶
 '''
-open_finding = { zytw = "GLB-101", zyvm = "GLB-101", zyjs = "GLB-101" }
 
 [[cell]]
 id      = "argument-type-not-from-a-loop-body"
@@ -516,7 +517,108 @@ f(v, c) {
 >> f(1, #1) ¶
 >> f("a", #0) ¶
 '''
-open_finding = { zytw = "GLB-101", zyvm = "GLB-101", zyjs = "GLB-101" }
+
+[[cell]]
+id      = "argument-type-not-past-an-early-return"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a guard that returns early: the use after it is not on the path the guard takes, so `f(\"a\")` answers a1 (GLB-101)"
+src     = '''
+f(v) {
+    t = v#?
+    ? t[1] == "##\"" {
+        <~ v "1"
+    }
+    <~ v + 1
+}
+>> f(1) ¶
+>> f("a") ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-a-later-condition"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a `_?` condition is read only on the paths that reach it: with `c` true, `v > 0` is never asked, and `f(\"a\", #1)` answers 0 (GLB-101)"
+src     = '''
+f(v, c) {
+    ? c {
+        <~ 0
+    } _? v > 0 {
+        <~ 1
+    }
+    <~ 2
+}
+>> f("a", #1) ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-one-arm"
+premise = "TYP-2"
+expect  = "warn"
+what    = "a `??` arm is one path: `1 => v + 1` beside `_ => (v \"1\")` requires nothing, and `f(\"a\")` answers a — the warning is the statement discarding the arms' values (GLB-101)"
+# A value no arm matches fails (`no pattern matched`) in the Rust engines, so a
+# `??` with no `_` arm leaves no path past it: that one is not a cell, because
+# what it requires is what the arms that match require.
+src     = '''
+f(v) {
+    ?? v {
+        1 => v + 1
+        _ => (v "1")
+    }
+    <~ v
+}
+>> f(1) ¶
+>> f("a") ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-past-a-return-under-try"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a `<~` under `!?` closes its path, so the use after the `!?` is not asked of it: `f(\"a\")` answers ax (GLB-101)"
+src     = '''
+f(v) {
+    !? {
+        <~ v "x"
+    } :! {
+        >> "fallo" ¶
+    }
+    <~ v + 1
+}
+>> f("a") ¶
+'''
+
+[[cell]]
+id      = "argument-type-from-both-branches"
+premise = "TYP-2"
+what    = "`? c { <~ v + 1 } _ { <~ v * 2 }`: every path uses `v` as a number, so `f(\"a\", #1)` is refused before it runs (GLB-101)"
+src     = '''
+f(v, c) {
+    ? c {
+        <~ v + 1
+    } _ {
+        <~ v * 2
+    }
+}
+>> "antes" ¶
+>> f("a", #1) ¶
+'''
+
+[[cell]]
+id      = "argument-type-from-every-arm"
+premise = "TYP-2"
+what    = "a `??` whose every arm, `_` included, uses `v` as a number: refused before it runs (GLB-101)"
+src     = '''
+f(v) {
+    ?? v {
+        1 => v + 1
+        _ => v * 2
+    }
+}
+>> "antes" ¶
+>> f("a") ¶
+'''
 
 # ── An expression that is not a statement (added 2026-10-06) ────────────────
 #
