@@ -161,11 +161,12 @@ x = "dato"
 # Measured beside GLB-096. `<< n` reads text, a String; `<< ### n` an Int and
 # `<< ##. n` a Float (the table of GUIDE § Input `<<`); `<< #|n|` a number when
 # the line is one and text when it is not, so what that name holds is decided
-# by the input. The Rust analyser types every one of them as String — "Input
-# always produces a string" — and warns on arithmetic that runs (GLB-098). zyjs
-# types none, and is silent on all (ZYJS-049). Without a line to read, the `<<`
-# fails at its end of input, which the `!?` meets: the warning is what each cell
-# asserts.
+# by the input. The Rust analyser typed every one of them as String — "Input
+# always produces a string" — and warned on arithmetic that runs. GLB-098,
+# corrected 2026-10-06: the name holds what the marker reads, and `#|…|` is
+# "cannot tell". zyjs types none, and is silent on all (ZYJS-049). Without a line
+# to read, the `<<` fails at its end of input, which the `!?` meets: the warning
+# is what each cell asserts.
 
 [[cell]]
 id     = "numeric-input-in-arithmetic"
@@ -179,7 +180,6 @@ src    = """
     >> "sin entrada" ¶
 }
 """
-open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }
 
 [[cell]]
 id     = "typed-integer-input-in-arithmetic"
@@ -193,7 +193,6 @@ src    = """
     >> "sin entrada" ¶
 }
 """
-open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }
 
 [[cell]]
 id     = "typed-float-input-in-arithmetic"
@@ -207,7 +206,20 @@ src    = """
     >> "sin entrada" ¶
 }
 """
-open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }
+
+[[cell]]
+id     = "typed-char-input-in-arithmetic"
+expect = "warn"
+what   = "`<< ##' c` reads a Char, and `c - 1` warns `non-numeric type: Char` — Rust named it a String (GLB-098); zyjs is silent (ZYJS-049)"
+src    = """
+!? {
+    << ##' c
+    >> (c - 1) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+open_finding = { zyjs = "ZYJS-049" }
 
 [[cell]]
 id     = "text-input-in-arithmetic"

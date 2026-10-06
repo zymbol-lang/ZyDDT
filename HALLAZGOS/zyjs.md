@@ -2704,8 +2704,9 @@ operando:
 | `x = 1` · `x = () -> 1` · `x - 1` | `() -> Int`, y el cambio de tipo | nada | `argType` no nombra el tipo de una lambda, así que tampoco avisa del cambio de tipo |
 | `<< f` · `f * 2` | `String` | nada | un nombre leído con `<<` no recibe tipo |
 
-Ninguno avisa de más: es silencio, que siempre está permitido. El último depende de
-[`GLB-098`](GLOBAL.md): lo que tiene que guardar un nombre leído con `<<` es lo que se decida allí.
+Ninguno avisa de más: es silencio, que siempre está permitido. Lo que tiene que guardar un nombre leído
+con `<<` lo decidió [`GLB-098`](GLOBAL.md) el 2026-10-06: el tipo que lee la marca (`<<` y `##"` String,
+`###` Int, `##.` Float, `##'` Char) y «no se sabe» para `#|…|`.
 
 ### Qué hay que decidir
 
@@ -2718,8 +2719,8 @@ Ninguno avisa de más: es silencio, que siempre está permitido. El último depe
 ### Qué lo sujeta
 
 `runtime-operators/arithmetic-on-an-empty-array-literal`, `runtime-operators/arithmetic-on-a-new-iterator`,
-`runtime-operators/arithmetic-on-a-name-holding-a-lambda` y `runtime-io/text-input-in-arithmetic`
-(`expect = "warn"`), con `open_finding = { zyjs = "ZYJS-049" }`.
+`runtime-operators/arithmetic-on-a-name-holding-a-lambda`, `runtime-io/text-input-in-arithmetic` y
+`runtime-io/typed-char-input-in-arithmetic` (`expect = "warn"`), con `open_finding = { zyjs = "ZYJS-049" }`.
 
 ---
 
