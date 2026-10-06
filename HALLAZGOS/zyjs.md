@@ -2680,7 +2680,8 @@ sujeta la salida, que se compara: `antes` sólo lo imprime un motor que ejecutó
 
 ## ZYJS-049 — Cuatro operandos que Rust sabe nombrar y `zyjs` no: el literal `[]`, el iterador de un `@` nuevo, un nombre que guarda una lambda y uno leído con `<<`
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.15)** — decidido por el autor el 2026-10-06: nombrar los cuatro
+como Rust
 **Encontrado por:** al medir las vecinas de [`GLB-096`](GLOBAL.md) (paso P3.12, 2026-10-06)
 
 ```zymbol
@@ -2716,11 +2717,49 @@ con `<<` lo decidió [`GLB-098`](GLOBAL.md) el 2026-10-06: el tipo que lee la ma
 - sólo los tres primeros, y la lambda queda como límite de este analizador;
 - ninguno: son los límites de lo que `zyjs` sabe nombrar.
 
+### Corrección
+
+En `web/src/zymbol/zymbol.js`:
+
+- **`[]`** escrito como literal es `[Any]` en `operandTypeName`;
+- **el iterador de un `@` nuevo** recibe el tipo de su elemento (`iteratorElemType`), como ya hacía el de
+  un rango (ZYJS-034);
+- **una lambda tiene tipo**, `(Any, …) -> R`, como la nombra `infer_expr`: cada parámetro `Any`, y `R` lo
+  que da el cuerpo — una expresión, o los `<~` de un bloque, Unit si no hay ninguno (`lambdaType`, con el
+  recorrido de `funcReturnType` sacado a `returnTypeOfBlock`). El cuerpo lee los nombres de fuera
+  (MEM-6), y un `+` con un lado `Any` da `Any`, como en Rust. Donde este análisis no sabe qué da el
+  cuerpo, calla en vez de nombrarlo distinto;
+- **un nombre leído con `<<`** guarda lo que lee su marca, con los tipos de [`GLB-098`](GLOBAL.md);
+- `Any` encaja con todo en las dos relaciones, como en Rust.
+
+### Lo que salió al medir
+
+El primer barrido, con sólo lo de arriba, ganó **12 errores que Rust no da**: `E_ARRAY_MIX` sobre arrays
+de lambdas, `[(x) -> x + 1, (x) -> x * 2]`, en seis ficheros (el curso, el tour del playground, el
+corpus). El chequeo comparaba los nombres de los tipos, y `(Any) -> Any` y `(Any) -> Int` son la misma
+función para `types_compatible_static`, que acepta `Any` a cualquier profundidad. Ahora el chequeo de
+elementos y el de argumentos usan esa relación (`typesCompatibleStatic`, parte por parte); el cambio de
+tipo sigue con la otra, `is_compatible_with`, que compara una función entera.
+
+Eso cerró además una divergencia: `[(a) -> a, () -> 1]` y `[() -> 1, () -> "s"]` los rechazan los motores
+Rust, y `zyjs`, que no nombraba ninguna lambda, los ejecutaba.
+
+Barrido de `checkSource` sobre los 3213 `.zy` del workspace, antes y después: gana **cinco**
+diagnósticos, los de las celdas de este hallazgo, iguales a los de Rust en línea y texto; no pierde
+ninguno. Las 33 sondas de [`GLB-096`](GLOBAL.md) y 17 de lambdas — anidadas, de bloque, con colecciones,
+la entrada `##'` — dan lo mismo que Rust, palabra por palabra.
+
+Una de esas 17 coincide en algo dudoso: `f = (a) -> a` · `f = (b) -> b * 2` avisa `type mismatch: 'f'
+was (Any) -> Any but assigned (Any) -> Int` en los tres motores: [`GLB-100`](GLOBAL.md).
+
 ### Qué lo sujeta
 
-`runtime-operators/arithmetic-on-an-empty-array-literal`, `runtime-operators/arithmetic-on-a-new-iterator`,
-`runtime-operators/arithmetic-on-a-name-holding-a-lambda`, `runtime-io/text-input-in-arithmetic` y
-`runtime-io/typed-char-input-in-arithmetic` (`expect = "warn"`), con `open_finding = { zyjs = "ZYJS-049" }`.
+`runtime-operators/arithmetic-on-an-empty-array-literal`, `arithmetic-on-a-new-iterator`,
+`arithmetic-on-a-name-holding-a-lambda`, `runtime-io/text-input-in-arithmetic` y
+`typed-char-input-in-arithmetic` (`expect = "warn"`), ya sin `open_finding`; y en `collections`, de
+COL-3, `lambdas-of-one-shape-are-not-a-mix` (`expect = "ok"`), `lambdas-of-another-arity-are-checked` y
+`lambdas-returning-another-type-are-checked` (`expect = "error"`). Con el `zyjs` de antes dan WRONG
+siete; con sólo la primera mitad de la corrección, el control.
 
 ---
 

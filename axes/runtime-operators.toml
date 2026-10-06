@@ -409,14 +409,14 @@ g(a) {
 #
 # Measured beside GLB-096: an empty array literal, which Rust calls `[Any]`; the
 # iterator of an `@` whose name is new, which Rust gives the element's type; and
-# a name holding a lambda, `() -> Int`. zyjs says "cannot tell" for all three and
-# stays silent (ZYJS-049, undecided). The fourth operand of that finding, a name
-# read by `<<`, is in runtime-io.
+# a name holding a lambda, `() -> Int`. zyjs said "cannot tell" for all three and
+# stayed silent. ZYJS-049, corrected 2026-10-06: zyjs names them as Rust does.
+# The fourth operand of that finding, a name read by `<<`, is in runtime-io.
 
 [[cell]]
 id     = "arithmetic-on-an-empty-array-literal"
 expect = "warn"
-what   = "`[] - 1`: Rust warns `arithmetic operation on non-numeric type: [Any]`, zyjs does not (ZYJS-049)"
+what   = "`[] - 1`: Rust warns `arithmetic operation on non-numeric type: [Any]`, zyjs did not (ZYJS-049)"
 src    = """
 !? {
     >> ([] - 1) ¶
@@ -424,12 +424,11 @@ src    = """
     >> "refused" ¶
 }
 """
-open_finding = { zyjs = "ZYJS-049" }
 
 [[cell]]
 id     = "arithmetic-on-a-new-iterator"
 expect = "warn"
-what   = "`@ c:\"ab\" { c - 1 }`: Rust warns `non-numeric type: Char`, zyjs does not — the new iterator has no type there (ZYJS-049)"
+what   = "`@ c:\"ab\" { c - 1 }`: Rust warns `non-numeric type: Char`, zyjs did not — the new iterator had no type there (ZYJS-049)"
 # Inside a function, where neither analyser gives the loop's lifetime warning:
 # with it, zyjs would answer `warn` for another reason, and the cell would be a
 # DIVERGE that a per-engine debt does not cover.
@@ -445,12 +444,11 @@ f() {
 }
 f()
 """
-open_finding = { zyjs = "ZYJS-049" }
 
 [[cell]]
 id     = "arithmetic-on-a-name-holding-a-lambda"
 expect = "warn"
-what   = "`x = 1`, `x = () -> 1`, then `x - 1`: Rust warns the change of type and `non-numeric type: () -> Int`, zyjs neither — it cannot name a lambda's type (ZYJS-049)"
+what   = "`x = 1`, `x = () -> 1`, then `x - 1`: Rust warns the change of type and `non-numeric type: () -> Int`, zyjs neither — it could not name a lambda's type (ZYJS-049)"
 src    = """
 x = 1
 x = () -> 1
@@ -460,7 +458,6 @@ x = () -> 1
     >> "refused" ¶
 }
 """
-open_finding = { zyjs = "ZYJS-049" }
 
 
 # ── The kind of a logical or comparison type error (added 2026-10-05) ──────

@@ -164,7 +164,8 @@ x = "dato"
 # by the input. The Rust analyser typed every one of them as String — "Input
 # always produces a string" — and warned on arithmetic that runs. GLB-098,
 # corrected 2026-10-06: the name holds what the marker reads, and `#|…|` is
-# "cannot tell". zyjs types none, and is silent on all (ZYJS-049). Without a line
+# "cannot tell". zyjs typed none and was silent on all; ZYJS-049, corrected the
+# same day, gives it the same types. Without a line
 # to read, the `<<` fails at its end of input, which the `!?` meets: the warning
 # is what each cell asserts.
 
@@ -210,7 +211,7 @@ src    = """
 [[cell]]
 id     = "typed-char-input-in-arithmetic"
 expect = "warn"
-what   = "`<< ##' c` reads a Char, and `c - 1` warns `non-numeric type: Char` — Rust named it a String (GLB-098); zyjs is silent (ZYJS-049)"
+what   = "`<< ##' c` reads a Char, and `c - 1` warns `non-numeric type: Char` — Rust named it a String (GLB-098); zyjs was silent (ZYJS-049)"
 src    = """
 !? {
     << ##' c
@@ -219,12 +220,11 @@ src    = """
     >> "sin entrada" ¶
 }
 """
-open_finding = { zyjs = "ZYJS-049" }
 
 [[cell]]
 id     = "text-input-in-arithmetic"
 expect = "warn"
-what   = "`<< f` then `f * 2`: Rust warns `non-numeric type: String`, zyjs does not — a name read by `<<` has no type there (ZYJS-049)"
+what   = "`<< f` then `f * 2`: Rust warns `non-numeric type: String`, zyjs did not — a name read by `<<` had no type there (ZYJS-049)"
 src    = """
 !? {
     << f
@@ -233,4 +233,3 @@ src    = """
     >> "sin entrada" ¶
 }
 """
-open_finding = { zyjs = "ZYJS-049" }
