@@ -2720,3 +2720,51 @@ Ninguno avisa de más: es silencio, que siempre está permitido. El último depe
 `runtime-operators/arithmetic-on-an-empty-array-literal`, `runtime-operators/arithmetic-on-a-new-iterator`,
 `runtime-operators/arithmetic-on-a-name-holding-a-lambda` y `runtime-io/text-input-in-arithmetic`
 (`expect = "warn"`), con `open_finding = { zyjs = "ZYJS-049" }`.
+
+---
+
+## ZYJS-050 — `zyjs` acepta como sentencia nueve expresiones que los motores Rust rechazan al parsear
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-097`](GLOBAL.md) (paso P3.13, 2026-10-06), con un
+subíndice escrito como sentencia
+
+```zymbol
+x = 3
+>> x ¶
+##_
+>> "sigue" ¶
+```
+
+`zytw` y `zyvm` lo rechazan antes de ejecutar: `error: unexpected token: '##_'`, con la guía `expected
+statement (>>, <<, ?, ??, @, @!, @>, !?, <~, ¶, \, or identifier)`. `zyjs` lo ejecuta, imprime `3` y
+`sigue`, y descarta el valor.
+
+Una sentencia empieza por una marca o por un nombre. Estas nueve expresiones no, y sólo `zyjs` las acepta
+en ese sitio:
+
+| primera línea de la sentencia | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `##_` | `unexpected token: '##_'` | la ejecuta |
+| `##Parse("x")` | `unexpected token: '#'` | la ejecuta |
+| `#\|"5"\|` | `unexpected token: '#\|'` | la ejecuta |
+| `#.2\|5\|`, `#!2\|5\|` | `unexpected token: '#.'`, `'#!'` | las ejecuta |
+| `#,\|5\|` | `unexpected token: '#,'` | la ejecuta |
+| `0x\|255\|`, `0d\|"65"\|` | `unexpected token: '0x'`, `'0d'` | las ejecuta |
+| `</ hola.zy />` | `unexpected token: '</ hola.zy />'` | la ejecuta, y falla porque el navegador no puede correr un subíndice |
+
+Las demás que empiezan por una marca las rechazan los dos (`5`, `"x"`, `(1 + 2)`, `[1, 2]`, `#1`, `'c'`,
+`##.\|5\|`, `###\|"5"\|`, `#?`) o las aceptan los dos, porque son sentencias (`<\ "echo hi" \>`,
+`>< a`, `°z = 1`).
+
+### Qué hay que decidir
+
+- que `zyjs` las rechace como Rust: el valor de una expresión que nadie usa se pierde, y la regla del
+  parser de Rust ya dice qué empieza una sentencia (Recomendado);
+- que los motores Rust las acepten, con el aviso `this statement does nothing` que ya dan para un nombre
+  suelto.
+
+### Qué lo sujeta
+
+Ocho celdas de `refusal` (`*-as-a-statement`), con `open_finding = { zyjs = "ZYJS-050" }`. El subíndice no
+tiene celda: el navegador no puede correrlo, y su respuesta allí la cubre una exclusión de entorno.

@@ -6671,7 +6671,8 @@ nombre que guarda una lambda y uno leído con `<<` —, todos silencio y ninguno
 
 ## GLB-097 — La clase de un error cuyo mensaje lleva un valor del programa sale de las palabras de ese valor
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.13)** — decidido por el autor el 2026-10-06: cada sitio declara
+su clase; el redondeo y el truncado de un texto que no es un número, `##Parse`
 **Encontrado por:** al medir las vecinas de [`GLB-094`](GLOBAL.md) (paso P3.11, 2026-10-06)
 
 ```zymbol
@@ -6726,15 +6727,44 @@ No están medidos uno a uno, y casi todos los rechaza el analizador antes de eje
    - `##Parse`, como la comparación y como `0d|…|` (Recomendado);
    - `##_`, como hoy, sólo que sin las palabras del valor.
 
+### Corrección
+
+Cada sitio declara la clase al lanzar, en los tres motores, y el mensaje no cambia:
+
+- **la clave que falta**, `##Key`: los siete sitios del tree-walker que lanzan `missing_key_msg` (lectura
+  con corchete y con punto, `$-[…]`, un paso de navegación, un patrón `#(…)`) pasan a
+  `RuntimeError::kinded("Key", …)`, y los tres de la VM a una variante nueva, `VmError::KeyMsg`. `zyjs`
+  ya la declaraba;
+- **un texto leído como número que no lo es**, `##Parse`: la conversión de base (`0d|…|`, `0x|…|`…), el
+  redondeo (`#.2|…|`) y el truncado (`#!2|…|`), con `kinded("Parse", …)`, `VmError::ParseMsg` y
+  `ZyRuntimeError(…, '##Parse')`. El redondeo y el truncado eran `##_`; la conversión de base ya era
+  `##Parse` por sus palabras.
+
+| programa | antes, `zytw` / `zyvm` | antes, `zyjs` | ahora, los tres |
+|---|---|---|---|
+| `#.2\|"abc"\|`, `#!2\|"abc"\|` | `##_` | `##_` | `##Parse` |
+| `#.2\|"index"\|` | `##Index` | `##Index` | `##Parse` |
+| `#!2\|"overflow"\|` | `##Range` | `##Range` | `##Parse` |
+| `0d\|"type"\|` | `##Type` | `##Type` | `##Parse` |
+| `u["overflow"]`, `u.overflow`, `u$-["overflow"]`, `m["a">"overflow"]`, `#(overflow: n) = u` | `##Range` | `##Key` | `##Key` |
+| `#(overflow: 1)["zz"]` | `##Range` | `##Key` | `##Key` |
+
+GUIDE: la tabla de clases y el párrafo del redondeo de un texto dicen `##Parse`.
+
+### Lo que queda
+
+Los mensajes que llevan un **nombre** del programa tienen el mismo defecto, y cuatro llegan a ejecución con
+un programa que `check` acepta. Su clase no estaba decidida: [`GLB-099`](GLOBAL.md).
+
 ### Qué lo sujeta
 
-Las celdas de `runtime-errors` con `open_finding` por motor:
-
-- `missing-key-is-a-key-whatever-its-name` (`zytw`, `zyvm`);
-- `missing-key-is-a-key-whatever-the-other-keys-are` (`zytw`, `zyvm`);
-- `base-conversion-failure-is-a-parse-whatever-the-text` (los tres);
-- `rounding-a-word-is-not-an-index` (los tres): sólo afirma que no es `##Index`, porque la clase queda por
-  decidir (punto 2).
+`runtime-errors`: `missing-key-is-a-key-whatever-its-name`, `missing-key-through-the-dot-is-a-key`,
+`missing-key-removed-is-a-key`, `missing-key-in-a-navigation-is-a-key`, `missing-key-in-a-pattern-is-a-key`,
+`missing-key-is-a-key-whatever-the-other-keys-are`, `base-conversion-failure-is-a-parse-whatever-the-text`,
+`rounding-a-text-is-a-parse-error`, `rounding-a-word-is-a-parse-error` y
+`truncating-a-word-is-a-parse-error`. Con los binarios de antes dan WRONG diez de ellas en `zytw` y `zyvm`;
+con el `zyjs` de antes, las cuatro de `##Parse`. Las celdas `runtime-format-convert/*-met` imprimen la clase
+que recibe el `:!`.
 
 ---
 
@@ -6785,3 +6815,57 @@ Float, `##'` Char, `##"` String). Para `#|…|`, el valor lo decide la entrada:
 `runtime-io/numeric-input-in-arithmetic`, `runtime-io/typed-integer-input-in-arithmetic` y
 `runtime-io/typed-float-input-in-arithmetic` (`expect = "ok"`), con
 `open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }`.
+
+---
+
+## GLB-099 — La clase de un error de ejecución que lleva un **nombre** del programa sale de las palabras del nombre
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`GLB-097`](GLOBAL.md) (paso P3.13, 2026-10-06), que lo dejó sin medir
+
+```zymbol
+id(v) { <~ v }
+t = id((1, 2))
+!? {
+    >> t.index ¶
+} :! {
+    >> _err ¶
+}
+```
+
+Los tres motores imprimen `##Index(a positional tuple is addressed by position, not by name: 'index' …)`.
+Con `t.zz`, `##_`.
+
+Es la regla de las palabras de [`GLB-097`](GLOBAL.md), con un nombre en vez de un valor. De los mensajes
+que llevan un nombre, `check` rechaza antes de ejecutar los de nombres que no existen (`undefined function:
+'index_of'`); estos cuatro llegan a ejecución, con la misma respuesta en los tres motores:
+
+| programa | con un nombre sin palabra clave | con `index` |
+|---|---|---|
+| `t = id((1, 2))` · `t.campo`, una tupla posicional leída por nombre | `##_` | `##Index` |
+| `x = id(5)` · `x.campo`, el punto sobre algo que no es un diccionario | `##_` | `##Index`: la guía dice `use d.index` |
+| `n = 5` · `\ n` · `>> n`, un nombre usado después de destruirlo | `##_` | `##Index` |
+| `r = </ nada.zy />`, un subíndice que no existe | `##_` | `##Index` |
+
+Ninguno de los cuatro tiene la clase decidida: con un nombre cualquiera sale `##_` porque la plantilla no
+tiene ninguna de las palabras, no porque se haya elegido.
+
+### Qué hay que decidir
+
+1. **Una tupla posicional leída por nombre y el punto sobre algo que no es un diccionario:**
+   - `##Type` (Recomendado): D1 — el receptor es del tipo equivocado, no tiene nombres; es la familia de
+     `d[2]` sobre un diccionario, que los tres motores ya lanzan como `##Type`;
+   - `##_`, como hoy, sólo que sin las palabras del nombre.
+2. **Un nombre usado después de destruirlo:** `##_` (Recomendado): no es un tipo ni un valor equivocado, y
+   ninguna familia lo describe; declarado, para que el nombre no la cambie.
+3. **Un subíndice que no existe:**
+   - `##IO` (Recomendado): es un fichero que no está, la familia del sistema de ficheros; un subíndice que
+     da un estado distinto de 0 ya es un `##IO` (GUIDE, § Execute Script);
+   - `##_`, como hoy.
+
+### Qué lo sujeta
+
+`runtime-errors`: `positional-tuple-read-by-a-name-is-not-an-index`,
+`dot-on-a-non-dictionary-is-not-an-index`, `use-after-destruction-is-not-an-index` y
+`missing-subscript-is-not-an-index` (`expect = "ok"`), con `open_finding` por motor en los tres. Sólo
+afirman que la clase no es la de las palabras, porque la clase queda por decidir.
