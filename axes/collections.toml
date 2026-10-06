@@ -82,6 +82,42 @@ a = #[1, "dos", #1]
 >> a$# ¶
 """
 
+# Lambdas are elements like any other, compared as the Rust analyser compares an
+# element with the first (`types_compatible_static`): part by part, `Any`
+# fitting anything. Measured beside ZYJS-049 (2026-10-06): once zyjs named a
+# lambda's type, comparing the names refused the first array below, which Rust
+# accepts; and before, zyjs named none and ran the other two, which Rust refuses.
+
+[[cell]]
+id      = "lambdas-of-one-shape-are-not-a-mix"
+premise = "COL-3"
+expect  = "ok"
+what    = "`[(x) -> x + 1, (x) -> x * 2]` — `(Any) -> Any` and `(Any) -> Int` are one function to the check"
+src     = """
+fs = [(x) -> x + 1, (x) -> x * 2, (x) -> x * x]
+>> fs[2](3) ¶
+"""
+
+[[cell]]
+id      = "lambdas-of-another-arity-are-checked"
+premise = "COL-3"
+expect  = "error"
+what    = "`[(a) -> a, () -> 1]` — two arities are two types (ZYJS-049)"
+src     = """
+fs = [(a) -> a, () -> 1]
+>> fs$# ¶
+"""
+
+[[cell]]
+id      = "lambdas-returning-another-type-are-checked"
+premise = "COL-3"
+expect  = "error"
+what    = "`[() -> 1, () -> \"s\"]` — `() -> Int` and `() -> String` are two types (ZYJS-049)"
+src     = """
+fs = [() -> 1, () -> "s"]
+>> fs$# ¶
+"""
+
 # ── COL-4: the tuple is positional, immutable, unordered ────────────────────
 
 [[cell]]

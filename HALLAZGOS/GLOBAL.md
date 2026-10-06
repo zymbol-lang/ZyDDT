@@ -6891,3 +6891,49 @@ tiene ninguna de las palabras, no porque se haya elegido.
 `dot-on-a-non-dictionary-is-not-an-index`, `use-after-destruction-is-not-an-index` y
 `missing-subscript-is-not-an-index` (`expect = "ok"`), con `open_finding` por motor en los tres. Sólo
 afirman que la clase no es la de las palabras, porque la clase queda por decidir.
+
+---
+
+## GLB-100 — Rust compara una función entera para el cambio de tipo, y parte por parte para un argumento o un elemento
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`ZYJS-049`](zyjs.md) (paso P3.15, 2026-10-06)
+
+```zymbol
+f = (a) -> a
+f = (b) -> b * 2
+>> f(2) ¶
+```
+
+Los tres motores avisan `type mismatch: 'f' was (Any) -> Any but assigned (Any) -> Int`, y el programa
+imprime `4`.
+
+El analizador de Rust tiene dos relaciones entre tipos. Para un argumento y para un elemento de un array,
+`types_compatible_static` compara una función parte por parte, y un `Any` encaja con todo: `[(a) -> a,
+(b) -> b * 2]` no es una mezcla. Para el cambio de tipo, `is_compatible_with` acepta un `Any` sólo como
+tipo entero y compara una función por igualdad, así que los mismos dos valores, asignados uno tras otro
+al mismo nombre, son un cambio de tipo. Desde `ZYJS-049`, `zyjs` hace lo mismo, que es lo decidido:
+nombrar como Rust.
+
+| programa | los tres motores |
+|---|---|
+| `f = (a) -> a` · `f = (b) -> b * 2` | avisa: `(Any) -> Any` contra `(Any) -> Int` |
+| `f = (a) -> a + 1` · `f = (b) -> b + 2` | nada: los dos son `(Any) -> Any` |
+| `f = () -> 1` · `f = () -> "s"` | avisa: `() -> Int` contra `() -> String` |
+| `fs = [(a) -> a, (b) -> b * 2]` | nada |
+| `fs = [(a) -> a, () -> 1]` | error: dos aridades |
+
+En el workspace no lo provoca ningún programa: el único aviso de Rust con un tipo de función era el de una
+celda de ZyDDT.
+
+### Qué hay que decidir
+
+- que el cambio de tipo compare una función parte por parte, como el argumento y el elemento: `(Any) ->
+  Any` y `(Any) -> Int` dejan de ser un cambio; `() -> Int` y `() -> String` lo siguen siendo (Recomendado);
+- dejarlo: un nombre que guarda una función y luego otra de distinto retorno avisa.
+
+### Qué lo sujeta
+
+Nada todavía: los tres coinciden, así que una celda con `open_finding` saldría pagada el primer día. La
+celda se escribe con la decisión.
+
