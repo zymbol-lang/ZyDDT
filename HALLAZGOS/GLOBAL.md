@@ -6412,7 +6412,7 @@ lambda. Salieron dos más, ajenos a éste: [`GLB-095`](GLOBAL.md) y [`GLB-096`](
 
 ## GLB-093 — El aviso de cambio de tipo: `zyjs` no ve los cambios a o desde una colección ni los del estado de un módulo dentro de sus funciones, y Rust avisa de un array vacío
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-05 (paso P3.9)** — decidido por el autor: A y B como Rust, C como `zyjs`
 **Encontrado por:** al medir el alcance de [`GLB-092`](GLOBAL.md): en tres ficheros del workspace Rust da
 más avisos de cambio de tipo que `zyjs` (`interpreter/examples/phase1/reassign.zy`, 7 frente a 4;
 `ZyDDT/cases/pin/module_state/lib.zy`, 1 frente a 0; `zyquality/bench/stress_v2/bench_text.zy`, 1
@@ -6437,13 +6437,36 @@ A y B: si `zyjs` tiene que avisar como Rust (la premisa del eje, `C-TYP-3`, dice
 un nombre es un aviso). C: si un array vacío reasignado con elementos es un cambio de tipo (Rust) o no
 (`zyjs`).
 
+### Decidido y corregido el 2026-10-05 (paso P3.9)
+
+- **C**, en Rust: `is_compatible_with` trata como compatibles dos arrays cuando el tipo de elemento de
+  uno no se sabe todavía (`Any` o `Unknown`): `x = []` y luego `x = ["a"]` es el array llenándose. Sólo
+  eso: `[Int]` frente a `[Float]` sigue siendo un cambio.
+- **A**, en `zyjs`: el aviso usa `argType`, que nombra las colecciones como `infer_expr` (`[Int]`,
+  `(Int, Int)`, `#(k: Int)`); `typesCompatible` sabe del `[Any]` de C y de que `Number` —un parámetro
+  usado en aritmética, desde `ZYJS-048`— es compatible con `Int` y `Float`, como en Rust. Al medirlo,
+  `argType` tomaba por String el centinela del acumulador caliente (`°x + 1`, `°l$+ v`), lo que dio un
+  rechazo falso en `ZyBank/pantalla/tui.zy` y avisos falsos en tres ficheros: se corrigió antes del
+  commit.
+- **B**, en `zyjs`: `onlyVisibleAcrossStrong` exceptúa el estado de un módulo, como ya hacía
+  `crossesStrongBoundary` (MEM-4) —una función del módulo escribe su estado, no crea una local—, y el
+  análisis de un módulo conserva el aviso de cambio de tipo. Los demás avisos de un módulo se siguen
+  descartando: conservados, `zyjs` marcaría como sin usar los nombres exportados de 224 ficheros de
+  módulo, que el CLI no marca.
+
+Barridos de todos los diagnósticos: `zymbol check` sobre los 3171 `.zy` cambia sólo en la celda de C y en
+`zyquality/bench/stress_v2/bench_text.zy` (el array vacío); `zyjs` sobre los 3174, sólo en
+`interpreter/examples/phase1/reassign.zy` (ahora los mismos siete avisos que Rust), en
+`ZyDDT/cases/pin/module_state/lib.zy` (B) y en la celda de A. Los ficheros de módulo con aviso de cambio
+de tipo coinciden en los dos analizadores.
+
 ### Qué lo sujeta
 
-- **A**: `type-change/type-change-to-a-collection`, con `open_finding = { zyjs = "GLB-093" }` (el eje
-  afirma `warn`).
-- **C**: `runtime-collection-ops/empty-array-reassigned-with-elements`, con `open_finding = "GLB-093"`,
-  sin `expect`.
-- **B**: **nada**, y no por olvido. Sólo `zymbol check` del propio fichero de módulo la ve: una celda
+- **A**: `type-change/type-change-to-a-collection` (el eje afirma `warn`), que hasta la corrección
+  llevaba `open_finding = { zyjs = "GLB-093" }`.
+- **C**: `runtime-collection-ops/empty-array-reassigned-with-elements` (`expect = "ok"`) y el control
+  `array-of-another-element-type-warns`.
+- **B**: **nada que mire a `zyjs`**, y no por olvido. Sólo `zymbol check` del propio fichero de módulo la ve: una celda
   de ZyDDT ejecuta, un módulo no se puede ejecutar, y al ejecutar el script que lo importa ningún motor
   muestra los avisos del módulo (medido: la celda salía `ok` en los tres). Lo que la sujetaría es
   `web/tests/test_check.mjs`, que compara el checker de `zyjs` con `zymbol check` por fichero, con un
