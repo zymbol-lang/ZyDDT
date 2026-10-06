@@ -1817,16 +1817,27 @@ print("hello".replace("l", "Ll", 2))
 
 # ── An empty array, reassigned (added 2026-10-05) ───────────────────────────
 #
-# The Rust analyser types `[]` as `[Any]` and warns when the name then takes a
-# typed array — `[Any] but assigned [String]`, and back. zyjs does not. Whether
-# an empty array has an element type to change is not decided (GLB-093).
+# The Rust analyser typed `[]` as `[Any]` and warned when the name then took a
+# typed array — `[Any] but assigned [String]`, and back. Decided 2026-10-05
+# (GLB-093): an empty array has no element type to change, so neither analyser
+# warns. `[Int]` against `[Float]` still differs.
 
 [[cell]]
-id   = "empty-array-reassigned-with-elements"
-what = "`x = []` then `x = [\"a\"]`: Rust warns `was [Any] but assigned [String]`, zyjs does not (GLB-093, undecided)"
-src  = """
+id     = "empty-array-reassigned-with-elements"
+expect = "ok"
+what   = "`x = []` then `x = [\"a\"]`: the array being filled, not a type change — nothing warns (GLB-093)"
+src    = """
 x = []
 x = ["a"]
 >> x ¶
 """
-open_finding = "GLB-093"
+
+[[cell]]
+id     = "array-of-another-element-type-warns"
+expect = "warn"
+what   = "the control: `x = [1]` then `x = [1.5]` is still a change, `[Int]` to `[Float]`, in both analysers"
+src    = """
+x = [1]
+x = [1.5]
+>> x ¶
+"""
