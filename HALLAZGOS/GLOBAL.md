@@ -7046,8 +7046,8 @@ sistema variante: deja correr lo que no puede probar que falla.
 ### Lo que queda
 
 - El lado derecho de `&&` y `||` sigue contando: `f(a, b) { <~ a && b }` rechaza `f(#0, 5)` con `expects
-  Bool`, y al ejecutar da `#0`, porque los tres motores cortocircuitan y `b` no se evalúa. Es la misma
-  familia, pero no estaba en la opción A: queda para decisión del autor.
+  Bool`, y al ejecutar da `#0`, porque los tres motores cortocircuitan y `b` no se evalúa. No estaba en la
+  opción A; desde el texto de TYP-2 del 2026-10-06 contradice la premisa: [`GLB-103`](GLOBAL.md).
 - Al medir el `??` salieron dos más: [`GLB-102`](GLOBAL.md) y [`ZYJS-051`](zyjs.md).
 
 ### Qué lo sujeta
@@ -7099,4 +7099,44 @@ La inferencia de parámetros (GLB-101) ya lee el `??` como lo ejecutan los motor
 
 Nada todavía: los dos analizadores dan el mismo aviso, así que una celda no vería nada. La celda se escribe
 con la decisión.
+
+---
+
+## GLB-103 — El lado derecho de `&&` y `||` obliga al parámetro, aunque no esté en todos los caminos
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06); contradice TYP-2 desde el
+texto que el autor le añadió ese día
+
+```zymbol
+f(a, b) {
+    <~ a && b
+}
+>> f(#0, 5) ¶
+```
+
+Los dos analizadores lo rechazan: `argument 2 has type Int, but function 'f' expects Bool`. Con el tipo
+del argumento oculto, los tres motores imprimen `#0`: cortocircuitan, y `b` no se evalúa.
+
+| programa | al ejecutar, con el tipo oculto | `check` |
+|---|---|---|
+| `<~ a && b` · `f(#0, 5)` | `#0` | rechaza |
+| `<~ a \|\| b` · `f(#1, 5)` | `#1` | rechaza |
+| `<~ a && #1` · `f(1)` | falla: `a` se evalúa siempre | rechaza |
+
+TYP-2 dice desde el 2026-10-06 que un uso sólo exige algo del parámetro cuando todo camino pasa por él. El
+lado derecho de `&&` sólo se evalúa cuando el izquierdo es `#1`, y el de `||` cuando es `#0`, así que no
+está en todos los caminos. El recolector de restricciones aún lo cuenta: `BinaryOp::And | BinaryOp::Or`
+en `collect_constraints_from_expr`, y su copia en `zyjs`.
+
+### Qué hay que decidir
+
+- que el lado derecho no obligue, como dice la premisa (Recomendado); el izquierdo sigue obligando, porque
+  se evalúa siempre;
+- que siga obligando, y la premisa diga la excepción.
+
+### Qué lo sujeta
+
+`refusal/argument-type-not-from-the-right-of-and` y `refusal/argument-type-not-from-the-right-of-or`
+(`expect = "ok"`, de TYP-2), con `open_finding` por motor en los tres.
 

@@ -589,6 +589,36 @@ f(v) {
 >> f("a") ¶
 '''
 
+# The right side of `&&` and `||` is evaluated only when the left does not
+# decide (the three engines short-circuit), so it is not on every path either.
+# TYP-2 says so since 2026-10-06; the analysers still require it (GLB-103).
+
+[[cell]]
+id      = "argument-type-not-from-the-right-of-and"
+premise = "TYP-2"
+expect  = "ok"
+what    = "the right side of `&&` runs only when the left is #1, so it is not on every path: `f(#0, 5)` answers #0 (GLB-103)"
+src     = '''
+f(a, b) {
+    <~ a && b
+}
+>> f(#0, 5) ¶
+'''
+open_finding = { zytw = "GLB-103", zyvm = "GLB-103", zyjs = "GLB-103" }
+
+[[cell]]
+id      = "argument-type-not-from-the-right-of-or"
+premise = "TYP-2"
+expect  = "ok"
+what    = "the right side of `||` runs only when the left is #0: `f(#1, 5)` answers #1 (GLB-103)"
+src     = '''
+f(a, b) {
+    <~ a || b
+}
+>> f(#1, 5) ¶
+'''
+open_finding = { zytw = "GLB-103", zyvm = "GLB-103", zyjs = "GLB-103" }
+
 [[cell]]
 id      = "argument-type-from-both-branches"
 premise = "TYP-2"
