@@ -388,6 +388,7 @@ src  = """
 
 [[cell]]
 id   = "argument-type-inferred-from-the-body"
+premise = "TYP-2"
 what = "a String passed where the body made the parameter a Number — refused before `antes` is printed (ZYJS-048)"
 src  = """
 f(v) {
@@ -399,6 +400,7 @@ f(v) {
 
 [[cell]]
 id   = "argument-type-bool-from-a-logical-operator"
+premise = "TYP-2"
 what = "a parameter read by `&&` is a Bool: an Int passed to it is refused"
 src  = """
 f(v) { <~ v && #1 }
@@ -408,6 +410,7 @@ f(v) { <~ v && #1 }
 
 [[cell]]
 id   = "argument-type-from-an-ordering-against-a-literal"
+premise = "TYP-2"
 what = "a parameter compared with `<` against an Int literal is an Int: a String is refused"
 src  = """
 f(v) { <~ v < 5 }
@@ -417,6 +420,7 @@ f(v) { <~ v < 5 }
 
 [[cell]]
 id   = "argument-type-from-a-dictionary-key"
+premise = "TYP-2"
 what = "a parameter used as the key of a dictionary built in the body is a String: an Int is refused"
 src  = """
 f(k) {
@@ -429,6 +433,7 @@ f(k) {
 
 [[cell]]
 id   = "argument-type-passed-on-to-another-function"
+premise = "TYP-2"
 what = "a parameter handed to a function declared before is that function's parameter type, and inside the body it is passed on with its own"
 src  = """
 g(n) { <~ n * 2 }
@@ -439,6 +444,7 @@ f(v) { <~ g(v) }
 
 [[cell]]
 id   = "argument-type-of-an-inferred-parameter-passed-on"
+premise = "TYP-2"
 what = "inside `g`, `w` is a Number — passing it where a Bool is expected is refused, though nobody calls `g` with a wrong value"
 src  = """
 f(v) { <~ v && #1 }
@@ -452,6 +458,7 @@ g(w) {
 
 [[cell]]
 id     = "argument-type-what-does-not-constrain"
+premise = "TYP-2"
 what   = "the controls: `==`, juxtaposition, a parenthesized use and a function declared later constrain nothing, so these calls run — the forms where a port would over-refuse"
 expect = "ok"
 src    = """
