@@ -6602,7 +6602,8 @@ binario de antes las tres dan DIVERGE.
 
 ## GLB-096 — Para la aritmética, `zyjs` lee el tipo literal de un nombre y no el que guarda ahora
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.12)** — decidido por el autor el 2026-10-06: lo que el nombre
+guarda ahora, para todos los tipos
 **Encontrado por:** al medir las vecinas de [`GLB-092`](GLOBAL.md) (paso P3.8, 2026-10-05)
 
 ```zymbol
@@ -6621,9 +6622,50 @@ El aviso aritmético de `zyjs` lee `staticKind`, que para un nombre es el tipo l
 nombre guarda ahora **para Unit**; si eso se extiende a todos los tipos es la pregunta. Dentro de una
 lambda pasa lo mismo (`x = "a"` y `<~ (x - 1)`).
 
+### Corrección
+
+`operandTypeName` (`web/src/zymbol/zymbol.js`) lee un nombre por lo que guarda ahora, `infType` tal como
+lo nombra `argType`, para todos los tipos y no sólo para Unit. `null` y `Any` son «no se sabe», que no
+avisa. Un nombre sin `infType` (un parámetro) se lee como antes. Lo usan los avisos aritmético, lógico y
+unario, así que los tres siguen a Rust.
+
+Un nombre puede guardar ahora un `Number`: un parámetro inferido numérico, `x = a`. `Number` cuenta como
+numérico en los avisos aritmético y unario, como `is_numeric` en Rust. Sin eso,
+`g(a) { y = a * 2  x = a  <~ (x - 1) + y }` avisaba `non-numeric type: Number`.
+
+| programa | `zymbol check` | `zyjs` antes | `zyjs` ahora |
+|---|---|---|---|
+| `x = 1` · `x = "a"` · `x - 1` | `String` | nada | `String` |
+| `x = 1` · `x = #1` · `x * 2` | `Bool` | nada | `Bool` |
+| `x = 1` · `x = 'c'` · `x - 1` | `Char` | nada | `Char` |
+| `x = 1` · `x = (1, 2)` · `x / 2` | `(Int, Int)` | nada | `(Int, Int)` |
+| `x = 1` · `x = []` · `x - 1` | `[Any]` | nada | `[Any]` |
+| `x = 1` · `x = g()`, `g` da un String · `x - 1` | `String` | nada | `String` |
+| `x = 1` · `? #1 { x = "a" }` · `x - 1` | `String` | nada | `String` |
+| `x = ##_` · `x = "a"` · `x - 1` | `String` | nada | `String` |
+| `x = 1` · `x = "a"` · `f = () -> { <~ (x - 1) }` | `String` | nada | `String` |
+| `x = #1` · `x = 5` · `x && #1` | `Int` | nada | `Int` |
+| `x = #1` · `x = "a"` · `!x` | `String` | nada | `String` |
+| `x = 1` · `x = "a"` · `-x` | `String` | nada | `String` |
+| `c = 'x'` · `@ c:"ab" { c - 1 }` | `Char` | nada | `Char` |
+| `g(a) { y = a * 2  x = a  <~ (x - 1) + y }` | nada | nada | nada |
+| `x = 1` · `x = 2.5` · `x - 1` | nada | nada | nada |
+
+Barrido de `checkSource` sobre los 3185 `.zy` del workspace, antes y después: gana **un** aviso, el de la
+celda de este hallazgo, y es el que da Rust en la misma línea; no pierde ninguno. Los avisos de operador
+que dan los dos pasan de 98 a 99, y los que sólo da Rust de 2 a 1; ninguno lo da sólo `zyjs`, ni antes ni
+ahora. El que queda es `zyquality/corpus/input/08_numeric_float.zy`, un aviso de más de Rust:
+[`GLB-098`](GLOBAL.md).
+
+Quedan cuatro operandos que Rust nombra y `zyjs` no — el literal `[]`, el iterador de un `@` nuevo, un
+nombre que guarda una lambda y uno leído con `<<` —, todos silencio y ninguno aviso de más:
+[`ZYJS-049`](zyjs.md).
+
 ### Qué lo sujeta
 
-`runtime-operators/arithmetic-on-a-name-that-changed-type`, con `open_finding = "GLB-096"`, sin `expect`.
+`runtime-operators/arithmetic-on-a-name-that-changed-type`, que pasa a `expect = "warn"` sin
+`open_finding`; `logical-on-a-name-that-changed-type` y `unary-on-a-name-that-changed-type`
+(`expect = "warn"`); y el control `arithmetic-on-a-name-holding-an-inferred-number` (`expect = "ok"`).
 
 ---
 
@@ -6693,3 +6735,53 @@ Las celdas de `runtime-errors` con `open_finding` por motor:
 - `base-conversion-failure-is-a-parse-whatever-the-text` (los tres);
 - `rounding-a-word-is-not-an-index` (los tres): sólo afirma que no es `##Index`, porque la clase queda por
   decidir (punto 2).
+
+---
+
+## GLB-098 — El analizador de Rust tipa toda entrada `<<` como String, aunque lleve una marca de tipo
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-096`](GLOBAL.md) (paso P3.12, 2026-10-06): era el único
+aviso de operador que daba sólo Rust en todo el workspace (`zyquality/corpus/input/08_numeric_float.zy`)
+
+```zymbol
+!? {
+    << ### n
+    >> (n * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+```
+
+`zymbol check` avisa `arithmetic operation on non-numeric type: String`. El programa funciona: con la
+entrada `7` imprime `14`, en los tres motores.
+
+La marca de `<<` decide qué se lee (la tabla de la GUIDE, § Input `<<`), pero el analizador define el
+nombre como String en todos los casos: «Input always produces a string»
+(`crates/zymbol-semantic/src/type_check.rs`, `Statement::Input`).
+
+| entrada | lo que guarda el nombre (GUIDE) | `zymbol check` sobre `x * 2` / `x - 1` | `zyjs` |
+|---|---|---|---|
+| `<< f` | String | `String` (bien) | nada |
+| `<< ##"(20) "T: " s` | String | `String` (bien) | nada |
+| `<< ### n`, `<< ###(4) "E: " n` | Int | `String`, de más | nada |
+| `<< ##. g`, `<< ##.(5,2) "D: " m` | Float | `String`, de más | nada |
+| `<< ##' "C: " c` | Char | `String`: avisa bien, nombra mal el tipo | nada |
+| `<< #\|f\|` | un número si la línea lo es, y si no el texto | `String`, de más si la línea es un número | nada |
+
+`zyjs` no tipa ninguna entrada, y por eso no avisa en ninguna: eso es [`ZYJS-049`](zyjs.md).
+
+### Qué hay que decidir
+
+Para las marcas tipadas no hay nada que decidir: su tipo está en la tabla de la GUIDE (`###` Int, `##.`
+Float, `##'` Char, `##"` String). Para `#|…|`, el valor lo decide la entrada:
+
+- «no se sabe» (`Any`): el analizador no puede saberlo, y callar siempre está permitido (Recomendado);
+- `Number`: lo que el programa espera; pero cuando la línea no es un número el nombre guarda el texto, y un
+  programa que mira cuál de los dos le llegó recibiría avisos que no tocan.
+
+### Qué lo sujeta
+
+`runtime-io/numeric-input-in-arithmetic`, `runtime-io/typed-integer-input-in-arithmetic` y
+`runtime-io/typed-float-input-in-arithmetic` (`expect = "ok"`), con
+`open_finding = { zytw = "GLB-098", zyvm = "GLB-098" }`.

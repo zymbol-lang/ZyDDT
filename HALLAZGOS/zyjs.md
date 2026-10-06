@@ -2675,3 +2675,48 @@ Lo sujetan, en `refusal`: `argument-type-inferred-from-the-body` y seis más —
 `…-of-an-inferred-parameter-passed-on`— y el control `argument-type-what-does-not-constrain`,
 con las formas donde un port avisaría de más. `expect` sólo afirma la categoría; lo estático lo
 sujeta la salida, que se compara: `antes` sólo lo imprime un motor que ejecutó antes de rechazar.
+
+---
+
+## ZYJS-049 — Cuatro operandos que Rust sabe nombrar y `zyjs` no: el literal `[]`, el iterador de un `@` nuevo, un nombre que guarda una lambda y uno leído con `<<`
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-096`](GLOBAL.md) (paso P3.12, 2026-10-06)
+
+```zymbol
+!? {
+    >> ([] - 1) ¶
+} :! {
+    >> "refused" ¶
+}
+```
+
+`zymbol check` avisa `arithmetic operation on non-numeric type: [Any]`; `zyjs`, nada.
+
+Desde `GLB-096`, `zyjs` lee un nombre por el tipo que guarda ahora, y en las sondas de las vecinas coincide
+con Rust salvo en cuatro sitios. En los cuatro calla donde Rust avisa, porque no sabe nombrar el tipo del
+operando:
+
+| programa | `zymbol check` | `zyjs` | por qué calla |
+|---|---|---|---|
+| `[] - 1` | `[Any]` | nada | `staticKind` toma el tipo común de los elementos (`arrayElemKind`); sin elementos no hay ninguno. Guardado en un nombre sí lo nombra: `x = []` · `x - 1` avisa `[Any]` desde `GLB-096` |
+| `f() { @ c:"ab" { c - 1 } }` | `Char` | nada | un iterador cuyo nombre es nuevo se define sin tipo (`define`); sólo uno que ya existía recibe el del elemento (`assignIterator`), y ese sí avisa `Char` |
+| `x = 1` · `x = () -> 1` · `x - 1` | `() -> Int`, y el cambio de tipo | nada | `argType` no nombra el tipo de una lambda, así que tampoco avisa del cambio de tipo |
+| `<< f` · `f * 2` | `String` | nada | un nombre leído con `<<` no recibe tipo |
+
+Ninguno avisa de más: es silencio, que siempre está permitido. El último depende de
+[`GLB-098`](GLOBAL.md): lo que tiene que guardar un nombre leído con `<<` es lo que se decida allí.
+
+### Qué hay que decidir
+
+- que `zyjs` nombre los cuatro como Rust: `[]` como `[Any]`, el iterador nuevo con el tipo de su
+  elemento, la lambda por su firma, y la entrada con el tipo que fije `GLB-098` (Recomendado). La lambda
+  es la de más trabajo: hay que inferir su retorno, como ya hace `funcReturnType` para las funciones;
+- sólo los tres primeros, y la lambda queda como límite de este analizador;
+- ninguno: son los límites de lo que `zyjs` sabe nombrar.
+
+### Qué lo sujeta
+
+`runtime-operators/arithmetic-on-an-empty-array-literal`, `runtime-operators/arithmetic-on-a-new-iterator`,
+`runtime-operators/arithmetic-on-a-name-holding-a-lambda` y `runtime-io/text-input-in-arithmetic`
+(`expect = "warn"`), con `open_finding = { zyjs = "ZYJS-049" }`.
