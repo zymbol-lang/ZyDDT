@@ -6270,7 +6270,7 @@ analizador, que no se copió y es otro hallazgo: [`GLB-092`](GLOBAL.md).
 
 ## GLB-090 — `x / 2` con `x` vacía habla de partir cadenas
 
-**Estado:** **abierto** — pendiente de decisión del autor; es la forma de [`GLB-059`](GLOBAL.md) en el `/`
+**Estado:** **corregido 2026-10-05 (paso P3.6)** — decidido por el autor: la regla del `+` de [`GLB-059`](GLOBAL.md)
 **Encontrado por:** al implementar `GLB-059` (paso P3.2, 2026-10-05)
 
 ```zymbol
@@ -6289,10 +6289,16 @@ preguntar.
 Si el `/` sigue la regla del `+` —nombrar los tipos (`arithmetic requires numeric operands: Unit,
 Int`) salvo cuando hay texto, que conserva la guía de `$/`— o se queda como está.
 
+### Decidido el 2026-10-05 (paso P3.6)
+
+Opción 1 de dos: el `/` nombra los tipos (`arithmetic requires numeric operands: Unit, Int`) salvo
+cuando un operando es texto, que conserva la guía de `$/`. TW `eval_div`, VM `arith_type_error`, `zyjs`
+`applyOp`. El barrido de 65 casos de `GLB-088` sigue idéntico en los tres.
+
 ### Qué lo sujeta
 
-El golden de `zyquality/corpus/errors/runtime/arithmetic_type_errors.zy` (`r11`), que graba el texto de
-hoy: los tres coinciden, así que una celda saldría verde.
+El golden de `zyquality/corpus/errors/runtime/arithmetic_type_errors.zy`: `r11` (`/` con Unit, el texto
+de la familia) y `r14`, añadido (`/` con texto, la guía de `$/`).
 
 ---
 
