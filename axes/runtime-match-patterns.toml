@@ -270,3 +270,41 @@ v = 2
 >> "sigue" ¶
 """
 
+# ── A top-level `<~` inside a `??` that gives a value (added 2026-10-07) ────
+#
+# Measured beside ZYVM-011. A top-level `<~` ends the program and its value is
+# the exit status: alone, and inside a `??` statement, the three engines exit
+# with it. Inside a `??` whose value is used, the VM still does; the tree-walker
+# goes on with the `??` worth Unit, and zyjs fails with `Runtime error: [object
+# Object]` (GLB-107, undecided). Both cells name the engines out of the rule
+# alongside a DIVERGE, so the debt is the whole cell.
+
+[[cell]]
+id     = "top-level-return-inside-a-match-value-exits"
+expect = "ok"
+what   = "`x = ?? v { 1 => { <~ 5 } }` at the top level ends the program with status 5 — zyjs fails with `[object Object]` (GLB-107)"
+src    = """
+v = 1
+x = ?? v {
+    1 => {
+        <~ 5
+    }
+}
+>> x ¶
+"""
+open_finding = "GLB-107"
+
+[[cell]]
+id     = "top-level-return-inside-a-match-operand-exits"
+expect = "ok"
+what   = "`x = 1 + (?? v { 1 => { <~ 7 } })` ends the program with status 7 in the VM; the TW goes on and fails at the `+` (GLB-107)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => {
+        <~ 7
+    }
+})
+>> x ¶
+"""
+open_finding = "GLB-107"

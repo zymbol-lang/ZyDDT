@@ -376,3 +376,41 @@ src    = """
     >> "IO" ¶
 }
 """
+
+# ── The line of an error raised after a nested block (added 2026-10-07) ─────
+#
+# Measured beside ZYVM-011. The line of a runtime error is the line of the
+# statement. When the statement ran a nested block before failing — the block of
+# a `??` arm, the body of a function it called — the tree-walker gives the line
+# of the last statement in that block, and so does the VM for the arm. zyjs
+# gives the statement's line in both (GLB-106, undecided). DIVERGE on the
+# location, so the debt is the whole cell.
+
+[[cell]]
+id     = "error-after-a-block-arm-is-at-the-statement"
+expect = "error"
+what   = "`x = 1 + (?? v { 1 => \"uno\" { >> \"a\" ¶ } })` fails at the `+`: TW and VM say line 4, the `>>` (GLB-106)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => "uno" {
+        >> "a" ¶
+    }
+})
+>> x ¶
+"""
+open_finding = "GLB-106"
+
+[[cell]]
+id     = "error-after-a-call-is-at-the-statement"
+expect = "error"
+what   = "`x = 1 + g()` fails at the `+` after `g` ran: the TW says line 3, the `<~` inside `g` (GLB-106)"
+src    = """
+g() {
+    >> "a" ¶
+    <~ "b"
+}
+x = 1 + g()
+>> x ¶
+"""
+open_finding = "GLB-106"
