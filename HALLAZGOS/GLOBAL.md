@@ -7104,7 +7104,8 @@ con la decisión.
 
 ## GLB-103 — El lado derecho de `&&` y `||` obliga al parámetro, aunque no esté en todos los caminos
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-06 (paso P3.17)** — decidido por el autor el 2026-10-06: el lado derecho no
+obliga, como dice TYP-2
 **Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06); contradice TYP-2 desde el
 texto que el autor le añadió ese día
 
@@ -7135,8 +7136,19 @@ en `collect_constraints_from_expr`, y su copia en `zyjs`.
   se evalúa siempre;
 - que siga obligando, y la premisa diga la excepción.
 
+### Corrección
+
+En los dos recolectores — el brazo `BinaryOp::And | BinaryOp::Or` de `collect_constraints_from_expr` y su
+copia en `collectConstraintsExpr` — sólo el lado izquierdo de `&&` y `||` obliga a un Bool, y no se lee
+nada de lo que hay dentro del derecho: `a && b > 0` no le pide nada a `b`. El izquierdo se evalúa siempre,
+así que `f(v) { <~ v && #1 }` sigue rechazando `f(1)`.
+
+Barridos de `zymbol check` y de `checkSource` sobre los 3228 `.zy` del workspace, antes y después: cambian
+sólo las dos celdas de este hallazgo, en los dos analizadores, y no aparece ningún rechazo.
+
 ### Qué lo sujeta
 
-`refusal/argument-type-not-from-the-right-of-and` y `refusal/argument-type-not-from-the-right-of-or`
-(`expect = "ok"`, de TYP-2), con `open_finding` por motor en los tres.
+`refusal/argument-type-not-from-the-right-of-and`, `…-of-or` y `…-not-from-inside-the-right-of-and`
+(`expect = "ok"`, de TYP-2), sin `open_finding`: con los analizadores de antes dan WRONG. El lado izquierdo
+lo sujeta `refusal/argument-type-bool-from-a-logical-operator`.
 
