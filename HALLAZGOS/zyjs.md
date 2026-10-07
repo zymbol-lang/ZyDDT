@@ -3070,3 +3070,44 @@ después: desaparecen esos 28 `unused variable`, ninguno dado por Rust, y no apa
 `unused/read-inside-an-interpolated-argument-is-a-read` y
 `read-inside-an-interpolated-module-argument-is-a-read` (`expect = "ok"`), una por cada caso. Con el `zyjs`
 de antes, las dos dan WRONG.
+
+---
+
+## ZYJS-055 — Un nombre usado como patrón de un `??`: `zyjs` no cuenta la lectura y avisa `unused variable`
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`GLB-105`](GLOBAL.md) (2026-10-07): nueve de los doce avisos de variable sin
+usar que `zyjs` da en el workspace y Rust no
+
+```zymbol
+umbral = 5
+v = 5
+?? v {
+    umbral => { >> "igual" ¶ }
+    _ => { >> "otro" ¶ }
+}
+```
+
+Los tres motores imprimen `igual`: un identificador en un patrón es un valor que se compara —el `??`
+compara `v` con lo que tiene `umbral`—, así que el patrón lo lee. `zymbol check` no dice nada; `checkSource`
+dice `unused variable 'umbral'`.
+
+| programa | al ejecutar | Rust | `zyjs` |
+|---|---|---|---|
+| el de arriba | `igual` | nada | `unused variable 'umbral'` |
+| `ok = [1, 2]` · `?? 2 { ok => … }` (contención) | `dentro` | nada | `unused variable 'ok'` |
+| `r = ?? v { umbral => "igual"  _ => "otro" }` · `>> r ¶` | `igual` | nada | `unused variable 'umbral'` |
+
+En el workspace son nueve avisos: `zyquality/corpus/match/13_ident_scalar.zy` (3),
+`match/14_ident_array_containment.zy` (2), `match/17_or_pattern_mixed.zy` (en un patrón `1 || expected || 9`),
+`smoke/18_match.zy` (2) y `aprende_zymbol/basico/ejemplos/04_selector_de_casos.zy`.
+
+### Qué hay que decidir
+
+- que `zyjs` cuente como lectura el nombre de un patrón, como Rust (Recomendado): es lo que el patrón hace
+  en los tres motores, y Rust es la referencia del analizador;
+- que la distancia se quede.
+
+### Qué lo sujeta
+
+`unused/name-read-as-a-match-pattern-is-a-read` (`expect = "ok"`), KNOWN para `zyjs` con esta ficha.

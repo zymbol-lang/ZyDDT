@@ -7323,7 +7323,8 @@ deuda; `tuple-with-a-float-for-an-int-is-no-change`, `dictionary-with-a-float-fo
 
 ## GLB-105 — El mismo nombre en dos bloques hermanos: los motores Rust lo cuentan como una variable escrita dos veces, y pierden el segundo sitio
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: un aviso por sitio, como decidió
+GLB-003
 **Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07); es la única fila en
 desacuerdo de la línea base de `web/tests/test_check.mjs`, `examples/tour/errors.zy`
 
@@ -7367,10 +7368,48 @@ hermano no se trata como declaración, así que no llega.
   sitio, como `zyjs` y como decidió GLB-003 (Recomendado);
 - que una sola advertencia por nombre baste, y `zyjs` junte también.
 
+### Corrección
+
+En `variable_analysis.rs`, una escritura declara una variable nueva salvo que alcance una que existe:
+`reaches_existing` pide que el nombre esté a la vista (`current_scope_vars`) —la regla que `bind_iterator`
+ya seguía para el iterador desde GLB-003— o que se haya escrito en caliente (`°s = …`, `s = °s …`), que vive
+por encima de su bucle: después del bucle `s` sigue existiendo en los tres motores, y `s° = …` no. La
+declaración desplazada se guarda en `retired` y se avisa en su sitio. Siguen la regla la asignación, la
+desestructuración, `<<`, la captura, la tecla y el nombre de `##Kind(m) =>`. Un `_nombre` conserva la regla
+de antes: su ámbito lo lleva el árbol de ámbitos.
+
+| programa | Rust, antes | Rust, ahora y `zyjs` |
+|---|---|---|
+| dos `!? { x = … }`, dos `? c > 0 { x = … }`, dos `@ 2 { x = … }` | 1 aviso, en el primer sitio | 2, `unused variable` |
+| `[a, b] = …` en dos bloques | 2, en el primero | 4 |
+| `<< x` en dos bloques | 1 | 2 |
+| `##Div(m) =>` en dos `??` | `m` assigned but never read | 2, `unused variable` |
+| `? c > 0 { x = 1 }` · `x = 2` · `>> x ¶` | nada | `unused variable`, el del bloque |
+| `f() { t = 1  <~ t }` · `g() { t = 2  <~ 0 }` | nada | el `t` de `g` |
+| `x = 1` · `!? { x = 2 }` (control) | assigned but never read | igual |
+| `@ 3 { s = °s "x" }` · `s = "y"` (control) | assigned but never read | igual |
+
+La sexta fila es la vecina que más se nota: Rust juntaba por nombre también los locales de funciones
+distintas, así que un local que una función lee tapaba el mismo nombre sin leer en otra. Barrido de
+`zymbol check` sobre los 3261 `.zy` del workspace, antes y después: cambian 12 ficheros. Tres pasan a decir
+lo que `zyjs` ya decía (`web/examples/tour/errors.zy`, `aprende_zymbol/intermedio/ejemplos/06_errores.zy`,
+`zyquality/corpus/errors/catchable/estado_de_salida.zy`) y uno es la celda de esta ficha. Los otros ocho son
+ficheros de módulo de las aplicaciones —`GO/表示/描画.zy`, `klingon_galaxy/bach.zy`, `HuD.zy` y `jagh.zy`,
+`Zofia/modulos/tensor.zy` y su copia en el corpus, `ZyBank/núcleo/almacén.zy`—, cuyos avisos `zyjs`
+descarta; revisados uno a uno, son nombres que de verdad no se leen en su función o en su bloque. Al
+ejecutar no se ven: los avisos de un módulo importado no se muestran.
+
+Los avisos de variable sin usar que da `zyjs` y no Rust pasan de 18 a 12 en el workspace. Nueve de los doce
+son otra cosa: [`ZYJS-055`](zyjs.md).
+
 ### Qué lo sujeta
 
-`unused/same-name-in-two-blocks-warns-at-each-site` (`expect = "warn"`), KNOWN con esta ficha: los tres
-avisan, y lo que diverge es cuántas veces.
+`unused/same-name-in-two-blocks-warns-at-each-site`, ya sin deuda;
+`same-name-in-two-if-blocks-warns-at-each-site`, `same-name-in-two-loops-warns-at-each-site`,
+`same-local-in-two-functions-warns-where-unread`, `block-variable-then-a-file-variable-of-its-name` y
+`same-names-destructured-in-two-blocks-warn-at-each-site`, que con el Rust de antes dan DIVERGE o WRONG; y
+los controles `outer-variable-written-in-a-block-is-one-variable` y
+`hot-accumulator-is-one-variable-after-its-loop`.
 
 ---
 
