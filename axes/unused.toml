@@ -311,8 +311,9 @@ s = "y"
 #
 # An identifier in a pattern is a value that gets compared — `umbral =>`
 # compares the scrutinee with what `umbral` holds, in all three engines — so the
-# pattern reads it. zyjs does not count that read and reports the name as
-# unused; Rust does not (ZYJS-055, measured beside GLB-105, undecided).
+# pattern reads it. zyjs did not count that read and reported the name as
+# unused; Rust does not (ZYJS-055, corrected 2026-10-07: the literal pattern
+# whose value is a name is a read in zyjs too).
 
 [[cell]]
 id     = "name-read-as-a-match-pattern-is-a-read"
@@ -326,4 +327,30 @@ v = 5
     _ => { >> "otro" ¶ }
 }
 """
-open_finding = { zyjs = "ZYJS-055" }
+
+[[cell]]
+id     = "array-read-as-a-match-pattern-is-a-read"
+what   = "`ok = [1, 2]`, then `?? 2 { ok => … }`: the pattern tests containment in `ok`, and reads it (ZYJS-055)"
+expect = "ok"
+src    = """
+ok = [1, 2]
+v = 2
+?? v {
+    ok => { >> "dentro" ¶ }
+    _ => { >> "fuera" ¶ }
+}
+"""
+
+[[cell]]
+id     = "name-read-in-an-or-pattern-is-a-read"
+what   = "`1 || esperado || 9 =>` in a `??` used as a value: the alternative reads `esperado` (ZYJS-055)"
+expect = "ok"
+src    = """
+esperado = 7
+v = 7
+r = ?? v {
+    1 || esperado || 9 => "conocido"
+    _ => "otro"
+}
+>> r ¶
+"""
