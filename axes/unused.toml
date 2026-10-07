@@ -128,3 +128,33 @@ src    = """
 >> "ok" ¶
 """
 open_finding = "GLB-105"
+
+# ── A name read inside an interpolated argument (added 2026-10-07) ──────────
+#
+# zyjs walked each argument of a call as `checkExpr(a.value ?? a)`, and a string
+# literal has a `.value` of its own — its parts — so the name read by
+# `f("{t}")` was never marked: 28 false `unused variable` in GO's 棋戦.zy, none
+# from Rust (ZYJS-054, corrected 2026-10-07). One cell per call site: a call to
+# a function of the file, and `alias::func(…)`.
+
+[[cell]]
+id     = "read-inside-an-interpolated-argument-is-a-read"
+expect = "ok"
+what   = "`t` read only by `f(\"{t}\")`: it is read, and nothing is reported (ZYJS-054)"
+src    = """
+f(s) {
+    >> s ¶
+}
+t = "a"
+f("{t}")
+"""
+
+[[cell]]
+id     = "read-inside-an-interpolated-module-argument-is-a-read"
+expect = "ok"
+what   = "`n` read only by `t::width(\"{n}\")`: it is read, and nothing is reported (ZYJS-054)"
+src    = """
+<# std/term => t
+n = "abc"
+>> t::width("{n}") ¶
+"""

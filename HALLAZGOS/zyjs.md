@@ -2995,3 +2995,48 @@ ficha.
 `refusal/argument-type-not-from-a-local-literal` (`expect = "error"`, en ejecución: `antes` se imprime) y
 `type-change/call-returning-a-local-stays-silent` (`expect = "ok"`). Con el `zyjs` de antes, las tres dan
 rojo.
+
+---
+
+## ZYJS-054 — Un nombre leído dentro de un texto interpolado que se pasa a una llamada: `zyjs` no ve la lectura y avisa `unused variable`
+
+**Estado:** **corregido 2026-10-07** — OK del autor el 2026-10-07: no hay decisión de diseño, la lectura ya la
+cuenta Rust (GLB-018 A)
+**Encontrado por:** al corregir [`ZYJS-052`](zyjs.md) (2026-10-07): el aviso nuevo daba cinco falsos en `GO/`,
+todos sobre nombres que sólo se leen así
+
+```zymbol
+f(s) {
+    >> s ¶
+}
+t = "a"
+f("{t}")
+```
+
+Los tres motores imprimen `a`. `zymbol check` no dice nada; `checkSource` decía `unused variable 't'`.
+
+| programa | Rust | `zyjs`, antes |
+|---|---|---|
+| el de arriba | nada | `unused variable 't'` |
+| `>> f("{t}") ¶`, `x = f("{t}")`, `f("x{t}")` | nada | el mismo aviso |
+| `<# std/term => t` · `n = "abc"` · `>> t::width("{n}") ¶` | nada | `unused variable 'n'` |
+| control: `g = "{t}"` · `f(g)` | nada | nada |
+
+Los casos `Call` y `CallExpr` del `Checker` recorrían cada argumento con `checkExpr(a.value ?? a)`. El
+parser da los argumentos como nodos de expresión —la marca `<~` va aparte, en `args.outArgs`—, y un literal
+de texto tiene su propio `.value`, la lista de sus partes: `checkExpr` recibía esa lista en lugar del
+literal, y la lectura de `{t}` nunca se marcaba.
+
+En el workspace eran 28 avisos falsos, todos en `GO/棋戦.zy` —el GO del playground—, que lee así sus textos
+traducidos: `記す("═══ {題} ═══", #1, 報告<~)`.
+
+### Corrección
+
+`checkExpr(a)` en los dos sitios. Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y
+después: desaparecen esos 28 `unused variable`, ninguno dado por Rust, y no aparece nada.
+
+### Qué lo sujeta
+
+`unused/read-inside-an-interpolated-argument-is-a-read` y
+`read-inside-an-interpolated-module-argument-is-a-read` (`expect = "ok"`), una por cada caso. Con el `zyjs`
+de antes, las dos dan WRONG.
