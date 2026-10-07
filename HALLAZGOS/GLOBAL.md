@@ -6923,7 +6923,8 @@ de antes, las cuatro dan WRONG.
 
 ## GLB-100 — Rust compara una función entera para el cambio de tipo, y parte por parte para un argumento o un elemento
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: parte por parte también para el
+cambio de tipo
 **Encontrado por:** al corregir [`ZYJS-049`](zyjs.md) (paso P3.15, 2026-10-06)
 
 ```zymbol
@@ -6959,10 +6960,31 @@ celda de ZyDDT.
   Any` y `(Any) -> Int` dejan de ser un cambio; `() -> Int` y `() -> String` lo siguen siendo (Recomendado);
 - dejarlo: un nombre que guarda una función y luego otra de distinto retorno avisa.
 
+### Corrección
+
+`is_compatible_with` (`crates/zymbol-semantic/src/type_check.rs`) tiene un brazo para dos funciones: la
+misma aridad, y cada parámetro y el retorno compatibles por esta misma relación. En `zyjs`, `typesCompatible`
+compara dos tipos de función parte por parte con `Checker.fitChange`, que es `is_compatible_with` sobre los
+nombres de tipo. Por la recursión, un retorno `[Any]` encaja con `[Int]`, como en el nivel de arriba.
+
+| programa | antes, los dos analizadores | ahora |
+|---|---|---|
+| `f = (a) -> a` · `f = (b) -> b * 2` | avisa: `(Any) -> Any` contra `(Any) -> Int` | nada |
+| `f = (a) -> a + 1` · `f = (b) -> "x"` | avisa | nada: el retorno era `Any` |
+| `f = () -> [1]` · `f = () -> []` | avisa | nada |
+| `f = () -> 1` · `f = () -> "s"` | avisa | avisa |
+| `f = (a) -> a` · `f = (a, b) -> a` | avisa | avisa: dos aridades |
+
+Barridos de `zymbol check` y de `checkSource` sobre los 3232 `.zy` del workspace: ningún diagnóstico cambia
+en ninguno de los dos. Ningún programa del workspace reasigna una función así.
+
+Las tuplas, los diccionarios y los arrays anidados se siguen comparando enteros: [`GLB-104`](GLOBAL.md).
+
 ### Qué lo sujeta
 
-Nada todavía: los tres coinciden, así que una celda con `open_finding` saldría pagada el primer día. La
-celda se escribe con la decisión.
+`type-change/function-of-one-shape-is-not-a-change` y `function-returning-an-empty-array-is-not-a-change`
+(`expect = "ok"`), que con los analizadores de antes dan WRONG; y los controles
+`function-returning-another-type-is-a-change` y `function-of-another-arity-is-a-change` (`expect = "warn"`).
 
 ---
 
@@ -7179,3 +7201,47 @@ sólo las dos celdas de este hallazgo, en los dos analizadores, y no aparece nin
 (`expect = "ok"`, de TYP-2), sin `open_finding`: con los analizadores de antes dan WRONG. El lado izquierdo
 lo sujeta `refusal/argument-type-bool-from-a-logical-operator`.
 
+
+
+---
+
+## GLB-104 — El cambio de tipo compara enteros las tuplas, los diccionarios y los arrays anidados: un `Any` o un Int/Float dentro es un cambio
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-100`](GLOBAL.md) (2026-10-07)
+
+```zymbol
+t = (1, 2)
+t = (1, 2.5)
+>> t ¶
+```
+
+Los dos analizadores avisan `type mismatch: 't' was (Int, Int) but assigned (Int, Float)`. Con `x = 1` ·
+`x = 2.5` no avisa ninguno: un Int que pasa a Float no es un cambio en el nivel de arriba.
+
+`is_compatible_with` acepta `Any`, Int con Float y Number sólo en el nivel de arriba, y un array de `Any` sólo
+como array entero; desde `GLB-100` compara las funciones parte por parte. Todo lo demás lo compara por
+igualdad, mientras que el argumento y el elemento (`types_compatible_static`) lo comparan parte por parte.
+
+| programa | `zymbol check` | `zyjs` |
+|---|---|---|
+| `t = (1, 2)` · `t = (1, 2.5)` | avisa `(Int, Int)` → `(Int, Float)` | igual |
+| `t = (1, id(2))` · `t = (1, "a")` | avisa `(Int, Any)` → `(Int, String)` | nada: no nombra la tupla |
+| `d = #(k: id(1))` · `d = #(k: "a")` | avisa `#(k: Any)` → `#(k: String)` | nada |
+| `x = [[]]` · `x = [["a"]]` | avisa `[[Any]]` → `[[String]]` | igual |
+| `f = () -> (1, 2)` · `f = () -> (1, 2.5)` | avisa | igual |
+
+Las dos filas con `Any` divergen además entre motores.
+
+### Qué hay que decidir
+
+- comparar también parte por parte las tuplas, los diccionarios y los arrays anidados, como el argumento y el
+  elemento: `(Int, Int)` → `(Int, Float)` deja de ser un cambio, igual que Int → Float, y un `Any` dentro
+  encaja con todo (Recomendado);
+- seguir comparándolos enteros; entonces `zyjs` tiene que nombrar `(Int, Any)` y `#(k: Any)` para coincidir.
+
+### Qué lo sujeta
+
+`type-change/tuple-with-an-unknown-part` y `type-change/dictionary-with-an-unknown-value`, con
+`open_finding = "GLB-104"`: hoy son un DIVERGE, y cualquiera de las dos opciones lo resuelve. Se reescriben
+con la decisión.

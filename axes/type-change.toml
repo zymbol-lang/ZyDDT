@@ -257,3 +257,79 @@ x = 'c'
 x = (1, 2)
 >> x ¶
 """
+
+# ── A function reassigned: compared part by part (added 2026-10-07) ─────────
+#
+# The type-change relation compared a function whole, while an argument and an
+# element compare it part by part, so `f = (a) -> a` then `f = (b) -> b * 2`
+# warned `(Any) -> Any` against `(Any) -> Int` — the same two values that are
+# no mix as the elements of an array. GLB-100, decided 2026-10-07: part by part
+# here too — the same arity, and each parameter and the return compatible.
+
+[[cell]]
+id     = "function-of-one-shape-is-not-a-change"
+expect = "ok"
+what   = "`f = (a) -> a`, then `f = (b) -> b * 2`: `(Any) -> Any` and `(Any) -> Int` are one function (GLB-100)"
+src    = """
+f = (a) -> a
+f = (b) -> b * 2
+>> f(2) ¶
+"""
+
+[[cell]]
+id     = "function-returning-an-empty-array-is-not-a-change"
+expect = "ok"
+what   = "`() -> [Int]`, then `() -> []`: an array of `Any` fits any array inside a function too (GLB-100)"
+src    = """
+f = () -> [1]
+f = () -> []
+>> f() ¶
+"""
+
+[[cell]]
+id   = "function-returning-another-type-is-a-change"
+what = "the control: `() -> Int`, then `() -> String`, is a change of type (GLB-100)"
+src  = """
+f = () -> 1
+f = () -> "s"
+>> f() ¶
+"""
+
+[[cell]]
+id   = "function-of-another-arity-is-a-change"
+what = "the control: `(Any) -> Any`, then `(Any, Any) -> Any`, is a change of type (GLB-100)"
+src  = """
+f = (a) -> a
+f = (a, b) -> a
+>> f(1, 2) ¶
+"""
+
+
+# ── A tuple, a dictionary or a nested array reassigned (added 2026-10-07) ───
+#
+# Measured beside GLB-100: the relation compares these whole, so an `Any` or an
+# Int/Float inside is a change of type, while an argument and an element compare
+# them part by part. With an `Any` inside, the engines also disagree: Rust warns,
+# zyjs does not name the tuple and is silent (GLB-104, undecided).
+
+[[cell]]
+id   = "tuple-with-an-unknown-part"
+what = "`t = (1, id(2))`, then `t = (1, \"a\")`: Rust warns `(Int, Any)` → `(Int, String)`, zyjs does not (GLB-104)"
+src  = """
+id(v) { <~ v }
+t = (1, id(2))
+t = (1, "a")
+>> t ¶
+"""
+open_finding = "GLB-104"
+
+[[cell]]
+id   = "dictionary-with-an-unknown-value"
+what = "`d = #(k: id(1))`, then `d = #(k: \"a\")`: Rust warns `#(k: Any)` → `#(k: String)`, zyjs does not (GLB-104)"
+src  = """
+id(v) { <~ v }
+d = #(k: id(1))
+d = #(k: "a")
+>> d ¶
+"""
+open_finding = "GLB-104"
