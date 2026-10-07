@@ -666,9 +666,12 @@ f(v) {
 #
 # A statement begins with a mark (`>>`, `<<`, `?`, `??`, `@`, `!?`, `<~`, `¶`,
 # `\`) or with a name, and the Rust parser refuses anything else at the start of
-# a line: `unexpected token`. zyjs parses these as statements, runs the program
-# and discards the value (ZYJS-050, measured beside GLB-097). The ninth form,
-# `</ file.zy />`, has no cell: the browser cannot run a subscript at all.
+# a line: `unexpected token`. zyjs parsed these as statements, ran the program
+# and discarded the value (ZYJS-050, measured beside GLB-097). Corrected
+# 2026-10-07: zyjs refuses all nine with the Rust parser's words, the token
+# spelled as `TokenKind::quoted` spells it. The ninth form, `</ file.zy />`, has
+# its cell since then: refused before anything runs, it no longer needs the
+# subscript the browser cannot run.
 
 [[cell]]
 id   = "unit-as-a-statement"
@@ -679,7 +682,6 @@ x = 3
 ##_
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "error-value-as-a-statement"
@@ -690,7 +692,6 @@ x = 3
 ##Parse("x")
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "numeric-eval-as-a-statement"
@@ -701,7 +702,6 @@ x = 3
 #|"5"|
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "rounding-as-a-statement"
@@ -712,7 +712,6 @@ x = 3
 #.2|5|
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "truncation-as-a-statement"
@@ -723,7 +722,6 @@ x = 3
 #!2|5|
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "format-as-a-statement"
@@ -734,7 +732,6 @@ x = 3
 #,|5|
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "base-conversion-as-a-statement"
@@ -745,7 +742,6 @@ x = 3
 0x|255|
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
 
 [[cell]]
 id   = "text-base-conversion-as-a-statement"
@@ -756,4 +752,13 @@ x = 3
 0d|"65"|
 >> "sigue" ¶
 """
-open_finding = { zyjs = "ZYJS-050" }
+
+[[cell]]
+id   = "subscript-as-a-statement"
+what = "`</ hola.zy />` alone on a line: refused before it runs, in the browser too"
+src  = """
+x = 3
+>> x ¶
+</ hola.zy />
+>> "sigue" ¶
+"""
