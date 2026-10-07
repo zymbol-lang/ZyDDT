@@ -2765,7 +2765,7 @@ siete; con sólo la primera mitad de la corrección, el control.
 
 ## ZYJS-050 — `zyjs` acepta como sentencia nueve expresiones que los motores Rust rechazan al parsear
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` las rechaza como Rust
 **Encontrado por:** al medir las vecinas de [`GLB-097`](GLOBAL.md) (paso P3.13, 2026-10-06), con un
 subíndice escrito como sentencia
 
@@ -2804,10 +2804,24 @@ Las demás que empiezan por una marca las rechazan los dos (`5`, `"x"`, `(1 + 2)
 - que los motores Rust las acepten, con el aviso `this statement does nothing` que ya dan para un nombre
   suelto.
 
+### Corrección
+
+`Parser.parseStatement` (`web/src/zymbol/zymbol.js`) rechaza al empezar una sentencia los tokens `UNIT`,
+`ERRCON`, `DATA_OP` y `EXECUTE`, igual que ya rechazaba un literal, un signo o `{`, con las palabras del
+parser de Rust: `unexpected token: …` y la guía `expected statement (…)`. `Parser.tokenSpelling` escribe
+cada token como `TokenKind::quoted` en Rust: `'##_'`; `'#'` para un `##Kind(…)`; `'#|'`, `'#.'`, `'#!'`,
+`'#,'` y `'#^'` para un operador de valor; `'0x'`, `'0b'`, `'0o'` y `'0d'` para una conversión de base; y el
+subíndice entero, `'</ app.zy -L es />'`. Las 19 variantes medidas dan el mismo mensaje en los dos.
+
+Barrido de `checkSource` sobre los 3230 `.zy` del workspace, antes y después: gana **ocho** rechazos, los de
+las celdas de este hallazgo, iguales a los de Rust en línea y texto, y no pierde nada. Ningún programa del
+workspace escribía una de estas formas como sentencia.
+
 ### Qué lo sujeta
 
-Ocho celdas de `refusal` (`*-as-a-statement`), con `open_finding = { zyjs = "ZYJS-050" }`. El subíndice no
-tiene celda: el navegador no puede correrlo, y su respuesta allí la cubre una exclusión de entorno.
+Las nueve celdas `refusal/*-as-a-statement`, ya sin `open_finding`: con el `zyjs` de antes, ocho dan WRONG y
+la del subíndice DIVERGE. Ésta existe desde la corrección: rechazado antes de ejecutar, ya no necesita el
+subíndice que el navegador no puede correr.
 
 ---
 
