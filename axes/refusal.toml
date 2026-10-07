@@ -870,9 +870,12 @@ c = 1
 # (`define_local_vars_from_block`). zyjs gives a local the type of the last
 # assignment it walks, whatever the path, so `f` below returns a String for it
 # alone, and `g(f(0))` — 6 in the Rust engines, since `f(0)` takes no branch —
-# is refused in the browser before it runs (ZYJS-053, measured beside GLB-102).
-# What inference does not reach is not refused (TYP-2). Every engine warns that
-# `r` changes type, so the category asked is `warn`.
+# was refused in the browser before it ran (ZYJS-053, measured beside GLB-102;
+# corrected 2026-10-07: a named function's locals have no type for its return
+# in zyjs either). What inference does not reach is not refused (TYP-2). Every
+# engine warns that `r` changes type, so the category asked is `warn`. The
+# second cell is the same local with one assignment: the program runs, prints
+# `antes` and fails at the `+` — it is not refused before it starts.
 
 [[cell]]
 id      = "argument-type-not-from-a-local-assigned-in-a-branch"
@@ -892,4 +895,20 @@ g(n) {
 }
 >> g(f(0)) ¶
 """
-open_finding = { zyjs = "ZYJS-053" }
+
+[[cell]]
+id      = "argument-type-not-from-a-local-literal"
+premise = "TYP-2"
+expect  = "error"
+what    = "`f(c) { r = \"a\"  <~ r }`: `g(f(1))` is not refused, so `antes` prints and the `+` fails (ZYJS-053)"
+src     = """
+f(c) {
+    r = "a"
+    <~ r
+}
+g(n) {
+    <~ n + 1
+}
+>> "antes" ¶
+>> g(f(1)) ¶
+"""

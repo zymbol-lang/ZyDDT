@@ -88,6 +88,20 @@ x = 1.5
 """
 
 [[cell]]
+id     = "call-returning-a-local-stays-silent"
+expect = "ok"
+what   = "a function that returns a local: its type is not read, so `x = \"b\"` then `x = f(1)` says nothing, as in Rust (ZYJS-053)"
+src    = """
+f(c) {
+    r = 5
+    <~ r
+}
+x = "b"
+x = f(1)
+>> x ¶
+"""
+
+[[cell]]
 id     = "call-returning-two-types-stays-silent"
 expect = "ok"
 what   = "a function returning Int on one path and String on another is Any: cannot tell, so nothing is said"
