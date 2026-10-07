@@ -688,7 +688,8 @@ vigila la llamada; el coste de soltar en cada escritura no tiene celda.
 
 ## ZYVM-011 — Un `??` de sentencia en el que no encaja ningún brazo: la VM sitúa el error en la última línea de un brazo
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — OK del autor el 2026-10-07: la VM da la línea de la sentencia, la regla
+de todos los errores de ejecución
 **Encontrado por:** al corregir [`ZYJS-051`](zyjs.md) (2026-10-07): la celda lo tapaba mientras `zyjs` seguía
 de largo, porque su deuda declarada cubría la celda entera
 
@@ -717,8 +718,32 @@ dentro de los brazos, que es lo que encuentra cuando lanza al final del `??`.
 Nada de diseño: la regla de la línea ya está decidida. Lo que queda es la corrección, que la VM dé la línea
 del `??`. Pendiente del OK del autor.
 
+### Corrección
+
+El compilador sella cada instrucción con la posición de la sentencia que se está compilando
+(`FunctionCtx::cur_src`), y una sentencia anidada la sobrescribe sin restaurarla. El `RaiseError` del final
+de un `??` se emite después de los brazos, así que se llevaba la posición de la última sentencia que había
+en ellos. `compile_match_expr` guarda ahora la posición al entrar y sella con ella esa única instrucción; lo
+que se emite después conserva el sello que tenía, que es también el del TW.
+
+| forma | antes, la VM | ahora, los tres |
+|---|---|---|
+| `?? v { 1 => { >> "uno" ¶ } }` | la línea del `>>` | la del `??` |
+| lo mismo dentro de una función | la del `>>` | la del `??` |
+| `r = ?? v { 1 => "x" { >> "a" ¶ } }` | la del `>>` | la de la sentencia |
+| el último brazo con un `?` dentro | la del `>>` del último brazo | la del `??` |
+| en el cuerpo de un `@` | la del `>>` | la del `??` |
+| `x = 1 + (?? v { 1 => 10 { >> "a" ¶ } })` | la del `>>` | la de la sentencia |
+| `r = ?? 2 { 1 => "uno" }`, sin bloques (control) | la de la sentencia | la de la sentencia |
+
+Al medirlo apareció lo que queda fuera de esta corrección: un error **posterior** en la misma sentencia,
+después de un bloque anidado, sale en TW y VM con la línea de ese bloque —
+[`GLB-106`](GLOBAL.md).
+
 ### Qué lo sujeta
 
-`runtime-match-patterns/match-statement-no-arm-matches`, con `open_finding = "ZYVM-011"`: es un DIVERGE de
-ubicación, no un WRONG, así que la deuda es de la celda entera.
+`runtime-match-patterns/match-statement-no-arm-matches`, ya sin deuda, y tres celdas nuevas para las formas
+que la VM también situaba mal: `match-value-no-arm-matches-after-a-block-arm`,
+`match-statement-no-arm-matches-past-a-nested-if` y `match-statement-no-arm-matches-in-a-loop`. Con la VM
+de antes, las cuatro dan DIVERGE.
 
