@@ -324,9 +324,11 @@ src    = """
 # Measured beside ZYVM-011. A top-level `<~` ends the program and its value is
 # the exit status: alone, and inside a `??` statement, the three engines exit
 # with it. Inside a `??` whose value is used, the VM still does; the tree-walker
-# goes on with the `??` worth Unit, and zyjs fails with `Runtime error: [object
-# Object]` (GLB-107, undecided). Both cells name the engines out of the rule
-# alongside a DIVERGE, so the debt is the whole cell.
+# went on with the `??` worth Unit, and zyjs failed with `Runtime error: [object
+# Object]` (GLB-107, corrected 2026-10-07: the signal leaves the expression in
+# the tree-walker, and a statement takes a thrown one in zyjs). The same
+# unwinding serves a `<~` inside a function and an `@!` inside a loop — the
+# three cells after the first two.
 
 [[cell]]
 id     = "top-level-return-inside-a-match-value-exits"
@@ -341,7 +343,6 @@ x = ?? v {
 }
 >> x ¶
 """
-open_finding = "GLB-107"
 
 [[cell]]
 id     = "top-level-return-inside-a-match-operand-exits"
@@ -356,4 +357,58 @@ x = 1 + (?? v {
 })
 >> x ¶
 """
-open_finding = "GLB-107"
+
+[[cell]]
+id     = "return-inside-a-match-operand-returns-from-the-function"
+expect = "ok"
+what   = "in a function, `x = 1 + (?? v { 1 => { <~ 5 } … })` returns 5 — the tree-walker went on and failed at the `+` (GLB-107)"
+src    = """
+f(v) {
+    x = 1 + (?? v {
+        1 => {
+            <~ 5
+        }
+        _ => 0
+    })
+    >> x ¶
+    <~ 9
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id     = "break-inside-a-match-operand-leaves-the-loop"
+expect = "ok"
+what   = "an `@!` in the arm of a `??` operand leaves the loop: `1`, then `9` — the tree-walker failed at the `+`, zyjs with `[object Object]` (GLB-107)"
+src    = """
+f(v) {
+    @ i:1..3 {
+        x = 1 + (?? i {
+            2 => {
+                @!
+            }
+            _ => 0
+        })
+        >> x ¶
+    }
+    <~ 9
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id     = "return-inside-a-match-element-skips-the-output"
+expect = "ok"
+what   = "`>> [1, (?? v { 1 => { <~ 5 } … })] ¶` returns 5 and prints nothing — the tree-walker printed `[1, ()]` first (GLB-107)"
+src    = """
+f(v) {
+    >> [1, (?? v {
+        1 => {
+            <~ 5
+        }
+        _ => 0
+    })] ¶
+    <~ 9
+}
+>> f(1) ¶
+"""

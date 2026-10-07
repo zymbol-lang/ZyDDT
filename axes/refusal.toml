@@ -912,3 +912,44 @@ g(n) {
 >> "antes" ¶
 >> g(f(1)) ¶
 """
+
+
+# ── A top-level `<~` of a String inside a `??` (added 2026-10-07) ───────────
+#
+# A top-level `<~` ends the program and its value is the exit status, a whole
+# number — refused before running when it is not. The walk of the top level
+# read statements, so inside a `??` whose value is used neither analyser saw
+# it, and zyjs did not see it in a `??` written as a statement either: its
+# `case 'Match'` read a shape the parser never builds (GLB-107). `antes` is
+# printed only by an engine that ran the program before refusing it.
+
+[[cell]]
+id   = "top-level-exit-of-a-string-in-a-match-statement"
+what = "`?? v { 1 => { <~ \"b\" } … }` at the top level: refused before `antes` prints — zyjs ran it (GLB-107)"
+src  = """
+>> "antes" ¶
+v = 1
+?? v {
+    1 => {
+        <~ "b"
+    }
+    _ => {
+        <~ 0
+    }
+}
+"""
+
+[[cell]]
+id   = "top-level-exit-of-a-string-in-a-match-value"
+what = "`x = ?? v { 1 => { <~ \"b\" } … }` at the top level: refused before `antes` prints, in the three engines (GLB-107)"
+src  = """
+>> "antes" ¶
+v = 1
+x = ?? v {
+    1 => {
+        <~ "b"
+    }
+    _ => 0
+}
+>> x ¶
+"""
