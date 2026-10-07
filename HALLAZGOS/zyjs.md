@@ -2874,7 +2874,7 @@ como sentencia, nunca es un valor vacío, y el programa no sigue a la línea sig
 WRONG. Y `match-statement-no-arm-matches-met` (`expect = "ok"`), que imprime la clase que recibe el `:!`.
 
 Al quitar la deuda de `zyjs`, la celda dejó ver otra divergencia que la tapaba: la VM sitúa el error en otra
-línea. La celda lleva ahora esa deuda, [`ZYVM-011`](zyvm.md).
+línea. La celda llevó esa deuda, [`ZYVM-011`](zyvm.md), hasta que se corrigió el 2026-10-07.
 
 ---
 

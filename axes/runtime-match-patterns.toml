@@ -231,8 +231,10 @@ x = 2
 # statement, zyjs went on to the next line, and only the Rust engines failed.
 # ZYJS-051, corrected 2026-10-07: zyjs fails there too. A block arm, so nothing
 # warns about a discarded value; `-met` holds the family the catch receives.
-# What still differs is where: the VM gives the line of the last statement in
-# an arm, the other two the line of the `??` (ZYVM-011, undecided).
+# The VM gave the line of the last statement in an arm, the other two the line
+# of the `??` — the line of the statement, the rule of every runtime error
+# (ZYVM-011, corrected 2026-10-07). The cells after `-met` are the forms the VM
+# also placed wrong: a value with a block arm, a `?` inside an arm, a loop.
 
 [[cell]]
 id     = "match-statement-no-arm-matches"
@@ -250,7 +252,6 @@ f(v) {
 >> f(1) ¶
 >> f(2) ¶
 """
-open_finding = "ZYVM-011"
 
 [[cell]]
 id     = "match-statement-no-arm-matches-met"
@@ -268,6 +269,54 @@ v = 2
     >> (_err#?)[1] ¶
 }
 >> "sigue" ¶
+"""
+
+[[cell]]
+id     = "match-value-no-arm-matches-after-a-block-arm"
+expect = "error"
+what   = "`r = ?? v { 1 => \"x\" { … } }` with no arm for 2: the error is at the line of the statement, not of the arm's `>>` (ZYVM-011)"
+src    = """
+v = 2
+r = ?? v {
+    1 => "x" {
+        >> "a" ¶
+    }
+}
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-statement-no-arm-matches-past-a-nested-if"
+expect = "error"
+what   = "the last arm holds a `?`: the error is still at the line of the `??` (ZYVM-011)"
+src    = """
+v = 2
+?? v {
+    1 => {
+        ? v > 0 {
+            >> "pos" ¶
+        }
+    }
+    3 => {
+        >> "tres" ¶
+    }
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "match-statement-no-arm-matches-in-a-loop"
+expect = "error"
+what   = "in the body of a `@`, the second turn fails at the line of the `??`, after the first printed `uno` (ZYVM-011)"
+src    = """
+@ i:1..3 {
+    ?? i {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+}
+>> "fin" ¶
 """
 
 # ── A top-level `<~` inside a `??` that gives a value (added 2026-10-07) ────
