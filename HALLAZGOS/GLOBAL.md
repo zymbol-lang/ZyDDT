@@ -7415,7 +7415,8 @@ los controles `outer-variable-written-in-a-block-is-one-variable` y
 
 ## GLB-106 — Un error de ejecución posterior a un bloque anidado, en la misma sentencia: TW y VM dan la línea del bloque
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: TW y VM dan la línea de la
+sentencia, como `zyjs`
 **Encontrado por:** al corregir [`ZYVM-011`](zyvm.md) (2026-10-07)
 
 ```zymbol
@@ -7452,10 +7453,34 @@ bloque de un brazo, no con la llamada, porque el cuerpo de `g` se compila aparte
 - que TW y VM den también aquí la línea de la sentencia (Recomendado): es la regla, y `zyjs` ya la cumple;
 - que la línea sea la de la última sentencia ejecutada, y cambie `zyjs`.
 
+### Corrección
+
+- **TW**: `execute_statement` devuelve la línea a la sentencia que contiene la que termina, si termina bien y
+  sin señal pendiente, y una llamada —función o lambda— la devuelve al volver. Un error que sale de dentro
+  conserva su línea, y una señal pendiente también, porque el nivel de arriba la lee para situar un `$!!`.
+  El comentario que decía *«the innermost statement that ran is the one named — which is what the other
+  two engines answer»* decía lo contrario de lo medido.
+- **VM**: `compile_match_expr` devuelve el sello de la sentencia a todo lo que se emite después del `??`, no
+  sólo al `RaiseError` de ZYVM-011.
+
+| programa | antes, TW | antes, VM | ahora, los tres |
+|---|---|---|---|
+| el de arriba, y con un `_ =>` | 4 | 4 | 2 |
+| `g() { >> "a" ¶  <~ "b" }` · `x = 1 + g()`, y la lambda de bloque | 3 | 5 | 5 |
+| el bloque del brazo con un `@` dentro | 5 | 5 | 2 |
+| control: el error dentro de un `?` | 3 | 3 | 3 |
+| control: el error dentro de la función llamada | 3 | 3 | 3 |
+
+Al medirlo apareció lo que queda fuera: dentro de una lambda cuyo cuerpo es una expresión, la VM no da
+ninguna línea — [`ZYVM-012`](zyvm.md).
+
 ### Qué lo sujeta
 
-`runtime-errors/error-after-a-block-arm-is-at-the-statement` y `error-after-a-call-is-at-the-statement`,
-con `open_finding = "GLB-106"`: son un DIVERGE de ubicación, así que la deuda es de la celda entera.
+`runtime-errors/error-after-a-block-arm-is-at-the-statement` y `error-after-a-call-is-at-the-statement`, ya
+sin deuda; `error-after-a-lambda-call-is-at-the-statement`,
+`error-after-a-block-arm-with-a-wildcard-is-at-the-statement` y
+`error-after-a-loop-in-a-block-arm-is-at-the-statement`, DIVERGE con los motores de antes; y los controles
+`error-inside-a-block-is-at-its-own-line` y `error-inside-a-function-is-at-its-own-line`.
 
 ---
 

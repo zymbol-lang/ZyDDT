@@ -747,3 +747,40 @@ que la VM también situaba mal: `match-value-no-arm-matches-after-a-block-arm`,
 `match-statement-no-arm-matches-past-a-nested-if` y `match-statement-no-arm-matches-in-a-loop`. Con la VM
 de antes, las cuatro dan DIVERGE.
 
+---
+
+## ZYVM-012 — Un error dentro de una lambda cuyo cuerpo es una expresión: la VM no dice en qué línea
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`GLB-106`](GLOBAL.md) (2026-10-07)
+
+```zymbol
+h = (s) -> s + 1
+x = h("b")
+>> x ¶
+```
+
+Los tres motores fallan con `+ is arithmetic only — use juxtaposition to concatenate strings`. El TW y
+`zyjs` añaden `--> …:2`, la línea de la sentencia que corre, la que llama a la lambda. La VM no añade nada.
+
+| programa | TW | VM | `zyjs` |
+|---|---|---|---|
+| el de arriba | 2 | sin línea | 2 |
+| `ys = ["a", "b"]$> (x -> x + 1)` | 2 | sin línea | 2 |
+| `g() { >> "a" ¶  <~ "b" }` · `h = (s) -> s + 1` · `x = h(g())` | 6 | sin línea | 6 |
+| control: `h = (s) -> { <~ s + 1 }`, la lambda de bloque | 2 | 2 | 2 |
+
+Una lambda se compila en su propio `FunctionCtx`, y sólo una sentencia pone posición
+(`ctx.cur_src`): un cuerpo que es una expresión no tiene ninguna, así que sus instrucciones llevan la
+posición por defecto, la línea 0, y un error de línea 0 se informa sin línea.
+
+### Qué hay que decidir
+
+- que un error sin posición propia dé la de la sentencia que llama, como el TW y `zyjs` (Recomendado): es
+  la regla de todos los errores de ejecución —la línea es la de la sentencia que corre—, y una lambda de
+  expresión no tiene sentencia;
+- que dé la línea en que se escribió la lambda: en la VM sería el sello natural, y cambiarían el TW y `zyjs`.
+
+### Qué lo sujeta
+
+`runtime-errors/error-inside-an-expression-lambda-has-a-line`, con `open_finding = "ZYVM-012"`.
