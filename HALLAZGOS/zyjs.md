@@ -2926,7 +2926,8 @@ ficha.
 
 ## ZYJS-053 — `zyjs` da a un local el tipo de su última asignación al inferir el retorno, y rechaza un programa que los motores Rust ejecutan
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` lee un local como Rust,
+sin tipo
 **Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07)
 
 ```zymbol
@@ -2971,7 +2972,26 @@ Rust no da no incluyen ningún rechazo de argumento ni ningún cambio de tipo.
 - que los dos analizadores sigan el tipo de los locales por caminos, como la inferencia de parámetros
   (GLB-101), y cambie Rust.
 
+### Corrección
+
+`funcReturnType` pide a `returnTypeOfBlock` que un local de la función no tenga tipo (`localsUnknown`), como
+`define_local_vars_from_block` en Rust. Al medirlo salió el límite: en una **lambda** de bloque Rust sí
+conoce el tipo de sus locales —comprueba el cuerpo antes de leer sus `<~`—, y `zyjs` ya coincidía
+(`g = (c) -> { r = 5  <~ r }` es `(Any) -> Int` en los dos), así que la lambda se queda como estaba.
+
+| programa | antes, `zyjs` | ahora, `zyjs` y Rust |
+|---|---|---|
+| el de arriba | rechaza `g(f(0))` | imprime `6`, con el aviso del cambio de `r` |
+| `f(c) { r = "a"  <~ r }` · `>> "antes" ¶` · `>> g(f(1)) ¶` | rechaza antes de imprimir `antes` | imprime `antes` y falla en el `+` |
+| `f(c) { r = 5  <~ r }` · `x = "b"` · `x = f(1)` | avisa String → Int | nada |
+| `g = (c) -> { r = 5  <~ r }` · `g = (c) -> "s"` (control) | avisa | avisa |
+
+Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: cambia sólo la celda de esta
+ficha.
+
 ### Qué lo sujeta
 
-`refusal/argument-type-not-from-a-local-assigned-in-a-branch` (`expect = "warn"`), KNOWN para `zyjs` con
-esta ficha.
+`refusal/argument-type-not-from-a-local-assigned-in-a-branch` (`expect = "warn"`), ya sin deuda;
+`refusal/argument-type-not-from-a-local-literal` (`expect = "error"`, en ejecución: `antes` se imprime) y
+`type-change/call-returning-a-local-stays-silent` (`expect = "ok"`). Con el `zyjs` de antes, las tres dan
+rojo.
