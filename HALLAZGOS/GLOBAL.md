@@ -7461,7 +7461,8 @@ con `open_finding = "GLB-106"`: son un DIVERGE de ubicación, así que la deuda 
 
 ## GLB-107 — Un `<~` en el nivel de arriba dentro de un `??` usado como valor: la VM termina el programa, el TW sigue y `zyjs` falla con `[object Object]`
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: termina el programa también ahí, en
+los tres, y su tipo se comprueba antes de ejecutar
 **Encontrado por:** al corregir [`ZYVM-011`](zyvm.md) (2026-10-07)
 
 ```zymbol
@@ -7501,7 +7502,41 @@ bloque.
 - que un `<~` en el nivel de arriba dentro de un `??` usado como valor se rechace antes de ejecutar: no
   tiene a dónde volver más que al programa.
 
+### Corrección
+
+Al medirlo salieron las vecinas: la misma señal dentro de una función y un `@!` dentro de un bucle tenían la
+misma causa.
+
+- **TW**: el brazo de un `??`, si su bloque deja pendiente un `<~`, un `@!` o un `@>`, devuelve
+  `RuntimeError::Unwind`, que no es un error: abandona la expresión de alrededor, y `execute_statement` lo
+  vuelve `Ok` en la sentencia que la contiene, así que la señal la toman el bucle, la función o el programa
+  como la de un `??` de sentencia. Una lambda cuyo cuerpo es esa expresión devuelve el valor del `<~`.
+- **`zyjs`**: `exec` devuelve la señal que una sentencia lanzó desde una expresión, en lugar de dejarla
+  seguir: los bucles y el nivel de arriba sólo leían señales devueltas.
+- **Los dos analizadores**: un `??` usado como valor fuera de toda función y lambda comprueba los `<~` de
+  sus brazos como cualquier `<~` del nivel de arriba. En `zyjs`, `checkTopLevelExit` busca además el `??`
+  dentro de las expresiones de cada sentencia: su `case 'Match'` leía `stmt.cases`, una forma que el parser
+  no construye, así que tampoco rechazaba `?? v { 1 => { <~ "b" } }` escrito como sentencia, que Rust sí
+  rechazaba. Y lleva ahora la ayuda de Rust, palabra por palabra.
+
+| programa | antes, TW | VM | antes, `zyjs` | ahora, los tres |
+|---|---|---|---|---|
+| `x = ?? v { 1 => { <~ 5 } }` | sale con 5 | sale con 5 | `[object Object]` | sale con 5 |
+| `x = 1 + (?? v { 1 => { <~ 7 } })` | sigue y falla en el `+` | sale con 7 | `[object Object]` | sale con 7 |
+| en una función, `x = 1 + (?? v { 1 => { <~ 5 } … })` | falla en el `+` | devuelve 5 | devuelve 5 | devuelve 5 |
+| en una función, `@!` en el brazo, dentro de un `@` | falla en el `+` | sale del bucle: `1`, `9` | `[object Object]` | `1`, `9` |
+| en una función, `>> [1, (?? v { 1 => { <~ 5 } … })] ¶` | imprime `[1, ()]` y devuelve 5 | devuelve 5 | devuelve 5 | devuelve 5 |
+| `x = ?? v { 1 => { <~ "b" } … }` (`check`) | nada | nada | nada | rechazado antes de ejecutar |
+| `?? v { 1 => { <~ "b" } … }`, sentencia (`check`) | rechazado | rechazado | nada | rechazado |
+| la lambda `(w) -> ?? w { 1 => { <~ "b" } … }` (control) | nada | nada | nada | nada |
+
+Barridos de `zymbol check` y de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: ningún
+diagnóstico cambia. Ningún programa del workspace escribe esa forma.
+
 ### Qué lo sujeta
 
 `runtime-match-patterns/top-level-return-inside-a-match-value-exits` y
-`top-level-return-inside-a-match-operand-exits` (`expect = "ok"`), con `open_finding = "GLB-107"`.
+`top-level-return-inside-a-match-operand-exits`, ya sin deuda;
+`return-inside-a-match-operand-returns-from-the-function`, `break-inside-a-match-operand-leaves-the-loop` y
+`return-inside-a-match-element-skips-the-output`; y `refusal/top-level-exit-of-a-string-in-a-match-statement`
+y `top-level-exit-of-a-string-in-a-match-value`. Con los motores de antes, las siete están en rojo.
