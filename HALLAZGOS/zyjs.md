@@ -3075,7 +3075,7 @@ de antes, las dos dan WRONG.
 
 ## ZYJS-055 — Un nombre usado como patrón de un `??`: `zyjs` no cuenta la lectura y avisa `unused variable`
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` cuenta la lectura, como Rust
 **Encontrado por:** al corregir [`GLB-105`](GLOBAL.md) (2026-10-07): nueve de los doce avisos de variable sin
 usar que `zyjs` da en el workspace y Rust no
 
@@ -3108,6 +3108,19 @@ En el workspace son nueve avisos: `zyquality/corpus/match/13_ident_scalar.zy` (3
   en los tres motores, y Rust es la referencia del analizador;
 - que la distancia se quede.
 
+### Corrección
+
+El parser de `zyjs` da el patrón `umbral =>` como un patrón literal cuyo valor es el nombre,
+`{ type: 'literal', value: Ident }`, y `checkMatchPattern` sólo leía un `Ident` suelto, los elementos de un
+patrón de lista y las alternativas. Ahora lee también ese literal, y con él cada alternativa de un patrón
+`||`.
+
+Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: desaparecen 11 `unused
+variable`, ninguno dado por Rust —los nueve de arriba y dos más, de la misma causa, en
+`vscode/syntax_test.zy`— y no aparece nada.
+
 ### Qué lo sujeta
 
-`unused/name-read-as-a-match-pattern-is-a-read` (`expect = "ok"`), KNOWN para `zyjs` con esta ficha.
+`unused/name-read-as-a-match-pattern-is-a-read`, ya sin deuda;
+`array-read-as-a-match-pattern-is-a-read` (la contención) y `name-read-in-an-or-pattern-is-a-read` (un `||`
+en un `??` usado como valor), que con el `zyjs` de antes dan WRONG.
