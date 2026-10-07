@@ -7112,7 +7112,8 @@ alcanzando.
 
 ## GLB-102 — Los analizadores toman los valores de un `??` escrito como sentencia por retornos, y los motores los descartan
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: el valor de un brazo no es un
+retorno, como lo ejecutan los motores
 **Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06)
 
 ```zymbol
@@ -7144,10 +7145,41 @@ La inferencia de parámetros (GLB-101) ya lee el `??` como lo ejecutan los motor
   brazo no es un retorno (Recomendado);
 - que un brazo con valor de un `??` de sentencia sí retorne, y cambien los motores.
 
+### Corrección
+
+En los dos analizadores — `collect_return_types` en `crates/zymbol-semantic/src/type_check.rs` y
+`returnTypeOfBlock` en `web/src/zymbol/zymbol.js` — un `??` escrito como sentencia aporta al tipo del
+retorno sólo los `<~` del bloque de cada brazo, también el bloque de `patrón => valor { … }`, y nunca el
+valor. `zyjs` no recorría ese último bloque: leía el valor y se paraba, así que no coincidía con Rust ni
+siquiera en el error.
+
+| programa | al ejecutar | antes, Rust | antes, `zyjs` | ahora, los dos |
+|---|---|---|---|---|
+| `?? v { 1 => "a"  _ => "b" }` | Unit | String | String | Unit |
+| `?? v { 1 => 10  _ => 20 }` · `<~ "texto"` | String | Any | Any | String |
+| `1 => 10 { <~ "diez" }` · `_ => 20 { <~ "veinte" }` | String | Any | Int | String |
+| `1 => { <~ "a" }` · `_ => { <~ "b" }` | String | String | String | String |
+
+Lo que cambia, medido en los tres motores:
+
+- una llamada que pasa ese retorno donde el parámetro pide otro tipo se rechaza ahora antes de ejecutar:
+  `g(f(1))` con `g(n) { <~ n + 1 }` da `argument 1 has type String, but function 'g' expects Number`;
+- una reasignación avisa del cambio que de verdad ocurre: `x = "texto"` · `x = f(1)` da `type mismatch:
+  'x' was String but assigned Int` cuando `f` devuelve `5` tras su `??`;
+- una lambda de bloque cuyo `??` sólo da valores es `(Any) -> Unit`, como `(v) -> { >> v ¶ }`, la que no
+  tiene `<~`: reasignarla a `(v) -> "s"` avisa ahora en los dos, como ya avisaba aquella.
+
+Barridos de `zymbol check` y de `checkSource` sobre los 3232 `.zy` del workspace, antes y después: ningún
+diagnóstico cambia en ninguno de los dos. Cuatro de esos ficheros tienen un `??` de sentencia con valores,
+y en ninguno cambia lo que dice el analizador.
+
 ### Qué lo sujeta
 
-Nada todavía: los dos analizadores dan el mismo aviso, así que una celda no vería nada. La celda se escribe
-con la decisión.
+`refusal/argument-type-from-a-return-past-a-match-statement`, `argument-type-from-the-block-of-a-value-arm`
+y `argument-type-of-a-match-statement-is-unit`, que con los analizadores de antes dan WRONG en los tres
+motores; y `argument-type-from-the-blocks-of-a-match-statement` (`expect = "ok"`), el control: los `<~` de
+los brazos siguen contando. Todo `??` con valores avisa de que los descarta, sea cual sea el tipo, así que
+`warn` no distingue nada: lo que distingue es un rechazo, en una rama que nunca se ejecuta.
 
 ---
 
