@@ -7277,3 +7277,56 @@ Las dos filas con `Any` divergen además entre motores.
 `type-change/tuple-with-an-unknown-part` y `type-change/dictionary-with-an-unknown-value`, con
 `open_finding = "GLB-104"`: hoy son un DIVERGE, y cualquiera de las dos opciones lo resuelve. Se reescriben
 con la decisión.
+
+---
+
+## GLB-105 — El mismo nombre en dos bloques hermanos: los motores Rust lo cuentan como una variable escrita dos veces, y pierden el segundo sitio
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07); es la única fila en
+desacuerdo de la línea base de `web/tests/test_check.mjs`, `examples/tour/errors.zy`
+
+```zymbol
+!? {
+    x = 1
+} :! {
+    >> "e" ¶
+}
+!? {
+    x = 2
+} :! {
+    >> "e" ¶
+}
+>> "ok" ¶
+```
+
+`zymbol check` da un aviso, `variable 'x' is assigned but never read`, en la línea 2. `checkSource` da
+dos, `unused variable 'x'`, en las líneas 2 y 7. Los tres motores imprimen `ok`.
+
+Cada bloque es un ámbito para los tres: leer `x` después de uno es `undefined variable 'x'`, antes de
+ejecutar, también en los motores Rust. Así que hay dos `x`, y ninguna se lee. El análisis de variables de
+Rust (`variable_analysis.rs`) las junta por nombre: la segunda asignación es, para él, otra escritura de la
+primera, y la línea 7 no aparece en ningún aviso.
+
+| programa | Rust | `zyjs` |
+|---|---|---|
+| dos `!? { x = … }` | 1 aviso, línea 2, `assigned but never read` | 2 avisos, `unused variable` |
+| dos `? c > 0 { x = … }` | 1 aviso, línea 3 | 2 avisos |
+| dos `@ 2 { x = … }` | 1 aviso, línea 2 | 2 avisos |
+| `!? { x = 1 } …` · `>> x ¶` (control) | `undefined variable 'x'` | `undefined variable 'x'` |
+
+Es la forma de [`GLB-003`](GLOBAL.md), que decidió *«dos avisos, uno por sitio»* para dos bucles que
+reutilizan el nombre del iterador: *«un aviso para dos sitios no es un resumen, es un informe
+incompleto»*. Aquella corrección guardó la declaración desplazada (`retired`); una asignación en un bloque
+hermano no se trata como declaración, así que no llega.
+
+### Qué hay que decidir
+
+- que los motores Rust traten cada bloque como el ámbito que ya es para los nombres, y avisen una vez por
+  sitio, como `zyjs` y como decidió GLB-003 (Recomendado);
+- que una sola advertencia por nombre baste, y `zyjs` junte también.
+
+### Qué lo sujeta
+
+`unused/same-name-in-two-blocks-warns-at-each-site` (`expect = "warn"`), KNOWN con esta ficha: los tres
+avisan, y lo que diverge es cuántas veces.

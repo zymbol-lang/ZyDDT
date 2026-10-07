@@ -2876,3 +2876,102 @@ WRONG. Y `match-statement-no-arm-matches-met` (`expect = "ok"`), que imprime la 
 Al quitar la deuda de `zyjs`, la celda dejó ver otra divergencia que la tapaba: la VM sitúa el error en otra
 línea. La celda lleva ahora esa deuda, [`ZYVM-011`](zyvm.md).
 
+---
+
+## ZYJS-052 — Una variable asignada dos veces y nunca leída: Rust avisa, y `zyjs` calla aunque su comentario diga que avisa
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07)
+
+```zymbol
+x = 1
+x = 2
+>> "ok" ¶
+```
+
+`zymbol check` avisa `variable 'x' is assigned but never read`; `checkSource` no dice nada. Los tres
+motores imprimen `ok`.
+
+| programa | Rust | `zyjs` |
+|---|---|---|
+| `x = 1` · `x = 2` · `>> "ok" ¶` | `variable 'x' is assigned but never read` | nada |
+| `y = 0` · `x = 1` · `x = y` · `>> "ok" ¶` | `variable 'x' is assigned but never read` | nada |
+| `x = 1` · `>> "ok" ¶` (control) | `unused variable 'x'` | `unused variable 'x'` |
+
+La causa está en la rama `VarAssign` del `Checker` (`web/src/zymbol/zymbol.js`): toda asignación a un nombre
+que ya existe hace `this.lookup(stmt.name, …)` — *«Kept for what it did before: the lookup marks the name,
+as it always has for an assignment»* — y `lookup` lo marca como leído. El comentario sobre `defineOrKeep`
+dice lo contrario: *«A variable that is assigned and never read still warns, because the record from its
+FIRST definition is the one that survives and nothing ever marks it used.»* Medido, algo sí lo marca: la
+segunda asignación.
+
+En el workspace, `zymbol check` da este aviso 10 veces en 6 ficheros. En 5 de ellos, 9 avisos, `zyjs` no
+dice nada. Uno es `zyquality/corpus/analysis/write_only_variable.zy`, que existe para esta forma
+(*«Variable assigned but never read (should warn)»*), y ningún gate lo ve: su golden guarda la salida, no
+los avisos. El sexto, `web/examples/tour/errors.zy`, es otra forma — el mismo nombre en dos bloques
+hermanos — y tiene su ficha, [`GLB-105`](GLOBAL.md).
+
+### Qué hay que decidir
+
+- que `zyjs` avise como Rust, con sus palabras, y que escribir un nombre deje de contar como leerlo
+  (Recomendado): es lo que el comentario ya dice que hace, y Rust es la referencia del analizador;
+- que la distancia se quede, y el comentario diga que una segunda asignación cuenta como lectura.
+
+### Qué lo sujeta
+
+`unused/variable-assigned-twice-and-never-read-warns` (`expect = "warn"`), KNOWN para `zyjs` con esta
+ficha.
+
+---
+
+## ZYJS-053 — `zyjs` da a un local el tipo de su última asignación al inferir el retorno, y rechaza un programa que los motores Rust ejecutan
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07)
+
+```zymbol
+f(c) {
+    r = 5
+    ? c > 0 {
+        r = "a"
+    }
+    <~ r
+}
+g(n) {
+    <~ n + 1
+}
+>> g(f(0)) ¶
+```
+
+Los dos motores Rust imprimen `6`, con el aviso `type mismatch: 'r' was Int but assigned String`. `zyjs`
+rechaza el programa antes de ejecutarlo: `argument 1 has type String, but function 'g' expects Number`.
+
+Rust define cada local de la función como `Any` antes de leer sus `<~` (`define_local_vars_from_block`, en
+`crates/zymbol-semantic/src/type_check.rs`), así que `<~ r` no le dice nada. `returnTypeOfBlock`, en
+`zyjs`, le da a `r` el tipo de la última asignación que recorre (`locals.set(st.name,
+this.inferType(st.value, locals))`) sin mirar por qué camino se llega al `<~`: aquí, la de una rama que
+`f(0)` no toma. Entró con la inferencia del cambio de tipo (`677d354`, GLB-043), que se decidió *«como
+Rust»*.
+
+| programa | al ejecutar | Rust | `zyjs` |
+|---|---|---|---|
+| el de arriba | `6` | avisa del cambio de `r` | rechaza `g(f(0))` |
+| `f(c) { r = "a"  <~ r }` · `>> "antes" ¶` · `>> g(f(1)) ¶` | `antes`, y falla en el `+` | nada | rechaza antes de imprimir `antes` |
+| `f(c) { r = 5  <~ r }` · `x = "b"` · `x = f(1)` | `5` | nada | `type mismatch: 'x' was String but assigned Int` |
+| `f(c) { <~ 5 }` · `x = "b"` · `x = f(1)` (control) | `5` | el mismo aviso | el mismo aviso |
+
+En el workspace no aparece: de los 1095 diagnósticos que `checkSource` da sobre los 3232 `.zy`, los 69 que
+Rust no da no incluyen ningún rechazo de argumento ni ningún cambio de tipo.
+
+### Qué hay que decidir
+
+- que `zyjs` lea un local como Rust, sin tipo (`Any`), y el retorno se infiera como en Rust (Recomendado):
+  es lo que decidió `677d354`, y una inferencia que no sigue los caminos sólo puede no rechazar un programa
+  correcto si no adivina;
+- que los dos analizadores sigan el tipo de los locales por caminos, como la inferencia de parámetros
+  (GLB-101), y cambie Rust.
+
+### Qué lo sujeta
+
+`refusal/argument-type-not-from-a-local-assigned-in-a-branch` (`expect = "warn"`), KNOWN para `zyjs` con
+esta ficha.
