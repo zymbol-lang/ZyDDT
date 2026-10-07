@@ -382,9 +382,11 @@ src    = """
 # Measured beside ZYVM-011. The line of a runtime error is the line of the
 # statement. When the statement ran a nested block before failing — the block of
 # a `??` arm, the body of a function it called — the tree-walker gives the line
-# of the last statement in that block, and so does the VM for the arm. zyjs
-# gives the statement's line in both (GLB-106, undecided). DIVERGE on the
-# location, so the debt is the whole cell.
+# of the last statement in that block, and so did the VM for the arm. zyjs gave
+# the statement's line in both (GLB-106, corrected 2026-10-07: a statement that
+# finishes gives the line back to the one holding it, and so does a call that
+# returns; the VM restamps what follows a `??`). The controls after the next
+# cells: an error raised INSIDE the block or the function keeps its own line.
 
 [[cell]]
 id     = "error-after-a-block-arm-is-at-the-statement"
@@ -399,7 +401,6 @@ x = 1 + (?? v {
 })
 >> x ¶
 """
-open_finding = "GLB-106"
 
 [[cell]]
 id     = "error-after-a-call-is-at-the-statement"
@@ -413,4 +414,91 @@ g() {
 x = 1 + g()
 >> x ¶
 """
-open_finding = "GLB-106"
+
+[[cell]]
+id     = "error-after-a-lambda-call-is-at-the-statement"
+expect = "error"
+what   = "`x = 1 + g()` with `g` a block lambda: the `+` fails at the line of the statement — the TW said the `<~` inside `g` (GLB-106)"
+src    = """
+g = () -> {
+    >> "a" ¶
+    <~ "b"
+}
+x = 1 + g()
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-after-a-block-arm-with-a-wildcard-is-at-the-statement"
+expect = "error"
+what   = "the same with a `_ =>` arm: the `+` fails at the line of the statement (GLB-106)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => "uno" {
+        >> "a" ¶
+    }
+    _ => "otro"
+})
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-after-a-loop-in-a-block-arm-is-at-the-statement"
+expect = "error"
+what   = "the arm's block holds a loop: the `+` after it still fails at the line of the statement (GLB-106)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => "a" {
+        @ i:1..2 {
+            >> i ¶
+        }
+    }
+})
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-inside-a-block-is-at-its-own-line"
+expect = "error"
+what   = "the control: an error raised inside a `?` block is at the line inside it"
+src    = """
+c = 1
+? c > 0 {
+    x = 1 + "a"
+    >> x ¶
+}
+"""
+
+[[cell]]
+id     = "error-inside-a-function-is-at-its-own-line"
+expect = "error"
+what   = "the control: an error raised inside the function called is at the line inside it"
+src    = """
+g() {
+    >> "a" ¶
+    x = 1 + "b"
+    <~ x
+}
+y = g()
+>> y ¶
+"""
+
+# ── An error inside a lambda whose body is an expression (added 2026-10-07) ─
+#
+# Measured beside GLB-106: the tree-walker and zyjs give the line of the
+# statement running — the one that called the lambda — and the VM gives no
+# `-->` line at all, called directly or by `$>` (ZYVM-012, undecided). A block
+# lambda is placed in all three.
+
+[[cell]]
+id     = "error-inside-an-expression-lambda-has-a-line"
+expect = "error"
+what   = "`h = (s) -> s + 1` called with a String: the error says where — the VM says nothing (ZYVM-012)"
+src    = """
+h = (s) -> s + 1
+x = h("b")
+>> x ¶
+"""
+open_finding = "ZYVM-012"
