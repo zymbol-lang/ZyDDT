@@ -489,8 +489,9 @@ y = g()
 #
 # Measured beside GLB-106: the tree-walker and zyjs give the line of the
 # statement running — the one that called the lambda — and the VM gives no
-# `-->` line at all, called directly or by `$>` (ZYVM-012, undecided). A block
-# lambda is placed in all three.
+# `-->` line at all, called directly or by `$>` (ZYVM-012, corrected
+# 2026-10-07: an instruction with no line takes the call that reached it). A
+# block lambda was placed in all three.
 
 [[cell]]
 id     = "error-inside-an-expression-lambda-has-a-line"
@@ -501,4 +502,38 @@ h = (s) -> s + 1
 x = h("b")
 >> x ¶
 """
-open_finding = "ZYVM-012"
+
+[[cell]]
+id     = "error-inside-an-expression-lambda-given-to-map-has-a-line"
+expect = "error"
+what   = "`[\"a\", \"b\"]$> (x -> x + 1)`: the error is at the line of the `$>` (ZYVM-012)"
+src    = """
+xs = ["a", "b"]
+ys = xs$> (x -> x + 1)
+>> ys ¶
+"""
+
+[[cell]]
+id     = "error-inside-an-expression-lambda-called-in-a-function-has-a-line"
+expect = "error"
+what   = "`<~ h(v)` inside `f`, with `h = (s) -> s + 1`: the error is at the `<~`, after `en f` printed (ZYVM-012)"
+src    = """
+h = (s) -> s + 1
+f(v) {
+    >> "en f" ¶
+    <~ h(v)
+}
+x = "b"
+>> f(x) ¶
+"""
+
+[[cell]]
+id     = "error-inside-a-filter-lambda-in-a-block-lambda-has-a-line"
+expect = "error"
+what   = "`xs$| (x -> x > 1)` inside a block lambda: the error is at the line of the `$|` (ZYVM-012)"
+src    = """
+g = (xs) -> {
+    <~ xs$| (x -> x > 1)
+}
+>> g(["a", "b"]) ¶
+"""
