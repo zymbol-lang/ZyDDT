@@ -591,7 +591,9 @@ f(v) {
 
 # The right side of `&&` and `||` is evaluated only when the left does not
 # decide (the three engines short-circuit), so it is not on every path either.
-# TYP-2 says so since 2026-10-06; the analysers still require it (GLB-103).
+# TYP-2 says so since 2026-10-06, and the analysers follow it since the same
+# day (GLB-103). The left side still requires a Bool:
+# `argument-type-bool-from-a-logical-operator` holds that.
 
 [[cell]]
 id      = "argument-type-not-from-the-right-of-and"
@@ -604,7 +606,6 @@ f(a, b) {
 }
 >> f(#0, 5) ¶
 '''
-open_finding = { zytw = "GLB-103", zyvm = "GLB-103", zyjs = "GLB-103" }
 
 [[cell]]
 id      = "argument-type-not-from-the-right-of-or"
@@ -617,7 +618,18 @@ f(a, b) {
 }
 >> f(#1, 5) ¶
 '''
-open_finding = { zytw = "GLB-103", zyvm = "GLB-103", zyjs = "GLB-103" }
+
+[[cell]]
+id      = "argument-type-not-from-inside-the-right-of-and"
+premise = "TYP-2"
+expect  = "ok"
+what    = "nor does anything inside the right side: `a && b > 0` asks nothing of `b`, and `f(#0, \"x\")` answers #0 (GLB-103)"
+src     = '''
+f(a, b) {
+    <~ a && b > 0
+}
+>> f(#0, "x") ¶
+'''
 
 [[cell]]
 id      = "argument-type-from-both-branches"
