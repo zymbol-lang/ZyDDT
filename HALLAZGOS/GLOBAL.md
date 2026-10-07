@@ -6842,7 +6842,7 @@ Una vecina queda distinta: la **expresión** `v = #|s|` el analizador la tipa `N
 
 ## GLB-099 — La clase de un error de ejecución que lleva un **nombre** del programa sale de las palabras del nombre
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: las tres opciones recomendadas
 **Encontrado por:** al corregir [`GLB-097`](GLOBAL.md) (paso P3.13, 2026-10-06), que lo dejó sin medir
 
 ```zymbol
@@ -6885,12 +6885,39 @@ tiene ninguna de las palabras, no porque se haya elegido.
      da un estado distinto de 0 ya es un `##IO` (GUIDE, § Execute Script);
    - `##_`, como hoy.
 
+### Corrección
+
+Cada sitio declara su clase al lanzar, en los tres motores, y el mensaje no cambia:
+
+- **una tupla posicional leída por nombre y el punto sobre algo que no es un diccionario**, `##Type`:
+  `kinded("Type", …)` en el tree-walker, `VmError::TypeMsg` en la VM, `ZyRuntimeError(…, '##Type')` en
+  `zyjs`;
+- **un nombre usado después de destruirlo**, `##_` declarado: `kinded("_", …)`, una variante nueva
+  `VmError::PlainMsg`, y en `zyjs` un `ZyRuntimeError(…, '##_')` que ahora se respeta — antes un `##_`
+  pasado a propósito se volvía a leer por las palabras, y `ZyRuntimeError` guarda si la clase se declaró
+  (`kindDeclared`). Los cuatro caminos dan lo mismo: un nombre del archivo, un parámetro, un `\` repetido
+  y una lambda;
+- **un subíndice que no existe**, `##IO`: `kinded("IO", …)` — el `match` de `runtime_error_to_value` no
+  tenía brazo para `IO` y lo habría dado como `##_` —, una variante nueva `VmError::IoMsg`, que también
+  lleva el `cannot run '…': a subscript needs the zymbol command`, y en `zyjs` el `cannot run '…'` del
+  navegador.
+
+| programa | antes, los tres | ahora, los tres |
+|---|---|---|
+| `t.zz` / `t.index` sobre una tupla posicional | `##_` / `##Index` | `##Type` / `##Type` |
+| `x.zz` / `x.index` con `x` un Int | `##_` / `##Index` | `##Type` / `##Type` |
+| `zz` / `index` leído después de `\` | `##_` / `##Index` | `##_` / `##_` |
+| `</ zz_nada.zy />` / `</ index_type.zy />`, que no existen | `##_` / `##Index` | `##IO` / `##IO` |
+
+GUIDE (§ Execute Script): un subíndice que no existe es un `##IO`.
+
 ### Qué lo sujeta
 
-`runtime-errors`: `positional-tuple-read-by-a-name-is-not-an-index`,
-`dot-on-a-non-dictionary-is-not-an-index`, `use-after-destruction-is-not-an-index` y
-`missing-subscript-is-not-an-index` (`expect = "ok"`), con `open_finding` por motor en los tres. Sólo
-afirman que la clase no es la de las palabras, porque la clase queda por decidir.
+`runtime-errors`: `positional-tuple-read-by-a-name-is-a-type-error`, `dot-on-a-non-dictionary-is-a-type-error`
+y `missing-subscript-is-an-io-error` (`:! ##Type`, `:! ##IO`), y `use-after-destruction-is-a-plain-error`, que
+comprueba ella misma la clase — un `:! ##_` las atrapa todas — con `(_err#?)[1] <> "##_"`. Cada una nombra
+su valor con una palabra clave, así que una clase leída otra vez por las palabras se vería. Con los motores
+de antes, las cuatro dan WRONG.
 
 ---
 

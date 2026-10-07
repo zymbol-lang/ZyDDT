@@ -310,48 +310,45 @@ id(v) { <~ v }
 #
 # The same rule as GLB-097, with a name of the program in the message instead of
 # a value. Four of them reach run time in a program `check` accepts, and all
-# four take the family of the name's words: `t.index` on a positional tuple is
-# an `##Index`, `t.zz` a `##_`. Their kind is undecided (GLB-099), so the cells
-# assert only that it is not the one the words give.
+# four took the family of the name's words: `t.index` on a positional tuple was
+# an `##Index`, `t.zz` a `##_`. GLB-099, decided and corrected 2026-10-07: each
+# declares its kind where it is raised — the tuple read by name and the dot on
+# what is not a dictionary are a `##Type` (D1), a name used after `\` is a
+# `##_`, a subscript that is not there is an `##IO`. Every cell names its value
+# with a word, so a kind read from the words again would show.
 
 [[cell]]
-id     = "positional-tuple-read-by-a-name-is-not-an-index"
+id     = "positional-tuple-read-by-a-name-is-a-type-error"
 expect = "ok"
-what   = "`t.index` on a positional tuple is refused, and not as an `##Index` — which kind it is is GLB-099's question"
+what   = "`t.index` on a positional tuple is a `##Type`: the receiver has no names (GLB-099)"
 src    = """
 id(v) { <~ v }
 t = id((1, 2))
 !? {
     >> t.index ¶
-} :! ##Index {
-    >> (1 / id(0)) ¶
-} :! {
-    >> "refused" ¶
+} :! ##Type {
+    >> "Type" ¶
 }
 """
-open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
 
 [[cell]]
-id     = "dot-on-a-non-dictionary-is-not-an-index"
+id     = "dot-on-a-non-dictionary-is-a-type-error"
 expect = "ok"
-what   = "`x.index` with `x` an Int is refused, and not as an `##Index` — the word is in the guidance, `use d.index` (GLB-099)"
+what   = "`x.index` with `x` an Int is a `##Type` — the word `index` is in the guidance, `use d.index` (GLB-099)"
 src    = """
 id(v) { <~ v }
 x = id(5)
 !? {
     >> x.index ¶
-} :! ##Index {
-    >> (1 / id(0)) ¶
-} :! {
-    >> "refused" ¶
+} :! ##Type {
+    >> "Type" ¶
 }
 """
-open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
 
 [[cell]]
-id     = "use-after-destruction-is-not-an-index"
+id     = "use-after-destruction-is-a-plain-error"
 expect = "ok"
-what   = "a name called `index` read after `\\ index` is refused, and not as an `##Index` (GLB-099)"
+what   = "a name called `index` read after `\\ index` is a `##_`, declared — the cell checks the family itself, since `:! ##_` would meet any (GLB-099)"
 src    = """
 id(v) { <~ v }
 index = 5
@@ -359,28 +356,23 @@ index = 5
 \\ index
 !? {
     >> index ¶
-} :! ##Index {
-    >> (1 / id(0)) ¶
 } :! {
-    >> "refused" ¶
+    ? (_err#?)[1] <> "##_" {
+        >> (1 / id(0)) ¶
+    }
+    >> (_err#?)[1] ¶
 }
 """
-open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
 
 [[cell]]
-id     = "missing-subscript-is-not-an-index"
+id     = "missing-subscript-is-an-io-error"
 expect = "ok"
-what   = "`</ index_type.zy />`, a subscript that is not there, is refused, and not as an `##Index` — the word is in the path (GLB-099)"
+what   = "`</ index_type.zy />`, a subscript that is not there, is an `##IO` — the word is in the path (GLB-099); in the browser too, where no subscript runs"
 src    = """
-id(v) { <~ v }
 !? {
     r = </ index_type.zy />
     >> r ¶
-} :! ##Index {
-    >> (1 / id(0)) ¶
-} :! {
-    >> "refused" ¶
+} :! ##IO {
+    >> "IO" ¶
 }
 """
-open_finding = { zytw = "GLB-099", zyvm = "GLB-099", zyjs = "GLB-099" }
-
