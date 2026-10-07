@@ -2827,7 +2827,8 @@ subíndice que el navegador no puede correr.
 
 ## ZYJS-051 — Un `??` escrito como sentencia en el que no encaja ningún brazo: `zyjs` sigue, y los motores Rust fallan
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` falla como los motores Rust,
+y la GUIDE lo dice
 **Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06)
 
 ```zymbol
@@ -2857,8 +2858,21 @@ La GUIDE no dice qué pasa cuando no encaja ningún brazo, y el corpus no lo pre
 - que `zyjs` falle como los motores Rust, y que la GUIDE lo diga (Recomendado);
 - que un `??` de sentencia sin brazo que encaje no haga nada, y cambien los motores Rust.
 
+### Corrección
+
+El `ExprStmt` de un `??` en `execStmt` (`web/src/zymbol/zymbol.js`) lanza `no pattern matched in match
+expression` cuando no encaja ningún brazo, igual que el camino del `??` como valor desde GLB-016. Antes
+devolvía sin más. Medido en los tres motores: con un brazo de bloque y con brazos de valor fallan los tres;
+dentro de `!?` el error llega como `##_`, también en los tres; con `_` no cambia nada.
+
+La GUIDE (§ 7, *When no arm matches*) lo dice: el error vale para un `??` que da un valor y para uno escrito
+como sentencia, nunca es un valor vacío, y el programa no sigue a la línea siguiente.
+
 ### Qué lo sujeta
 
-`runtime-match-patterns/match-statement-no-arm-matches` (`expect = "error"`), con
-`open_finding = { zyjs = "ZYJS-051" }`.
+`runtime-match-patterns/match-statement-no-arm-matches` (`expect = "error"`): con el `zyjs` de antes da
+WRONG. Y `match-statement-no-arm-matches-met` (`expect = "ok"`), que imprime la clase que recibe el `:!`.
+
+Al quitar la deuda de `zyjs`, la celda dejó ver otra divergencia que la tapaba: la VM sitúa el error en otra
+línea. La celda lleva ahora esa deuda, [`ZYVM-011`](zyvm.md).
 

@@ -684,3 +684,41 @@ dice cuánto hay que ganar con el primero.
 Nada todavía. La celda `call/function-in-hot-loop` (`time-ratio`, límite 1,30)
 vigila la llamada; el coste de soltar en cada escritura no tiene celda.
 
+---
+
+## ZYVM-011 — Un `??` de sentencia en el que no encaja ningún brazo: la VM sitúa el error en la última línea de un brazo
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`ZYJS-051`](zyjs.md) (2026-10-07): la celda lo tapaba mientras `zyjs` seguía
+de largo, porque su deuda declarada cubría la celda entera
+
+```zymbol
+v = 2
+?? v {
+    1 => {
+        >> "uno" ¶
+    }
+}
+>> "sigue" ¶
+```
+
+| motor | error | línea que da |
+|---|---|---|
+| `zytw` | `no pattern matched in match expression` | `--> …:2`, la del `??` |
+| `zyjs` | igual | `2` |
+| `zyvm` | igual | `--> …:4`, la del `>>` dentro del último brazo |
+
+Como valor, `r = ?? 2 { 1 => "uno" }`, los tres dan la línea 1. La regla es la de todos los errores de
+ejecución: la línea es la de la sentencia. La VM toma la posición de la última instrucción que compiló
+dentro de los brazos, que es lo que encuentra cuando lanza al final del `??`.
+
+### Qué hay que decidir
+
+Nada de diseño: la regla de la línea ya está decidida. Lo que queda es la corrección, que la VM dé la línea
+del `??`. Pendiente del OK del autor.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-statement-no-arm-matches`, con `open_finding = "ZYVM-011"`: es un DIVERGE de
+ubicación, no un WRONG, así que la deuda es de la celda entera.
+
