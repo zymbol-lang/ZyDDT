@@ -92,8 +92,9 @@ f = (base, x) -> {
 # ── A variable written twice, and one name in two blocks (added 2026-10-07) ──
 #
 # Measured beside GLB-102. Rust reports a variable written twice and never read
-# — `variable 'base' is assigned but never read` — and zyjs says nothing: its
-# checker counts the second write as a read (ZYJS-052). With the name in two
+# — `variable 'base' is assigned but never read` — and zyjs said nothing: its
+# checker counted the second write as a read (ZYJS-052, corrected 2026-10-07;
+# the cells after the next one hold its neighbours). With the name in two
 # sibling blocks it is the other way round. Each block is a scope, so there are
 # two variables; zyjs reports both, and Rust reports one, at the first site only
 # — the GLB-003 shape, reached through an assignment instead of a declaration
@@ -108,7 +109,52 @@ base = 100
 base = 200
 >> 1 ¶
 """
-open_finding = { zyjs = "ZYJS-052" }
+
+[[cell]]
+id     = "variable-written-in-a-loop-and-never-read-warns"
+what   = "`c = 0`, then `c = 5` in a loop, and nothing reads it: assigned but never read (ZYJS-052)"
+expect = "warn"
+src    = """
+c = 0
+@ 3 {
+    c = 5
+}
+>> "ok" ¶
+"""
+
+[[cell]]
+id     = "variable-written-twice-in-a-function-warns"
+what   = "`t = 1`, then `t = 2` inside a function, and nothing reads it (ZYJS-052)"
+expect = "warn"
+src    = """
+f() {
+    t = 1
+    t = 2
+    <~ 0
+}
+>> f() ¶
+"""
+
+[[cell]]
+id     = "destructured-twice-and-never-read-warns"
+what   = "`[a, b] = [1, 2]`, then `[a, b] = [3, 4]`: assigned but never read, in Rust's words — zyjs said `unused variable` (ZYJS-052)"
+expect = "warn"
+src    = """
+[a, b] = [1, 2]
+[a, b] = [3, 4]
+>> "ok" ¶
+"""
+
+[[cell]]
+id     = "accumulator-never-read-is-unused"
+what   = "the control: `s = °s \"x\"` in a loop brings `s` into being, and its own write is not a second one — `unused variable` (ZYJS-052)"
+expect = "warn"
+src    = """
+@ 3 {
+    s = °s "x"
+}
+>> "ok" ¶
+"""
 
 [[cell]]
 id     = "same-name-in-two-blocks-warns-at-each-site"

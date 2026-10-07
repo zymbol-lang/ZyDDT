@@ -2880,7 +2880,8 @@ línea. La celda llevó esa deuda, [`ZYVM-011`](zyvm.md), hasta que se corrigió
 
 ## ZYJS-052 — Una variable asignada dos veces y nunca leída: Rust avisa, y `zyjs` calla aunque su comentario diga que avisa
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` avisa como Rust, con sus
+palabras
 **Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07)
 
 ```zymbol
@@ -2917,10 +2918,39 @@ hermanos — y tiene su ficha, [`GLB-105`](GLOBAL.md).
   (Recomendado): es lo que el comentario ya dice que hace, y Rust es la referencia del analizador;
 - que la distancia se quede, y el comentario diga que una segunda asignación cuenta como lectura.
 
+### Corrección
+
+Escribir un nombre deja de contar como leerlo. `lookup(…, true)` —la reasignación, que sigue rechazando un
+`_nombre` escrito desde un bloque interior— y `markWritten` —la desestructuración— marcan el registro como
+escrito; al cerrar el marco, un registro escrito y nunca leído da `W_WRITE_ONLY`, `variable '…' is assigned
+but never read`, con la ayuda de Rust, y uno que no se escribió nunca sigue dando `unused variable`. La
+sentencia que crea el registro —una definición caliente, un acumulador `s = °s …`— es su declaración, no
+una segunda escritura. `W_WRITE_ONLY` tiene su entrada en los catálogos del playground, inglés y español.
+
+Al medirlo salió [`ZYJS-054`](zyjs.md): cinco nombres de `GO/` que sólo se leen dentro de un texto
+interpolado pasado a una llamada. Antes de esta corrección, la segunda escritura los marcaba como leídos y
+lo tapaba; se corrigió primero.
+
+| programa | Rust | `zyjs`, antes | `zyjs`, ahora |
+|---|---|---|---|
+| `x = 1` · `x = 2` | assigned but never read | nada | assigned but never read |
+| `c = 0` · `@ 3 { c = 5 }` | assigned but never read | nada | assigned but never read |
+| `f() { t = 1  t = 2  <~ 0 }` | assigned but never read | nada | assigned but never read |
+| `[a, b] = [1, 2]` · `[a, b] = [3, 4]` | assigned but never read | unused variable | assigned but never read |
+| `@ 3 { s = °s "x" }` (control) | unused variable | unused variable | unused variable |
+| `x = 0` · `x += 1` (control: `+=` lee) | nada | nada | nada |
+| `f(a) { a = 5  <~ 1 }` (control: un parámetro) | nada | nada | nada |
+
+Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: cinco avisos nuevos, los
+cinco dados por Rust (los dos de `write_only_variable.zy` entre ellos), y ninguno de más. Los que Rust da en
+`klingon_galaxy/HuD.zy` y `bach.zy` siguen sin salir en `zyjs`: son ficheros de módulo, cuyos avisos `zyjs`
+descarta a propósito (DG-06, GLB-093 B).
+
 ### Qué lo sujeta
 
-`unused/variable-assigned-twice-and-never-read-warns` (`expect = "warn"`), KNOWN para `zyjs` con esta
-ficha.
+`unused/variable-assigned-twice-and-never-read-warns`, ya sin deuda; `variable-written-in-a-loop-and-never-read-warns`,
+`variable-written-twice-in-a-function-warns` y `destructured-twice-and-never-read-warns`, que con el `zyjs`
+de antes dan WRONG o WORDING; y el control `accumulator-never-read-is-unused`.
 
 ---
 
