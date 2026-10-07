@@ -228,8 +228,11 @@ x = 2
 #
 # Measured beside GLB-101: as a value (`r = ?? 2 { 1 => "uno" }`) all three
 # engines fail with `no pattern matched in match expression`; written as a
-# statement, zyjs goes on to the next line, and only the Rust engines fail
-# (ZYJS-051, undecided). A block arm, so nothing warns about a discarded value.
+# statement, zyjs went on to the next line, and only the Rust engines failed.
+# ZYJS-051, corrected 2026-10-07: zyjs fails there too. A block arm, so nothing
+# warns about a discarded value; `-met` holds the family the catch receives.
+# What still differs is where: the VM gives the line of the last statement in
+# an arm, the other two the line of the `??` (ZYVM-011, undecided).
 
 [[cell]]
 id     = "match-statement-no-arm-matches"
@@ -247,5 +250,23 @@ f(v) {
 >> f(1) ¶
 >> f(2) ¶
 """
-open_finding = { zyjs = "ZYJS-051" }
+open_finding = "ZYVM-011"
+
+[[cell]]
+id     = "match-statement-no-arm-matches-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received: `##_`, in the three engines"
+src    = """
+v = 2
+!? {
+    ?? v {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+} :! {
+    >> (_err#?)[1] ¶
+}
+>> "sigue" ¶
+"""
 
