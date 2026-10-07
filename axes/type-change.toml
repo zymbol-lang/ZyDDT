@@ -307,29 +307,111 @@ f = (a, b) -> a
 
 # ── A tuple, a dictionary or a nested array reassigned (added 2026-10-07) ───
 #
-# Measured beside GLB-100: the relation compares these whole, so an `Any` or an
-# Int/Float inside is a change of type, while an argument and an element compare
-# them part by part. With an `Any` inside, the engines also disagree: Rust warns,
-# zyjs does not name the tuple and is silent (GLB-104, undecided).
+# Measured beside GLB-100: the relation compared these whole, so an `Any` or an
+# Int/Float inside was a change of type, while an argument and an element were
+# compared part by part; with an `Any` inside, Rust warned and zyjs, which does
+# not name that tuple, was silent. Decided 2026-10-07, uniform (GLB-104): a
+# change of type is the relation of the argument and the element, at every
+# depth — Int and Float fit each other inside a collection as they do at the
+# top level, and inside an array too, where all three engines already mix them
+# (`[1, 2.5]`). The last three cells are the controls: another part type,
+# another length and another key are still a change.
 
 [[cell]]
-id   = "tuple-with-an-unknown-part"
-what = "`t = (1, id(2))`, then `t = (1, \"a\")`: Rust warns `(Int, Any)` → `(Int, String)`, zyjs does not (GLB-104)"
-src  = """
+id     = "tuple-with-an-unknown-part"
+expect = "ok"
+what   = "`t = (1, id(2))`, then `t = (1, \"a\")`: an `Any` part fits anything, so nothing warns (GLB-104)"
+src    = """
 id(v) { <~ v }
 t = (1, id(2))
 t = (1, "a")
 >> t ¶
 """
-open_finding = "GLB-104"
 
 [[cell]]
-id   = "dictionary-with-an-unknown-value"
-what = "`d = #(k: id(1))`, then `d = #(k: \"a\")`: Rust warns `#(k: Any)` → `#(k: String)`, zyjs does not (GLB-104)"
-src  = """
+id     = "dictionary-with-an-unknown-value"
+expect = "ok"
+what   = "`d = #(k: id(1))`, then `d = #(k: \"a\")`: an `Any` value fits anything, so nothing warns (GLB-104)"
+src    = """
 id(v) { <~ v }
 d = #(k: id(1))
 d = #(k: "a")
 >> d ¶
 """
-open_finding = "GLB-104"
+
+[[cell]]
+id     = "tuple-with-a-float-for-an-int-is-no-change"
+expect = "ok"
+what   = "`t = (1, 2)`, then `t = (1, 2.5)`: no more a change than `x = 1` then `x = 2.5` (GLB-104)"
+src    = """
+t = (1, 2)
+t = (1, 2.5)
+>> t ¶
+"""
+
+[[cell]]
+id     = "dictionary-with-a-float-for-an-int-is-no-change"
+expect = "ok"
+what   = "`d = #(k: 1)`, then `d = #(k: 1.5)`: part by part, Int and Float fit (GLB-104)"
+src    = """
+d = #(k: 1)
+d = #(k: 1.5)
+>> d ¶
+"""
+
+[[cell]]
+id     = "nested-array-being-filled-is-no-change"
+expect = "ok"
+what   = "`x = [[]]`, then `x = [[\"a\"]]`: the inner array has no element type yet, at any depth (GLB-104)"
+src    = """
+x = [[]]
+x = [["a"]]
+>> x ¶
+"""
+
+[[cell]]
+id     = "array-holding-a-float-then-floats-is-no-change"
+expect = "ok"
+what   = "`x = [1, 2.5]`, then `x = [1.5]`: the first array already held a Float, and nothing warns (GLB-104)"
+src    = """
+x = [1, 2.5]
+x = [1.5]
+>> x ¶
+"""
+
+[[cell]]
+id     = "function-returning-a-tuple-with-a-float-is-no-change"
+expect = "ok"
+what   = "`f = () -> (1, 2)`, then `f = () -> (1, 2.5)`: the return is compared part by part too (GLB-104)"
+src    = """
+f = () -> (1, 2)
+f = () -> (1, 2.5)
+>> f() ¶
+"""
+
+[[cell]]
+id   = "tuple-with-another-part-type-is-a-change"
+what = "the control: `t = (1, 2)`, then `t = (1, \"a\")` is still a change"
+src  = """
+t = (1, 2)
+t = (1, "a")
+>> t ¶
+"""
+
+[[cell]]
+id   = "tuple-of-another-length-is-a-change"
+what = "the control: `t = (1, 2)`, then `t = (1, 2, 3)` is still a change"
+src  = """
+t = (1, 2)
+t = (1, 2, 3)
+>> t ¶
+"""
+
+[[cell]]
+id   = "dictionary-with-another-key-is-a-change"
+what = "the control: `d = #(k: 1)`, then `d = #(j: 1)` is still a change"
+src  = """
+d = #(k: 1)
+d = #(j: 1)
+>> d ¶
+"""
