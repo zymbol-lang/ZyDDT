@@ -98,7 +98,9 @@ f = (base, x) -> {
 # sibling blocks it is the other way round. Each block is a scope, so there are
 # two variables; zyjs reports both, and Rust reports one, at the first site only
 # — the GLB-003 shape, reached through an assignment instead of a declaration
-# (GLB-105).
+# (GLB-105, corrected 2026-10-07: a write declares unless it reaches a variable
+# in view, or one written hot, which lives above its loop; the cells after the
+# accumulator control hold the other blocks, two functions and the controls).
 
 [[cell]]
 id     = "variable-assigned-twice-and-never-read-warns"
@@ -173,7 +175,6 @@ src    = """
 }
 >> "ok" ¶
 """
-open_finding = "GLB-105"
 
 # ── A name read inside an interpolated argument (added 2026-10-07) ──────────
 #
@@ -204,3 +205,125 @@ src    = """
 n = "abc"
 >> t::width("{n}") ¶
 """
+
+# ── One name in two scopes is two variables (GLB-105, 2026-10-07) ───────────
+
+[[cell]]
+id     = "same-name-in-two-if-blocks-warns-at-each-site"
+what   = "`x` assigned in two `?` blocks and never read: one `unused variable` per site (GLB-105)"
+expect = "warn"
+src    = """
+c = 1
+? c > 0 {
+    x = 1
+}
+? c > 0 {
+    x = 2
+}
+>> "ok" ¶
+"""
+
+[[cell]]
+id     = "same-name-in-two-loops-warns-at-each-site"
+what   = "`x` assigned in the bodies of two `@` and never read: one warning per site (GLB-105)"
+expect = "warn"
+src    = """
+@ 2 {
+    x = 1
+}
+@ 2 {
+    x = 2
+}
+>> "ok" ¶
+"""
+
+[[cell]]
+id     = "same-local-in-two-functions-warns-where-unread"
+what   = "`t` is a local of `f`, read, and of `g`, never read: `g`'s is reported — Rust used to merge them (GLB-105)"
+expect = "warn"
+src    = """
+f() {
+    t = 1
+    <~ t
+}
+g() {
+    t = 2
+    <~ 0
+}
+>> f() g() ¶
+"""
+
+[[cell]]
+id     = "block-variable-then-a-file-variable-of-its-name"
+what   = "`x = 1` in a block, never read, then `x = 2` outside and read: the block's `x` is reported (GLB-105)"
+expect = "warn"
+src    = """
+c = 1
+? c > 0 {
+    x = 1
+}
+x = 2
+>> x ¶
+"""
+
+[[cell]]
+id     = "same-names-destructured-in-two-blocks-warn-at-each-site"
+what   = "`[a, b] = …` in two `?` blocks, never read: four warnings, two per site (GLB-105)"
+expect = "warn"
+src    = """
+c = 1
+? c > 0 {
+    [a, b] = [1, 2]
+}
+? c > 0 {
+    [a, b] = [3, 4]
+}
+>> "ok" ¶
+"""
+
+[[cell]]
+id     = "outer-variable-written-in-a-block-is-one-variable"
+what   = "the control: `x = 1`, then `x = 2` inside a `!?` — `x` is in view, one variable, assigned but never read"
+expect = "warn"
+src    = """
+x = 1
+!? {
+    x = 2
+} :! {
+    >> "e" ¶
+}
+>> "ok" ¶
+"""
+
+[[cell]]
+id     = "hot-accumulator-is-one-variable-after-its-loop"
+what   = "the control: `s = °s \"x\"` lives above its loop, so `s = \"y\"` after it writes the same variable — assigned but never read"
+expect = "warn"
+src    = """
+@ 3 {
+    s = °s "x"
+}
+s = "y"
+>> "ok" ¶
+"""
+
+# ── A name read as a `??` pattern (added 2026-10-07) ────────────────────────
+#
+# An identifier in a pattern is a value that gets compared — `umbral =>`
+# compares the scrutinee with what `umbral` holds, in all three engines — so the
+# pattern reads it. zyjs does not count that read and reports the name as
+# unused; Rust does not (ZYJS-055, measured beside GLB-105, undecided).
+
+[[cell]]
+id     = "name-read-as-a-match-pattern-is-a-read"
+what   = "`umbral = 5`, then `?? v { umbral => … }`: the pattern reads `umbral`, and nothing is reported — zyjs says unused (ZYJS-055)"
+expect = "ok"
+src    = """
+umbral = 5
+v = 5
+?? v {
+    umbral => { >> "igual" ¶ }
+    _ => { >> "otro" ¶ }
+}
+"""
+open_finding = { zyjs = "ZYJS-055" }
