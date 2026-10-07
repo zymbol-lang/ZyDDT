@@ -751,7 +751,8 @@ de antes, las cuatro dan DIVERGE.
 
 ## ZYVM-012 — Un error dentro de una lambda cuyo cuerpo es una expresión: la VM no dice en qué línea
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: la línea de la sentencia que
+llama, como el TW y `zyjs`
 **Encontrado por:** al corregir [`GLB-106`](GLOBAL.md) (2026-10-07)
 
 ```zymbol
@@ -781,6 +782,29 @@ posición por defecto, la línea 0, y un error de línea 0 se informa sin línea
   expresión no tiene sentencia;
 - que dé la línea en que se escribió la lambda: en la VM sería el sello natural, y cambiarían el TW y `zyjs`.
 
+### Corrección
+
+Dos sitios, uno por cada manera de llegar a la lambda:
+
+- **una llamada escrita** (`h(v)`): `locate`, cuando la instrucción que falló no tiene línea, baja por la
+  pila de marcos hasta la llamada que llegó a ella —la instrucción anterior a la dirección de vuelta que
+  guardó el marco que llama— y toma su posición;
+- **un operador que llama** (`$>`, `$|`, `$<`): la ejecución anidada devuelve sus marcos al fallar, así que
+  ahí ya no hay pila que bajar; `call_callable` repone la posición del operador cuando la del fallo no tiene
+  línea.
+
+| programa | antes, VM | ahora, los tres |
+|---|---|---|
+| `h = (s) -> s + 1` · `x = h("b")` | sin línea | 2 |
+| `xs$> (x -> x + 1)` | sin línea | 2 |
+| `<~ h(v)` dentro de una función | sin línea | 4 |
+| `xs$| (x -> x > 1)` dentro de una lambda de bloque | sin línea | 2 |
+| `x = h(g())`, con un `>>` antes en `g` | sin línea | 6 |
+| control: la lambda de bloque | 2 | 2 |
+
 ### Qué lo sujeta
 
-`runtime-errors/error-inside-an-expression-lambda-has-a-line`, con `open_finding = "ZYVM-012"`.
+`runtime-errors/error-inside-an-expression-lambda-has-a-line`, ya sin deuda;
+`error-inside-an-expression-lambda-given-to-map-has-a-line`,
+`error-inside-an-expression-lambda-called-in-a-function-has-a-line` y
+`error-inside-a-filter-lambda-in-a-block-lambda-has-a-line`. Con la VM de antes, las cuatro dan DIVERGE.
