@@ -762,3 +762,104 @@ x = 3
 </ hola.zy />
 >> "sigue" ¶
 """
+
+
+# ── The type a function returns, past a `??` written as a statement (added 2026-10-07)
+#
+# A `??` alone on a line discards the values of its arms — the three engines run
+# it so, and the check warns that it does — but both analysers read the return
+# type as if each value were a `<~`. The first `f` below was a function of Int
+# and String, so `Any`, and the call that passes its String where a Number is
+# required was accepted (GLB-102). Decided 2026-10-07: an arm's value is not a
+# return; a `<~` inside an arm's block is.
+#
+# Every `??` here but the control's gives values, so every engine warns either
+# way, and what a cell can tell apart is a refusal. The call sits in a branch
+# that does not run, so the category is decided by the inferred type alone: an
+# analyser that read the values as returns again answers `warn`.
+
+[[cell]]
+id      = "argument-type-from-a-return-past-a-match-statement"
+premise = "TYP-2"
+what    = "`?? v { 1 => 10  _ => 20 }`, then `<~ \"texto\"`: `f` returns a String, and `g(f(1))` is refused where a Number is required (GLB-102)"
+src     = """
+f(v) {
+    ?? v {
+        1 => 10
+        _ => 20
+    }
+    <~ "texto"
+}
+g(n) {
+    <~ n + 1
+}
+c = 1
+? c > 5 {
+    >> g(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id      = "argument-type-from-the-block-of-a-value-arm"
+premise = "TYP-2"
+what    = "`1 => 10 { <~ \"diez\" }`: the block returns and the value does not, so `f` returns a String (GLB-102)"
+src     = """
+f(v) {
+    ?? v {
+        1 => 10 { <~ "diez" }
+        _ => 20 { <~ "veinte" }
+    }
+}
+g(n) {
+    <~ n + 1
+}
+c = 1
+? c > 5 {
+    >> g(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id      = "argument-type-of-a-match-statement-is-unit"
+premise = "TYP-2"
+what    = "a `??` whose arms only give values returns nothing: `f` is Unit, and `h(f(1))` is refused where a String is required (GLB-102)"
+src     = """
+f(v) {
+    ?? v {
+        1 => "a"
+        _ => "b"
+    }
+}
+h(s) {
+    <~ s > "m"
+}
+c = 1
+? c > 5 {
+    >> h(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id      = "argument-type-from-the-blocks-of-a-match-statement"
+premise = "TYP-2"
+expect  = "ok"
+what    = "the control: `1 => { <~ \"a\" }` returns, so `f` is a String and `h(f(1))` is accepted where a String is required"
+src     = """
+f(v) {
+    ?? v {
+        1 => { <~ "a" }
+        _ => { <~ "b" }
+    }
+}
+h(s) {
+    <~ s > "m"
+}
+c = 1
+? c > 5 {
+    >> h(f(1)) ¶
+}
+>> "fin" ¶
+"""
