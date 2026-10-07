@@ -394,6 +394,39 @@ dob = fabrica(2)
 """
 
 [[cell]]
+id      = "lambda-write-stays-inside"
+premise = "MEM-6"
+expect  = "ok"
+what    = "the write direction of MEM-6's table: a lambda writes only the names it declares, so `c = c + x` inside `$>` leaves the file's `c` at 0, while a `?` block and a `@` write through to it (7)"
+# MEM-6 said on 2026-09-13 that "the write direction has no cell yet": an
+# engine in which a lambda wrote through to its container passed every cell
+# the premise named. Found again on 2026-10-06, reading the premises against
+# the cells; the three engines agree.
+# The program checks itself: a lambda that wrote through, or a block that did
+# not, ends in a `##Div`, so three engines failing alike are still WRONG.
+src     = """
+id(v) { <~ v }
+c = 0
+r = [1, 2, 3]$> (x -> {
+    c = c + x
+    <~ x
+})
+? c <> 0 {
+    >> (1 / id(0)) ¶
+}
+? r$# == 3 {
+    c = c + 5
+}
+@ _i:1..2 {
+    c = c + 1
+}
+? c <> 7 {
+    >> (1 / id(0)) ¶
+}
+>> r " " c ¶
+"""
+
+[[cell]]
 id      = "lambda-inside-a-function-cannot-reach-the-file"
 premise = "MEM-2"
 what    = "a lambda inherits its function's isolation: the file is out of reach"
