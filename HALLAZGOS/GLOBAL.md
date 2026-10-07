@@ -6465,7 +6465,8 @@ de tipo coinciden en los dos analizadores.
 - **A**: `type-change/type-change-to-a-collection` (el eje afirma `warn`), que hasta la corrección
   llevaba `open_finding = { zyjs = "GLB-093" }`.
 - **C**: `runtime-collection-ops/empty-array-reassigned-with-elements` (`expect = "ok"`) y el control
-  `array-of-another-element-type-warns`.
+  `array-of-another-element-type-warns` — desde [`GLB-104`](GLOBAL.md), con `[1]` → `["a"]`: Int y Float
+  encajan dentro de un array como en el nivel de arriba.
 - **B**: **nada que mire a `zyjs`**, y no por olvido. Sólo `zymbol check` del propio fichero de módulo la ve: una celda
   de ZyDDT ejecuta, un módulo no se puede ejecutar, y al ejecutar el script que lo importa ningún motor
   muestra los avisos del módulo (medido: la celda salía `ok` en los tres). Lo que la sujetaría es
@@ -7239,7 +7240,8 @@ lo sujeta `refusal/argument-type-bool-from-a-logical-operator`.
 
 ## GLB-104 — El cambio de tipo compara enteros las tuplas, los diccionarios y los arrays anidados: un `Any` o un Int/Float dentro es un cambio
 
-**Estado:** **abierto** — pendiente de decisión del autor
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: parte por parte a cualquier
+profundidad, también en el elemento de un array (la opción uniforme)
 **Encontrado por:** al medir las vecinas de [`GLB-100`](GLOBAL.md) (2026-10-07)
 
 ```zymbol
@@ -7272,11 +7274,50 @@ Las dos filas con `Any` divergen además entre motores.
   encaja con todo (Recomendado);
 - seguir comparándolos enteros; entonces `zyjs` tiene que nombrar `(Int, Any)` y `#(k: Any)` para coincidir.
 
+Al corregirlo salió una tercera forma de verlo, y el autor la decidió el mismo día: si el elemento de un
+array se compara igual, `x = [1]` · `x = [1.5]` deja de ser un cambio, y eso le da la vuelta al control de
+[`GLB-093`](GLOBAL.md). Medido en los tres motores, un array ya mezcla Int y Float sin aviso (`[1, 2.5]`,
+`a$+ 2.5` sobre un `[Int]`, `[[1], [2.5]]`), y `x = [1, 2.5]` · `x = [1.5]` avisaba de un Float que el array
+ya tenía. Elegida la opción uniforme frente a «arrays estrictos», que dejaba `(1, 2)` → `(1, 2.5)` sin aviso
+y `[1]` → `[1.5]` con él.
+
+### Corrección
+
+El cambio de tipo es ahora la relación del argumento y del elemento: `is_compatible_with` llama a
+`types_compatible_static`, que pasa a ser la única relación de compatibilidad de
+`crates/zymbol-semantic/src/type_check.rs`. En `zyjs`, `typesCompatible` compara los nombres ya
+analizados con `Checker.fitStatic`, la copia de esa relación, y desaparece `fitChange`, el brazo de las
+funciones que añadió GLB-100. Un Unit sigue sin ser un cambio en el nivel de arriba (GLB-043): eso lo
+decide quien llama.
+
+| programa | antes, los dos analizadores | ahora |
+|---|---|---|
+| `t = (1, 2)` · `t = (1, 2.5)` | avisa | nada |
+| `t = (1, id(2))` · `t = (1, "a")` | Rust avisa, `zyjs` nada | nada |
+| `d = #(k: id(1))` · `d = #(k: "a")` | Rust avisa, `zyjs` nada | nada |
+| `d = #(k: 1)` · `d = #(k: 1.5)` | avisa | nada |
+| `x = [[]]` · `x = [["a"]]` | avisa | nada |
+| `x = [1]` · `x = [1.5]` | avisa | nada |
+| `x = [1, 2.5]` · `x = [1.5]` | avisa | nada |
+| `x = [[1]]` · `x = [[1.5]]` y `x = [(1, 2)]` · `x = [(1, 2.5)]` | avisa | nada |
+| `f = () -> (1, 2)` · `f = () -> (1, 2.5)` y `f = () -> [1]` · `f = () -> [1.5]` | avisa | nada |
+| `t = (1, 2)` · `t = (1, "a")` (control) | avisa | avisa |
+| `t = (1, 2)` · `t = (1, 2, 3)` (control) | avisa | avisa |
+| `d = #(k: 1)` · `d = #(j: 1)` (control) | avisa | avisa |
+| `x = [1]` · `x = ["a"]` (control) | avisa | avisa |
+
+Barridos de `zymbol check` y de `checkSource` sobre los 3232 `.zy` del workspace, antes y después: cambia un
+solo fichero, en los dos, y es el control de GLB-093, `[1]` → `[1.5]`. Ese control pasa a `[1]` → `["a"]`.
+
 ### Qué lo sujeta
 
-`type-change/tuple-with-an-unknown-part` y `type-change/dictionary-with-an-unknown-value`, con
-`open_finding = "GLB-104"`: hoy son un DIVERGE, y cualquiera de las dos opciones lo resuelve. Se reescriben
-con la decisión.
+`type-change/tuple-with-an-unknown-part` y `dictionary-with-an-unknown-value`, ahora `expect = "ok"` y sin
+deuda; `tuple-with-a-float-for-an-int-is-no-change`, `dictionary-with-a-float-for-an-int-is-no-change`,
+`nested-array-being-filled-is-no-change`, `array-holding-a-float-then-floats-is-no-change`,
+`function-returning-a-tuple-with-a-float-is-no-change` y `runtime-collection-ops/array-of-floats-for-ints-is-no-change`
+(`expect = "ok"`), que con los analizadores de antes dan WRONG; y los controles
+`tuple-with-another-part-type-is-a-change`, `tuple-of-another-length-is-a-change`,
+`dictionary-with-another-key-is-a-change` y `runtime-collection-ops/array-of-another-element-type-warns`.
 
 ---
 

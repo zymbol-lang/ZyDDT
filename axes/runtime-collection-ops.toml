@@ -1835,7 +1835,21 @@ x = ["a"]
 [[cell]]
 id     = "array-of-another-element-type-warns"
 expect = "warn"
-what   = "the control: `x = [1]` then `x = [1.5]` is still a change, `[Int]` to `[Float]`, in both analysers"
+what   = "the control: `x = [1]` then `x = [\"a\"]` is still a change, `[Int]` to `[String]`, in both analysers"
+# Until GLB-104 (decided 2026-10-07) this control was `[1]` then `[1.5]`. Int
+# and Float now fit each other inside an array as at the top level, so that one
+# is the cell below, and this one keeps its claim with an element type that is
+# a change.
+src    = """
+x = [1]
+x = ["a"]
+>> x ¶
+"""
+
+[[cell]]
+id     = "array-of-floats-for-ints-is-no-change"
+expect = "ok"
+what   = "`x = [1]` then `x = [1.5]`: Int and Float fit inside an array as at the top level, and nothing warns (GLB-104)"
 src    = """
 x = [1]
 x = [1.5]
