@@ -88,3 +88,43 @@ f = (base, x) -> {
 }
 >> f(base, 2) ¶
 """
+
+# ── A variable written twice, and one name in two blocks (added 2026-10-07) ──
+#
+# Measured beside GLB-102. Rust reports a variable written twice and never read
+# — `variable 'base' is assigned but never read` — and zyjs says nothing: its
+# checker counts the second write as a read (ZYJS-052). With the name in two
+# sibling blocks it is the other way round. Each block is a scope, so there are
+# two variables; zyjs reports both, and Rust reports one, at the first site only
+# — the GLB-003 shape, reached through an assignment instead of a declaration
+# (GLB-105).
+
+[[cell]]
+id     = "variable-assigned-twice-and-never-read-warns"
+what   = "`base = 100`, then `base = 200`, and nothing reads it: reported (ZYJS-052)"
+expect = "warn"
+src    = """
+base = 100
+base = 200
+>> 1 ¶
+"""
+open_finding = { zyjs = "ZYJS-052" }
+
+[[cell]]
+id     = "same-name-in-two-blocks-warns-at-each-site"
+what   = "`x` assigned in two `!?` blocks, each its own scope, and never read: one warning per site (GLB-105)"
+expect = "warn"
+src    = """
+!? {
+    x = 1
+} :! {
+    >> "e" ¶
+}
+!? {
+    x = 2
+} :! {
+    >> "e" ¶
+}
+>> "ok" ¶
+"""
+open_finding = "GLB-105"
