@@ -7330,3 +7330,98 @@ hermano no se trata como declaración, así que no llega.
 
 `unused/same-name-in-two-blocks-warns-at-each-site` (`expect = "warn"`), KNOWN con esta ficha: los tres
 avisan, y lo que diverge es cuántas veces.
+
+---
+
+## GLB-106 — Un error de ejecución posterior a un bloque anidado, en la misma sentencia: TW y VM dan la línea del bloque
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`ZYVM-011`](zyvm.md) (2026-10-07)
+
+```zymbol
+v = 1
+x = 1 + (?? v {
+    1 => "uno" {
+        >> "a" ¶
+    }
+})
+>> x ¶
+```
+
+Los tres motores imprimen `a` y fallan en el `+`: `+ is arithmetic only — use juxtaposition to concatenate
+strings`. El TW y la VM lo sitúan en la línea 4, la del `>>` del bloque del brazo; `zyjs` en la 2, la de la
+sentencia.
+
+| programa | TW | VM | `zyjs` |
+|---|---|---|---|
+| el de arriba | 4 | 4 | 2 |
+| lo mismo con un `_ => "otro"` | 4 | 4 | 2 |
+| `g() { >> "a" ¶  <~ "b" }` · `x = 1 + g()` | 3, el `<~` de `g` | 5 | 5 |
+| lo mismo con una lambda de bloque | 3 | 5 | 5 |
+| `x = 1 + (?? v { 1 => { <~ 7 } })` ([`GLB-107`](GLOBAL.md)) | 4 | — | — |
+| control: `? v > 0 { >> "a" ¶ }` y, en la sentencia siguiente, `x = 1 + "b"` | 5 | 5 | 5 |
+
+La regla es la de todos los errores de ejecución: la línea es la de la sentencia (*«los errores de ejecución
+dicen dónde»*), y `zyjs` la cumple en todas. El TW actualiza la línea con cada sentencia que ejecuta, también
+las del bloque de un brazo y las del cuerpo de la función llamada, y el error que sale después en la misma
+sentencia se lleva la última. La VM sella cada instrucción con la sentencia que se compila: le pasa con el
+bloque de un brazo, no con la llamada, porque el cuerpo de `g` se compila aparte.
+
+### Qué hay que decidir
+
+- que TW y VM den también aquí la línea de la sentencia (Recomendado): es la regla, y `zyjs` ya la cumple;
+- que la línea sea la de la última sentencia ejecutada, y cambie `zyjs`.
+
+### Qué lo sujeta
+
+`runtime-errors/error-after-a-block-arm-is-at-the-statement` y `error-after-a-call-is-at-the-statement`,
+con `open_finding = "GLB-106"`: son un DIVERGE de ubicación, así que la deuda es de la celda entera.
+
+---
+
+## GLB-107 — Un `<~` en el nivel de arriba dentro de un `??` usado como valor: la VM termina el programa, el TW sigue y `zyjs` falla con `[object Object]`
+
+**Estado:** **abierto** — pendiente de decisión del autor
+**Encontrado por:** al corregir [`ZYVM-011`](zyvm.md) (2026-10-07)
+
+```zymbol
+v = 1
+x = 1 + (?? v {
+    1 => {
+        <~ 7
+    }
+})
+>> x ¶
+```
+
+Un `<~` en el nivel de arriba termina el programa, y su valor es el estado de salida — *«a top-level `<~`
+ends the program, so its value is the exit status and must be a whole number»*, GAP-ZYB-006. La VM sale
+con `7`. El TW sigue con el `??` valiendo Unit y falla en el `+` (`arithmetic requires numeric operands:
+Int, Unit`, en la línea 4: [`GLB-106`](GLOBAL.md)). `zyjs` falla con `Runtime error: [object Object]`: la
+señal del `<~` sale como un error sin mensaje.
+
+| programa | TW | VM | `zyjs` |
+|---|---|---|---|
+| `<~ 5` suelto | sale con 5 | sale con 5 | sale con 5 |
+| `?? v { 1 => { <~ 5 } }`, como sentencia | sale con 5 | sale con 5 | sale con 5 |
+| `x = ?? v { 1 => { <~ 5 } }` | sale con 5 | sale con 5 | `[object Object]`, sale con 1 |
+| el de arriba, `x = 1 + (?? …)` | sigue y falla en el `+` | sale con 7 | `[object Object]` |
+| `x = 1 + (?? v { 1 => { >> "a" ¶  <~ "b" } })` | sigue y falla en el `+` | sale con 1, sin mensaje | `[object Object]` |
+| control: `<~ "b"` suelto | rechazado antes de ejecutar: *«must be a whole number — this one is String»* | igual | igual |
+
+La quinta fila es la otra mitad: `zymbol check` no dice nada de un `<~ "b"` dentro del bloque de un brazo
+de un `??` usado como valor, que suelto se rechaza antes de ejecutar. La comprobación no entra en ese
+bloque.
+
+### Qué hay que decidir
+
+- que un `<~` del nivel de arriba termine el programa también dentro de un `??` usado como valor, en los
+  tres, y que su tipo se compruebe ahí antes de ejecutar como en cualquier otro sitio (Recomendado): es la
+  regla que dicen el mensaje y la VM;
+- que un `<~` en el nivel de arriba dentro de un `??` usado como valor se rechace antes de ejecutar: no
+  tiene a dónde volver más que al programa.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/top-level-return-inside-a-match-value-exits` y
+`top-level-return-inside-a-match-operand-exits` (`expect = "ok"`), con `open_finding = "GLB-107"`.
