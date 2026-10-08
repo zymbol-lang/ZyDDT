@@ -7581,3 +7581,69 @@ diagnóstico cambia. Ningún programa del workspace escribe esa forma.
 `return-inside-a-match-operand-returns-from-the-function`, `break-inside-a-match-operand-leaves-the-loop` y
 `return-inside-a-match-element-skips-the-output`; y `refusal/top-level-exit-of-a-string-in-a-match-statement`
 y `top-level-exit-of-a-string-in-a-match-value`. Con los motores de antes, las siete están en rojo.
+
+---
+
+## GLB-108 — `$^` con comparador propio es cuadrático en los tres motores: una burbuja sin salida anticipada
+
+**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-08)
+**Encontrado por:** ZyBench, `BUG-BEN-001`, una medición de la VM contra Python hecha en otra sesión sobre
+`820a60a` (2026-10-04); validado aquí contra la rama `v0.0.10` el 2026-10-08
+
+```zymbol
+x = 7
+a = []
+@ 1000 {
+    x = (x * 75 + 74) % 65537
+    a$+ x
+}
+b = a$^ (p, q -> p < q)
+>> b[1] " " b[b$#] ¶
+```
+
+Los tres motores dan el resultado correcto. Lo que crece mal es el coste: medido el 2026-10-08 con el binario
+release, enteros al azar y comparador `a < b`, tiempo de reloj con el arranque incluido.
+
+| n | VM | TW | `zyjs` | `$^+`, el orden natural (VM) |
+|---|---:|---:|---:|---:|
+| 1 000 | 79 ms | 294 ms | 1 705 ms | 13 ms |
+| 2 000 | 281 ms | 1 102 ms | 5 955 ms | 14 ms |
+| 4 000 | 1 102 ms | 4 486 ms | — | 21 ms |
+
+Cada vez que `n` se duplica, el tiempo se multiplica por 3,5–4: cuadrático. El orden natural usa `sort_by` y
+no se ve afectado.
+
+### Causa
+
+Los tres motores corren la misma burbuja, con un `for i` / `for j` fijo y sin la bandera de «no hubo
+intercambios»: `eval_collection_sort` en `zymbol-interpreter/src/collection_ops.rs`, `Instruction::ArraySort`
+en `zymbol-vm/src/lib.rs` y `case '$^'` en `web/src/zymbol/zymbol.js`. Visitan siempre las n(n−1)/2 parejas,
+también con la entrada ya ordenada. Desde [`GLB-073`](GLOBAL.md) (2026-10-03) cada pareja pregunta al
+comparador una segunda vez cuando la primera responde `#0` —la regla B, que hace la ordenación estable—, así
+que hoy son entre n(n−1)/2 y n(n−1) llamadas. ZyBench midió antes de GLB-073, con una por pareja.
+
+Que los tres corran el **mismo** algoritmo es a propósito: GLB-073 lo decidió llamada por llamada, porque el
+orden de las llamadas es observable (un comparador que imprime imprime lo mismo en los tres), y lo sujeta
+`runtime-collection-ops/sort-comparator-calls-in-the-same-order`.
+
+### Lo que propuso ZyBench, y por qué no vale tal cual
+
+Una ordenación por mezcla en un módulo común, `zymbol-common/src/sort.rs`, con **una** llamada por
+comparación, para el TW y la VM. Con un comparador estricto (`p < q`) deja los empates en otro orden: es
+deshacer GLB-073, que decidió que `$^` es estable también con `<`. Y no toca `zyjs`, así que el orden de las
+llamadas dejaría de ser el mismo en los tres. Su «opción 2» —cuando `keep(l, r)` es falso, preguntar también
+`keep(r, l)` y, si también es falso, tomar el de la izquierda— es la regla B aplicada a la mezcla, y sí es
+compatible: sigue siendo O(n log n), con hasta ~1,5 llamadas por comparación.
+
+El parche (`ordenar_comparador.patch`) no está en este workspace.
+
+### Qué hay que decidir
+
+- una ordenación por mezcla estable con la regla B, la misma en los tres motores y con el mismo orden de
+  llamadas en los tres (Recomendado);
+- dejarlo como está, y que la GUIDE diga que `$^` con comparador es cuadrático.
+
+### Qué lo sujeta
+
+`zyquality/cost` `growth/sort-with-comparator` (`growth-ratio`, ×4, límite 6,0), KNOWN en los tres motores con
+esta ficha: una ordenación O(n log n) daría ~5, la burbuja da ~14 en los motores Rust y ~11 en `zyjs`.

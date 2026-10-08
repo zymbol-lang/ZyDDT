@@ -684,6 +684,36 @@ dice cuánto hay que ganar con el primero.
 Nada todavía. La celda `call/function-in-hot-loop` (`time-ratio`, límite 1,30)
 vigila la llamada; el coste de soltar en cada escritura no tiene celda.
 
+### Lo que añadió una medición de fuera (ZyBench, documentado el 2026-10-08)
+
+`IDEA-BEN-002`, de ZyBench —una medición de la VM contra Python hecha en otra
+sesión—, perfiló con callgrind sobre `820a60a` (2026-10-04) y aporta el dato que
+esta ficha dejaba **sin separar**. En `fib(22)`, ~1 000 instrucciones por
+llamada, `Vec::resize` era el 23 % (rellenar con `Unit` el marco de 7 registros:
+`resize(n, Value::Unit)` clona el valor en cada hueco) y soltarlo al volver el
+19 %; y los 7 registros contienen enteros o `Unit` cuando la función vuelve, es
+decir, **todo** ese desmontaje es de valores que no poseen nada. En un programa
+que devuelve filas del tablero no tiene por qué serlo; eso no se midió.
+
+Propone cuatro cambios, sólo en `zymbol-vm/src/lib.rs`: `resize_with` en lugar
+de `resize` (5 sitios); un `truncate_regs` que suelta sólo lo que posee memoria
+(7 sitios, el único `unsafe`); `call_callable` con los argumentos en un array y
+no en un `Vec` (los 7 llamadores de `$>`, `$|`, `$<` y `$^`); y `StoreGlobal`, que
+hace `destroyed_globals.remove` en cada asignación a una global, sólo cuando el
+conjunto no está vacío. Mide un 19–27 % menos de instrucciones (`fib(22)`, un
+`reduce` de 50 000 llamadas, un bucle de 200 000 vueltas).
+
+Verificado aquí, en `v0.0.10`, el 2026-10-08: los hechos de código siguen siendo
+ciertos —5 `resize(…, Value::Unit)`, 7 `value_stack.truncate`, `call_callable`
+con `args: Vec<Value>`, el `remove` incondicional en `StoreGlobal`—. **No**
+verificado: las cifras de instrucciones (aquí no hay `valgrind`) y el parche
+(`vm_llamadas.patch` no está en este workspace).
+
+Es **la mitad del primer arreglo** de arriba —no soltar lo que no posee nada—, y
+sólo al desmontar el marco. No toca la escritura de un registro (`wreg!`,
+`reg_set`), que es el ~11 % de todo programa, ni la reutilización de temporales
+del compilador: esas dos partes siguen abiertas.
+
 ---
 
 ## ZYVM-011 — Un `??` de sentencia en el que no encaja ningún brazo: la VM sitúa el error en la última línea de un brazo
