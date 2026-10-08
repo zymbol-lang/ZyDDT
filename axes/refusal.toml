@@ -953,3 +953,24 @@ x = ?? v {
 }
 >> x ¶
 """
+
+
+# ── `#|…|` gives a number or the text (added 2026-10-07) ────────────────────
+#
+# `#|s|` is an Int or a Float when the text is a number and the text itself when
+# it is not, which only running can tell — Any, as the input `<< #|v|` has been
+# since GLB-098. Typed Number, Rust refused this program, which runs in all
+# three engines and prints `#1` (decided 2026-10-07, GLB-098's open half).
+
+[[cell]]
+id      = "argument-type-not-from-a-numeric-eval"
+premise = "TYP-2"
+expect  = "ok"
+what    = "`h(#|x|)` with `h` wanting a String and `x = \"zeta\"`: `#|x|` is the text, and the call runs — `#1` (GLB-098)"
+src     = """
+h(s) {
+    <~ s > "m"
+}
+x = "zeta"
+>> h(#|x|) ¶
+"""

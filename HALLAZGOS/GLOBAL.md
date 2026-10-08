@@ -6833,6 +6833,22 @@ Una vecina queda distinta: la **expresión** `v = #|s|` el analizador la tipa `N
 (`Expr::NumericEval`), y la entrada `<< #|v|` ahora `Any`. Las dos callan en la aritmética, y con
 `Number`, `v$#` tampoco avisa. Igualarlas es decisión del autor.
 
+**Igualadas el 2026-10-07**, decidido por el autor: la expresión es `Any`, como la entrada. Medido en los
+tres motores, `#|s|` devuelve un Int o un Float si el texto es un número y el texto si no lo es, igual que la
+entrada; y con `Number` el analizador de Rust rechazaba un programa válido que `zyjs` ejecuta:
+
+| programa | al ejecutar | Rust con `Number` | ahora, los dos analizadores |
+|---|---|---|---|
+| `h(s) { <~ s > "m" }` · `x = "zeta"` · `>> h(#\|x\|) ¶` | `#1` | rechaza: `argument 1 has type Number, but function 'h' expects String` | nada |
+| `v = #\|s\|` · `v = "otro"`, con `s = "abc"` | `otro` | `'v' was Number but assigned String` | nada |
+| `f(t) { <~ #\|t\| }` · `v = "a"` · `v = f("5")` | `5` | `'v' was String but assigned Number` | nada |
+| `a[#\|"2"\|]`, `g(#\|"4"\|)` con `g(n) { <~ n + 1 }`, `[1, #\|"2"\|]` (control) | `20`, `5`, `[1, 2]` | nada | nada |
+
+`zyjs` no tipaba la expresión, así que no cambia. Barrido de `zymbol check` sobre los 3261 `.zy` del
+workspace, antes y después: ningún diagnóstico cambia. Lo sujetan
+`refusal/argument-type-not-from-a-numeric-eval` y `type-change/numeric-eval-then-text-is-no-change`, que con
+el binario de antes dan WRONG.
+
 ### Qué lo sujeta
 
 `runtime-io/numeric-input-in-arithmetic`, `typed-integer-input-in-arithmetic` y
