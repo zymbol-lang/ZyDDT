@@ -429,3 +429,14 @@ d = #(k: 1)
 d = #(j: 1)
 >> d ¶
 """
+
+[[cell]]
+id     = "numeric-eval-then-text-is-no-change"
+expect = "ok"
+what   = "`v = #|s|` with `s = \"abc\"` is the text already, so `v = \"otro\"` is no change of type (GLB-098)"
+src    = """
+s = "abc"
+v = #|s|
+v = "otro"
+>> v ¶
+"""
