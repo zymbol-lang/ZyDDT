@@ -389,22 +389,25 @@ print(sorted([3, 1])[0])
 
 # ── A prefix operator as a juxtaposed operand of an assignment (2026-10-09) ──
 #
-# In `>>`, the three engines take `"a" ###3.7`, `"a" #|"3"|` or `"a" !#1` as
-# juxtaposed operands. In an assignment's right-hand side only zyjs does: the
-# Rust parser's `can_juxtapose` lists literals and names, so a cast, `#|…|`,
-# `0x|…|`, `#.N|…|` or `!` that opens the next operand is refused as a new
-# statement (GLB-114, filed, undecided). The `expect` here is the axis's, not a
-# decision: which side is right is the author's, and the debt covers any red.
+# In `>>`, the three engines took `"a" ###3.7`, `"a" #|"3"|` or `"a" !#1` as
+# juxtaposed operands; in an assignment, after `<~` and among the items of `$++`
+# only zyjs did — the Rust parser's `can_juxtapose` listed literals and names.
+# Decided 2026-10-09 (GLB-114): a prefix operator opens an operand wherever
+# items are juxtaposed. The answers are concatenations, so the oracle is plain
+# string joining.
 
 [[cell]]
-id   = "juxtaposed-cast-in-an-assignment"
-what = "`x = \"a\" ###n` — the Rust engines refuse the cast as an operand of the assignment, zyjs concatenates (GLB-114)"
-src  = """
+id     = "juxtaposed-cast-in-an-assignment"
+what   = "`x = \"a\" ###n` concatenates the cast, as `>>` does: `a4` (GLB-114)"
+expect = "ok"
+src    = """
 n = 3.7
 x = "a" ###n
 >> x ¶
 """
-open_finding = "GLB-114"
+oracle.py = """
+print("a" + str(round(3.7)))
+"""
 
 [[cell]]
 id     = "juxtaposed-cast-in-output"
@@ -413,4 +416,25 @@ expect = "ok"
 src    = """
 n = 3.7
 >> "a" ###n ¶
+"""
+
+[[cell]]
+id     = "juxtaposed-prefix-operators-in-a-return"
+what   = "after `<~`, a format, a base conversion and `!` open operands too (GLB-114)"
+expect = "ok"
+src    = """
+f(v, ok) {
+    <~ "v=" #,|v| " hex=" 0x|v| " not=" !ok
+}
+>> f(4660, #1) ¶
+"""
+
+[[cell]]
+id     = "juxtaposed-prefix-operators-after-a-concatenation"
+what   = "among the items of `$++`, a cast and `#|…|` open operands too (GLB-114)"
+expect = "ok"
+src    = """
+c = 66
+s = "a"$++ "b" ##'c #|"7"|
+>> s ¶
 """

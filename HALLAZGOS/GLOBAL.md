@@ -7758,9 +7758,9 @@ expresión. Las superficies de resaltado (`zyddt surfaces`) no dejan nada sin ma
 Al medir aparecieron dos cosas que **no** se tocaron: una ruta indirecta de `Int` a `Char` que esta ficha no vio
 —`0d|"{n}"|`, el texto de las cifras leído en esa base— cuyos bordes dan `##_` nombrando el valor
 ([`GLB-113`](GLOBAL.md)), y que en una asignación los motores Rust no aceptan una cast como operando yuxtapuesto
-y `zyjs` sí ([`GLB-114`](GLOBAL.md)); `##'` se comporta en eso como sus hermanas. Y `zymbol-design/SYMBOLS.md`
-sigue diciendo que `##'` es *«input typespec position only»* (líneas 605, 1150 y 1260): es diseño, y lo cambia
-el autor.
+y `zyjs` sí ([`GLB-114`](GLOBAL.md)); `##'` se comporta en eso como sus hermanas. `zymbol-design/SYMBOLS.md` y
+`SIMBOLOS_ES.md` decían que `##'` es *«input typespec position only»*; corregidos con permiso del autor el
+2026-10-09 (`f51357b`), con la fila de v0.0.10 en § 19: ninguna marca nueva. GLB-114 se corrigió el mismo día.
 
 Lo sujetan, en `runtime-format-convert`: `char-cast-from-an-int` (con oráculo), `char-cast-code-with-no-character-is-range`,
 `char-cast-of-a-non-int-is-type`, y las dos sin capturar que provocan sus mensajes (`reach`); y
@@ -8021,7 +8021,8 @@ vería nada, y una que afirme un kind estaría eligiendo la respuesta. La celda 
 
 ## GLB-114 — En una asignación, un operando yuxtapuesto que empieza por un operador prefijo: Rust lo rechaza, `zyjs` lo concatena
 
-**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09: los motores Rust aceptan los operadores
+prefijos como operando yuxtapuesto, como `>>` y como `zyjs`
 **Encontrado por:** al implementar [`GLB-109`](GLOBAL.md): el caso de corpus de `##'` escribía
 `shifted = shifted ##'(##!ch + 3)`
 
@@ -8054,4 +8055,27 @@ comparador de `$^`—; los prefijos no tienen esa ambigüedad. `##'` se comporta
 
 `syntax-expressions/juxtaposed-cast-in-an-assignment`, con `open_finding = "GLB-114"`, y el control
 `syntax-expressions/juxtaposed-cast-in-output`, en el que los tres coinciden.
+
+### Corrección
+
+Al medir antes de cambiar apareció que no era sólo la asignación: `Parser::can_juxtapose` decide también el
+operando siguiente tras `<~` y entre los elementos de `$++`, y en las tres posiciones `zyjs` aceptaba los ocho
+prefijos medidos (`###`, `##'`, `#|…|`, `0x|…|`, `0b|…|`, `#.N|…|`, `#!N|…|`, `#,|…|`, `#^|…|`, `!`) y Rust
+ninguno. `can_juxtapose` lista ahora, además de literales y nombres, las cuatro casts, los formatos `#|`, `#.`,
+`#!`, `#,`, `#^`, las conversiones de base `0x|`, `0b|`, `0o|`, `0d|` y `!`. Ninguno de ellos puede leerse de
+otra manera tras una expresión completa en la misma línea. El `(` sigue fuera, por la ambigüedad con el
+comparador de `$^`, y el `-` también: tras una expresión es una resta.
+
+| forma | antes, Rust | ahora, los tres |
+|---|---|---|
+| `x = "a" ###3.7`, `<~ "a" ###3.7`, `s = "a"$++ "b" ###3.7` | `unexpected token: '###'` | `a4`, `a4`, `ab4` |
+| lo mismo con `#\|"3"\|`, `0x\|255\|`, `0b\|5\|`, `#.1\|2.25\|`, `#!1\|2.25\|`, `#,\|1234\|`, `#^\|12345.0\|`, `!#1` | rechazado | concatena |
+| control: `>> "a" ###3.7 ¶` | `a4` | `a4` |
+
+`zymbol check` sobre los 3258 `.zy` del workspace, antes y después: ningún fichero cambia por esto — todo lo que
+cambia se rechazaba antes. El formateador reimprime las formas nuevas igual (idempotente, misma salida). La GUIDE §
+Concatenation lo dice, con un ejemplo que `guide_verify` comprueba.
+
+Las celdas: `juxtaposed-cast-in-an-assignment` deja la deuda y afirma `a4` contra un oráculo, y dos vecinas
+nuevas, `juxtaposed-prefix-operators-in-a-return` y `juxtaposed-prefix-operators-after-a-concatenation`.
 
