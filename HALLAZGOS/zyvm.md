@@ -603,7 +603,8 @@ sin imprimir nada. Ahora son dos pasos: el valor a `dst` y después el bloque.
 
 ## ZYVM-010 — Soltar valores cuesta entre el 11 y el 17 % del tiempo de la VM
 
-**Estado:** abierto — propuesta, no decisión
+**Estado:** abierto — la parte del marco (los cuatro cambios de `IDEA-BEN-002`) **aplicada el 2026-10-09**;
+quedan abiertas la escritura de un registro (`wreg!`, `reg_set`) y la reutilización de temporales del compilador
 **Encontrado por:** el perfil de [`IDEA-GOL-007`](../../GoL/HALLAZGOS.md) (el
 coste de una llamada por celda), el 2026-10-01, **no por una celda**
 **Familia:** ninguna con nombre todavía. Es coste, no semántica: los tres
@@ -713,6 +714,45 @@ Es **la mitad del primer arreglo** de arriba —no soltar lo que no posee nada�
 sólo al desmontar el marco. No toca la escritura de un registro (`wreg!`,
 `reg_set`), que es el ~11 % de todo programa, ni la reutilización de temporales
 del compilador: esas dos partes siguen abiertas.
+
+### La parte del marco, aplicada (2026-10-09)
+
+Aprobado por el autor el 2026-10-09 al habilitar `perf` para medirlo (D4 de la ronda de ZyBench y ZyBF), y medido con `perf stat -e
+instructions:u` sobre el binario de release (opt-level 3 + LTO), cinco ejecuciones; las instrucciones no varían
+entre ejecuciones. Sólo `zymbol-vm/src/lib.rs`, aplicado y medido **de uno en uno**:
+
+| cambio | `fib(22)` | `reduce`, 50 000 llamadas | bucle de 200 000 vueltas | `llamada_por_celda`, lado 160 |
+|---|---:|---:|---:|---:|
+| antes | 45,79 M | 79,87 M | 229,97 M | 5 707 M |
+| 1. `resize_with` en lugar de `resize(…, Value::Unit)` (5 sitios) | −11,5 % | −4,5 % | −1,3 % | −2,8 % |
+| 2. `StoreGlobal` sólo quita de `destroyed_globals` si no está vacío; `get_chunk` en línea | 0 | 0 | **−14,3 %** | −0,1 % |
+| 3. `call_callable` con los argumentos en un array, no en un `Vec` (7 llamadores) | +0,1 % | **−11,1 %** | 0 | 0 |
+| 4. `truncate_regs`: al desmontar el marco suelta sólo lo que posee memoria (7 sitios) | **−10,0 %** | −2,1 % | 0 | −0,9 % |
+| después | 36,54 M (**−20,2 %**) | 66,33 M (**−17,0 %**) | 194,58 M (**−15,4 %**) | 5 490 M (**−3,8 %**) |
+
+El bucle de 200 000 vueltas gana con el cambio 2 porque su `s` es una variable global: cada asignación pagaba
+un `remove` en un mapa vacío. En `llamada_por_celda`, lo que cuesta llamar —su diferencia con `en_linea`, que hace
+el mismo trabajo sin llamar— baja de 479 M a 305 M de instrucciones, un 36 %.
+
+En tiempo de reloj, contra un binario de antes compilado aparte desde el mismo commit (que reproduce las
+instrucciones de antes con menos del 0,001 % de diferencia), mediana de 7 ejecuciones alternadas: `fib(30)` 218 →
+172 ms (−21 %), el bucle de 2 000 000 de vueltas 221 → 191 ms (−14 %), `llamada_por_celda` 727 → 679 ms (−7 %).
+Un `reduce` de 500 000 elementos no cambia (88 ms los dos): ahí domina construir el array.
+
+**El único `unsafe`** está en `truncate_regs`, y es más simple que el del parche de ZyBench, que no se usó (no
+está en el workspace). Un bucle sustituye por `Unit` cada valor que posee memoria —una asignación segura, que
+lo suelta— y después `set_len` acorta el vector. Acortar nunca deja memoria sin inicializar, así que el peor
+caso de un error en `Value::owns_memory` sería una fuga, nunca un comportamiento indefinido. Y `owns_memory`
+enumera los escalares, no los dueños: una variante que se añada después se suelta hasta que alguien diga lo
+contrario.
+
+Lo que lo comprueba: `cargo test --release` (1060 pasan, 4 ignorados, como antes); el consenso del corpus
+(672 de 678 de acuerdo, 0 divergen) y sus goldens (642 + 30); dos sondas de memoria —una función que crea un
+array, una cadena larga y un diccionario, llamada 20 000 y 80 000 veces, y 3 000 errores que desmontan 41 marcos
+con colecciones dentro— que dan el mismo resultado que el TW y un pico de memoria plano (11,1–11,2 MB).
+
+Lo que **no** se hizo, y mantiene la ficha abierta: escribir un registro (`wreg!`, `reg_set`), el ~11 % de todo
+programa, y reutilizar los temporales del compilador (`alloc_temp`).
 
 ---
 
