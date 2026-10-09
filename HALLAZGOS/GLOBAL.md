@@ -7756,7 +7756,8 @@ fuera de él: `interpreter/IMPLEMENTATION.md` (líneas 1164 y 1608) y los manual
 
 ## GLB-111 — Tras `x = e`, una segunda sentencia en la misma línea falla con un error que no dice que la primera se la comió
 
-**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09 (D2): el texto dice lo que pasó,
+igual en los dos analizadores; la yuxtaposición silenciosa no avisa
 **Encontrado por:** ZyBF, `IDEA-BF-003` (2026-10-01, al escribir `pruebas.zy`); validado contra la rama
 `v0.0.10` el 2026-10-09
 
@@ -7799,6 +7800,38 @@ escribir: `s = 1  i`, con `i = 1`, da el texto `11`.
 
 `refusal/second-statement-after-an-assignment-on-one-line` (`expect = "error"`), con `open_finding =
 "GLB-111"`: los tres rechazan, y lo que difiere es la redacción.
+
+### Corrección
+
+En los dos parsers, cuando una sentencia empieza por `=`, una asignación compuesta (`+=`, `-=`, `*=`, `/=`,
+`%=`, `^=`), `++` o `--`, y el token anterior es un nombre, ese nombre lo consumió por fuerza la sentencia
+anterior. El error lo dice:
+
+```text
+error: unexpected '=': 'i' was read as part of the expression before it
+  = help: a new statement starts on a new line, or after ';'
+```
+
+Rust: un brazo con guarda en `Parser::parse_statement`, delante del genérico, y `name_before_current`, que salta
+los comentarios. `zyjs`: la misma comprobación al principio de `_parseStmt`, con las mismas palabras. Antes de
+cambiar, el genérico de Rust ofrecía *«or identifier»* en su lista, y `i` es un identificador.
+
+| segunda sentencia, tras `s = s + 1` | antes, Rust | antes, `zyjs` | ahora, los tres |
+|---|---|---|---|
+| `i = i + 1` | `unexpected token: '='` | `expected expression, found '='` | `unexpected '=': 'i' was read as part of the expression before it` |
+| `i += 1` | `unexpected token: '+='` | `expected expression, found '+='` | lo mismo, con `'+='` |
+| `i++` | `unexpected token: '++'` | `expected expression, found '++'` | lo mismo, con `'++'` |
+| `f(i)`, `arr$+ 3`, `i`, `(i)` | corre y concatena; aviso de cambio de tipo si `s` era `Int` | igual | igual |
+| `>> "x" ¶`, `? i > 0 { … }`, `s = s + 1; i = i + 1` | corre | corre | corre |
+
+Barridos sobre los 3258 `.zy` del workspace, antes y después: en `zyjs` ningún fichero cambia de estado (OK o
+ERR); el texto nuevo sale en dos, la celda de esta ficha y `vida_min.zy`, un programa de una línea del autor
+que tiene exactamente este error (`cc = c + dc` tras `ff = f + df`). `zymbol check` da el texto nuevo en los
+mismos dos.
+
+Lo sujetan la celda de arriba, ya sin `open_finding`, dos vecinas nuevas para `+=` y `++`, y el control
+`runtime-operators/juxtaposition-with-a-name-is-concatenation`, con oráculo: `t = 1  i` corre, da `11` y no
+avisa.
 
 ---
 
