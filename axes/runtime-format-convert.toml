@@ -468,3 +468,86 @@ c = 0d65
 >> (a#?)[1] " " (b#?)[1] " " (c#?)[1] ¶
 >> (##!a + 1) ¶
 """
+
+# ── `##'expr`: an Int code point to its Char (added 2026-10-09) ─────────────
+#
+# Decided by the author on 2026-10-09 (GLB-109, D1): `##'` is the pair of `##!`
+# on a Char, and fails the way its siblings `###`, `##.` and `##!` do — at run
+# time, with the kind declared: a wrong type is `##Type`, a code with no
+# character (past 0x10FFFF, a surrogate, below 0) is `##Range`. Only an Int is a
+# code; a Float is not, even a whole one. A Char stays itself.
+
+[[cell]]
+id     = "char-cast-from-an-int"
+what   = "`##'n` is the Char with code point n — computed, past ASCII and at Unicode's last code — and `##!` reads it back (GLB-109)"
+expect = "ok"
+src    = """
+n = 65
+>> ##'n ¶
+>> ##'(n + 12289) ¶
+>> ##'0x41 ¶
+c = ##'n
+>> (c#?)[1] ¶
+@ code:[0, 55295, 57344, 1114111] {
+    >> (##!##'code + 7) ¶
+}
+"""
+oracle.py = """
+print(chr(65))
+print(chr(65 + 12289))
+print("A")
+print("##'")
+for code in [0, 55295, 57344, 1114111]:
+    print(ord(chr(code)) + 7)
+"""
+
+[[cell]]
+id     = "char-cast-code-with-no-character-is-range"
+what   = "`##'` on an Int that is no character — past 0x10FFFF, a surrogate, below 0 — is caught by `:! ##Range` (GLB-109)"
+expect = "ok"
+src    = """
+@ code:[1114112, 55296, 57343, -1] {
+    !? {
+        >> ##'code ¶
+    } :! ##Range {
+        >> "range" ¶
+    }
+}
+"""
+
+[[cell]]
+id     = "char-cast-of-a-non-int-is-type"
+what   = "`##'` on a Float, even a whole one, a String or a Bool is caught by `:! ##Type`: only an Int is a code (GLB-109)"
+expect = "ok"
+src    = """
+l = #[65.0, "A", #1]
+@ v:l {
+    !? {
+        >> ##'v ¶
+    } :! ##Type {
+        >> "type" ¶
+    }
+}
+"""
+
+[[cell]]
+id     = "char-cast-requires-an-int-or-char"
+expect = "error"
+what   = "##' requires an Int or Char, got {} — uncaught, as its siblings' cells above (GLB-109)"
+src    = """
+t(v) {
+    <~ ##'v
+}
+>> t(65.0) ¶
+"""
+
+[[cell]]
+id     = "char-cast-character-out-of-range"
+expect = "error"
+what   = "character out of range: ##' cannot represent this Int — uncaught (GLB-109)"
+src    = """
+t(v) {
+    <~ ##'v
+}
+>> t(1114112) ¶
+"""

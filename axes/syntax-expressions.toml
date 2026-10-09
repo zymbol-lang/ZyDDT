@@ -386,3 +386,31 @@ x = (a$^+)[1]
 oracle.py = """
 print(sorted([3, 1])[0])
 """
+
+# ── A prefix operator as a juxtaposed operand of an assignment (2026-10-09) ──
+#
+# In `>>`, the three engines take `"a" ###3.7`, `"a" #|"3"|` or `"a" !#1` as
+# juxtaposed operands. In an assignment's right-hand side only zyjs does: the
+# Rust parser's `can_juxtapose` lists literals and names, so a cast, `#|…|`,
+# `0x|…|`, `#.N|…|` or `!` that opens the next operand is refused as a new
+# statement (GLB-114, filed, undecided). The `expect` here is the axis's, not a
+# decision: which side is right is the author's, and the debt covers any red.
+
+[[cell]]
+id   = "juxtaposed-cast-in-an-assignment"
+what = "`x = \"a\" ###n` — the Rust engines refuse the cast as an operand of the assignment, zyjs concatenates (GLB-114)"
+src  = """
+n = 3.7
+x = "a" ###n
+>> x ¶
+"""
+open_finding = "GLB-114"
+
+[[cell]]
+id     = "juxtaposed-cast-in-output"
+what   = "the control: in `>>` the same operand is taken by all three, `a4` (GLB-114)"
+expect = "ok"
+src    = """
+n = 3.7
+>> "a" ###n ¶
+"""
