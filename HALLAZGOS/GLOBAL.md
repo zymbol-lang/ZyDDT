@@ -7652,7 +7652,8 @@ esta ficha: una ordenación O(n log n) daría ~5, la burbuja da ~14 en los motor
 
 ## GLB-109 — Un valor calculado no se puede convertir en `Char`: hay literal por código, pero ningún paso de entero a carácter
 
-**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09 (D1): `##'expr` convierte un `Int` en
+su carácter, con la forma de sus hermanas
 **Encontrado por:** ZyBF, `GAP-BF-001`: un intérprete de Brainf\*\*\* escrito en Zymbol (`ZyBrainfuck/`,
 2026-10-01), cuya instrucción `.` imprime «el carácter cuyo código es el valor de la celda»; validado contra la
 rama `v0.0.10` el 2026-10-09
@@ -7692,6 +7693,47 @@ el oráculo en Python. Hay que escribirla en cada programa, y no llega más all�
 
 Nada todavía: los tres motores rechazan la forma igual, así que una celda no vería nada. La celda se escribe
 con la decisión.
+
+### Corrección
+
+Antes de implementar se midieron las tres hermanas sobre Int, Float, Char, `"7"`, `""`, Bool, Unit, `[1]`, `[]`
+y una tupla, con el operando escrito y leído de una lista `#[…]`: **ninguna cast se rechaza antes de ejecutar**;
+un tipo equivocado es `##Type` y un valor que no cabe es `##Range`, los dos al ejecutar. `##'` sigue esa forma:
+
+| operando | los tres motores |
+|---|---|
+| `Int` de 0 a `0x10FFFF`, salvo `0xD800`–`0xDFFF` | su carácter: `##'65` es `A`, `##'1114111` existe |
+| `Int` fuera de eso (`1114112`, `55296`, `57343`, `-1`, 2⁵³−1) | `##Range`: `character out of range: ##' cannot represent this Int` |
+| `Char` | él mismo |
+| `Float` (también `65.0`), `String`, `""`, `Bool`, `Unit`, array, tupla | `##Type`: `##' requires an Int or Char, got Float` |
+
+- **Rust:** `CastKind::ToChar` en el AST; el parser lee `##'` como prefijo con un operando postfijo, como sus
+  hermanas (`##'n#?` es `##'(n#?)`); el TW evalúa; la VM tiene `Instruction::IntToChar` y
+  `VmError::CharOutOfRange`, de la familia `##Range`; el formateador reimprime `##'` (idempotente, misma salida).
+- **`zyjs`:** el parser, las dos listas de operandos yuxtapuestos (como sus hermanas) y la evaluación.
+- **Los dos analizadores tipan el resultado.** Rust lo tipa `Char`. `zyjs` no tipaba ninguna cast (`inferType`
+  no tenía `CastOp`), así que no avisaba del cambio de tipo en `x = "s"` + `x = ###3.7` donde Rust sí; ahora tipa
+  las cuatro como Rust. Barrido de `checkSource` sobre los 3258 `.zy` del workspace, antes y después: ningún
+  diagnóstico cambia.
+- **La ayuda del playground** (`typed_chr`, en inglés y en español) describe los dos usos de `##'`, y su ejemplo
+  los enseña.
+- **Documentos:** `GUIDE.md` § Type Conversion Casts (fila, párrafo y ejemplo, que `guide_verify` comprueba: 123
+  de 123), la fila `##Range` de la tabla de kinds, `REFERENCE.md` (tabla de símbolos y de `##Range`), `LLM.md` y la
+  gramática de `IMPLEMENTATION.md`.
+
+Barridos de parseo de `zyjs` sobre los 3258 ficheros: ningún estado ni árbol cambia — nadie escribía `##'` en una
+expresión. Las superficies de resaltado (`zyddt surfaces`) no dejan nada sin marcar.
+
+Al medir aparecieron dos cosas que **no** se tocaron: una ruta indirecta de `Int` a `Char` que esta ficha no vio
+—`0d|"{n}"|`, el texto de las cifras leído en esa base— cuyos bordes dan `##_` nombrando el valor
+([`GLB-113`](GLOBAL.md)), y que en una asignación los motores Rust no aceptan una cast como operando yuxtapuesto
+y `zyjs` sí ([`GLB-114`](GLOBAL.md)); `##'` se comporta en eso como sus hermanas. Y `zymbol-design/SYMBOLS.md`
+sigue diciendo que `##'` es *«input typespec position only»* (líneas 605, 1150 y 1260): es diseño, y lo cambia
+el autor.
+
+Lo sujetan, en `runtime-format-convert`: `char-cast-from-an-int` (con oráculo), `char-cast-code-with-no-character-is-range`,
+`char-cast-of-a-non-int-is-type`, y las dos sin capturar que provocan sus mensajes (`reach`); y
+`zyquality/corpus/casts/07_int_to_char.zy`, el sentido contrario de `06_char_to_int`.
 
 ---
 
@@ -7837,8 +7879,7 @@ avisa.
 
 ## GLB-112 — Dentro de `###`, `##.` y `##!` el analizador no mira nada: sexta aparición de la zona ciega de `infer_expr`
 
-**Estado:** **abierto** — sin decisión de diseño pendiente, pero corregirlo rechaza antes de ejecutar programas
-que hoy pasan `check`, así que se pregunta antes (2026-10-09)
+**Estado:** **corregido 2026-10-09** — con el paso de GLB-109, como decidió el autor (D1-bis)
 **Encontrado por:** al medir las casts hermanas para la decisión de [`GLB-109`](GLOBAL.md) (`##'expr`), el
 2026-10-09
 
@@ -7888,3 +7929,98 @@ Las dos celdas son lo único que provoca dos diagnósticos de ejecución del TW 
 '{}°' (hot definition)?»* y *«function expects {} arguments, got {}»*—, así que `reach` los quitó de su lista de
 «sin provocar» (`--prune`, 2026-10-09). Al corregir esta ficha dejarán de provocarse: vuelven a esa lista a mano,
 en el mismo commit, porque `--prune` sólo quita.
+
+### Corrección
+
+`type_check.rs`: el brazo de `Expr::NumericCast` infiere su operando antes de responder el tipo de la cast. Los
+tres motores rechazan ahora antes de ejecutar: `antes` ya no se imprime.
+
+Alcance, medido con `zymbol check` de antes y de después sobre los 3258 `.zy` del workspace: sólo cambian las dos
+celdas de esta ficha. Ningún programa tenía un error escondido dentro de una cast.
+
+Las celdas pierden la deuda, y se añaden `refusal/arity-inside-a-char-cast` y
+`refusal/output-mark-inside-a-numeric-cast` (la marca `<~` ausente, la forma que encontró Chaturanga dentro de
+`$#`). Las dos entradas de `reach` volvieron a su línea base a mano, en el mismo commit.
+
+---
+
+## GLB-113 — La ruta por texto de un código a un carácter: sus bordes dan `##_` y nombran el valor
+
+**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Encontrado por:** al implementar [`GLB-109`](GLOBAL.md), buscando si ya había alguna ruta de `Int` a `Char`
+
+```zymbol
+n = 1114112
+!? {
+    c = 0d|"{n}"|
+    >> c ¶
+} :! ##Range {
+    >> "range" ¶
+} :! {
+    >> "otro: " _err ¶
+}
+```
+
+Un literal con prefijo de base lee también un **texto** de cifras en esa base: `0d|"65"|` es `A`, así que
+`0d|"{n}"|` lleva un `Int` calculado a su carácter pasando por texto. Los tres motores coinciden; lo que no
+coincide es con `##'`:
+
+| programa | los tres motores | `##'` con el mismo código |
+|---|---|---|
+| `0d\|"{n}"\|`, `n = 1114112` | `##_`: `character code must be in range 0..0x10FFFF, got 1114112` | `##Range`, sin el valor |
+| `0d\|"{n}"\|`, `n = 55296` (sustituto) | `##_`: `invalid Unicode character code: 55296` | `##Range`, sin el valor |
+| `0d\|"{n}"\|`, `n = -1` | `##Parse`: `failed to parse '-1' as decimal number` | `##Range` |
+| control: `0d\|"{n}"\|`, `n = 65` | `A` | `A` |
+
+Dos cosas chocan con lo decidido: el kind (`##_` donde un código sin carácter es ahora `##Range`) y el valor en el
+mensaje (los diagnósticos nombran tipos, no valores, GLB-033).
+
+### Qué hay que decidir
+
+- que los dos bordes sean `##Range` con el texto de `##'` (Recomendado): un código sin carácter es el mismo fallo
+  por cualquier camino;
+- dejarlo: la ruta por texto es la del literal, y su error habla del texto leído.
+
+### Qué lo sujeta
+
+Nada todavía, como GLB-109 antes de decidirse: los tres motores coinciden, así que una celda que sólo pregunte no
+vería nada, y una que afirme un kind estaría eligiendo la respuesta. La celda se escribe con la decisión.
+
+---
+
+## GLB-114 — En una asignación, un operando yuxtapuesto que empieza por un operador prefijo: Rust lo rechaza, `zyjs` lo concatena
+
+**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Encontrado por:** al implementar [`GLB-109`](GLOBAL.md): el caso de corpus de `##'` escribía
+`shifted = shifted ##'(##!ch + 3)`
+
+```zymbol
+n = 3.7
+x = "a" ###n
+>> x ¶
+>> "a" ###n ¶
+```
+
+| operando tras `"a"` | `x = "a" …`, Rust | `x = "a" …`, `zyjs` | `>> "a" … ¶`, los tres |
+|---|---|---|---|
+| `###3.7`, `##.2`, `##!'A'`, `##'n` | `unexpected token: '###'` | `a4`, `a2`, `a65`, `aB` | igual que `zyjs` |
+| `#\|"3"\|`, `0x\|255\|`, `#.1\|2.25\|` | `unexpected token: '#\|'` … | `a3`, `a0x00FF`, `a2.3` | igual que `zyjs` |
+| `!#1` | `unexpected token: '!'` | `a#0` | `a#0` |
+| control: `(1)`, `[1]` | `a1`, `a` | igual | igual |
+
+La causa: el lado derecho de una asignación decide si sigue otro operando con `Parser::can_juxtapose`
+(`zymbol-parser/src/variables.rs`), que sólo lista literales y nombres; `>>` usa otra regla, y `zyjs` una lista
+(`implicitExprStart`) que incluye los operadores prefijos. El `(` queda fuera a propósito —es ambiguo con el
+comparador de `$^`—; los prefijos no tienen esa ambigüedad. `##'` se comporta como sus hermanas.
+
+### Qué hay que decidir
+
+- que los motores Rust acepten los operadores prefijos como operando yuxtapuesto también en una asignación
+  (Recomendado): `>>` ya lo hace en los tres, y `zyjs` ya lo hace en los dos sitios;
+- que `zyjs` los rechace en una asignación, como Rust.
+
+### Qué lo sujeta
+
+`syntax-expressions/juxtaposed-cast-in-an-assignment`, con `open_finding = "GLB-114"`, y el control
+`syntax-expressions/juxtaposed-cast-in-output`, en el que los tres coinciden.
+

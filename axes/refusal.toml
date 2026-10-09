@@ -220,16 +220,17 @@ s = g(1, 2, 3)$#
 
 # ── The operand of a numeric cast (added 2026-10-09) ─────────────────────────
 #
-# The sixth appearance of the same hole: `infer_expr` answers `Expr::NumericCast`
-# with the cast's result type and never infers the operand, so nothing written
-# inside `###`, `##.` or `##!` is checked. The tree-walker then runs the program
-# and fails half way, the VM's compiler refuses an undefined name before running
-# but not a wrong arity, and zyjs refuses both before running (GLB-112, filed,
-# not fixed). The `>> "antes"` line is what tells static from run-time apart.
+# The sixth appearance of the same hole: `infer_expr` answered `Expr::NumericCast`
+# with the cast's result type and never inferred the operand, so nothing written
+# inside `###`, `##.` or `##!` was checked. The tree-walker ran the program and
+# failed half way, the VM's compiler refused an undefined name before running
+# but not a wrong arity, and zyjs refused both before running. Corrected
+# 2026-10-09 with `##'` (GLB-112, GLB-109): the three refuse before running, so
+# `antes` is never printed. The `>> "antes"` line is what tells the two apart.
 
 [[cell]]
 id   = "arity-inside-a-numeric-cast"
-what = "a call with the wrong argument count, as the operand of `###`: zyjs refuses before running, the Rust engines print `antes` first (GLB-112)"
+what = "a call with the wrong argument count, as the operand of `###`: refused before running — the Rust engines printed `antes` first (GLB-112)"
 src  = """
 g(a) {
     <~ a
@@ -238,17 +239,40 @@ g(a) {
 x = ###g(1, 2)
 >> x ¶
 """
-open_finding = "GLB-112"
 
 [[cell]]
 id   = "undefined-inside-a-numeric-cast"
-what = "a name that does not exist, inside `##.`: the tree-walker prints `antes` first and fails running (GLB-112)"
+what = "a name that does not exist, inside `##.`: refused before running — the tree-walker printed `antes` first (GLB-112)"
 src  = """
 >> "antes" ¶
 x = ##.(noexiste + 1)
 >> x ¶
 """
-open_finding = "GLB-112"
+
+[[cell]]
+id   = "arity-inside-a-char-cast"
+what = "a call with the wrong argument count, inside `##'`: refused before running, as in the other three casts (GLB-112)"
+src  = """
+g(a) {
+    <~ a
+}
+>> "antes" ¶
+x = ##'g(1, 2)
+>> x ¶
+"""
+
+[[cell]]
+id   = "output-mark-inside-a-numeric-cast"
+what = "an output parameter passed without `<~`, inside `###`: refused before running (GLB-112)"
+src  = """
+f(a, b<~) {
+    b = a
+    <~ 1
+}
+y = 0
+x = ###f(2, y)
+>> x " " y ¶
+"""
 
 # The help of an arity refusal writes the signature as the CALLER writes it —
 # the names, and `<~` where the call must spell it (GLB-040, decided
