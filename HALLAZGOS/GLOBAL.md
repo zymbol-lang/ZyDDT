@@ -7799,3 +7799,59 @@ escribir: `s = 1  i`, con `i = 1`, da el texto `11`.
 
 `refusal/second-statement-after-an-assignment-on-one-line` (`expect = "error"`), con `open_finding =
 "GLB-111"`: los tres rechazan, y lo que difiere es la redacción.
+
+---
+
+## GLB-112 — Dentro de `###`, `##.` y `##!` el analizador no mira nada: sexta aparición de la zona ciega de `infer_expr`
+
+**Estado:** **abierto** — sin decisión de diseño pendiente, pero corregirlo rechaza antes de ejecutar programas
+que hoy pasan `check`, así que se pregunta antes (2026-10-09)
+**Encontrado por:** al medir las casts hermanas para la decisión de [`GLB-109`](GLOBAL.md) (`##'expr`), el
+2026-10-09
+
+```zymbol
+g(a) {
+    <~ a
+}
+>> "antes" ¶
+x = ###g(1, 2)
+>> x ¶
+```
+
+| programa | `zymbol check` | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|---|
+| `x = ###g(1, 2)` (aridad) | nada | `antes`, y falla **al ejecutar** | `antes`, y falla al ejecutar | rechazado **antes** de ejecutar |
+| `x = ##.(noexiste + 1)` | nada | `antes`, y falla al ejecutar | rechazado antes (sin ayuda) | rechazado antes |
+| `x = ###f(2, y)`, con `b<~` sin marcar | nada | — | — | — |
+| control: `x = g(1, 2)` | rechazado | rechazado | rechazado | rechazado |
+| control: `x = (1 + "a" * 2)` | aviso de aritmética | — | — | — |
+| control: `n = 3.7` y `x = ###n` | sin aviso de `n` sin usar | — | — | — |
+
+`##!` y `##.` dan lo mismo que `###`. El análisis de variables sin usar sí entra en la cast (la última fila); lo
+que se pierde es todo lo que hace `infer_expr`: la aridad, el nombre inexistente, la marca `<~`, los avisos de
+tipo.
+
+### Causa
+
+`zymbol-semantic/src/type_check.rs:3725`: `Expr::NumericCast(op) => match op.kind { … }` responde `Float` o
+`Int` sin inferir `op.expr`. Es la misma forma que los operandos de `$#`/`$?`/`$??`, el cuerpo de bloque de una
+lambda (ZYTW-001), `#|…|` ([`GLB-071`](GLOBAL.md)) y los argumentos de `<\ … \>` ([`GLB-075`](GLOBAL.md)). La VM
+ve el nombre inexistente porque su compilador resuelve los nombres al compilar; `zyjs` lo ve todo porque su
+`checkSource` desciende.
+
+### Qué hay que decidir
+
+Nada del lenguaje: una llamada mal escrita es un error estático en cualquier otra posición. Lo que se pregunta
+es el **cuándo**, porque corregirlo rechaza antes de ejecutar los programas que hoy pasan `check` con un error
+dentro de una cast. Recomendado: con el paso de [`GLB-109`](GLOBAL.md), si se decide, porque el brazo nuevo de
+`##'` va en el mismo `match` y copiar el de al lado sería la séptima aparición.
+
+### Qué lo sujeta
+
+`refusal/arity-inside-a-numeric-cast` y `refusal/undefined-inside-a-numeric-cast`, con `open_finding =
+"GLB-112"`: los tres rechazan, y difieren en si `antes` llega a imprimirse.
+
+Las dos celdas son lo único que provoca dos diagnósticos de ejecución del TW —*«'{}' is undefined — did you mean
+'{}°' (hot definition)?»* y *«function expects {} arguments, got {}»*—, así que `reach` los quitó de su lista de
+«sin provocar» (`--prune`, 2026-10-09). Al corregir esta ficha dejarán de provocarse: vuelven a esa lista a mano,
+en el mismo commit, porque `--prune` sólo quita.
