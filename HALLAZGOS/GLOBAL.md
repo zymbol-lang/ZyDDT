@@ -7761,6 +7761,8 @@ Al medir aparecieron dos cosas que **no** se tocaron: una ruta indirecta de `Int
 y `zyjs` sí ([`GLB-114`](GLOBAL.md)); `##'` se comporta en eso como sus hermanas. `zymbol-design/SYMBOLS.md` y
 `SIMBOLOS_ES.md` decían que `##'` es *«input typespec position only»*; corregidos con permiso del autor el
 2026-10-09 (`f51357b`), con la fila de v0.0.10 en § 19: ninguna marca nueva. GLB-114 se corrigió el mismo día.
+Y el escáner de ZyFmtCheck tomaba el `'` de `##'` por una comilla de apertura: ZyBF, con `##'cinta[p]`, lo puso en
+rojo en cuanto entró en la puerta; ya lee `##'` y `##"` como marcas.
 
 Lo sujetan, en `runtime-format-convert`: `char-cast-from-an-int` (con oráculo), `char-cast-code-with-no-character-is-range`,
 `char-cast-of-a-non-int-is-type`, y las dos sin capturar que provocan sus mensajes (`reach`); y
