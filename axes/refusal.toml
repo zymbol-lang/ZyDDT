@@ -218,6 +218,38 @@ s = g(1, 2, 3)$#
 >> s ¶
 """
 
+# ── The operand of a numeric cast (added 2026-10-09) ─────────────────────────
+#
+# The sixth appearance of the same hole: `infer_expr` answers `Expr::NumericCast`
+# with the cast's result type and never infers the operand, so nothing written
+# inside `###`, `##.` or `##!` is checked. The tree-walker then runs the program
+# and fails half way, the VM's compiler refuses an undefined name before running
+# but not a wrong arity, and zyjs refuses both before running (GLB-112, filed,
+# not fixed). The `>> "antes"` line is what tells static from run-time apart.
+
+[[cell]]
+id   = "arity-inside-a-numeric-cast"
+what = "a call with the wrong argument count, as the operand of `###`: zyjs refuses before running, the Rust engines print `antes` first (GLB-112)"
+src  = """
+g(a) {
+    <~ a
+}
+>> "antes" ¶
+x = ###g(1, 2)
+>> x ¶
+"""
+open_finding = "GLB-112"
+
+[[cell]]
+id   = "undefined-inside-a-numeric-cast"
+what = "a name that does not exist, inside `##.`: the tree-walker prints `antes` first and fails running (GLB-112)"
+src  = """
+>> "antes" ¶
+x = ##.(noexiste + 1)
+>> x ¶
+"""
+open_finding = "GLB-112"
+
 # The help of an arity refusal writes the signature as the CALLER writes it —
 # the names, and `<~` where the call must spell it (GLB-040, decided
 # 2026-09-25). It used to print inferred types, `g(Number, Number)`, which zyjs
