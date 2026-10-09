@@ -974,3 +974,25 @@ h(s) {
 x = "zeta"
 >> h(#|x|) ¶
 """
+
+
+# ── A second statement on the line of an assignment (added 2026-10-09) ──────
+#
+# The right-hand side of `=` takes juxtaposition, so in `s = s + 1  i = i + 1`
+# the `i` is read as one more operand and the error lands on the second `=`. The
+# three engines refuse it; the Rust ones say `unexpected token: '='` with a list
+# of the statements expected, zyjs `expected expression, found '='`, and none
+# says what happened (GLB-111, documented, undecided).
+
+[[cell]]
+id   = "second-statement-after-an-assignment-on-one-line"
+what = "`s = s + 1  i = i + 1` on one line: refused, and the message does not say the `i` joined the expression before it (GLB-111)"
+src  = """
+s = 0
+i = 1
+@ i <= 2 {
+    s = s + 1  i = i + 1
+}
+>> s " " i ¶
+"""
+open_finding = "GLB-111"

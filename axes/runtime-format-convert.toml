@@ -447,3 +447,24 @@ what = "`#|nada|` on a name that does not exist is refused before running"
 src  = """
 >> #|nada| ¶
 """
+
+
+# ── A literal with a base prefix is a Char (added 2026-10-09) ───────────────
+#
+# `0x`, `0b`, `0o` and `0d` write character codes (zymbol-design/SYMBOLS.md):
+# `0xFF` is `ÿ` and `0d65` is `A`, outside ASCII too, in the three engines.
+# Three texts say Int (GLB-110, documented): this cell holds the engines,
+# which are right, against a drift towards what those texts say.
+
+[[cell]]
+id     = "base-literal-is-a-char"
+expect = "ok"
+what   = "`0xFF`, `0x3042` and `0d65` are Chars — `ÿ`, `あ`, `A` — and `##!` gives their codes (GLB-110)"
+src    = """
+a = 0xFF
+b = 0x3042
+c = 0d65
+>> a " " b " " c ¶
+>> (a#?)[1] " " (b#?)[1] " " (c#?)[1] ¶
+>> (##!a + 1) ¶
+"""
