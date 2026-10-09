@@ -7647,3 +7647,139 @@ El parche (`ordenar_comparador.patch`) no está en este workspace.
 
 `zyquality/cost` `growth/sort-with-comparator` (`growth-ratio`, ×4, límite 6,0), KNOWN en los tres motores con
 esta ficha: una ordenación O(n log n) daría ~5, la burbuja da ~14 en los motores Rust y ~11 en `zyjs`.
+
+---
+
+## GLB-109 — Un valor calculado no se puede convertir en `Char`: hay literal por código, pero ningún paso de entero a carácter
+
+**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Encontrado por:** ZyBF, `GAP-BF-001`: un intérprete de Brainf\*\*\* escrito en Zymbol (`ZyBrainfuck/`,
+2026-10-01), cuya instrucción `.` imprime «el carácter cuyo código es el valor de la celda»; validado contra la
+rama `v0.0.10` el 2026-10-09
+
+```zymbol
+n = 65
+c = ##'n
+>> c ¶
+```
+
+Los tres motores lo rechazan al parsear: `expected expression, found '##''`.
+
+| intento, con `n = 65` | los tres motores |
+|---|---|
+| `##'n`, `##'65`, `##'(n)` | `expected expression, found '##''` |
+| `"{n}"`, `"" n` | el texto `65`, de dos caracteres |
+| control: `0d65`, el literal por código | `A`, un `Char` (`##'`) |
+| control: `##!'A'`, el sentido contrario | `65` |
+
+`##!` es *«the only direct Char→Int route»* (`GUIDE.md` § Type Conversion Casts), y del sentido contrario no
+hay ninguno: ni en la GUIDE ni en los 678 ficheros del corpus. `##'` existe sólo como marca de **entrada**
+(`<< ##' "msg" c`, que pide un texto de un carácter), mientras que `###` y `##.` son a la vez marca de entrada
+y conversión en una expresión (`###x`, `##.x`).
+
+El rodeo es una tabla de 256 literales indexada al ejecutar —`tabla = [0d0, 0d1, …, 0d255]` y
+`tabla[v + 1]`—, que es lo que hace `ZyBrainfuck/bf.zy`: sus 13 pruebas dan, en los tres motores, lo mismo que
+el oráculo en Python. Hay que escribirla en cada programa, y no llega más allá del 255.
+
+### Qué hay que decidir
+
+- que `##'expr` convierta un entero en el carácter de ese punto de código, y que uno fuera de Unicode sea
+  un `##Range` (Recomendado): la marca ya existe y ya significa «un Char» —derivar, no inventar (SYM-1)—, y
+  completa la pareja con `##!`;
+- dejarlo como está, y que la GUIDE documente la tabla.
+
+### Qué lo sujeta
+
+Nada todavía: los tres motores rechazan la forma igual, así que una celda no vería nada. La celda se escribe
+con la decisión.
+
+---
+
+## GLB-110 — Tres textos dicen que un literal con prefijo de base es `Int`; los motores y el diseño dicen `Char`
+
+**Estado:** **abierto** — sólo documentado (2026-10-09); corregirlo no necesita decisión: la descripción es
+lo que está mal
+**Encontrado por:** ZyBF, `ERROR-BF-002` (2026-10-01), leyendo `corpus/arithmetic/07_base_literals.zy`
+contra su golden; validado contra la rama `v0.0.10` el 2026-10-09
+
+```zymbol
+a = 0xFF
+b = 0x3042
+c = 0d65
+>> a " " b " " c ¶
+>> (a#?)[1] " " (b#?)[1] " " (c#?)[1] ¶
+>> (##!a + 1) ¶
+```
+
+Los tres motores imprimen `ÿ あ A`, `##' ##' ##'` y `256`: un literal con prefijo de base es siempre un
+`Char`, también fuera de ASCII. Es lo que dice el diseño —`zymbol-design/SYMBOLS.md`, *«base prefixes for
+character codes: `0x41` → `'A'`»*— y lo que dicen `REFERENCE.md` (`0xFF // → 'ÿ'`) y `GUIDE.md` cuando habla
+de *«numeric character codes»*. Tres textos dicen otra cosa:
+
+| dónde | dice |
+|---|---|
+| `interpreter/LLM.md`, línea 48, la tabla de tipos | `0x41`, `0b1010`, `0o17` y `0d99` en la fila de **`Int`** |
+| `interpreter/GUIDE.md` § Base Literals and Conversions | *«result: Char if ASCII range, Int otherwise»* |
+| `zyquality/corpus/arithmetic/07_base_literals.zy`, línea 11 | *«Higher hex values (Int result)»* — y su `.expected` registra `ÿ` |
+
+La consecuencia práctica: no hay literal entero en hexadecimal. `0xFF + 1` falla con `arithmetic requires
+numeric operands: Char, Int`, y hay que escribir `##!0xFF + 1`. Tener uno sería otra decisión, aparte de ésta.
+
+### Qué hay que hacer
+
+Corregir los tres textos para que digan lo que el diseño. No necesita decisión: cuando una descripción y el
+diseño no coinciden, lo que está mal es la descripción (`CLAUDE.md`).
+
+### Qué lo sujeta
+
+`runtime-format-convert/base-literal-is-a-char` (`expect = "ok"`) sujeta a los motores, que ya están bien.
+Los textos no los vigila nada: `zyquality/docs/guide_verify.py` comprueba lo que imprimen los ejemplos de la
+GUIDE, no el comentario de cabecera de ese ejemplo, y `LLM.md` no lo comprueba nada.
+
+---
+
+## GLB-111 — Tras `x = e`, una segunda sentencia en la misma línea falla con un error que no dice que la primera se la comió
+
+**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Encontrado por:** ZyBF, `IDEA-BF-003` (2026-10-01, al escribir `pruebas.zy`); validado contra la rama
+`v0.0.10` el 2026-10-09
+
+```zymbol
+s = 0
+i = 1
+@ i <= 2 {
+    s = s + 1  i = i + 1
+}
+>> s " " i ¶
+```
+
+Los motores Rust: `unexpected token: '='` en la columna del segundo `=`, con la ayuda *«expected statement
+(>>, <<, ?, ??, @, @!, @>, !?, <~, ¶, \\, or identifier)»*. `zyjs`: `expected expression, found '='`, sin
+ayuda. Ninguno dice lo que pasó.
+
+| escrito en una línea | los tres motores |
+|---|---|
+| `s += 1  i += 1` y `s += 1  i = i + 1` | corre: `2 3` |
+| `s = s + 1  i += 1` | rechazado en el `+=` (`zyjs`, con otras palabras) |
+| `s = s + 1  i = i + 1` | rechazado en el `=` (`zyjs`, con otras palabras) |
+| `s = s + 1; i = i + 1` | corre |
+| `>> ¶ ok " de " (ok + mal) ¶` | `unexpected token: " de "`, igual en los tres |
+
+La causa, medida: el lado derecho de `=` acepta yuxtaposición y el de `+=` no. `t = "a" b "c"` da `axc`;
+`t += "a" b "c"` se rechaza en el `"c"`. Así que en `s = s + 1  i = i + 1` la `i` se lee como un operando
+más de `s + 1`, y el error llega en el `=`. La misma regla deja pasar en silencio lo que no se quería
+escribir: `s = 1  i`, con `i = 1`, da el texto `11`.
+
+### Qué hay que decidir
+
+- que el diagnóstico diga lo que pasó —que la `i` se leyó como parte de la expresión anterior, y que una
+  sentencia nueva va en otra línea o tras `;`—, con las mismas palabras en los dos analizadores
+  (Recomendado);
+- además, avisar de una yuxtaposición de un número con un nombre en una asignación (`s = 1  i`): es otra
+  decisión, porque la yuxtaposición es la concatenación del lenguaje;
+- dejarlo como está.
+
+### Qué lo sujeta
+
+`refusal/second-statement-after-an-assignment-on-one-line` (`expect = "error"`), con `open_finding =
+"GLB-111"`: los tres rechazan, y lo que difiere es la redacción.
