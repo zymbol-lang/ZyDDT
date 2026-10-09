@@ -240,6 +240,25 @@ print(len(x))
 print(str(5) + str(1))
 """
 
+# The neighbour of GLB-111: a name juxtaposed in an assignment is concatenation,
+# and the language writes no warning for it — `s = s + 1  i = i + 1` is refused
+# for the second `=`, not for the `i` (decided 2026-10-09).
+[[cell]]
+id     = "juxtaposition-with-a-name-is-concatenation"
+what   = "`t = 1  i` with `i = 1` runs, is the text \"11\", and warns nothing — the neighbour GLB-111 left alone"
+expect = "ok"
+src    = """
+i = 1
+t = 1  i
+>> t ¶
+>> t$# ¶
+"""
+oracle.py = """
+t = str(1) + str(1)
+print(t)
+print(len(t))
+"""
+
 # ── The kind of an arithmetic type error (added 2026-10-05) ────────────────
 #
 # Measured beside GLB-059: every arithmetic operator refused for its operands'

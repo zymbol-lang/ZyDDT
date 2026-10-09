@@ -1012,9 +1012,12 @@ x = "zeta"
 #
 # The right-hand side of `=` takes juxtaposition, so in `s = s + 1  i = i + 1`
 # the `i` is read as one more operand and the error lands on the second `=`. The
-# three engines refuse it; the Rust ones say `unexpected token: '='` with a list
-# of the statements expected, zyjs `expected expression, found '='`, and none
-# says what happened (GLB-111, documented, undecided).
+# Rust engines said `unexpected token: '='` with a list of the statements
+# expected — which offers an identifier, and `i` is one — and zyjs `expected
+# expression, found '='`. Corrected 2026-10-09 (GLB-111): the three say
+# `unexpected '=': 'i' was read as part of the expression before it`, with the
+# help `a new statement starts on a new line, or after ';'`, for `=`, the
+# compound assignments and `++`/`--` alike.
 
 [[cell]]
 id   = "second-statement-after-an-assignment-on-one-line"
@@ -1027,4 +1030,23 @@ i = 1
 }
 >> s " " i ¶
 """
-open_finding = "GLB-111"
+
+[[cell]]
+id   = "second-statement-after-an-assignment-on-one-line-compound"
+what = "`s = s + 1  i += 1`: the same sentence, for `+=` (GLB-111)"
+src  = """
+s = 0
+i = 1
+s = s + 1  i += 1
+>> s " " i ¶
+"""
+
+[[cell]]
+id   = "second-statement-after-an-assignment-on-one-line-increment"
+what = "`s = s + 1  i++`: the same sentence, for `++` (GLB-111)"
+src  = """
+s = 0
+i = 1
+s = s + 1  i++
+>> s " " i ¶
+"""
