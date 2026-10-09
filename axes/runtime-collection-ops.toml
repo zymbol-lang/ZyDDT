@@ -1581,10 +1581,9 @@ t(v) {
 
 # ── Ties under `$^` (added 2026-10-02) ──────────────────────────────────────
 #
-# No `expect`: which tied element goes first is exactly what nobody has decided
-# (GLB-073), and an assertion here would be inventing it. The cell asks the
-# engines alike, diverges today, and carries the debt until the decision lands.
-
+# Added without `expect`, while the order of ties was undecided and the engines
+# diverged on it (GLB-073); the cells assert the decision since it landed.
+#
 # `$^` is stable — decided 2026-10-03 (GLB-073). A pair is swapped only when the
 # first does NOT go before the second AND the second goes before the first, so
 # a strict comparator (`>`, the form every program in the workspace writes)
