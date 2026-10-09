@@ -453,8 +453,8 @@ src  = """
 #
 # `0x`, `0b`, `0o` and `0d` write character codes (zymbol-design/SYMBOLS.md):
 # `0xFF` is `ÿ` and `0d65` is `A`, outside ASCII too, in the three engines.
-# Three texts say Int (GLB-110, documented): this cell holds the engines,
-# which are right, against a drift towards what those texts say.
+# Three texts said Int (GLB-110, corrected 2026-10-09): this cell holds the
+# engines, which were right, against a drift towards what those texts said.
 
 [[cell]]
 id     = "base-literal-is-a-char"

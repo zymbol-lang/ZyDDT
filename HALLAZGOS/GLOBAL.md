@@ -7697,8 +7697,8 @@ con la decisión.
 
 ## GLB-110 — Tres textos dicen que un literal con prefijo de base es `Int`; los motores y el diseño dicen `Char`
 
-**Estado:** **abierto** — sólo documentado (2026-10-09); corregirlo no necesita decisión: la descripción es
-lo que está mal
+**Estado:** **corregido 2026-10-09** (fase 0.1 del plan de ZyBench y ZyBF) — sin decisión: la descripción
+era lo que estaba mal
 **Encontrado por:** ZyBF, `ERROR-BF-002` (2026-10-01), leyendo `corpus/arithmetic/07_base_literals.zy`
 contra su golden; validado contra la rama `v0.0.10` el 2026-10-09
 
@@ -7735,6 +7735,22 @@ diseño no coinciden, lo que está mal es la descripción (`CLAUDE.md`).
 `runtime-format-convert/base-literal-is-a-char` (`expect = "ok"`) sujeta a los motores, que ya están bien.
 Los textos no los vigila nada: `zyquality/docs/guide_verify.py` comprueba lo que imprimen los ejemplos de la
 GUIDE, no el comentario de cabecera de ese ejemplo, y `LLM.md` no lo comprueba nada.
+
+### Corrección
+
+Los tres textos dicen ahora `Char`, y ningún motor cambia:
+
+- `interpreter/LLM.md`: los literales con prefijo pasan de la fila `Int` a la de `Char`, con la nota *«a
+  base-prefixed literal is a character code, in any range: `0x41` is `'A'`, `0xFF` is `'ÿ'`; its Int is
+  `##!0x41`»*.
+- `interpreter/GUIDE.md` § Base Literals and Conversions: la cabecera dice *«result: a Char, the character with
+  that code»*, y el ejemplo gana `e = 0xFF` con dos líneas que `guide_verify.py` sí comprueba,
+  `>> e ¶ // → ÿ` y `>> ##!e ¶ // → 255` (el bloque #206 pasa; la GUIDE, 122 de 122).
+- `zyquality/corpus/arithmetic/07_base_literals.zy`: el comentario dice *«still a Char»*; su golden no cambia.
+
+Quedan cuatro frases ciertas pero estrechas, que dicen «en el rango ASCII es un carácter» sin decir qué es
+fuera de él: `interpreter/IMPLEMENTATION.md` (líneas 1164 y 1608) y los manuales `v009` (`manual_en.md`,
+`manual_tl.md`). No afirman `Int`, así que no entran en esta ficha.
 
 ---
 
