@@ -7586,7 +7586,8 @@ y `top-level-exit-of-a-string-in-a-match-value`. Con los motores de antes, las s
 
 ## GLB-108 — `$^` con comparador propio es cuadrático en los tres motores: una burbuja sin salida anticipada
 
-**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-08)
+**Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09 (D3): una mezcla ascendente estable
+con la regla B, la misma en los tres motores llamada por llamada
 **Encontrado por:** ZyBench, `BUG-BEN-001`, una medición de la VM contra Python hecha en otra sesión sobre
 `820a60a` (2026-10-04); validado aquí contra la rama `v0.0.10` el 2026-10-08
 
@@ -7647,6 +7648,36 @@ El parche (`ordenar_comparador.patch`) no está en este workspace.
 
 `zyquality/cost` `growth/sort-with-comparator` (`growth-ratio`, ×4, límite 6,0), KNOWN en los tres motores con
 esta ficha: una ordenación O(n log n) daría ~5, la burbuja da ~14 en los motores Rust y ~11 en `zyjs`.
+
+### Corrección
+
+Una sola especificación, portada a `eval_collection_sort` (TW), `Instruction::ArraySort` (VM) y `case '$^'`
+(`zyjs`): mezcla ascendente por índices —tramos de anchura 1, 2, 4, …, mezclados de izquierda a derecha— y, en
+cada comparación, la regla B de GLB-073: sale el de la izquierda salvo que el comparador diga que el de la
+izquierda **no** va antes **y** que el de la derecha **sí**. Con `<` los empates quedan en su orden de entrada;
+con `<=` nunca se pregunta dos veces. Un comparador que no responde un `Bool` y el primer error del comparador
+cortan la ordenación como antes.
+
+Lo que la comprueba:
+
+- **El orden de las llamadas.** La especificación escrita en Python (que además coincide con `sorted`, estable)
+  generó 40 programas al azar, de 0 a 13 elementos con claves de 1 a 4 y comparadores `<` y `<=`, cuyo comparador
+  imprime cada pareja que le preguntan: los tres motores imprimen exactamente lo que la especificación predice,
+  120 de 120.
+- **El coste.** `zyquality/cost` `growth/sort-with-comparator`, ya sin deuda: 3,75 en el TW, 3,55 en la VM y 2,07
+  en `zyjs` (antes 14,9, 13,6 y 10,6). El caso creció para los motores Rust —8000 elementos en el TW, 32 000 en la
+  VM— porque con la mezcla los tamaños de antes corrían por debajo del suelo de 40 ms del arnés y habrían medido
+  el arranque; `zyjs` se queda en 500, porque más grande mediría su `$+` cuadrático (ZYJS-014).
+
+| n | VM antes → ahora | TW antes → ahora | `zyjs` antes → ahora |
+|---|---:|---:|---:|
+| 1 000 | 79 → 7 ms | 294 → 11 ms | 1 705 → 170 ms |
+| 2 000 | 281 → 13 ms | 1 102 → 25 ms | 5 955 → 226 ms |
+| 4 000 | 1 102 → 21 ms | 4 486 → 33 ms | — → 367 ms |
+
+- **La estabilidad.** Las celdas de GLB-073 siguen verdes, y `runtime-collection-ops/sort-ties-across-every-merge-width`
+  —60 registros sobre 4 claves, descendente con `>`, tramos de anchura 1 a 32— coincide con `sorted` de Python.
+- La GUIDE § Sort dice el coste.
 
 ---
 
