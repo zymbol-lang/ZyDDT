@@ -1632,7 +1632,7 @@ print("".join(n for n, s in sorted(p, key=lambda t: -t[1])))
 
 [[cell]]
 id   = "sort-comparator-calls-in-the-same-order"
-what = "a comparator that prints: the three engines ask it the same pairs in the same order (zyjs ran an insertion sort until GLB-073)"
+what = "a comparator that prints: the three engines ask it the same pairs in the same order (zyjs ran an insertion sort until GLB-073; the three run one merge sort since GLB-108)"
 src  = """
 v = [3, 1, 2, 1]
 q = v$^ (a, b -> {
@@ -1641,6 +1641,41 @@ q = v$^ (a, b -> {
 })
 >> ¶
 >> q ¶
+"""
+
+# GLB-108 (corrected 2026-10-09): the bubble sort that visited every pair is a
+# bottom-up merge sort, the same call for call in the three engines, and rule B
+# still decides every comparison. Many ties under a strict comparator are where
+# a merge can lose stability — the run boundaries fall between tied elements —
+# so the oracle is Python's `sorted`, documented stable.
+
+[[cell]]
+id     = "sort-ties-across-every-merge-width"
+what   = "60 records on 4 keys, descending with a strict comparator — runs of width 1 to 32: every tie keeps its input order, as Python's `sorted` (GLB-108)"
+expect = "ok"
+src    = """
+x = 11
+v = []
+@ i:1..60 {
+    x = (x * 75 + 74) % 65537
+    t = (x % 4, i)
+    v$+ t
+}
+q = v$^ (a, b -> a[1] > b[1])
+s = ""
+@ e:q {
+    s = s e[1] ":" e[2] " "
+}
+>> s ¶
+"""
+oracle.py = """
+x = 11
+v = []
+for i in range(1, 61):
+    x = (x * 75 + 74) % 65537
+    v.append((x % 4, i))
+q = sorted(v, key=lambda t: -t[0])
+print("".join(f"{a}:{b} " for a, b in q))
 """
 
 # ── The empty pattern (added 2026-10-02, decided 2026-10-03) ───────────────
