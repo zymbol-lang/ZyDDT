@@ -714,13 +714,15 @@ for _ in range(2):
 }
 """
 
-# What the three do TODAY while the state is passed as output and read directly
-# at the same time: two copies, 3 and 4 elements. Lending the original instead
-# of copying (GLB-117) has to decide this case; the cell says what changes.
+# Module state passed as output and read directly at the same time: two copies,
+# 3 and 4 elements. Everything else passed as `<~` is LENT to its parameter
+# since 2026-10-10 (GLB-117); this is the one case that is not, decided as S3 —
+# every function of the module can see the original while the call lasts, so
+# the parameter works on a copy, written back when the call returns.
 
 [[cell]]
 id     = "module-state-read-while-passed-as-output"
-what   = "inside the callee, the module's state read directly and the `<~` parameter bound to it are two copies today: `3 4` (GLB-117, S3)"
+what   = "inside the callee, the module's state read directly and the `<~` parameter bound to it are two copies: `3 4` (GLB-117, S3)"
 expect = "ok"
 src    = """
 <# ./mod/pres2 => P
@@ -1124,3 +1126,78 @@ otro(); show()
     ver() { <~ (n, t) }
 }
 """
+
+# The other side of S3: a copy that is not written back is dropped. A function
+# that writes its `<~` parameter and then fails leaves the module's state as it
+# was — where a variable of the caller's own keeps what was written (S1), since
+# that one was lent. A local of a module function is lent like any other.
+
+[[cell]]
+id     = "module-state-passed-as-output-to-a-call-that-fails"
+what   = "`tocar(datos<~)` writes and then fails, with `datos` the module's state: the state is unchanged; a local passed the same way keeps the writes, through two levels (GLB-117, S1 and S3)"
+expect = "ok"
+oracle_literal_ok = "the labels are the observable of a path; the collections are computed on both sides"
+src    = """
+<# ./mod/presta => P
+P::correr()
+>> P::ver() ¶
+>> P::anidado() ¶
+"""
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+datos = [1, 2, 3]
+def tocar(a):
+    a.append(9)
+    x = [1]
+    a.append(x[5 - 1])
+def interno(a):
+    a.append(5)
+    z = [1]
+    a.append(z[9 - 1])
+def externo(a):
+    a.append(4)
+    interno(a)
+    a.append(6)
+try: tocar(list(datos))
+except IndexError: print("falla en el modulo")
+print(show(datos))
+local = [0]
+try: externo(local)
+except IndexError: print("falla anidada")
+print(show(local))
+"""
+[cell.files]
+"mod/presta.zy" = """
+# presta {
+    #> { correr, ver, anidado }
+    datos = [1, 2, 3]
+
+    tocar(a<~) {
+        a$+ 9
+        x = [1]
+        y = x[5]
+        a$+ y
+    }
+    correr() {
+        !? { tocar(datos<~) } :! { >> "falla en el modulo" ¶ }
+    }
+    interno(a<~) {
+        a$+ 5
+        z = [1]
+        w = z[9]
+        a$+ w
+    }
+    externo(a<~) {
+        a$+ 4
+        interno(a<~)
+        a$+ 6
+    }
+    anidado() {
+        local = [0]
+        !? { externo(local<~) } :! { >> "falla anidada" ¶ }
+        <~ local
+    }
+    ver() { <~ datos }
+}
+"""
+
