@@ -629,8 +629,8 @@ sin imprimir nada. Ahora son dos pasos: el valor a `dst` y después el bloque.
 
 ## ZYVM-010 — Soltar valores cuesta entre el 11 y el 17 % del tiempo de la VM
 
-**Estado:** abierto — la parte del marco (los cuatro cambios de `IDEA-BEN-002`) **aplicada el 2026-10-09**;
-quedan abiertas la escritura de un registro (`wreg!`, `reg_set`) y la reutilización de temporales del compilador
+**Estado:** abierto — la parte del marco (`IDEA-BEN-002`) **aplicada el 2026-10-09** y la escritura de un registro
+el **2026-10-10**; queda abierta sólo la reutilización de temporales del compilador, aplazada por el autor (R4)
 **Encontrado por:** el perfil de [`IDEA-GOL-007`](../../GoL/HALLAZGOS.md) (el
 coste de una llamada por celda), el 2026-10-01, **no por una celda**
 **Familia:** ninguna con nombre todavía. Es coste, no semántica: los tres
@@ -795,6 +795,35 @@ Un binario de release compilado aparte con símbolos (`strip = false`, `debug = 
 Soltar el valor anterior al escribir un registro sigue costando entre el 10 y el 20 %, también en las
 aplicaciones. La llamada en sí (la diferencia entre la versión con llamada y la versión en línea) es ya el 5,5 %
 de las instrucciones, así que lo que queda por ganar reutilizando temporales es poco.
+
+### La escritura de un registro, aplicada (2026-10-10)
+
+Decidido por el autor el 2026-10-10 (R3). `wreg!` y `reg_set` escriben ahora por `put_reg`: sustituyen el valor
+y sólo llaman a la rutina de soltado si el anterior posee memoria; un escalar se olvida (`mem::forget`). **Sin
+`unsafe`**, y `owns_memory` enumera los escalares, así que una variante nueva se suelta por defecto.
+
+Ciclos de CPU de usuario (`perf stat -e cycles:u`, mediana de 5), contra el mismo binario de antes sin símbolos:
+
+| programa, en la VM | antes | ahora | |
+|---|---:|---:|---:|
+| `fib(30)` | 641,5 M | 618,8 M | −3,5 % |
+| un `reduce` de 500 000 | 245,4 M | 237,0 M | −3,4 % |
+| un bucle de 2 000 000 de vueltas | 691,3 M | 609,5 M | **−11,8 %** |
+| una llamada por celda, lado 160 | 2 720,8 M | 2 272,2 M | **−16,5 %** |
+| GO, una partida contra sí mismo | 506,0 M | 486,1 M | −3,9 % |
+| Chaturanga, la búsqueda | 521,7 M | 475,3 M | −8,9 % |
+| `ZyBF/pesado2.zy` | 1 294,6 M | 1 275,7 M | −1,5 % |
+
+Las instrucciones bajan menos (del 2 al 4 %): lo que se ahorra es la llamada, que costaba en ciclos más que en
+instrucciones. El tiempo de reloj no se da: en programas de menos de 100 ms baila un 15 % entre corridas, y el
+binario con símbolos que sirvió de «antes» tarda 8 ms más en cargar — comparar contra él inflaba la mejora.
+
+Ninguna salida cambia: `cargo test --release` 1060 y 4 ignorados, el consenso del corpus (673 de 679, 0 divergen),
+las nueve aplicaciones, y las dos sondas de memoria con el pico plano (11,2 MB). `zyquality/cost`
+`call/function-in-hot-loop` da 1,04 en la VM.
+
+Lo que mantiene la ficha abierta: reutilizar los temporales del compilador (`alloc_temp`). Aplazado: la llamada
+entera es el 5,5 % de las instrucciones, y reutilizar un registro que sigue vivo es un error de valores silencioso.
 
 ---
 
