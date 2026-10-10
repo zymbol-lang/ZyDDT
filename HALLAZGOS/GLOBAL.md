@@ -8102,3 +8102,107 @@ Concatenation lo dice, con un ejemplo que `guide_verify` comprueba.
 Las celdas: `juxtaposed-cast-in-an-assignment` deja la deuda y afirma `a4` contra un oráculo, y dos vecinas
 nuevas, `juxtaposed-prefix-operators-in-a-return` y `juxtaposed-prefix-operators-after-a-concatenation`.
 
+---
+
+## GLB-115 — Una edición cuyo operando escribe el mismo estado de módulo: el TW conserva esa escritura, la VM y `zyjs` la pierden
+
+**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-10)
+**Encontrado por:** al medir [`ZYVM-003`](zyvm.md) (el coste de editar el estado de un módulo en la VM), cuyo
+arreglo tiene que implementar una de las dos respuestas
+
+```zymbol
+// mod/orden.zy
+# orden {
+    #> { anexar, ver }
+    datos = [1, 2, 3]
+
+    meter() {
+        datos$+ 99
+        <~ 1
+    }
+    anexar() { datos$+ meter() }
+    ver() { <~ datos }
+}
+```
+
+```zymbol
+<# ./mod/orden => O
+O::anexar()
+>> O::ver() ¶
+```
+
+| edición, con `meter()` que añade `99` a `datos` y devuelve `1` | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `datos$+ meter()` | `[1, 2, 3, 99, 1]` | `[1, 2, 3, 1]` | `[1, 2, 3, 1]` |
+| `datos[1]$~ meter()` | `[1, 2, 3, 99]` | `[1, 2, 3]` | `[1, 2, 3]` |
+| `datos$-[meter()]` | `[2, 3, 99]` | `[2, 3]` | `[2, 3]` |
+
+En la VM y en `zyjs` la escritura que hace el operando **se pierde en silencio**: la edición lee el receptor
+antes de evaluar el operando, edita esa copia y la guarda encima del estado.
+
+### Causa
+
+- **TW:** el camino rápido de `execute_assignment` (`variables.rs`, «B3») evalúa primero el operando y después
+  modifica la variable en su ranura (`get_variable_mut`), así que edita el estado tal como está en ese momento.
+- **VM:** una edición es azúcar de `datos = datos$+ meter()`: `LoadGlobal` (el receptor, antes), el operando, la
+  edición sobre esa copia, `StoreGlobal`. Es también por lo que copia la colección entera (ZYVM-003).
+- **`zyjs`:** lo mismo; evalúa el receptor, luego el operando, y asigna el resultado.
+
+Sólo puede pasar con el estado de un módulo: una función no escribe las variables de quien la llama (MEM-2) y
+una lambda captura por valor, así que en una variable local el operando no tiene cómo tocar al receptor.
+
+### Qué hay que decidir
+
+- que la edición se aplique al receptor **tal como está cuando se ejecuta**, después de evaluar sus operandos, como
+  hace el TW (Recomendado): una edición descartada *modifica* —no es «leer, calcular y guardar»—, y la otra
+  respuesta pierde una escritura sin decir nada. Es también la forma que deja a la VM editar en el sitio;
+- que la edición use el valor de **antes** de evaluar el operando, como la VM y `zyjs`: es lo que da leer
+  `datos$+ meter()` como `datos = datos$+ meter()` de izquierda a derecha.
+
+Ninguna premisa lo decide: `PREMISES.md` no habla del orden entre el receptor y el operando de una edición, y el
+eje `evaluation-order` de ZyDDT ordena los efectos entre operandos, no esto.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/edit-whose-operand-writes-the-same-state`, con `open_finding = "GLB-115"`, sin `expect`:
+la respuesta no está decidida. Y, para cualquier arreglo, `runtime-modules-scripts/module-state-after-a-failed-edit`
+(`expect = "ok"`): una edición que falla, capturada, deja el estado como estaba — hoy en los tres.
+
+---
+
+## GLB-116 — `a$-[i - 1]`: el parser de Rust no acepta aritmética en el índice de `$-[…]`, y `zyjs` sí
+
+**Estado:** **abierto** — sólo documentado (2026-10-10)
+**Encontrado por:** una sonda escrita al medir [`GLB-115`](GLOBAL.md)
+
+```zymbol
+a = [10, 20, 30, 40]
+i = 3
+b = a$-[i - 1]
+>> b ¶
+```
+
+Los motores Rust: `expected ']', '..', or ':' after index`, con la ayuda *«remove syntax: $-[index],
+$-[start..end], or $-[start:count]»*. `zyjs`: `[10, 30, 40]`.
+
+| forma | Rust | `zyjs` |
+|---|---|---|
+| `a$-[i - 1]` | rechazado al parsear | `[10, 30, 40]` |
+| `a$-[(i - 1)]` | `[10, 30, 40]` | igual |
+| `a$-[i]` | `[10, 20, 40]` | igual |
+| `a$+[i - 1] 5`, `a[i - 1]`, `a[i - 1]$~ 5`, `a$[i - 1..i]` | corren | igual |
+
+Sólo el índice de `$-[…]` es más estrecho: el de `$+[…]`, el de lectura, el de `$~` y los límites de un corte
+aceptan la misma expresión en los tres.
+
+### Qué hay que decidir
+
+- que el parser de Rust lea ahí una expresión, como en los demás corchetes (Recomendado): es el único que no lo
+  hace, y con paréntesis ya lo acepta;
+- que `zyjs` lo rechace.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/remove-by-an-arithmetic-index`, con `open_finding = "GLB-116"`, y el control
+`runtime-collection-ops/arithmetic-index-in-the-other-brackets` (`expect = "ok"`).
+
