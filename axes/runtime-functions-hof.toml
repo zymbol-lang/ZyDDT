@@ -622,13 +622,38 @@ sumar(k<~)
 #
 # Operands are evaluated left to right (the `evaluation-order` axis), so in
 # `x + inc(x<~)` the `x` is 5 when it is read, whatever `inc` writes to it
-# afterwards. The tree-walker and zyjs answer 6; the VM reads the register when
-# the operator runs, after the write-back, and answers 16 (ZYVM-015, filed).
+# afterwards. The tree-walker and zyjs answered 6; the VM read the register when
+# the operator ran, after the write-back, and answered 16 (ZYVM-015, corrected
+# 2026-10-10: a variable the statement also passes as `<~` is read into a
+# temporary of its own).
 
 [[cell]]
-id   = "variable-read-before-a-later-operand-writes-it"
-what = "`x + inc(x<~)`, `(x, inc(x<~), x)` and `e = d$+ meter(d<~)`: the earlier read is the value before the call; the VM reads it after (ZYVM-015)"
-src  = """
+id     = "variable-read-before-a-later-operand-writes-it"
+what   = "`x + inc(x<~)`, `(x, inc(x<~), x)` and `e = d$+ meter(d<~)`: the earlier read is the value before the call (ZYVM-015)"
+expect = "ok"
+oracle.py = """
+def inc(box):
+    box[0] += 10
+    return 1
+def meter(d):
+    d.append(99)
+    return 1
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+x = [5]
+left = x[0]
+y = left + inc(x)
+print(y, x[0])
+x = [5]
+a = x[0]
+b = inc(x)
+c = x[0]
+print(f"({a}, {b}, {c})")
+d = [1, 2, 3]
+read = list(d)
+e = read + [meter(d)]
+print(show(e), show(d))
+"""
+src    = """
 inc(a<~) {
     a = a + 10
     <~ 1
@@ -647,4 +672,3 @@ d = [1, 2, 3]
 e = d$+ meter(d<~)
 >> e " " d ¶
 """
-open_finding = "ZYVM-015"

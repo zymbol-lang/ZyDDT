@@ -485,3 +485,49 @@ no mira antes si la variable se destruyó.
 Antes de buscar la función por nombre, la llamada comprueba con
 `check_variable_alive` si el nombre es una variable destruida. Solo lo hace cuando
 no hay una función con ese nombre. `lifetime` queda 24 de 24.
+
+---
+
+## ZYTW-008 — Una función cuyo parámetro se llama como el estado del módulo llama a otra: el TW escribe el parámetro en el estado
+
+**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: la VM y `zyjs` coinciden, y un
+parámetro es de su función
+**Encontrado por:** la misma sonda de [`ZYVM-018`](zyvm.md)
+
+```zymbol
+// mod/pasa.zy
+# pasa {
+    #> { d, ver }
+    datos = [1, 2, 3]
+
+    lee(v) { <~ v$# }
+    d(datos) { <~ lee(datos) }
+    ver() { <~ datos }
+}
+```
+
+```zymbol
+<# ./mod/pasa => P
+>> P::d([1]) " " P::ver() ¶
+```
+
+`zyvm` y `zyjs`: `1 [1, 2, 3]`. **`zytw`: `1 [1]`** — después de la llamada, el estado del módulo es el argumento.
+No hay ningún `<~` en el programa.
+
+| `d(datos)` con el argumento `[1]` | `zyvm`, `zyjs` | `zytw` |
+|---|---|---|
+| `<~ lee(datos)` — llama a otra función del módulo | estado `[1, 2, 3]` | **estado `[1]`** |
+| `otro(datos<~)` — la llama con el parámetro como salida | estado `[1, 2, 3]` | **estado `[1]`** |
+| control: `datos[1]$~ 9` · `<~ datos` — no llama a nadie | estado `[1, 2, 3]` | estado `[1, 2, 3]` |
+| control: el parámetro se llama `p` | estado `[1, 2, 3]` | estado `[1, 2, 3]` |
+
+### Causa
+
+Sin localizar. Sólo ocurre cuando la función que tiene el parámetro **llama** a otra función del módulo: lo que
+sincroniza el estado del módulo alrededor de una llamada toma el parámetro por la variable del módulo.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/call-from-a-function-whose-parameter-is-named-like-module-state`, con
+`open_finding = "ZYTW-008"`.
+

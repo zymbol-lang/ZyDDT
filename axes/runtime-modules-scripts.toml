@@ -625,10 +625,12 @@ open_finding = "GLB-115"
 }
 """
 
-# What ZYVM-003's fix must not break, whichever way GLB-115 goes: an edit of
-# module state that FAILS, caught, leaves the state as it was. The three agree
-# today; the VM's edit instructions take the value out of the register before
-# they validate, which is harmless only while the global slot keeps its own copy.
+# What ZYVM-003's fix could not break: an edit of module state that FAILS,
+# caught, leaves the state as it was. The VM's edit instructions used to take the
+# value out of the register before they validated, which was harmless only while
+# the module's slot kept its own copy. Since 2026-10-10 the edit is the only
+# owner of the value: every instruction validates before it writes, and a failed
+# edit hands the value back to the slot.
 
 [[cell]]
 id     = "module-state-after-a-failed-edit"
@@ -661,19 +663,29 @@ src    = """
 
 # ── Module state as an output argument (added 2026-10-10) ───────────────────
 #
-# `tocar(datos<~)` inside the module that owns `datos`. The tree-walker and zyjs
-# write the result back to the module's state; the VM loses it, silently
-# (ZYVM-014, filed). MEM-5 says an output parameter comes back modified.
+# `tocar(datos<~)` inside the module that owns `datos`. MEM-5 says an output
+# parameter comes back modified. The tree-walker and zyjs wrote the result back
+# to the module's state; the VM wrote it to the temporary it had loaded the
+# state into and lost it, silently (ZYVM-014, corrected 2026-10-10).
 
 [[cell]]
-id   = "output-argument-that-is-module-state"
-what = "a function writes its `<~` parameter and the argument is the module's own state: the VM loses the write (ZYVM-014)"
-src  = """
+id     = "output-argument-that-is-module-state"
+what   = "a function writes its `<~` parameter and the argument is the module's own state: the write reaches the state (ZYVM-014)"
+expect = "ok"
+src    = """
 <# ./mod/pres => P
 P::correr()
 >> P::ver() ¶
+P::correr()
+>> P::ver() ¶
 """
-open_finding = "ZYVM-014"
+oracle.py = """
+datos = [1, 2, 3]
+def tocar(a): a.append(9)
+for _ in range(2):
+    tocar(datos)
+    print("[" + ", ".join(str(x) for x in datos) + "]")
+"""
 [cell.files]
 "mod/pres.zy" = """
 # pres {
@@ -709,5 +721,216 @@ P::correr()
         >> datos$# " " a$# ¶
     }
     correr() { tocar(datos<~) }
+}
+"""
+
+# ── A tuple held as module state does not change either (added 2026-10-10) ──
+#
+# A positional tuple is not edited in place: `t$+ 4` as a statement is refused,
+# and `u = t$+ 4` builds. The VM made that check on the receiver's REGISTER, and
+# module state has none — so inside a module every editing operator but `$~`
+# went through and the tuple grew (ZYVM-016, corrected the day it was found).
+# The oracle says what each line must print; three engines that all let the
+# edit through would agree with each other.
+
+[[cell]]
+id     = "tuple-held-as-module-state-is-not-edited"
+what   = "`t$+ v`, `t$-[i]`, `t$- v`, `t$-- v`, `t$+[i] v`, `t$++ a b`, `t[i]$~ v` and `t$-[a..b]` on a tuple that is module state: each refused, the tuple unchanged; `u = t$+ 4` builds (ZYVM-016)"
+expect = "ok"
+src    = """
+<# ./mod/fija => F
+F::probar()
+"""
+oracle.py = """
+for _ in range(8):
+    print("refused")
+print("(1, 2, 3)")
+print("(1, 2, 3, 4) (1, 2, 3)")
+"""
+[cell.files]
+"mod/fija.zy" = """
+# fija {
+    #> { probar }
+    t = (1, 2, 3)
+
+    probar() {
+        !? {
+            t$+ 4
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$-[1]
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$- 1
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$-- 1
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$+[1] 0
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$++ 7 8
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t[1]$~ 9
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$-[1..2]
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        >> t ¶
+        u = t$+ 4
+        >> u " " t ¶
+    }
+}
+"""
+
+# ── A local name that is also the module's (added 2026-10-10) ───────────────
+#
+# Inside a module function, a PARAMETER named like the module's state is the
+# function's own variable. The VM read it from its register and wrote it to the
+# module's slot: `asignar(datos) { datos = [0]  <~ datos }` returned the argument
+# untouched and replaced the module's `datos` (ZYVM-018, corrected the day it
+# was found). The oracle is Python, where a parameter shadows a global the same
+# way.
+
+[[cell]]
+id     = "parameter-named-like-module-state-is-the-function-s-own"
+what   = "a parameter named like the module's state, assigned, added to, edited in place and taken by a block lambda: the function sees its own value and the module's state is untouched (ZYVM-018)"
+expect = "ok"
+src    = """
+<# ./mod/sombra => S
+>> S::asignar([10, 20]) " " S::ver() ¶
+>> S::sumar(1) " " S::ver() ¶
+>> S::editar([10, 20, 30], 9) " " S::ver() ¶
+>> S::en_lambda() " " S::ver() ¶
+"""
+oracle.py = """
+datos = [1, 2, 3]
+n = 100
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def asignar(datos):
+    datos = [0]
+    return datos
+def sumar(n):
+    n = n + 1
+    n += 1
+    return n
+def editar(datos, n):
+    datos = list(datos)
+    datos[0] = n
+    del datos[1]
+    datos.append(n)
+    return datos
+def en_lambda():
+    g = lambda n: n + 1
+    return g(5)
+def ver(): return f"({show(datos)}, {n})"
+print(show(asignar([10, 20])), ver())
+print(sumar(1), ver())
+print(show(editar([10, 20, 30], 9)), ver())
+print(en_lambda(), ver())
+"""
+[cell.files]
+"mod/sombra.zy" = """
+# sombra {
+    #> { asignar, sumar, editar, en_lambda, ver }
+    datos = [1, 2, 3]
+    n = 100
+
+    asignar(datos) {
+        datos = [0]
+        <~ datos
+    }
+    sumar(n) {
+        n = n + 1
+        n += 1
+        <~ n
+    }
+    editar(datos, n) {
+        datos[1]$~ n
+        datos$-[2]
+        datos$+ n
+        <~ datos
+    }
+    en_lambda() {
+        g = (n) -> {
+            n = n + 1
+            <~ n
+        }
+        <~ g(5)
+    }
+    ver() { <~ (datos, n) }
+}
+"""
+
+# A loop variable or a destructured name that coincides with the module's state
+# is NOT a parameter, and here the engines part: the tree-walker and zyjs write
+# the module's state — `@ n:1..3 { }` leaves the module's `n` at 3 — and the VM
+# gives the name a register of its own, then writes later assignments to the
+# slot. Which one the language means is the author's (GLB-119, filed, open).
+
+[[cell]]
+id   = "loop-variable-or-destructured-name-that-is-module-state"
+what = "`@ n:1..3 { … }` and `[n, m] = [7, 8]` inside a module whose state has an `n`: the tree-walker and zyjs write the module's `n`, the VM keeps a local and answers `15` where they answer `16` (GLB-119)"
+src  = """
+<# ./mod/vuelta => V
+>> V::bucle() " " V::ver() ¶
+V::reiniciar()
+>> V::destr() " " V::ver() ¶
+"""
+open_finding = "GLB-119"
+[cell.files]
+"mod/vuelta.zy" = """
+# vuelta {
+    #> { bucle, destr, ver, reiniciar }
+    n = 100
+
+    bucle() {
+        s = 0
+        @ n:1..3 {
+            s = s + n
+        }
+        <~ s
+    }
+    destr() {
+        [n, m] = [7, 8]
+        n = n + 1
+        <~ n + m
+    }
+    ver() { <~ n }
+    reiniciar() { n = 100 }
+}
+"""
+
+# And the tree-walker's own: a function whose parameter is named like the
+# module's state CALLS another function of the module, and the module's state
+# becomes the parameter's value — with no `<~` anywhere (ZYTW-008, filed, open).
+
+[[cell]]
+id   = "call-from-a-function-whose-parameter-is-named-like-module-state"
+what = "`d(datos) { <~ lee(datos) }` in a module whose state is `datos`: after the call the tree-walker's module state is the argument, `[1]`; the VM and zyjs leave it `[1, 2, 3]` (ZYTW-008)"
+src  = """
+<# ./mod/pasa => P
+>> P::d([1]) " " P::ver() ¶
+"""
+open_finding = "ZYTW-008"
+[cell.files]
+"mod/pasa.zy" = """
+# pasa {
+    #> { d, ver }
+    datos = [1, 2, 3]
+
+    lee(v) { <~ v$# }
+    d(datos) { <~ lee(datos) }
+    ver() { <~ datos }
 }
 """

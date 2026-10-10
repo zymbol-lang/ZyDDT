@@ -1958,3 +1958,51 @@ x = [1]
 x = [1.5]
 >> x ¶
 """
+
+# ── `$-` and `$--` by value on a dictionary (added 2026-10-10) ──────────────
+#
+# COLLECTIONS.md: `$-[key]` removes by address, "which leaves `$- value` free to
+# keep meaning by value in both collections". The tree-walker and zyjs removed
+# the first entry holding the value (`$--`: every one); the VM refused both with
+# `$- requires an array, tuple, or string` (ZYVM-017, corrected the day it was
+# found). The oracle is a Python dict, which keeps insertion order too.
+
+[[cell]]
+id     = "remove-by-value-from-a-dictionary"
+what   = "`d$- v` removes the first entry that holds `v` and `d$-- v` every one, built and in place; a value that is not there removes nothing (ZYVM-017)"
+expect = "ok"
+src    = """
+k = 2
+d = #(a: k - 1, b: k, c: k)
+>> d$- 2 ¶
+>> d$-- 2 ¶
+>> d$- 9 ¶
+>> d ¶
+d$- 2
+>> d ¶
+d$-- 2
+>> d ¶
+d$- 1
+>> d ¶
+"""
+oracle.py = """
+def show(d): print("#(" + ", ".join(f"{k}: {v}" for k, v in d.items()) + ")")
+def minus(d, v):
+    for k in d:
+        if d[k] == v:
+            return {a: b for a, b in d.items() if a != k}
+    return dict(d)
+def minus_all(d, v): return {k: x for k, x in d.items() if x != v}
+k = 2
+d = {"a": k - 1, "b": k, "c": k}
+show(minus(d, 2))
+show(minus_all(d, 2))
+show(minus(d, 9))
+show(d)
+d = minus(d, 2)
+show(d)
+d = minus_all(d, 2)
+show(d)
+d = minus(d, 1)
+show(d)
+"""
