@@ -7979,7 +7979,8 @@ Las celdas pierden la deuda, y se añaden `refusal/arity-inside-a-char-cast` y
 
 ## GLB-113 — La ruta por texto de un código a un carácter: sus bordes dan `##_` y nombran el valor
 
-**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-09)
+**Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09: los dos bordes son `##Range`, con el
+texto de `##'` y sin el valor
 **Encontrado por:** al implementar [`GLB-109`](GLOBAL.md), buscando si ya había alguna ruta de `Int` a `Char`
 
 ```zymbol
@@ -8018,6 +8019,26 @@ mensaje (los diagnósticos nombran tipos, no valores, GLB-033).
 
 Nada todavía, como GLB-109 antes de decidirse: los tres motores coinciden, así que una celda que sólo pregunte no
 vería nada, y una que afirme un kind estaría eligiendo la respuesta. La celda se escribe con la decisión.
+
+### Corrección
+
+En los tres motores, un código leído por `0x|…|`, `0b|…|`, `0o|…|` o `0d|…|` que no es ningún carácter —más allá
+de `0x10FFFF` o un sustituto— lanza un solo error, de la familia `##Range`:
+
+```text
+character out of range: 0x|…| cannot represent this code
+```
+
+Es la frase de `##'` con el operador que la lanza, y sin el código. En Rust, `char::from_u32` decide los dos bordes
+de una vez (TW: `RuntimeError::kinded("Range", …)`; VM: `VmError::CodeOutOfRange`); en `zyjs`, un
+`ZyRuntimeError` con `##Range` en lugar de dos `ZyError`. El negativo (`0d|"-1"|`) sigue siendo `##Parse`: `-1` no
+es un número en esa base, y eso no cambia.
+
+Lo sujeta `runtime-format-convert/code-with-no-character-through-text-is-range` (`expect = "ok"`, tres bordes
+capturados por `:! ##Range`); las dos celdas que provocaban los textos viejos sin capturar
+(`runtime-loops-ranges/character-code-must-be-in-range-0`, `runtime-format-convert/invalid-unicode-character-code`)
+provocan ahora el nuevo, y su `what` lo dice. La GUIDE (tabla de kinds) y la REFERENCE (fuentes de `##Range`)
+nombran esta ruta.
 
 ---
 
