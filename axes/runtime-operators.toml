@@ -586,3 +586,47 @@ f = id(1.5)
     >> "Parse" ¶
 }
 """
+
+# ── `+` on two strings, assigned to its own left side (added 2026-10-10) ────
+#
+# `+` is arithmetic only: `u = s + t` on two strings is a `##Type` in the three
+# engines. The tree-walker had a shortcut for `s = s + t` that pushed `t` onto
+# `s`, so the same operation was refused or done depending on where its result
+# went — and a program that joined text that way ran under the default engine
+# and under no other (ZYTW-009, corrected the day it was found). The marker is
+# printed AFTER the statement: an engine that joins says so.
+
+[[cell]]
+id     = "plus-on-strings-assigned-to-its-own-left-side-is-refused"
+oracle_literal_ok = "the lines are the observable of a path — refused or joined — not a typed answer"
+what   = "`s = s + t`, `s = s + c` with a Char and `s += t` on strings: refused like `u = s + t`, and `s` is unchanged (ZYTW-009)"
+expect = "ok"
+src    = """
+dame(v) { <~ v }
+s = dame("a")
+t = dame("b")
+c = dame('x')
+!? {
+    s = s + t
+    >> "joined" ¶
+} :! ##Type { >> "refused" ¶ }
+!? {
+    s = s + c
+    >> "joined" ¶
+} :! ##Type { >> "refused" ¶ }
+!? {
+    s += t
+    >> "joined" ¶
+} :! ##Type { >> "refused" ¶ }
+!? {
+    u = s + t
+    >> "joined " u ¶
+} :! ##Type { >> "refused" ¶ }
+>> s " " s t ¶
+"""
+oracle.py = """
+s, t = "a", "b"
+for _ in range(4):
+    print("refused")
+print(s, s + t)
+"""

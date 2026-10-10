@@ -672,3 +672,183 @@ d = [1, 2, 3]
 e = d$+ meter(d<~)
 >> e " " d ¶
 """
+
+# ── A self-assignment whose operand writes its receiver (added 2026-10-10) ──
+#
+# The statement forms of the cell above: `d$+ meter(d<~)` is `d = d$+
+# meter(d<~)`, and left to right the `d` on the left is read before the call
+# writes it — so the call's write is overwritten by the assignment (GLB-115,
+# decided 2026-10-10). The tree-walker edited `d` as the call had left it, on
+# the operators that had a shortcut and only on those.
+
+[[cell]]
+id     = "self-assignment-whose-operand-writes-the-receiver"
+what   = "`d$+ meter(d<~)`, `d[1]$~ meter(d<~)`, `d$-[meter(d<~)]`, `x = x + inc(x<~)` and `v = d[cambia(d<~)]`: the receiver is the value from before the call (GLB-115, ZYTW-014)"
+expect = "ok"
+src    = """
+inc(a<~) {
+    a = a + 10
+    <~ 1
+}
+meter(a<~) {
+    a$+ 99
+    <~ 1
+}
+cambia(a<~) {
+    a = [7, 8, 9, 6]
+    <~ 1
+}
+d = [4, 2, 3]
+d$+ meter(d<~)
+>> d ¶
+d = [4, 2, 3]
+d[1]$~ meter(d<~)
+>> d ¶
+d = [4, 2, 3]
+d$-[meter(d<~)]
+>> d ¶
+x = 5
+x = x + inc(x<~)
+>> x ¶
+d = [10, 20, 30]
+v = d[cambia(d<~)]
+>> v " " d ¶
+"""
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def meter(d):
+    d.append(99)
+    return 1
+d = [4, 2, 3]
+read = list(d); d = read + [meter(d)]
+print(show(d))
+d = [4, 2, 3]
+read = list(d); read[0] = meter(d); d = read
+print(show(d))
+d = [4, 2, 3]
+read = list(d); del read[meter(d) - 1]; d = read
+print(show(d))
+x = 5
+left = x; x = x + 10; x = left + 1
+print(x)
+d = [10, 20, 30]
+read = d; d = [7, 8, 9, 6]; v = read[1 - 1]
+print(v, show(d))
+"""
+
+# ── An operand runs once (added 2026-10-10) ─────────────────────────────────
+#
+# `x = x OP y`, `x = arr[i]` and the edits work on the variable where it lives.
+# In the tree-walker each of those shortcuts evaluated its operand first and,
+# when the shortcut did not apply — a division, a comparison, a juxtaposition,
+# an index past the end — handed the whole expression back to be evaluated
+# again: `n = n / f()` and `s = s f()` called `f` twice, and `v = v && f()`
+# called it with `v` false (ZYTW-011, corrected the day it was found). The
+# values came out right, so nothing with a golden could see it; only an operand
+# with an effect tells one evaluation from two.
+
+[[cell]]
+id     = "operand-of-a-self-assignment-runs-once"
+oracle_literal_ok = "the lines are the observable of a path — how many calls ran, and in what order — not a typed answer"
+what   = "`n = n / f()`, `%`, `^`, a float, `s = s f()`, `s$+ f()`, `b = b == f()`, `v = v && f()` with `v` false, and three indices past the end: `f` runs once each, and not at all behind a false `&&` (ZYTW-011)"
+expect = "ok"
+src    = """
+dos() {
+    >> "call" ¶
+    <~ 2
+}
+letra() {
+    >> "call" ¶
+    <~ "z"
+}
+si() {
+    >> "call" ¶
+    <~ #1
+}
+n = 10
+n = n / dos()
+n = n % dos()
+n = n ^ dos()
+f = 1.5
+f = f / dos()
+s = "ab"
+s = s letra()
+s$+ letra()
+b = #1
+b = b == si()
+v = #0
+v = v && si()
+t = [1, 2, 3]
+!? { t$-[dos() + 7] } :! { >> "refused" ¶ }
+!? { t[dos() + 7]$~ 0 } :! { >> "refused" ¶ }
+!? {
+    x = t[dos() + 7]
+    >> x ¶
+} :! { >> "refused" ¶ }
+>> n " " f " " s " " b " " v " " t ¶
+"""
+oracle.py = """
+def dos():
+    print("call")
+    return 2
+def letra():
+    print("call")
+    return "z"
+def si():
+    print("call")
+    return True
+def flag(x): return "#1" if x else "#0"
+n = 10
+n = n // dos()
+n = n % dos()
+n = n ** dos()
+f = 1.5
+f = f / dos()
+s = "ab"
+s = s + letra()
+s = s + letra()
+b = True
+b = b == si()
+v = False
+v = v and si()
+t = [1, 2, 3]
+for _ in range(3):
+    i = dos() + 7
+    if not 1 <= i <= len(t):
+        print("refused")
+print(n, f, s, flag(b), flag(v), "[" + ", ".join(str(x) for x in t) + "]")
+"""
+
+# ── A tuple is refused before its operand runs (added 2026-10-10) ───────────
+#
+# `t[1]$~ f()` on a positional tuple: the receiver is what is wrong, and it is
+# read first, so `f` never runs. The tree-walker and zyjs refused first; the VM
+# left the check to the instruction that writes, which runs after the operand,
+# and called `f` before refusing (ZYVM-019, corrected the day it was found).
+
+[[cell]]
+id     = "tuple-edit-is-refused-before-its-operand-runs"
+oracle_literal_ok = "the lines are the observable of a path — how many calls ran, and in what order — not a typed answer"
+what   = "`t[1]$~ f()` and `t$+ f()` on a positional tuple: refused without calling `f` (ZYVM-019)"
+expect = "ok"
+src    = """
+f() {
+    >> "call" ¶
+    <~ 9
+}
+t = (1, 2)
+!? { t[1]$~ f() } :! { >> "refused" ¶ }
+!? { t$+ f() } :! { >> "refused" ¶ }
+u = t[1]$~ f()
+>> t " " u ¶
+"""
+oracle.py = """
+def f():
+    print("call")
+    return 9
+t = (1, 2)
+print("refused")
+print("refused")
+u = (f(),) + t[1:]
+print(f"({t[0]}, {t[1]}) ({u[0]}, {u[1]})")
+"""

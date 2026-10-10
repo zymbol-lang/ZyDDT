@@ -3177,3 +3177,84 @@ Ningún `.zy` del workspace usaba la forma.
 ### Qué lo sujeta
 
 `zyquality/reject/functions/02_wrapped_lambda_without_a_parameter.zy`: 51 formas rechazadas por los tres.
+
+---
+
+## ZYJS-057 — `m[f()>2]`: `zyjs` lo lee como un camino, y es una comparación
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: lo dice la gramática
+**Encontrado por:** una sonda de [`GLB-115`](GLOBAL.md), escrita con una llamada como primer paso
+
+```zymbol
+f() { <~ 1 }
+m = [[1, 2], [3, 4]]
+>> m[f()>2] ¶
+```
+
+`zytw` y `zyvm`: `index must be an integer, got Bool`. **`zyjs`: `2`.**
+
+El paso de un camino es un átomo (`interpreter/IMPLEMENTATION.md`, § 14): un entero, `-entero`, una cadena, un
+nombre o `( expr )`. Un corchete cuyo contenido no **empieza** por un átomo seguido de `>`, `;` o `..` es un
+índice corriente, diga lo que diga después: `m[f()>2]` indexa con `f() > 2`. El camino se escribe
+`m[(f())>2]`.
+
+| | `zytw`, `zyvm` | `zyjs`, antes |
+|---|---|---|
+| `m[f()>2]` | `##Type`, el índice es un Bool | `2` — camino |
+| `a[i + 1>2]` | `##Type` | camino |
+| control: `m[1>2]` · `m[i>2]` · `m[(f())>2]` · `m[-1>1]` · `d["k">"z"]` | camino | camino |
+
+### Causa
+
+`parseNavContent` leía el primer paso con `parseAdditive` —cualquier expresión aditiva— y decidía que era un
+camino si después venía `>` o `;`. Los dos parsers de Rust lo deciden mirando los primeros tokens
+(`is_nav_index`).
+
+### Corrección
+
+La misma mirada: `navPathAhead`. Si no hay camino, el contenido del corchete es una expresión entera.
+
+### Qué lo sujeta
+
+`runtime-index-nav/a-first-step-that-is-not-an-atom-is-an-index-expression`. Con el `zyjs` de antes da DIVERGE.
+
+---
+
+## ZYJS-058 — `m[1;2]` sobre un array de filas: `zyjs` devuelve las casillas, no las filas
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: lo dice `GUIDE.md`
+**Encontrado por:** la sonda de [`ZYJS-057`](zyjs.md)
+
+```zymbol
+m = [[1, 2], [3, 4]]
+>> m[1;2] ¶
+```
+
+`zytw` y `zyvm`: `[[1, 2], [3, 4]]`. **`zyjs`: `[1, 2, 3, 4]`.**
+
+`GUIDE.md`: `arr[p ; q ; r]` es `[v, v, v]`, un valor por camino. Un valor que es un array sigue siendo un valor.
+Sólo un paso con **rango** hace que un camino dé varios.
+
+| | `zytw`, `zyvm` | `zyjs`, antes |
+|---|---|---|
+| `m[1;2]` | `[[1, 2], [3, 4]]` | `[1, 2, 3, 4]` |
+| `m[[1, 2]]` · `m[[1];[2]]` | filas | casillas |
+| `c[1..2>1]`, un rango antes del último paso | `[[1, 2], [5, 6]]` | `[1, 2, 5, 6]` |
+| control: `m[1>1;2>2]` · `m[1>1..2;2>1]` | `[1, 4]` · `[1, 2, 3]` | igual |
+
+### Causa
+
+Las extracciones, y el paso con rango que no es el último, desplegaban **cualquier array** que recibían
+(`if (val.type === 'arr') results.push(...val.v)`): no distinguían «el camino recorrió varias posiciones» de «el
+camino encontró un array». En Rust el recorrido devuelve una lista de valores y la pregunta no existe.
+
+### Corrección
+
+Se despliega sólo si el camino —o el resto del camino— tiene un paso con rango (`navPathFans`).
+
+El eje `addressing` no podía verlo: sus hojas son escalares.
+
+### Qué lo sujeta
+
+`runtime-index-nav/extraction-of-values-that-are-arrays`, dieciséis formas, sin oráculo: lo que se pide es que
+los tres coincidan, y el que no coincidía era el port. Con el `zyjs` de antes da DIVERGE.

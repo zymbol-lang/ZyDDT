@@ -585,17 +585,34 @@ v = 5
 
 # ── An edit whose operand writes the same module state (added 2026-10-10) ───
 #
-# `datos$+ meter()` where `meter` appends to `datos` too. The tree-walker
-# evaluates the operand and then edits the state as it stands — the operand's
-# write is kept. The VM and zyjs read the receiver first, edit that snapshot and
-# store it over the state — the operand's write is lost, silently (GLB-115,
-# filed, undecided). No `expect`: which one the language means is the author's.
-# Found measuring ZYVM-003, whose fix has to implement one of the two.
+# `datos$+ meter()` where `meter` appends to `datos` too. Decided by the author
+# on 2026-10-10 (GLB-115): left to right, in an edit as everywhere else. The
+# receiver is read first, so `d$+ f()` is `d = d$+ f()` and what the operand
+# wrote is overwritten. The VM and zyjs already answered that; the tree-walker
+# evaluated the operand first and edited the state as it then stood — on the
+# three operators that had a shortcut, and only on those.
 
 [[cell]]
-id   = "edit-whose-operand-writes-the-same-state"
-what = "`datos$+ meter()`, `datos[1]$~ meter()` and `datos$-[meter()]` where `meter` appends to `datos`: the tree-walker keeps that write, the VM and zyjs lose it (GLB-115)"
-src  = """
+id     = "edit-whose-operand-writes-the-same-state"
+what   = "`datos$+ meter()`, `datos[1]$~ meter()` and `datos$-[meter()]` where `meter` appends to `datos`: the receiver is read before the operand runs, and the operand's write is overwritten (GLB-115)"
+expect = "ok"
+oracle.py = """
+def show(v): print("[" + ", ".join(str(x) for x in v) + "]")
+datos = [1, 2, 3]
+def meter():
+    global datos
+    datos = datos + [99]
+    return 1
+read = list(datos); datos = read + [meter()]
+show(datos)
+datos = [1, 2, 3]
+read = list(datos); v = meter(); read[0] = v; datos = read
+show(datos)
+datos = [1, 2, 3]
+read = list(datos); i = meter(); del read[i - 1]; datos = read
+show(datos)
+"""
+src    = """
 <# ./mod/orden => O
 O::anexar()
 >> O::ver() ¶
@@ -606,7 +623,6 @@ O::reiniciar()
 O::quitar()
 >> O::ver() ¶
 """
-open_finding = "GLB-115"
 [cell.files]
 "mod/orden.zy" = """
 # orden {
@@ -912,25 +928,199 @@ open_finding = "GLB-119"
 """
 
 # And the tree-walker's own: a function whose parameter is named like the
-# module's state CALLS another function of the module, and the module's state
-# becomes the parameter's value — with no `<~` anywhere (ZYTW-008, filed, open).
+# module's state CALLED another function of the module, and the module's state
+# became the parameter's value — with no `<~` anywhere. The parameter's name had
+# been injected into the frame as the module's variable, and the flush on the
+# way into the next call published it (ZYTW-008, corrected 2026-10-10).
 
 [[cell]]
-id   = "call-from-a-function-whose-parameter-is-named-like-module-state"
-what = "`d(datos) { <~ lee(datos) }` in a module whose state is `datos`: after the call the tree-walker's module state is the argument, `[1]`; the VM and zyjs leave it `[1, 2, 3]` (ZYTW-008)"
-src  = """
+id     = "call-from-a-function-whose-parameter-is-named-like-module-state"
+what   = "`d(datos) { <~ lee(datos) }` in a module whose state is `datos`: the call leaves the module's state alone (ZYTW-008)"
+expect = "ok"
+src    = """
 <# ./mod/pasa => P
 >> P::d([1]) " " P::ver() ¶
+>> P::e([1, 2]) " " P::ver() ¶
 """
-open_finding = "ZYTW-008"
+oracle.py = """
+datos = [1, 2, 3]
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def lee(v): return len(v)
+def otro(x): x.append(5)
+def d(datos): return lee(datos)
+def e(datos):
+    datos = list(datos)
+    otro(datos)
+    return datos
+print(d([1]), show(datos))
+print(show(e([1, 2])), show(datos))
+"""
 [cell.files]
 "mod/pasa.zy" = """
 # pasa {
-    #> { d, ver }
+    #> { d, e, ver }
     datos = [1, 2, 3]
 
     lee(v) { <~ v$# }
+    otro(x<~) { x$+ 5 }
     d(datos) { <~ lee(datos) }
+    e(datos) {
+        otro(datos<~)
+        <~ datos
+    }
     ver() { <~ datos }
+}
+"""
+
+# ── Module state read, then written by a later operand (added 2026-10-10) ───
+#
+# The same rule as the edits above, on every other shape a receiver has: the
+# left side of an arithmetic self-assignment, the collection of an indexed
+# read, the root of a deep update. The tree-walker read each of them AFTER the
+# operand — its shortcuts evaluate the operand and then work on the variable
+# where it lives — and so did the VM for the root of `m[i>j]$~ v`. Left to
+# right in the three since 2026-10-10 (GLB-115, ZYTW-014).
+
+[[cell]]
+id     = "module-state-read-before-a-later-operand-writes-it"
+what   = "`n = n + tocar()`, `n = n * tocar()`, `datos[meter()]` and `m[(cambia())>1]$~ 5` where the call writes what is on its left: the value read is the one from before the call (GLB-115, ZYTW-014)"
+expect = "ok"
+src    = """
+<# ./mod/antes => A
+A::sumar()
+>> A::n_es() ¶
+A::reiniciar()
+A::multiplicar()
+>> A::n_es() ¶
+A::reiniciar()
+>> A::indice() ¶
+A::reiniciar()
+>> A::hondo() ¶
+"""
+oracle.py = """
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    return str(v)
+n = 5
+def tocar():
+    global n
+    n = n + 10
+    return 1
+left = n; n = left + tocar(); print(n)
+n = 5
+left = n; n = left * tocar(); print(n)
+datos = [10, 20, 30]
+def meter():
+    global datos
+    datos = [7, 8, 9, 6]
+    return 1
+read = datos; i = meter(); print(read[i - 1])
+m = [[1, 2], [3, 4]]
+def cambia():
+    global m
+    m = [[70, 80], [90, 60]]
+    return 1
+read = [list(r) for r in m]; i = cambia(); read[i - 1][0] = 5; m = read
+print(show(m))
+"""
+[cell.files]
+"mod/antes.zy" = """
+# antes {
+    #> { sumar, multiplicar, indice, hondo, n_es, reiniciar }
+    n = 5
+    datos = [10, 20, 30]
+    m = [[1, 2], [3, 4]]
+
+    tocar() {
+        n = n + 10
+        <~ 1
+    }
+    meter() {
+        datos = [7, 8, 9, 6]
+        <~ 1
+    }
+    cambia() {
+        m = [[70, 80], [90, 60]]
+        <~ 1
+    }
+    sumar()       { n = n + tocar() }
+    multiplicar() { n = n * tocar() }
+    indice()      { <~ datos[meter()] }
+    hondo() {
+        m[(cambia())>1]$~ 5
+        <~ m
+    }
+    n_es() { <~ n }
+    reiniciar() {
+        n = 5
+        datos = [10, 20, 30]
+        m = [[1, 2], [3, 4]]
+    }
+}
+"""
+
+# ── Save, call, restore (added 2026-10-10) ──────────────────────────────────
+#
+# A function calls another that changes the module's state and then writes the
+# state back to what it was when the function started — how a search undoes a
+# move. The tree-walker lost that write: it decides what a frame changed by
+# comparing each variable with the copy the frame was given on entry, and a
+# value written back to equal that copy looked untouched, so the module kept
+# what the nested call had stored (ZYTW-013, corrected the day it was found).
+
+[[cell]]
+id     = "module-state-written-back-to-its-starting-value-after-a-nested-call"
+what   = "`deshacer() { mover()  n = 5  t = [1, 2] }` with `n` 5 and `t` `[1, 2]` on entry and `mover` changing both: the state is what `deshacer` wrote last (ZYTW-013)"
+expect = "ok"
+src    = """
+<# ./mod/deshace => D
+D::deshacer()
+>> D::ver() ¶
+D::otro()
+>> D::ver() ¶
+"""
+oracle.py = """
+n = 5
+t = [1, 2]
+def show(): print(f"({n}, [" + ", ".join(str(x) for x in t) + "])")
+def mover():
+    global n, t
+    n = 99
+    t = [9]
+def deshacer():
+    global n, t
+    mover()
+    n = 5
+    t = [1, 2]
+def otro():
+    global n, t
+    mover()
+    n = 6
+    t = [3]
+deshacer(); show()
+otro(); show()
+"""
+[cell.files]
+"mod/deshace.zy" = """
+# deshace {
+    #> { deshacer, otro, ver }
+    n = 5
+    t = [1, 2]
+
+    mover() {
+        n = 99
+        t = [9]
+    }
+    deshacer() {
+        mover()
+        n = 5
+        t = [1, 2]
+    }
+    otro() {
+        mover()
+        n = 6
+        t = [3]
+    }
+    ver() { <~ (n, t) }
 }
 """
