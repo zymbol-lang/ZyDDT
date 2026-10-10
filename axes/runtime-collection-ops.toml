@@ -1678,27 +1678,65 @@ q = sorted(v, key=lambda t: -t[0])
 print("".join(f"{a}:{b} " for a, b in q))
 """
 
-# ── Arithmetic in the index of `$-[…]` (added 2026-10-10) ────────────────────
+# ── Arithmetic in the bounds of `$-[…]` and `$[…]` (added 2026-10-10) ───────
 #
-# `a$-[i - 1]`: the Rust parser refuses it (`expected ']', '..', or ':' after
-# index`) and zyjs removes the element. Every other bracket takes the same
-# expression in the three engines — `a$+[i - 1] v`, `a[i - 1]`, `a[i - 1]$~ v`,
-# `a$[i - 1..i]` — and `a$-[(i - 1)]`, parenthesised, too (GLB-116, filed).
+# `a$-[i - 1]` was refused by the Rust parser (`expected ']', '..', or ':' after
+# index`) and run by zyjs; a slice bound took `+` and `-` but not `*`, so
+# `a$[i * 2..n]` was refused too. Every other bracket took the same expression in
+# the three engines. Corrected 2026-10-10 (GLB-116): one reader for the bounds
+# of a ranged bracket, with `+ - * / % ^` over postfix operands, that stops
+# before `..` and `:`. The oracle is Python's slicing.
 
 [[cell]]
-id   = "remove-by-an-arithmetic-index"
-what = "`a$-[i - 1]`: refused by the Rust parser, run by zyjs; parenthesised, and in every other bracket, the three take it (GLB-116)"
-src  = """
-a = [10, 20, 30, 40]
+id     = "remove-by-an-arithmetic-index"
+what   = "`a$-[i - 1]` removes the element, with `*`, `/`, `%` and `^` in the index and in both ends of a range too (GLB-116)"
+expect = "ok"
+src    = """
+a = [10, 20, 30, 40, 50]
 i = 3
-b = a$-[i - 1]
->> b ¶
+>> a$-[i - 1] ¶
+>> a$-[i * 1] ¶
+>> a$-[2 ^ 1] ¶
+>> a$-[i / 3..i % 2 + 1] ¶
+>> a$-[i - 1:2] ¶
 """
-open_finding = "GLB-116"
+oracle.py = """
+a = [10, 20, 30, 40, 50]
+i = 3
+def show(v): print("[" + ", ".join(str(x) for x in v) + "]")
+def without(lo, hi): return a[:lo - 1] + a[hi:]          # 1-based, inclusive
+show(without(i - 1, i - 1))
+show(without(i * 1, i * 1))
+show(without(2 ** 1, 2 ** 1))
+show(without(i // 3, i % 2 + 1))
+show(without(i - 1, i - 1 + 2 - 1))
+"""
+
+[[cell]]
+id     = "slice-bounds-take-arithmetic"
+what   = "a slice bound takes `*`, `/`, `%` and `^`, not only `+` and `-` — the same reader as `$-[…]` (GLB-116)"
+expect = "ok"
+src    = """
+a = [10, 20, 30, 40, 50]
+i = 3
+>> a$[i * 1..i + 1] ¶
+>> a$[2 ^ 2 - 2..2 ^ 2] ¶
+>> a$[i % 2:i - 1] ¶
+>> a$[..i * 1] ¶
+"""
+oracle.py = """
+a = [10, 20, 30, 40, 50]
+i = 3
+def show(v): print("[" + ", ".join(str(x) for x in v) + "]")
+show(a[i * 1 - 1:i + 1])
+show(a[2 ** 2 - 2 - 1:2 ** 2])
+show(a[i % 2 - 1:i % 2 - 1 + (i - 1)])
+show(a[:i * 1])
+"""
 
 [[cell]]
 id     = "arithmetic-index-in-the-other-brackets"
-what   = "the control: `a$-[(i - 1)]`, `a$+[i - 1] 5`, `a[i - 1]`, `a[i - 1]$~ 5` and `a$[i - 1..i]` are taken by all three (GLB-116)"
+what   = "the control: `a$-[(i - 1)]`, `a$+[i - 1] 5`, `a[i - 1]` and `a[i - 1]$~ 5` were taken by all three all along (GLB-116)"
 expect = "ok"
 src    = """
 a = [10, 20, 30, 40]
@@ -1707,7 +1745,6 @@ i = 3
 >> a$+[i - 1] 5 ¶
 >> a[i - 1] ¶
 >> a[i - 1]$~ 5 ¶
->> a$[i - 1..i] ¶
 """
 
 # ── The empty pattern (added 2026-10-02, decided 2026-10-03) ───────────────

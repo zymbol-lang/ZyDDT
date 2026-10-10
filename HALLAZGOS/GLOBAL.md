@@ -8172,7 +8172,8 @@ la respuesta no está decidida. Y, para cualquier arreglo, `runtime-modules-scri
 
 ## GLB-116 — `a$-[i - 1]`: el parser de Rust no acepta aritmética en el índice de `$-[…]`, y `zyjs` sí
 
-**Estado:** **abierto** — sólo documentado (2026-10-10)
+**Estado:** **corregido 2026-10-10** — decidido por el autor el 2026-10-10 (R2): el parser de Rust lee ahí una
+expresión, como en los demás corchetes
 **Encontrado por:** una sonda escrita al medir [`GLB-115`](GLOBAL.md)
 
 ```zymbol
@@ -8205,4 +8206,26 @@ aceptan la misma expresión en los tres.
 
 `runtime-collection-ops/remove-by-an-arithmetic-index`, con `open_finding = "GLB-116"`, y el control
 `runtime-collection-ops/arithmetic-index-in-the-other-brackets` (`expect = "ok"`).
+
+### Corrección
+
+`$-[…]` leía su índice, sus dos extremos y su cuenta con una expresión postfija, sin aritmética. El corte
+`$[…]` tenía su propio lector, `parse_slice_bound`, que sólo sabía sumar y restar — así que al medir salió la otra
+mitad: `a$[i * 2..n]` también se rechazaba en Rust y corría en `zyjs`. Ahora hay **un** lector para los límites de
+un corchete con rango, con `+ - * / % ^` y su precedencia sobre operandos postfijos, que se detiene ante `..` y
+`:`; lo usan el corte y la eliminación. La gramática general no sirve ahí: en ella `..` liga más fuerte que la
+aritmética, y `i - 1..i` sería `i - (1..i)`.
+
+| forma | antes, Rust | `zyjs` | ahora, los tres |
+|---|---|---|---|
+| `a$-[i - 1]`, `a$-[i - 1:2]`, `a$-[..i - 1]` | rechazado | corre | corre |
+| `a$-[i * 1]`, `a$-[2 ^ 1]`, `a$-[i / 3..i % 2 + 1]` | rechazado | corre | corre |
+| `a$[i * 1..i + 1]`, `a$[2 ^ 2 - 2..2 ^ 2]`, `a$[i % 2:i - 1]` | rechazado | corre | corre |
+| control: `a$[i - 1..i]`, `a$-[2..3]`, `a$[-2..-1]` | corre | corre | igual |
+
+`zymbol check` sobre los 3281 `.zy` del workspace, antes y después: sólo cambia la celda de esta ficha. El
+formateador reimprime las formas nuevas igual. La GUIDE lo dice, con un ejemplo comprobado.
+
+Las celdas afirman ahora el resultado contra el corte de Python: `remove-by-an-arithmetic-index`, ya sin deuda, y
+`slice-bounds-take-arithmetic`.
 
