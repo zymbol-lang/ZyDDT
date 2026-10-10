@@ -1201,3 +1201,45 @@ print(show(local))
 }
 """
 
+# The same for module state: what a module hands out is a value. An edit the
+# module makes afterwards does not reach it, and an edit of what was handed out
+# does not reach the module (ZYJS-014; the two Rust engines share and copy on
+# write).
+
+[[cell]]
+id     = "module-state-handed-out-is-a-value"
+what   = "`z = S::dame()`, then the module edits its state in place, then the caller edits what it was given: three separate arrays"
+expect = "ok"
+src    = """
+<# ./mod/st => S
+S::mete(1)
+S::mete(2)
+z = S::dame()
+S::mete(3)
+S::toca(1, 9)
+w = S::dame()
+w$+ 100
+>> z " " w " " S::dame() " " S::largo() ¶
+"""
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+datos = []
+datos.append(1); datos.append(2)
+z = list(datos)
+datos.append(3); datos[0] = 9
+w = list(datos); w.append(100)
+print(show(z), show(w), show(datos), len(datos))
+"""
+[cell.files]
+"mod/st.zy" = """
+# st {
+    #> { mete, dame, toca, largo }
+    datos = []
+
+    mete(v) { datos$+ v }
+    dame() { <~ datos }
+    toca(i, v) { datos[i]$~ v }
+    largo() { <~ datos$# }
+}
+"""
+

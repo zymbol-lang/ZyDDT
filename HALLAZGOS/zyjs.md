@@ -867,7 +867,7 @@ paso que nadie miraba.
 
 ## ZYJS-014 — `$+` es O(n²) en el motor del navegador
 
-**Estado:** abierto
+**Estado:** **corregido 2026-10-10** — decidido por el autor el 2026-10-10: con el diseño conservador
 **Encontrado por:** la medición del auto-free del 2026-09-12, como control
 **Familia:** `HLZ-014` — es la nota de `CLAUDE.md` («the browser engine reaches
 the same place by sharing the JavaScript array and **rebuilding it on write**»)
@@ -934,6 +934,58 @@ A esa escala la copia no se nota. El único programa real donde sí: `ZyBF/pesad
 celdas 419 430 veces — **6,35 s en `zyjs`, 0,33 s en la VM** y 0,60 s en el TW.
 
 No es sólo `$+`: `$~`, insertar y quitar copian igual (`[...col.v]` en cada uno).
+
+### Corrección (2026-10-10)
+
+Una edición escribe donde está el array cuando su variable es la única que lo tiene, y eso lo dice una marca en
+el propio array (`own`).
+
+La regla es conservadora y va en una sola dirección:
+
+- **sólo una edición de una variable, guardada de vuelta en esa variable, produce un array propio**: `a$+ x`,
+  `a[i]$~ v`, `a$-[i]`, `a$++ x y`, como sentencia o escritas enteras (`a = a$+ x`);
+- **cualquier lectura que entrega el array a alguien le quita la marca para siempre**: otro nombre, un argumento,
+  un elemento de otra colección, una captura, un bucle que lo recorre, una interpolación. Todas pasan por
+  `Env.get`, que es donde se quita;
+- **leen sin quitarla** (`Env.peek`) los pocos que no se quedan con nada: la propia edición, `$#`, `$?` y la
+  lectura de un elemento por un índice;
+- un array que nadie marcó es compartido, así que un camino que se le hubiera escapado a esta lista **copia**,
+  como antes.
+
+Y una condición más, por [`GLB-115`](GLOBAL.md): se escribe en el sitio, y se lee sin marcar, sólo junto a
+operandos que no ejecutan código del programa —un literal, un nombre, aritmética, un índice—. El receptor se lee
+antes que sus operandos, y uno que pudiera escribirlo tiene que encontrarlo como estaba: con una llamada en el
+operando se copia, igual que antes.
+
+Con [`GLB-117`](GLOBAL.md): un argumento de salida que es una variable de quien llama se pasa sin quitarle la
+marca, así que la función escribe en el sitio. El estado de un módulo no (S3), ni una variable dada dos veces
+como salida.
+
+| el mismo programa a N y a 4N, segundos | antes | ahora |
+|---|---|---|
+| `a$+ i`, N veces | 5 000 → 20 000: 0,15 → 2,1 (×14) | 100 000 → 400 000: 0,57 → 1,57 (×2,8) |
+| `a$++ i i` | 3 000 → 12 000: ×10,8 | 50 000 → 200 000: ×2,7 |
+| `t[i]$~ k`, N veces sobre N | 5 000 → 20 000: ×17 | 100 000 → 400 000: ×3,1 |
+| una llamada por casilla a un módulo, que escribe | 5 000 → 20 000: ×13 | 40 000 → 160 000: ×2,9 |
+| una llamada por casilla a través de `<~` | 6 000 → 24 000: ×19 | 40 000 → 160 000: ×2,9 |
+
+**Lo que no arregla, y la ficha decía que arreglaría.** `ZyBF/pesado2.zy` tarda lo mismo, 6,5 s. El objetivo
+«por debajo de 1 s» estaba mal planteado: su cinta tiene 300 celdas y copiarla nunca fue lo que costaba. El perfil
+lo dice — 31 % en `eval`, **13,5 % en `performance.now()`** (lo llama `maybeYield` en cada vuelta de un bucle para
+decidir si cede el turno al navegador), 9 % en el recolector. Es el coste de un intérprete `async` de punta a
+punta, no una curva. Mirar el reloj una de cada N vueltas quitaría ese 13 %; cambia cada cuánto responde la
+página y no se ha tocado.
+
+### Qué lo sujeta
+
+`zyquality/cost`: `growth/append-local`, `append-several-local`, `update-local`,
+`module-call-that-writes-one-cell` y `write-through-an-output-parameter`, ya sin deuda para `zyjs` y medidos
+donde antes tardaban minutos; `module-call-that-reads-one-cell` lo incluye desde hoy.
+
+Y lo que no puede romper: `runtime-collection-ops/an-array-edited-in-place-does-not-show-through-another-holder`
+—diez maneras de tener un segundo dueño, contra un oráculo en Python con las copias escritas— y
+`runtime-modules-scripts/module-state-handed-out-is-a-value`. Con la marca desactivada a propósito, las dos dan
+rojo.
 
 ---
 

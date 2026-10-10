@@ -2050,3 +2050,149 @@ print(show(t))
 print("refused")
 print(show(t))
 """
+
+# ── A collection assigns by value, whoever edits it in place (2026-10-10) ───
+#
+# An edit of a variable writes where the array is when that variable is its only
+# holder, in the three engines: the tree-walker and the VM know it from a
+# reference count, the browser engine from a mark it takes away whenever the
+# array is handed to anyone (ZYJS-014). What must not happen, in any of them, is
+# an edit of one name showing through another. Each line below builds an array
+# with edits — so it is its variable's own — hands it to someone else, and then
+# edits the original; the oracle is Python with the copies a Zymbol assignment
+# makes written out.
+
+[[cell]]
+id     = "an-array-edited-in-place-does-not-show-through-another-holder"
+what   = "a second name, an element of another array, an element taken out, an argument, an iteration over itself, a lambda's capture, an output parameter kept by its callee, a tuple, a dictionary, a slice and a map: none of them sees a later edit of the original (ZYJS-014)"
+expect = "ok"
+src    = """
+muta(a) {
+    a$+ 99
+    a[1]$~ 0
+    <~ a
+}
+sal(a<~) {
+    a$+ 7
+    a[1]$~ 70
+}
+guarda(a<~) {
+    copia = a
+    a$+ 1
+    <~ copia
+}
+a = []
+@ i:1..3 { a$+ i }
+b = a
+a$+ 4
+a[1]$~ 10
+>> a " " b ¶
+fila = [1, 2]
+fila$+ 3
+m = [fila, fila]
+fila$+ 4
+fila[1]$~ 9
+>> m " " fila ¶
+caja = [[1], [2]]
+caja$+ [3]
+e = caja[1]
+e$+ 5
+caja[1]$~ [8]
+>> caja " " e ¶
+p = [1]
+p$+ 2
+q = muta(p)
+p$+ 3
+>> p " " q ¶
+r = [1, 2, 3]
+r$+ 4
+@ x:r {
+    r$+ (x * 10)
+    r[1]$~ 0
+}
+>> r ¶
+c = [1]
+c$+ 2
+f = (n) -> c$# + n
+c$+ 3
+c[1]$~ 5
+>> f(0) " " c ¶
+g = [1]
+g$+ 2
+h = guarda(g<~)
+g$+ 3
+>> g " " h ¶
+k = [1]
+k$+ 2
+sal(k<~)
+l = k
+sal(k<~)
+>> k " " l ¶
+u = [1]
+u$+ 2
+tu = (u, 1)
+di = #(k: u)
+u$+ 3
+u[1]$~ 0
+>> tu " " di " " u ¶
+o = [1, 2, 3]
+o$+ 4
+parte = o$[1..2]
+doble = o$> (x -> x * 2)
+o$+ 5
+o[1]$~ 9
+>> parte " " doble " " o ¶
+"""
+oracle.py = """
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    if isinstance(v, tuple): return "(" + ", ".join(show(x) for x in v) + ")"
+    if isinstance(v, dict): return "#(" + ", ".join(f"{k}: {show(x)}" for k, x in v.items()) + ")"
+    return str(v)
+def out(*vs): print(" ".join(show(v) for v in vs))
+def muta(a):
+    a = list(a); a.append(99); a[0] = 0
+    return a
+def sal(a):
+    a.append(7); a[0] = 70
+def guarda(a):
+    copia = list(a); a.append(1)
+    return copia
+a = []
+for i in range(1, 4): a.append(i)
+b = list(a); a.append(4); a[0] = 10
+out(a, b)
+fila = [1, 2]; fila.append(3)
+m = [list(fila), list(fila)]; fila.append(4); fila[0] = 9
+out(m, fila)
+caja = [[1], [2]]; caja.append([3])
+e = list(caja[0]); e.append(5); caja[0] = [8]
+out(caja, e)
+p = [1]; p.append(2)
+q = muta(p); p.append(3)
+out(p, q)
+r = [1, 2, 3]; r.append(4)
+for x in list(r):
+    r.append(x * 10); r[0] = 0
+out(r)
+c = [1]; c.append(2)
+held = list(c)
+f = lambda n: len(held) + n
+c.append(3); c[0] = 5
+out(f(0), c)
+g = [1]; g.append(2)
+h = guarda(g); g.append(3)
+out(g, h)
+k = [1]; k.append(2)
+sal(k); l = list(k); sal(k)
+out(k, l)
+u = [1]; u.append(2)
+tu = (list(u), 1); di = {"k": list(u)}
+u.append(3); u[0] = 0
+out(tu, di, u)
+o = [1, 2, 3]; o.append(4)
+parte = o[0:2]; doble = [x * 2 for x in o]
+o.append(5); o[0] = 9
+out(parte, doble, o)
+"""
+
