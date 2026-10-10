@@ -658,3 +658,56 @@ src    = """
     ver() { <~ tabla }
 }
 """
+
+# ── Module state as an output argument (added 2026-10-10) ───────────────────
+#
+# `tocar(datos<~)` inside the module that owns `datos`. The tree-walker and zyjs
+# write the result back to the module's state; the VM loses it, silently
+# (ZYVM-014, filed). MEM-5 says an output parameter comes back modified.
+
+[[cell]]
+id   = "output-argument-that-is-module-state"
+what = "a function writes its `<~` parameter and the argument is the module's own state: the VM loses the write (ZYVM-014)"
+src  = """
+<# ./mod/pres => P
+P::correr()
+>> P::ver() ¶
+"""
+open_finding = "ZYVM-014"
+[cell.files]
+"mod/pres.zy" = """
+# pres {
+    #> { correr, ver }
+    datos = [1, 2, 3]
+
+    tocar(a<~) { a$+ 9 }
+    correr() { tocar(datos<~) }
+    ver() { <~ datos }
+}
+"""
+
+# What the three do TODAY while the state is passed as output and read directly
+# at the same time: two copies, 3 and 4 elements. Lending the original instead
+# of copying (GLB-117) has to decide this case; the cell says what changes.
+
+[[cell]]
+id     = "module-state-read-while-passed-as-output"
+what   = "inside the callee, the module's state read directly and the `<~` parameter bound to it are two copies today: `3 4` (GLB-117, S3)"
+expect = "ok"
+src    = """
+<# ./mod/pres2 => P
+P::correr()
+"""
+[cell.files]
+"mod/pres2.zy" = """
+# pres2 {
+    #> { correr }
+    datos = [1, 2, 3]
+
+    tocar(a<~) {
+        a$+ 9
+        >> datos$# " " a$# ¶
+    }
+    correr() { tocar(datos<~) }
+}
+"""

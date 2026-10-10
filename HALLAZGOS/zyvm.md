@@ -949,3 +949,94 @@ Dos sitios, uno por cada manera de llegar a la lambda:
 `error-inside-an-expression-lambda-given-to-map-has-a-line`,
 `error-inside-an-expression-lambda-called-in-a-function-has-a-line` y
 `error-inside-a-filter-lambda-in-a-block-lambda-has-a-line`. Con la VM de antes, las cuatro dan DIVERGE.
+
+---
+
+## ZYVM-013 — `t[i]$~ v` y `t$-[i]` copian la colección entera en la VM, también sobre una variable local
+
+**Estado:** **abierto** — sólo documentado (2026-10-10); corregirlo no cambia ninguna salida
+**Encontrado por:** el control de una medición de `<~` (2026-10-10): las mismas escrituras **en línea**, sin
+ninguna llamada, costaban lo mismo que a través de un parámetro de salida
+**Familia:** [`ZYVM-003`](zyvm.md) — el mismo `Rc` con dos dueños en el momento de escribir
+
+```zymbol
+correr(n) {
+    t = []
+    @ i:1..n { t$+ 0 }
+    @ k:1..2000 { t[(k % n) + 1]$~ k }
+    <~ t$#
+}
+>> correr(16000) ¶
+```
+
+Instrucciones (`perf stat -e instructions:u`), 2000 ediciones sobre 16 000 elementos:
+
+| edición, sobre una variable local | `zytw` | `zyvm` | crece ×4 en la VM |
+|---|---:|---:|---:|
+| actualizar un elemento, `t[i]$~ k` | 33 M | **1 202 M** | ×3,94 |
+| quitar del final, `t$-[t$#]` | 31 M | **1 096 M** | ×4,9 |
+| añadir, `t$+ k` | 31 M | 14 M | ×2,6 |
+
+Lo mismo en el nivel de arriba del programa, con un índice literal (`t[1]$~ k`), y escrito como `t = t[i]$~ k`.
+Añadir no lo sufre: tiene su propio camino en el compilador (`arr = arr$+ elem → ArrayPush in-place`).
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_collection_update_as`: para `t[i]$~ v` emite `CopyReg(dst, r_arr)` y después
+`DeepSet(dst, …)`. La copia del registro deja dos dueños del `Rc` —la variable y `dst`—, y `Rc::make_mut` copia el
+vector. Es lo correcto para la forma funcional, `u = t[i]$~ v`, donde `t` no puede cambiar; la forma que modifica
+(`t[i]$~ v` como sentencia) pasa por el mismo camino. `ArrayRemove` llega igual, sobre una copia.
+
+### Alcance
+
+Todo programa que actualice un tablero, una cinta o una tabla casilla a casilla en la VM, que es el futuro motor
+por defecto: GO, Chaturanga, GoL, ZyBF. No lo ve nada: la salida es idéntica.
+
+### Arreglo propuesto
+
+En la forma que modifica, operar sobre el registro de la propia variable, sin `CopyReg`. Exige que la instrucción
+sea atómica ante el fallo —validar antes de sacar el valor—: hoy `DeepSet` y `ArrayRemove` hacen `mem::replace` y,
+si el índice es malo, lanzan el error con el valor ya soltado, lo que sólo es inocuo porque escriben sobre una
+copia.
+
+### Qué lo sujeta
+
+`zyquality/cost` `growth/update-local`, con `open_finding = { zyvm = "ZYVM-013" }`.
+
+---
+
+## ZYVM-014 — La VM pierde lo que una función escribe en un parámetro `<~` cuando el argumento es estado de un módulo
+
+**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: MEM-5 dice que vuelve modificado
+**Encontrado por:** una sonda de `<~` (2026-10-10)
+
+```zymbol
+// mod/pres.zy
+# pres {
+    #> { correr, ver }
+    datos = [1, 2, 3]
+
+    tocar(a<~) { a$+ 9 }
+    correr() { tocar(datos<~) }
+    ver() { <~ datos }
+}
+```
+
+```zymbol
+<# ./mod/pres => P
+P::correr()
+>> P::ver() ¶
+```
+
+`zytw` y `zyjs`: `[1, 2, 3, 9]`. **`zyvm`: `[1, 2, 3]`** — la escritura no llega al estado del módulo, sin aviso.
+
+### Causa
+
+Sin localizar con un parche. La escritura de vuelta de un parámetro de salida lleva pares *(parámetro, registro del
+llamante)*; cuando el argumento es una global de módulo, su valor está en un temporal cargado con `LoadGlobal`, y
+la vuelta escribe en ese temporal, no en la ranura.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/output-argument-that-is-module-state`, con `open_finding = "ZYVM-014"`.
+

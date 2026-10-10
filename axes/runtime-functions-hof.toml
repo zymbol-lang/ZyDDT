@@ -551,3 +551,69 @@ src    = """
     >> "Type" ¶
 }
 """
+
+# ── What an output parameter does today, where copying and lending differ ────
+#
+# `<~` is copied in and written back (GLB-117): the author asked that it work on
+# the original instead. Lending the caller's variable removes the copy and
+# changes these answers, so they are asserted as they are today — a change here
+# is a decision (S1, S2), not a side effect.
+
+[[cell]]
+id     = "output-parameter-after-a-failed-call"
+what   = "the callee writes its `<~` parameter and then fails, caught by the caller: today the caller's variable is untouched (GLB-117, S1)"
+expect = "ok"
+src    = """
+f(a<~) {
+    a$+ 99
+    x = [1]
+    y = x[5]
+    a$+ y
+}
+d = [1, 2, 3]
+!? {
+    f(d<~)
+} :! {
+    >> "falla" ¶
+}
+>> d ¶
+"""
+
+[[cell]]
+id     = "output-parameter-same-variable-twice"
+what   = "the same variable passed as two `<~` arguments: today the second write-back wins and the first is lost, `[0, 2]`; once as output and once by value, the by-value one sees the old value (GLB-117, S2)"
+expect = "ok"
+src    = """
+h(a<~, b<~) {
+    a$+ 1
+    b$+ 2
+}
+e = [0]
+h(e<~, e<~)
+>> e ¶
+g(a<~, b) {
+    a$+ 7
+    <~ b$#
+}
+d = [1, 2, 3]
+n = g(d<~, d)
+>> n " " d ¶
+"""
+
+[[cell]]
+id     = "output-parameter-handed-on"
+what   = "the control: an output parameter passed on as output, and a scalar one — `[1, 5, 6] 11`, whatever the mechanism"
+expect = "ok"
+src    = """
+sumar(n<~) { n = n + 1 }
+interno(a<~) { a$+ 5 }
+externo(a<~) {
+    interno(a<~)
+    a$+ 6
+}
+d = [1]
+externo(d<~)
+k = 10
+sumar(k<~)
+>> d " " k ¶
+"""
