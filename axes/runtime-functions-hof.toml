@@ -617,3 +617,34 @@ k = 10
 sumar(k<~)
 >> d " " k ¶
 """
+
+# ── A variable read, then written by a later operand through `<~` ───────────
+#
+# Operands are evaluated left to right (the `evaluation-order` axis), so in
+# `x + inc(x<~)` the `x` is 5 when it is read, whatever `inc` writes to it
+# afterwards. The tree-walker and zyjs answer 6; the VM reads the register when
+# the operator runs, after the write-back, and answers 16 (ZYVM-015, filed).
+
+[[cell]]
+id   = "variable-read-before-a-later-operand-writes-it"
+what = "`x + inc(x<~)`, `(x, inc(x<~), x)` and `e = d$+ meter(d<~)`: the earlier read is the value before the call; the VM reads it after (ZYVM-015)"
+src  = """
+inc(a<~) {
+    a = a + 10
+    <~ 1
+}
+meter(a<~) {
+    a$+ 99
+    <~ 1
+}
+x = 5
+y = x + inc(x<~)
+>> y " " x ¶
+x = 5
+t = (x, inc(x<~), x)
+>> t ¶
+d = [1, 2, 3]
+e = d$+ meter(d<~)
+>> e " " d ¶
+"""
+open_finding = "ZYVM-015"

@@ -1040,3 +1040,44 @@ la vuelta escribe en ese temporal, no en la ranura.
 
 `runtime-modules-scripts/output-argument-that-is-module-state`, con `open_finding = "ZYVM-014"`.
 
+---
+
+## ZYVM-015 — La VM lee una variable cuando se ejecuta el operador, no cuando se evalúa el operando: un `<~` posterior cambia lo ya leído
+
+**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: el orden es de izquierda a derecha
+**Encontrado por:** al medir [`GLB-115`](GLOBAL.md), buscando si la pregunta de las ediciones era más general
+**Familia:** el eje `evaluation-order` de ZyDDT — *«sub-expressions with effects run left to right»*
+
+```zymbol
+inc(a<~) {
+    a = a + 10
+    <~ 1
+}
+x = 5
+y = x + inc(x<~)
+>> y " " x ¶
+```
+
+| programa, con `x = 5` | `zytw` | `zyjs` | `zyvm` |
+|---|---|---|---|
+| `y = x + inc(x<~)` | `6` | `6` | **`16`** |
+| `z = inc(x<~) + x` | `16` | `16` | `16` |
+| `t = (x, inc(x<~), x)` | `(5, 1, 15)` | `(5, 1, 15)` | **`(15, 1, 15)`** |
+| `>> x " " inc(x<~) " " x ¶` | `5 1 15` | `5 1 15` | `5 1 15` |
+| `e = d$+ meter(d<~)`, con `meter` que añade `99` | `[1, 2, 3, 1]` | `[1, 2, 3, 1]` | **`[1, 2, 3, 99, 1]`** |
+
+### Causa
+
+Leer una variable local no copia nada: el operando **es** el registro de la variable, y la instrucción lo lee al
+ejecutarse — después de que la escritura de vuelta del `<~` lo haya cambiado. En la salida `>>` cada elemento se
+emite al evaluarse, y por eso ahí coincide.
+
+### Arreglo propuesto
+
+Cuando un operando ya evaluado es una variable que un operando posterior de la misma expresión recibe como `<~`,
+fijar su valor en un temporal al evaluarlo. El compilador lo sabe: el `<~` está escrito en la llamada.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/variable-read-before-a-later-operand-writes-it`, con `open_finding = "ZYVM-015"`.
+
