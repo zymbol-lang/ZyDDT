@@ -341,7 +341,7 @@ t(v) {
 [[cell]]
 id     = "invalid-unicode-character-code"
 expect = "error"
-what   = "invalid Unicode character code: {}"
+what   = "a surrogate read by `0x|…|`: `character out of range: 0x|…| cannot represent this code` — it was `invalid Unicode character code: {}`, a `##_` that quoted the value (GLB-113)"
 src    = """
 t(v) {
     <~ 0x|v|
@@ -527,6 +527,31 @@ l = #[65.0, "A", #1]
     } :! ##Type {
         >> "type" ¶
     }
+}
+"""
+
+# GLB-113 (decided 2026-10-09): a base literal also reads a TEXT of digits —
+# `0d|"65"|` is 'A' — so a code reached through text with no character is the
+# same failure as `##'` on that Int: `##Range`, without the value.
+[[cell]]
+id     = "code-with-no-character-through-text-is-range"
+what   = "`0d|\"{n}\"|` with a code past 0x10FFFF or a surrogate, in each base, is caught by `:! ##Range` (GLB-113)"
+expect = "ok"
+src    = """
+n = 1114112
+s = 55296
+for_text = ["{n}", "{s}"]
+@ t:for_text {
+    !? {
+        >> 0d|t| ¶
+    } :! ##Range {
+        >> "range" ¶
+    }
+}
+!? {
+    >> 0x|"DFFF"| ¶
+} :! ##Range {
+    >> "range" ¶
 }
 """
 

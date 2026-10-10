@@ -108,7 +108,7 @@ t(v) {
 [[cell]]
 id     = "character-code-must-be-in-range-0"
 expect = "error"
-what   = "character code must be in range 0..0x10FFFF, got {}"
+what   = "a code past 0x10FFFF read by `0x|…|`: `character out of range: 0x|…| cannot represent this code` — it was `character code must be in range 0..0x10FFFF, got {}`, a `##_` that quoted the value (GLB-113)"
 src    = """
 t(v) {
     <~ 0x|v|
