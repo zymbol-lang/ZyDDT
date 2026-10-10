@@ -8229,3 +8229,47 @@ formateador reimprime las formas nuevas igual. La GUIDE lo dice, con un ejemplo 
 Las celdas afirman ahora el resultado contra el corte de Python: `remove-by-an-arithmetic-index`, ya sin deuda, y
 `slice-bounds-take-arithmetic`.
 
+---
+
+## GLB-117 — Un parámetro `<~` copia la colección en cada llamada: se copia a la entrada y se escribe de vuelta
+
+**Estado:** **abierto** — pendiente de decisión del autor, que ha pedido que `<~` trabaje sobre el original
+(2026-10-10); prestar en vez de copiar cambia tres respuestas, y esas son las decisiones
+**Encontrado por:** la petición del autor, medida el 2026-10-10
+
+```zymbol
+poner(t<~, i, v) { t[i]$~ v }
+t = []
+@ i:1..16000 { t$+ 0 }
+@ k:1..2000 { poner(t<~, (k % 16000) + 1, k) }
+>> t[1] + t$# ¶
+```
+
+Instrucciones, 2000 llamadas sobre 16 000 elementos: **2 808 M en `zytw`** y 1 204 M en `zyvm`. Las mismas
+escrituras en línea son 33 M en el TW. Los tres motores copian a la entrada y escriben de vuelta a la salida:
+mientras dura la llamada, la variable del llamante y el parámetro son dos dueños del mismo dato, y la primera
+edición dentro de la función copia la colección.
+
+Si las ediciones ocurren todas dentro de **una** llamada, se paga una copia y nada más (33 M en el TW).
+
+### Lo que cambiaría al prestar
+
+Mover el valor al parámetro al llamar y devolverlo al volver quita la copia. Tres respuestas dependen de que hoy se
+copie:
+
+| programa | hoy, los tres | prestando |
+|---|---|---|
+| la función escribe en `a<~` y después falla; el llamante lo captura | el original, intacto: `[1, 2, 3]` | lo escrito antes del fallo queda: `[1, 2, 3, 99]` |
+| `h(e<~, e<~)` con `a$+ 1` y `b$+ 2` | `[0, 2]` — lo de `a` se pierde en silencio | una variable no se puede prestar dos veces |
+| el estado de un módulo pasado como `<~` a una función de ese módulo, que además lo lee | dentro, `datos` y el parámetro son dos copias (3 y 4 elementos) | o se copia en ese caso, o los dos son lo mismo |
+
+### Qué hay que decidir
+
+Las tres, en `scratchpad/decisiones/salida/LEEME.md` (S1, S2, S3), con sus programas.
+
+### Qué lo sujeta
+
+`zyquality/cost` `growth/write-through-an-output-parameter`, con `open_finding` para los tres motores. Las tres
+respuestas de la tabla las fijan hoy `runtime-functions-hof/output-parameter-*` (tres celdas nuevas, `expect =
+"ok"`, que afirman lo que los tres motores hacen hoy): si la decisión las cambia, cambian con ella.
+
