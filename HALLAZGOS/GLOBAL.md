@@ -8450,7 +8450,7 @@ minutos (200 000 y 600 000); la de `zyjs` sigue: [`ZYJS-014`](zyjs.md).
 
 ## GLB-119 — La variable de un bucle o un nombre desestructurado que se llama como el estado del módulo: el TW y `zyjs` escriben el estado, la VM usa un local
 
-**Estado:** **abierto** — pendiente de decisión del autor (2026-10-10)
+**Estado:** **corregido 2026-10-10** — decidido por el autor el 2026-10-10: escriben el estado, como una asignación
 **Encontrado por:** la sonda de [`ZYVM-018`](zyvm.md)
 **Familia:** [`ZYVM-018`](zyvm.md) — el parámetro, que no necesitaba decisión
 
@@ -8501,7 +8501,36 @@ La respuesta de la VM en `destr()` es un error se decida lo que se decida: lee d
 - que la variable de un bucle sea siempre local a su bucle, y entonces tapa al estado del módulo mientras dura:
   cambian el TW y `zyjs`, y hace falta decir qué pasa con la desestructuración.
 
+### Decisión y corrección (2026-10-10)
+
+El autor aprobó la recomendada: **dar valor a un nombre del módulo es escribir su estado**, sea con `=`, con un
+bucle o con una desestructuración. Una sola regla.
+
+La recomendación decía que sólo cambiaba la VM. Al barrer todas las formas —once, no las dos de arriba— resultó
+que `zyjs` también difería en una, y se corrigió con ella:
+
+| dentro de una función del módulo, con `n`, `m` y `k` en su estado | `zytw` | `zyvm`, antes | `zyjs`, antes |
+|---|---|---|---|
+| `@ n:1..3 { s = s + n }` | `n` queda en 3 | `n` sigue en 100 | 3 |
+| `@ n:1..3 { s = s + lee() }`, con `lee()` que devuelve `n` | `6` | **`300`** | **`300`** |
+| `@ n:[10, 20] { … }` | `n` queda en 20 | sigue en 100 | 20 |
+| `@ (k, n):d { … }` | `k` y `n` del módulo | no los toca | sí |
+| `[n, m] = [7, 8]` · `n = n + 1` · `<~ n + m` | `16` | **`15`** | `16` |
+| `(n, m) = (5, 6)` · `#(n: n, m: m) = …` · `[n, *m] = …` | escriben el estado | no lo tocan | sí |
+| dos bucles anidados sobre `n` y `m` | los dos | ninguno | los dos |
+| control: `n = 55` en un `:!` · `@ n:1..3 { n = n * 10 }` | igual en los tres | igual | igual |
+
+- **VM** — un bucle o una desestructuración daban al nombre un registro propio, y desde ahí las lecturas salían
+  del registro y las asignaciones iban a la ranura. Ahora un nombre que es estado del módulo **no recibe
+  registro**: el valor pasa por un temporal a la ranura (`binding_target`), y toda lectura posterior lo carga de
+  ahí. Un parámetro del mismo nombre sigue siendo de su función ([`ZYVM-018`](zyvm.md)).
+- **`zyjs`** — la variable del bucle se ligaba en el ámbito de cada vuelta y se publicaba al terminar el bucle, así
+  que una función del módulo llamada desde el cuerpo leía el valor de antes. Cuando el nombre es estado del
+  módulo se escribe en él en cada vuelta.
+- **TW** — no cambia.
+
 ### Qué lo sujeta
 
-`runtime-modules-scripts/loop-variable-or-destructured-name-that-is-module-state`, con `open_finding = "GLB-119"`.
+`runtime-modules-scripts/loop-variable-or-destructured-name-that-is-module-state`, ya sin deuda: las diez formas,
+contra un oráculo en Python donde `global n` hace lo mismo. Con la VM y el `zyjs` de antes da DIVERGE.
 

@@ -722,6 +722,7 @@ for _ in range(2):
 
 [[cell]]
 id     = "module-state-read-while-passed-as-output"
+premise = "MEM-5"
 what   = "inside the callee, the module's state read directly and the `<~` parameter bound to it are two copies: `3 4` (GLB-117, S3)"
 expect = "ok"
 src    = """
@@ -891,41 +892,166 @@ print(en_lambda(), ver())
 """
 
 # A loop variable or a destructured name that coincides with the module's state
-# is NOT a parameter, and here the engines part: the tree-walker and zyjs write
-# the module's state — `@ n:1..3 { }` leaves the module's `n` at 3 — and the VM
-# gives the name a register of its own, then writes later assignments to the
-# slot. Which one the language means is the author's (GLB-119, filed, open).
+# is NOT a parameter: it is the module's state, however it gets its value.
+# Decided by the author on 2026-10-10 (GLB-119) — one rule, "giving a value to a
+# name of the module writes its state", the one an assignment already followed.
+# The tree-walker did that. The VM gave the name a register of its own in nine
+# of these forms, then read from the register and assigned to the slot; zyjs
+# kept a loop variable in the turn's scope and published it when the loop
+# ended, so a function of the module called from the body read the old value.
 
 [[cell]]
-id   = "loop-variable-or-destructured-name-that-is-module-state"
-what = "`@ n:1..3 { … }` and `[n, m] = [7, 8]` inside a module whose state has an `n`: the tree-walker and zyjs write the module's `n`, the VM keeps a local and answers `15` where they answer `16` (GLB-119)"
-src  = """
+id     = "loop-variable-or-destructured-name-that-is-module-state"
+what   = "`@ n:1..3`, `@ n:[…]`, `@ (k, n):d`, `[n, m] = …`, `(n, m) = …`, `#(n: n, m: m) = …`, `[n, *m] = …` and two nested loops, inside a module whose state has `n`, `m` and `k`: each writes the state, and a function called from the loop's body reads it (GLB-119)"
+expect = "ok"
+src    = """
 <# ./mod/vuelta => V
->> V::bucle() " " V::ver() ¶
+>> V::rango() " " V::ver() ¶
 V::reiniciar()
->> V::destr() " " V::ver() ¶
+>> V::rango_lee() " " V::ver() ¶
+V::reiniciar()
+>> V::coleccion() " " V::ver() ¶
+V::reiniciar()
+>> V::pares() " " V::ver() ¶
+V::reiniciar()
+>> V::destr_arr() " " V::ver() ¶
+V::reiniciar()
+>> V::destr_tupla() " " V::ver() ¶
+V::reiniciar()
+>> V::destr_dic() " " V::ver() ¶
+V::reiniciar()
+>> V::resto() " " V::ver() ¶
+V::reiniciar()
+>> V::anidado() " " V::ver() ¶
+V::reiniciar()
+>> V::bucle_escribe() " " V::ver() ¶
 """
-open_finding = "GLB-119"
+oracle.py = """
+n, m, k = 100, 200, "k0"
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    return str(v)
+def ver(): return f"({show(n)}, {show(m)}, {k})"
+def reiniciar():
+    global n, m, k
+    n, m, k = 100, 200, "k0"
+def lee(): return n
+def rango():
+    global n
+    s = 0
+    for n in range(1, 4): s = s + n
+    return s
+def rango_lee():
+    global n
+    s = 0
+    for n in range(1, 4): s = s + lee()
+    return s
+def coleccion():
+    global n
+    s = 0
+    for n in [10, 20]: s = s + n
+    return s
+def pares():
+    global n, k
+    s = ""
+    for k, n in {"a": 1, "b": 2}.items(): s = s + k + str(n)
+    return s
+def destr_arr():
+    global n, m
+    n, m = [7, 8]
+    n = n + 1
+    return n + m
+def destr_tupla():
+    global n, m
+    n, m = (5, 6)
+    return n * m
+def destr_dic():
+    global n, m
+    d = {"n": 3, "m": 4}
+    n, m = d["n"], d["m"]
+    return n + m
+def resto():
+    global n, m
+    n, *m = [1, 2, 3]
+    return n + len(m)
+def anidado():
+    global n, m
+    s = 0
+    for n in range(1, 3):
+        for m in range(1, 3): s = s + n * m
+    return s
+def bucle_escribe():
+    global n
+    for n in range(1, 4): n = n * 10
+    return 0
+for f in (rango, rango_lee, coleccion, pares, destr_arr, destr_tupla, destr_dic, resto, anidado, bucle_escribe):
+    print(f(), ver())
+    reiniciar()
+"""
 [cell.files]
 "mod/vuelta.zy" = """
 # vuelta {
-    #> { bucle, destr, ver, reiniciar }
+    #> { rango, rango_lee, coleccion, pares, destr_arr, destr_tupla, destr_dic, resto, anidado, bucle_escribe, ver, reiniciar }
     n = 100
+    m = 200
+    k = "k0"
 
-    bucle() {
+    lee() { <~ n }
+    rango() {
         s = 0
-        @ n:1..3 {
-            s = s + n
-        }
+        @ n:1..3 { s = s + n }
         <~ s
     }
-    destr() {
+    rango_lee() {
+        s = 0
+        @ n:1..3 { s = s + lee() }
+        <~ s
+    }
+    coleccion() {
+        s = 0
+        @ n:[10, 20] { s = s + n }
+        <~ s
+    }
+    pares() {
+        d = #(a: 1, b: 2)
+        s = ""
+        @ (k, n):d { s = s k n }
+        <~ s
+    }
+    destr_arr() {
         [n, m] = [7, 8]
         n = n + 1
         <~ n + m
     }
-    ver() { <~ n }
-    reiniciar() { n = 100 }
+    destr_tupla() {
+        (n, m) = (5, 6)
+        <~ n * m
+    }
+    destr_dic() {
+        #(n: n, m: m) = #(n: 3, m: 4)
+        <~ n + m
+    }
+    resto() {
+        [n, *m] = [1, 2, 3]
+        <~ n + m$#
+    }
+    anidado() {
+        s = 0
+        @ n:1..2 {
+            @ m:1..2 { s = s + n * m }
+        }
+        <~ s
+    }
+    bucle_escribe() {
+        @ n:1..3 { n = n * 10 }
+        <~ 0
+    }
+    ver() { <~ (n, m, k) }
+    reiniciar() {
+        n = 100
+        m = 200
+        k = "k0"
+    }
 }
 """
 
@@ -1134,6 +1260,7 @@ otro(); show()
 
 [[cell]]
 id     = "module-state-passed-as-output-to-a-call-that-fails"
+premise = "MEM-5"
 what   = "`tocar(datos<~)` writes and then fails, with `datos` the module's state: the state is unchanged; a local passed the same way keeps the writes, through two levels (GLB-117, S1 and S3)"
 expect = "ok"
 oracle_literal_ok = "the labels are the observable of a path; the collections are computed on both sides"
