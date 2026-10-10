@@ -8297,8 +8297,8 @@ Las celdas afirman ahora el resultado contra el corte de Python: `remove-by-an-a
 
 ## GLB-117 — Un parámetro `<~` copia la colección en cada llamada: se copia a la entrada y se escribe de vuelta
 
-**Estado:** **abierto** — pendiente de decisión del autor, que ha pedido que `<~` trabaje sobre el original
-(2026-10-10); prestar en vez de copiar cambia tres respuestas, y esas son las decisiones
+**Estado:** **corregido 2026-10-10** — decidido por el autor el 2026-10-10: prestar, con S1, S2 y S3 como se
+recomendaron
 **Encontrado por:** la petición del autor, medida el 2026-10-10
 
 ```zymbol
@@ -8331,11 +8331,54 @@ copie:
 
 Las tres, en `scratchpad/decisiones/salida/LEEME.md` (S1, S2, S3), con sus programas.
 
+### Decisión y corrección (2026-10-10)
+
+El autor aprobó las tres recomendadas. La variable de quien llama **se presta** al parámetro: su valor pasa a él
+al empezar la llamada y vuelve al terminar, salga como salga.
+
+| | antes, los tres | ahora, los tres |
+|---|---|---|
+| **S1** — la función escribe en `a<~` y después falla; quien llama lo captura | `[1, 2, 3]` | `[1, 2, 3, 99]`: lo escrito está escrito |
+| lo mismo a través de dos niveles, `externo(a<~) { interno(a<~) }` | `[1]` | `[1, 4, 5]` |
+| **S2** — `h(e<~, e<~)` | `[0, 2]`, lo de `a` perdido en silencio | error antes de ejecutar: `'e' is given to 'h' as an output argument twice` |
+| control de S2: `g(d<~, d)`, una vez de salida y otra por valor | `3 [1, 2, 3, 7]` | igual |
+| **S3** — el estado de un módulo pasado como `<~` a una función de ese módulo | dentro, dos copias: `3 4` | igual: **se copia**, no se presta |
+| S3, y la función falla | el estado, intacto | igual: la copia se suelta |
+
+- **TW** — `lendable_arguments`: un argumento de salida que es una variable del marco que llama se saca de ella
+  después de leer los demás argumentos, y vuelve tanto al retornar como al fallar. No se presta el estado de un
+  módulo (S3), ni una constante, ni un nombre que el marco no tiene.
+- **VM** — `Call` suelta el registro de quien llama después de copiar los argumentos; al deshacer marcos por un
+  error, `raise_kind!` devuelve a cada marco lo que prestó antes de descartarlo. El estado de un módulo llega en
+  un temporal y la ranura conserva el original, así que se copia solo.
+- **`zyjs`** — devuelve el parámetro en **todas** las salidas (`giveBack`): antes sólo cuando el cuerpo llegaba al
+  final, y por eso también se lo saltaba con un `$!!` y con un `<~` lanzado desde un `??` usado como valor. Presta
+  en el mismo sentido y sigue copiando la colección en cada edición: eso es [`ZYJS-014`](zyjs.md).
+- **Los dos analizadores** — el rechazo de S2, con las mismas palabras, en `check_out_marks` y `checkOutMarks`.
+
+**El espejo.** Los dos motores de Rust guardaban una segunda copia de cada variable del script, para que una
+función con nombre pudiera leerla. Era un segundo dueño de todo lo que el cuerpo del programa tenía, así que nada
+prestado desde ahí podía ser nunca el único dueño. Desde MEM-2 una función alcanza una variable del fichero de una
+sola manera que el analizador permite —llamando a una lambda que vive en ella—, así que el TW refleja sólo los
+valores que se pueden llamar y la VM da ranura sólo a los nombres que el cuerpo de alguna función menciona.
+
+Instrucciones, 2000 llamadas que escriben un elemento sobre 16 000:
+
+| | antes | ahora |
+|---|---:|---:|
+| `zytw` | 2 808 M | 55 M |
+| `zyvm` | 1 204 M | 19 M |
+
+Y, por el espejo, una asignación en el nivel de arriba del programa (`z = i`, instrucciones por vuelta):
+`zytw` 1 827 → 1 307; `zyvm` 641 → 569.
+
 ### Qué lo sujeta
 
-`zyquality/cost` `growth/write-through-an-output-parameter`, con `open_finding` para los tres motores. Las tres
-respuestas de la tabla las fijan hoy `runtime-functions-hof/output-parameter-*` (tres celdas nuevas, `expect =
-"ok"`, que afirman lo que los tres motores hacen hoy): si la decisión las cambia, cambian con ella.
+`zyquality/cost` `growth/write-through-an-output-parameter`, ya sin deuda para `zytw` y `zyvm` (la de `zyjs` es
+[`ZYJS-014`](zyjs.md)). `runtime-functions-hof/output-parameter-after-a-failed-call` (S1, con oráculo),
+`output-parameter-same-variable-twice` (S2, `expect = "error"`), `output-parameter-also-passed-by-value` y
+`output-parameter-handed-on` (los controles); `runtime-modules-scripts/module-state-read-while-passed-as-output`
+y `module-state-passed-as-output-to-a-call-that-fails` (S3).
 
 ---
 

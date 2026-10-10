@@ -3258,3 +3258,45 @@ El eje `addressing` no podía verlo: sus hojas son escalares.
 
 `runtime-index-nav/extraction-of-values-that-are-arrays`, dieciséis formas, sin oráculo: lo que se pide es que
 los tres coincidan, y el que no coincidía era el port. Con el `zyjs` de antes da DIVERGE.
+
+---
+
+## ZYJS-059 — La orden con que los juegos publicados piden su semilla se rechaza en el navegador
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión
+**Encontrado por:** `web/tests/test_shell.mjs`, que estaba en rojo y **fuera de la puerta**: `zyq suite` no lo
+corre
+
+```zymbol
+_u = <\ "od -An -N2 -tu2 /dev/urandom | tr -d ' \n'" \>
+```
+
+Es, letra por letra, lo que escriben GO, Serpiente y Klingon Galaxy para sembrar su generador. En el navegador:
+`cannot run 'od -An -N2 -tu2 /dev/urandom | tr -d ' …'': a shell command runs as a process, and the browser has
+none`.
+
+El navegador no tiene shell; tiene una lista corta de sustitutos, y éste es uno de ellos (BUG-GOL-014).
+
+### Causa
+
+El sustituto compara la orden después de aplanarla: las comillas pasan a espacios y los espacios se juntan. Su
+patrón pedía algo después de `tr -d`. Cuando se escribió, `\n` dentro de una cadena eran dos caracteres y quedaba
+`tr -d \n`; desde que `\n` es un escape, `' \n'` es un espacio y un salto de línea, y aplanado no deja nada.
+
+Estaba roto desde antes del 2026-10-07 (la prueba ya fallaba en los commits de ese día). Nadie lo vio porque la
+prueba que lo sujeta no está en `zyquality/suites.toml`, y porque el consenso excusa a `zyjs` de todo fichero con
+`<\ … \>`.
+
+### Corrección
+
+Lo que siga a `tr -d` es opcional en el patrón.
+
+De paso, dos cosas que la misma prueba y `test_symbols.mjs` tenían en rojo por la forma vieja del bloque, que hoy
+toma una expresión y no palabras sueltas: el caso `whoami` de la prueba, y el ejemplo de la tarjeta de `<\` en la
+ayuda de símbolos del playground, que enseñaba `<\ echo hola \>` — una forma que ya no compila.
+
+### Qué lo sujeta
+
+`web/tests/test_shell.mjs` y `web/tests/test_symbols.mjs`, en verde. **Siguen fuera de la puerta**: es la razón
+de que esto durara días, y meterlos es decisión del autor.
+

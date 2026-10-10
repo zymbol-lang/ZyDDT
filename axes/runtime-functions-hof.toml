@@ -552,18 +552,81 @@ src    = """
 }
 """
 
-# ── What an output parameter does today, where copying and lending differ ────
+# ── An output parameter is the caller's variable (GLB-117, 2026-10-10) ──────
 #
-# `<~` is copied in and written back (GLB-117): the author asked that it work on
-# the original instead. Lending the caller's variable removes the copy and
-# changes these answers, so they are asserted as they are today — a change here
-# is a decision (S1, S2), not a side effect.
+# `<~` used to be copied in and written back, so one write through it cost the
+# size of the collection, every call. The author asked that it work on the
+# original: the caller's variable is LENT to the parameter for as long as the
+# call lasts. Three answers depended on the copy, and each was decided:
+#
+#   S1  what the function wrote before failing stays written;
+#   S2  the same variable cannot be two output arguments of one call;
+#   S3  module state passed to a function of its own module is still copied,
+#       and the copy is dropped if the call fails (runtime-modules-scripts).
 
 [[cell]]
 id     = "output-parameter-after-a-failed-call"
-what   = "the callee writes its `<~` parameter and then fails, caught by the caller: today the caller's variable is untouched (GLB-117, S1)"
+what   = "the callee writes its `<~` parameter and then fails, caught by the caller: what it wrote is written — at one level, through two, with a scalar, and after a `$!!` (GLB-117, S1)"
 expect = "ok"
+oracle_literal_ok = "`falla` is the observable of a path; the collections are computed on both sides"
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def f(a):
+    a.append(99)
+    x = [1]
+    a.append(x[5 - 1])
+def interno(a):
+    a.append(5)
+    z = [1]
+    a.append(z[9 - 1])
+def externo(a):
+    a.append(4)
+    interno(a)
+    a.append(6)
+d = [1, 2, 3]
+try: f(d)
+except IndexError: print("falla")
+print(show(d))
+d = [1]
+try: externo(d)
+except IndexError: print("falla")
+print(show(d))
+n = [5]
+def escalar(n):
+    n[0] = n[0] + 1
+    k = [1]
+    n[0] = n[0] + k[3 - 1]
+try: escalar(n)
+except IndexError: print("falla")
+print(n[0])
+d = [1]
+d.append(7)
+print(show(d))
+"""
 src    = """
+interno(a<~) {
+    a$+ 5
+    z = [1]
+    w = z[9]
+    a$+ w
+}
+externo(a<~) {
+    a$+ 4
+    interno(a<~)
+    a$+ 6
+}
+escalar(n<~) {
+    n = n + 1
+    k = [1]
+    j = k[3]
+    n = n + j
+}
+propaga(a<~) {
+    a$+ 7
+    e = ##Mio("x")
+    e$!!
+    a$+ 8
+}
 f(a<~) {
     a$+ 99
     x = [1]
@@ -577,12 +640,21 @@ d = [1, 2, 3]
     >> "falla" ¶
 }
 >> d ¶
+d = [1]
+!? { externo(d<~) } :! { >> "falla" ¶ }
+>> d ¶
+n = 5
+!? { escalar(n<~) } :! { >> "falla" ¶ }
+>> n ¶
+d = [1]
+_r = propaga(d<~)
+>> d ¶
 """
 
 [[cell]]
 id     = "output-parameter-same-variable-twice"
-what   = "the same variable passed as two `<~` arguments: today the second write-back wins and the first is lost, `[0, 2]`; once as output and once by value, the by-value one sees the old value (GLB-117, S2)"
-expect = "ok"
+what   = "`h(e<~, e<~)`: one variable cannot be two output parameters of one call. It was copied into both and the second write-back discarded the first, `[0, 2]`; it is refused (GLB-117, S2)"
+expect = "error"
 src    = """
 h(a<~, b<~) {
     a$+ 1
@@ -591,13 +663,30 @@ h(a<~, b<~) {
 e = [0]
 h(e<~, e<~)
 >> e ¶
+"""
+
+[[cell]]
+id     = "output-parameter-also-passed-by-value"
+what   = "the control of S2: once as output and once by value is a call like any other, and the by-value argument holds what the variable held before the call"
+expect = "ok"
+src    = """
 g(a<~, b) {
     a$+ 7
     <~ b$#
 }
-d = [1, 2, 3]
+k = 3
+d = [1, 2, k]
 n = g(d<~, d)
 >> n " " d ¶
+"""
+oracle.py = """
+def g(a, b):
+    a.append(7)
+    return len(b)
+k = 3
+d = [1, 2, k]
+n = g(d, list(d))
+print(n, "[" + ", ".join(str(x) for x in d) + "]")
 """
 
 [[cell]]
