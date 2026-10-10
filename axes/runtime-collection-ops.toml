@@ -2006,3 +2006,47 @@ show(d)
 d = minus(d, 1)
 show(d)
 """
+
+# ── The functional update of a tuple, bound to its own name (added 2026-10-10)
+#
+# COL-4: a tuple cannot be modified, and `u = t[i]$~ v` derives a second one.
+# `t = t[i]$~ v` is that same derivation, bound back to `t` — as `t = t$+ 3`
+# already was in the three engines. The tree-walker's shortcut for `name =
+# name[i]$~ v` refused it whatever the form written, where the VM and zyjs built
+# the tuple (ZYTW-012, corrected the day it was found).
+
+[[cell]]
+id     = "functional-update-of-a-tuple-bound-to-its-own-name"
+oracle_literal_ok = "`refused` is the observable of a path; the tuples are computed on both sides"
+what   = "`t = t[1]$~ 9` builds `(9, 2)` like `u = t[1]$~ 9` does; the statement `t[1]$~ 9` is still refused (ZYTW-012)"
+expect = "ok"
+src    = """
+k = 9
+t = (1, 2)
+o = t
+t = t[1]$~ k
+>> t " " o ¶
+t = t$+ 3
+>> t ¶
+t = t$-[1]
+>> t ¶
+!? {
+    t[1]$~ 0
+    >> "edited" ¶
+} :! { >> "refused" ¶ }
+>> t ¶
+"""
+oracle.py = """
+def show(t): return "(" + ", ".join(str(x) for x in t) + ")"
+k = 9
+t = (1, 2)
+o = t
+t = (k,) + t[1:]
+print(show(t), show(o))
+t = t + (3,)
+print(show(t))
+t = t[1:]
+print(show(t))
+print("refused")
+print(show(t))
+"""

@@ -490,8 +490,7 @@ no hay una función con ese nombre. `lifetime` queda 24 de 24.
 
 ## ZYTW-008 — Una función cuyo parámetro se llama como el estado del módulo llama a otra: el TW escribe el parámetro en el estado
 
-**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: la VM y `zyjs` coinciden, y un
-parámetro es de su función
+**Estado:** **corregido 2026-10-10** — sin decisión: la VM y `zyjs` coinciden, y un parámetro es de su función
 **Encontrado por:** la misma sonda de [`ZYVM-018`](zyvm.md)
 
 ```zymbol
@@ -523,11 +522,342 @@ No hay ningún `<~` en el programa.
 
 ### Causa
 
-Sin localizar. Sólo ocurre cuando la función que tiene el parámetro **llama** a otra función del módulo: lo que
-sincroniza el estado del módulo alrededor de una llamada toma el parámetro por la variable del módulo.
+El TW da a cada marco una copia de las variables del módulo que su cuerpo nombra, y al salir —y al entrar en otra
+función del mismo módulo— publica las que han cambiado. Un cuerpo «nombra» `datos` también cuando `datos` es su
+parámetro: la variable del módulo se inyectaba, el parámetro ocupaba su sitio en el ámbito, y en la siguiente
+llamada el vaciado encontraba una «variable de módulo» con otro valor —el argumento— y la publicaba. La escritura
+de vuelta al salir ya excluía a los parámetros; el vaciado al entrar, no.
+
+### Corrección (2026-10-10)
+
+Un nombre que es parámetro de la función no se inyecta. Y una función llamada desde otra del mismo módulo toma el
+valor vivo del marco que llama sólo si a ese marco se le **dio** la variable del módulo, no si tiene en su ámbito
+algo que se llama igual.
+
+| `d(datos)` con el argumento `[1]` | antes, `zytw` | ahora, los tres |
+|---|---|---|
+| `<~ lee(datos)` | estado `[1]` | estado `[1, 2, 3]` |
+| `otro(datos<~)` · `<~ datos` | devuelve `[1, 5]`, estado `[1]` | devuelve `[1, 5]`, estado `[1, 2, 3]` |
 
 ### Qué lo sujeta
 
-`runtime-modules-scripts/call-from-a-function-whose-parameter-is-named-like-module-state`, con
-`open_finding = "ZYTW-008"`.
+`runtime-modules-scripts/call-from-a-function-whose-parameter-is-named-like-module-state`, ya sin deuda y con un
+oráculo en Python. Con el TW de antes da DIVERGE.
 
+---
+
+## ZYTW-009 — `s = s + t` sobre dos cadenas: el TW las une, donde `+` es sólo aritmético
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: la regla ya estaba, y el propio TW
+la aplica en cualquier otro sitio
+**Encontrado por:** leyendo los atajos de asignación del TW para corregir [`GLB-115`](GLOBAL.md)
+
+```zymbol
+s = "a"
+s = s + "b"
+>> s ¶
+```
+
+`zyvm` y `zyjs`: `+ is arithmetic only — use juxtaposition to concatenate strings: "a" b "c"`. **`zytw`: `ab`.**
+
+| programa | `zytw`, antes | `zyvm`, `zyjs` |
+|---|---|---|
+| `s = s + t`, dos cadenas | **`ab`** | `##Type` |
+| `s = s + c`, cadena y carácter | **`abx`** | `##Type` |
+| `s += t` | **`abxb`** | `##Type` |
+| control: `u = s + t`, a otra variable | `##Type` | `##Type` |
+
+La misma operación se rechazaba o se hacía según a quién se asignara el resultado. Un programa que une texto así
+corría en el motor por defecto y en ningún otro; la VM va a ser el motor por defecto. Ningún fichero del corpus ni
+de las aplicaciones lo hacía —correría en uno de tres—, y por eso no lo vio nada.
+
+### Causa
+
+El atajo de `x = x OP y` (`variables.rs`, «B12») tenía un tercer brazo, después del entero y el flotante: si `OP`
+es `+` y los dos lados son cadenas, `push_str`. Venía de cuando `+` unía cadenas.
+
+### Corrección
+
+El brazo se quita. `s = s + t` llega al operador, que lo rechaza con las palabras de siempre. La forma que une
+texto, `s = s x`, gana su propio camino en el sitio (ver [`ZYTW-011`](zytw.md)).
+
+### Qué lo sujeta
+
+`runtime-operators/plus-on-strings-assigned-to-its-own-left-side-is-refused`. La marca se imprime **después** de
+la sentencia: un motor que une lo dice. Con el TW de antes da DIVERGE.
+
+---
+
+## ZYTW-010 — Llamar a una función de un módulo cuesta el tamaño del estado del módulo
+
+**Estado:** **abierto** — la mitad de lectura, corregida el 2026-10-10; la de escritura pide una decisión sobre el
+TW
+**Encontrado por:** leyendo cómo sincroniza el TW el estado de un módulo, para [`ZYTW-008`](zytw.md), y midiéndolo
+**Familia:** [`ZYVM-003`](zyvm.md), ya cerrado — allí copiaba cada edición; aquí, cada llamada
+
+```zymbol
+// mod/mesa.zy
+# mesa {
+    #> { crear, leer, poner, cuanto }
+    t = []
+
+    crear(n) { @ i:1..n { t$+ 0 } }
+    leer(i) { <~ t[i] }
+    poner(i, v) { t[i]$~ v }
+    cuanto() { <~ t$# }
+}
+```
+
+```zymbol
+<# ./mod/mesa => M
+M::crear(16000)
+@ k:1..2000 { M::poner((k % 16000) + 1, k) }
+>> M::cuanto() ¶
+```
+
+Es la forma de un módulo con API: el estado se toca una casilla por llamada, desde fuera. Instrucciones, 2000
+llamadas, con el estado a 4000 y a 16 000 casillas:
+
+| cada llamada | `zytw`, antes | `zytw`, ahora | `zyvm` |
+|---|---:|---:|---:|
+| **lee** una casilla, `leer(i)` | 374 M → **1 401 M** | 41 M → 66 M | 9 M → 23 M |
+| **escribe** una casilla, `poner(i, v)` | 821 M → **2 905 M** | 822 M → **2 911 M** | 11 M → 25 M |
+| control: escribe otra variable del módulo, pequeña | 223 M → 244 M | 224 M → 249 M | 9 M → 23 M |
+
+### Causa
+
+El TW no guarda el estado de un módulo en un solo sitio. Cada marco recibe una **copia** de las variables que su
+cuerpo nombra —el almacén del módulo conserva el original— y, al salir, decide cuáles ha cambiado comparando cada
+una con la que recibió.
+
+- **Leer:** el 91 % del tiempo estaba en `Value::eq`. Una tabla que nadie tocó se comparaba consigo misma,
+  elemento a elemento, en cada llamada.
+- **Escribir:** el original sigue en el almacén, así que el marco nunca es el único dueño de la colección: la
+  primera edición de cada llamada la copia entera (54 % en `Vec::clone`, 25 % soltándola), y la comparación de
+  salida la recorre otra vez.
+
+### Corrección, la mitad de lectura (2026-10-10)
+
+La comparación pregunta primero por la **identidad**: un marco que no escribió una colección sigue teniendo el
+mismo `Rc` que recibió. Sólo si los punteros difieren se comparan los valores, como antes — un marco que escribió
+de vuelta lo que ya había no ha cambiado nada, y decir que sí dejaría que su copia pisara lo que guardó una
+llamada anidada.
+
+### Qué hay que decidir, la mitad de escritura
+
+Quitar la copia por llamada es dejar de inyectar: que el estado de un módulo viva en un solo sitio y las funciones
+lo lean y lo escriban ahí, como en la VM y en `zyjs`, que *«never had the question»* (lo dice el propio comentario
+del TW). Desaparecen la inyección, la instantánea, el vaciado al entrar y la escritura de vuelta al salir — y con
+ellos la clase de fallo de [`ZYTW-008`](zytw.md) y [`ZYTW-013`](zytw.md), que son los dos de esa maquinaria.
+
+- **hacerlo:** es reescribir cómo el TW resuelve una variable dentro de un módulo. Lo sujetan el corpus, las nueve
+  aplicaciones y ZyDDT, que hoy están en verde;
+- **no hacerlo:** la VM va a ser el motor por defecto y ya no lo tiene; el TW queda con una llamada que cuesta el
+  tamaño del estado cuando escribe, declarada.
+
+### Qué lo sujeta
+
+`zyquality/cost`: `growth/module-call-that-reads-one-cell`, en verde (`zytw` y `zyvm`; `zyjs` entra cuando cierre
+[`ZYJS-014`](zyjs.md), porque allí construir la tabla ya es cuadrático y es lo único que mediría), y
+`growth/module-call-that-writes-one-cell`, con `open_finding = { zytw = "ZYTW-010" }`.
+
+---
+
+## ZYTW-011 — Un operando se evalúa dos veces cuando el atajo de la asignación no se puede aplicar
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión
+**Encontrado por:** leyendo los atajos de asignación del TW para corregir [`GLB-115`](GLOBAL.md)
+
+```zymbol
+dos() {
+    >> "llamada" ¶
+    <~ 2
+}
+n = 10
+n = n / dos()
+>> n ¶
+```
+
+`zyvm` y `zyjs`: `llamada`, `5`. **`zytw`: `llamada`, `llamada`, `5`.**
+
+| sentencia | llamadas a `f` en `zytw`, antes | en `zyvm`, `zyjs` |
+|---|---:|---:|
+| `n = n / f()` · `n = n % f()` · `n = n ^ f()` | **2** | 1 |
+| `x = x / f()`, con `x` flotante | **2** | 1 |
+| `s = s f()` — el acumulador de texto | **2** | 1 |
+| `n = n == f()` · `n = n > f()` | **2** | 1 |
+| `v = v && f()`, con `v` cierto | **2** | 1 |
+| `v = v && f()`, con `v` **falso** | **1** | 0 |
+| `m = m - f()`, flotante y entero | **2** | 1 |
+| `x = t[f()]`, `t$-[f()]`, `t[f()]$~ 0`, con el índice fuera de rango | **2** | 1 |
+| `s$+ f()`, con `f` que devuelve una cadena | **2** | 1 |
+| control: `n = n + f()`, `u = n / f()` | 1 | 1 |
+
+El valor sale bien, así que ningún fichero con salida grabada podía verlo: sólo un operando con efecto —que
+imprima, que cuente, que consuma una cola— distingue una evaluación de dos. Y con `&&`, la que no debía ocurrir.
+
+### Causa
+
+`execute_assignment` tiene atajos para `nombre = nombre OP …`: evalúan el operando y trabajan sobre la variable
+en su sitio. Cuando el atajo no se podía aplicar —una división, una comparación, una yuxtaposición, un índice
+fuera de rango, un tipo que no es el del atajo— el código *«caía»* al camino general, que es
+`eval_expr(&assign.value)`: la expresión entera otra vez, operando incluido.
+
+### Corrección
+
+Ningún atajo devuelve la expresión. El operando se evalúa una vez y la operación se termina **con los valores en
+la mano**: cada operación del lenguaje que tenía atajo tiene ahora una forma que recibe valores (`append_in`,
+`remove_at_in`, `update_in`, `apply_binary`, `index_into`), y es la misma que usa el camino general. `&&` y `||`
+no entran al atajo: quien decide si el lado derecho corre es `eval_binary`.
+
+De paso, lo que el camino en el sitio cubre: `s = s x` añade sobre la cadena, y `d["k"]$~ v` y `d.k$~ v` escriben
+en el diccionario donde está.
+
+### Coste
+
+El TW, contra el commit anterior, en instrucciones por vuelta de un bucle mínimo y en los benchmarks del proyecto
+(nueve corridas):
+
+| | instrucciones | ciclos |
+|---|---:|---:|
+| `s = s + i` | +6 % | +5 % |
+| `a$+ i` | +8 % | +12 % |
+| `x = a[3]` · `s = s + x` | +3 % | +5 % |
+| `a[3]$~ i` | −12 % | −12 % |
+| `f = f * 1.0000001` | −22 % | −23 % |
+| `s = s "a"`, 100 000 veces | −94 % | −97 % |
+| los ocho de `zyquality/bench/` | de −10 % a +1,5 % | de −11 % a +3 % |
+
+Las dos primeras filas son un coste que no está localizado: no hay ninguna búsqueda de variable de más, y mover el
+código entre funciones lo cambia de sitio sin quitarlo.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/operand-of-a-self-assignment-runs-once`, con un oráculo en Python: once sentencias, cada
+una con su llamada contada. Con el TW de antes da DIVERGE.
+
+---
+
+## ZYTW-012 — `t = t[1]$~ 9` sobre una tupla: el TW la rechaza, donde construye una tupla nueva
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: COL-4
+**Encontrado por:** leyendo los atajos de asignación del TW
+
+```zymbol
+t = (1, 2)
+t = t[1]$~ 9
+>> t ¶
+```
+
+`zyvm` y `zyjs`: `(9, 2)`. **`zytw`: `cannot modify tuple 't': tuples are immutable`.**
+
+COL-4: una tupla no se modifica, y `u = t[i]$~ v` *deriva* otra. `t = t[i]$~ v` es esa misma derivación, ligada de
+vuelta a `t` — como `t = t$+ 3` y `t = t$-[1]`, que los tres motores ya aceptaban. Lo que se rechaza es la
+sentencia `t[1]$~ 9`.
+
+### Causa
+
+El atajo de `nombre = nombre[i]$~ v` comprobaba que el receptor no fuera una tupla sin mirar qué forma se había
+escrito. La comprobación general, unas líneas antes, sí lo mira.
+
+### Corrección
+
+El atajo deja de comprobarlo: la sentencia ya llegó rechazada, y la forma funcional construye.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/functional-update-of-a-tuple-bound-to-its-own-name`, con oráculo. Con el TW de antes da
+WRONG.
+
+---
+
+## ZYTW-013 — Guardar, llamar, restaurar: el TW pierde la escritura que devuelve el estado a su valor de entrada
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión
+**Encontrado por:** una celda de [`GLB-115`](GLOBAL.md) que dio `15` donde eran `5` con el orden ya corregido
+
+```zymbol
+// mod/deshace.zy
+# deshace {
+    #> { deshacer, ver }
+    n = 5
+
+    mover() { n = 99 }
+    deshacer() {
+        mover()
+        n = 5
+    }
+    ver() { <~ n }
+}
+```
+
+```zymbol
+<# ./mod/deshace => D
+D::deshacer()
+>> D::ver() ¶
+```
+
+`zyvm` y `zyjs`: `5`. **`zytw`: `99`.** Es como una búsqueda deshace una jugada.
+
+| `deshacer()`, con `n = 5` al entrar | `zytw`, antes | `zyvm`, `zyjs` |
+|---|---|---|
+| `mover()` · `n = 5` — el valor de entrada | **`99`** | `5` |
+| `mover()` · `n = 6` — otro valor | `6` | `6` |
+| lo mismo con una colección, `t = [1, 2]` | **`[9]`** | `[1, 2]` |
+
+### Causa
+
+Al salir, el marco decide qué variables del módulo ha cambiado comparándolas con las que recibió. Tiene dos
+copias de «las que recibió»: una local, tomada al entrar, y la del intérprete, que una llamada anidada mueve
+cuando escribe el estado (MM-12). La escritura de vuelta comparaba contra **la de entrada**. `n = 5` es igual a
+la de entrada, luego «no cambió», y el módulo se quedaba con lo que guardó `mover`.
+
+### Corrección
+
+La escritura de vuelta compara contra la instantánea del marco, la que se mueve.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/module-state-written-back-to-its-starting-value-after-a-nested-call`, con oráculo. Con
+el TW de antes da DIVERGE.
+
+---
+
+## ZYTW-014 — `d[f()]`, con `f` que escribe `d`: el TW indexa lo que `f` dejó
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — decidido con [`GLB-115`](GLOBAL.md): de
+izquierda a derecha
+**Encontrado por:** barriendo las demás lecturas después de corregir las ediciones
+
+```zymbol
+cambia(a<~) {
+    a = [7, 8, 9, 6]
+    <~ 1
+}
+d = [10, 20, 30]
+x = d[cambia(d<~)]
+>> x ¶
+```
+
+`zyvm` y `zyjs`: `10`. **`zytw`: `7`.**
+
+| lectura | `zytw`, antes | los tres, ahora |
+|---|---|---|
+| `d[cambia(d<~)]` | `7` | `10` |
+| `datos[meter()]`, estado de módulo | `7` | `10` |
+| control: `d[1] + cambia(d<~)` · `d$# + cambia(d<~)` · `(d, cambia(d<~), d)` | de izquierda a derecha | igual |
+
+### Causa
+
+`eval_index` evalúa los índices y **después** toma prestada la colección de la variable, para no copiarla
+(`HLZ-012`). Es lo mismo que leerla antes — salvo cuando un índice la escribe.
+
+### Corrección
+
+Cuando un índice puede escribir la colección —lo mismo que se pregunta para una edición—, la lectura va por el
+camino general, que evalúa la colección primero. Si no, que es casi siempre, sigue prestada.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/self-assignment-whose-operand-writes-the-receiver` y
+`runtime-modules-scripts/module-state-read-before-a-later-operand-writes-it`.

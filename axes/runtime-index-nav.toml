@@ -713,3 +713,82 @@ f() { <~ [[7, 8]] }
 >> (m[1..2])[1] ¶
 >> f()[1>2] ¶
 """
+
+# ── What makes a bracket a navigation path (added 2026-10-10) ───────────────
+#
+# The grammar's step is an atom: an integer, `-integer`, a string, a name, or
+# `( expr )`. A bracket whose content does not START with an atom followed by
+# `>`, `;` or `..` is an ordinary index expression, whatever comes later in it —
+# so `m[f()>2]` indexes with the comparison `f() > 2`, a Bool. Both Rust parsers
+# read it that way (`is_nav_index`). The browser engine took any additive
+# expression as a first step and walked the path (ZYJS-057, corrected the day
+# it was found). The marker is printed after the read: an engine that walks
+# says so.
+
+[[cell]]
+id     = "a-first-step-that-is-not-an-atom-is-an-index-expression"
+what   = "`m[f()>2]` and `a[i + 1>2]`: the index is the comparison, a Bool, and is refused; `m[(f())>2]` is the path (ZYJS-057)"
+expect = "ok"
+oracle_literal_ok = "the lines are the observable of a path — refused or walked — not a typed answer"
+src    = """
+f() { <~ 1 }
+m = [[1, 2], [3, 4]]
+a = [10, 20, 30]
+i = 1
+!? {
+    x = m[f()>2]
+    >> "walked " x ¶
+} :! ##Type { >> "refused" ¶ }
+!? {
+    y = a[i + 1>2]
+    >> "walked " y ¶
+} :! ##Type { >> "refused" ¶ }
+>> m[(f())>2] + a[i + 1] ¶
+"""
+oracle.py = """
+def f(): return 1
+m = [[1, 2], [3, 4]]
+a = [10, 20, 30]
+i = 1
+print("refused")
+print("refused")
+print(m[f() - 1][2 - 1] + a[i + 1 - 1])
+"""
+
+# ── A path yields one value unless one of its steps is a range (2026-10-10) ─
+#
+# `arr[p ; q]` is `[v, v]`, one value per path (GUIDE.md). A value that is
+# itself an array is still one value: `m[1;2]` on an array of rows is two rows.
+# Only a RANGE step makes a path yield several. The browser engine spread any
+# array an extraction was handed, so `m[1;2]` answered the four cells of both
+# rows, and `c[1..2>1]` — a range before the last step — likewise (ZYJS-058,
+# corrected the day it was found). The addressing axis could not see it: its
+# leaves are scalars. No oracle here; what is asked is that the three agree,
+# and the one that did not was the port.
+
+[[cell]]
+id     = "extraction-of-values-that-are-arrays"
+what   = "`m[1;2]`, `m[[1, 2]]`, `m[[1];[2]]`, `c[1..2>1]`, `c[1..2>1..2]` and a dictionary under a range: an array found at the end of a path is one value, not a list of them (ZYJS-058)"
+expect = "ok"
+src    = """
+m = [[1, 2], [3, 4]]
+c = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+d = [#(a: [1, 2]), #(a: [3, 4])]
+>> m[1;2] ¶
+>> m[1>1;2>2] ¶
+>> m[1>1..2;2>1] ¶
+>> m[[1]] " " m[[1>2]] ¶
+>> m[[1, 2]] ¶
+>> m[[1];[2]] ¶
+>> m[[1>1..2];[2>1..2]] ¶
+>> c[1>1;2>2] ¶
+>> c[1..2>1] ¶
+>> c[[1>1];[2>1..2]] ¶
+>> c[1>1..2>1] ¶
+>> c[1..2>1..2] ¶
+>> c[1..2>1..2>1] ¶
+>> c[2..1>2] ¶
+>> d[1..2>"a"] ¶
+>> d[1>"a";2>"a"] ¶
+"""
+

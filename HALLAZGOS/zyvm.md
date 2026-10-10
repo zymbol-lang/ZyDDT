@@ -1322,3 +1322,34 @@ motores no coinciden y hace falta decidir ([`GLB-119`](GLOBAL.md)). Esos casos q
 `runtime-modules-scripts/parameter-named-like-module-state-is-the-function-s-own`, con un oráculo en Python, donde
 un parámetro tapa a una global del mismo modo. Con la VM de antes da DIVERGE.
 
+---
+
+## ZYVM-019 — `t[1]$~ f()` sobre una tupla: la VM llama a `f` y después rechaza
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — decidido con [`GLB-115`](GLOBAL.md): el receptor
+se lee primero
+**Encontrado por:** la sonda de [`ZYTW-011`](zytw.md), que cuenta las llamadas
+
+```zymbol
+f() {
+    >> "llamada" ¶
+    <~ 9
+}
+t = (1, 2)
+!? { t[1]$~ f() } :! { >> "rechazada" ¶ }
+```
+
+`zytw` y `zyjs`: `rechazada`. **`zyvm`: `llamada`, `rechazada`.**
+
+### Causa
+
+La comprobación de que el receptor no es una tupla se emitía antes de los operandos para todas las ediciones
+menos `$~`, que se dejaba a `DeepSetInPlace` — la instrucción que escribe, que corre después de los operandos.
+
+### Corrección
+
+`AssertMutable` se emite para toda sentencia de edición, antes de sus operandos.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/tuple-edit-is-refused-before-its-operand-runs`. Con la VM de antes da DIVERGE.

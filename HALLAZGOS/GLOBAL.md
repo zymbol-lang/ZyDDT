@@ -8106,7 +8106,8 @@ nuevas, `juxtaposed-prefix-operators-in-a-return` y `juxtaposed-prefix-operators
 
 ## GLB-115 — Una edición cuyo operando escribe el mismo estado de módulo: el TW conserva esa escritura, la VM y `zyjs` la pierden
 
-**Estado:** **abierto** — pendiente de decisión del autor; sólo documentado (2026-10-10)
+**Estado:** **corregido 2026-10-10** — decidido por el autor el 2026-10-10: de izquierda a derecha también en una
+edición
 **Encontrado por:** al medir [`ZYVM-003`](zyvm.md) (el coste de editar el estado de un módulo en la VM), cuyo
 arreglo tiene que implementar una de las dos respuestas
 
@@ -8192,11 +8193,44 @@ cuadro entero la recomendación cambia, y se vuelve a preguntar:
 
 Ninguna premisa lo decide: `PREMISES.md` no habla del orden entre el receptor y el operando de una edición.
 
+### Decisión y corrección (2026-10-10)
+
+El autor aprobó la recomendada: **de izquierda a derecha**. El receptor se lee antes que sus operandos, y lo que
+un operando le escriba lo pisa la asignación. `d$+ f(d<~)` y `d = d$+ f(d<~)` son lo mismo.
+
+- **VM** — ya lo hacía sobre el estado de un módulo. Sobre una variable local leía tarde, y eso era
+  [`ZYVM-015`](zyvm.md). Quedaba la raíz de `m[i>j]$~ v`, que se leía después de los pasos (*«same evaluation order
+  as the tree-walker»*, decía el comentario): ahora, antes.
+- **TW** — sus atajos de asignación evaluaban el operando y después trabajaban sobre la variable en su sitio.
+  Ahora, cuando un operando **puede** escribir al receptor, el receptor se lee antes (una referencia, no una
+  copia); si al volver del operando la variable ya no es lo que se leyó, la operación se aplica a lo leído y el
+  resultado se asigna. Si nada lo tocó —casi siempre— se edita en el sitio, como antes. Un operando puede escribir
+  al receptor de dos maneras y sólo de dos: una llamada que lo recibe como `<~`, que está escrita; o, si el
+  receptor es estado de un módulo, cualquier cosa que ejecute código del programa.
+- **`zyjs`** — no cambia: era el único coherente.
+
+No eran sólo las tres ediciones. El mismo atajo existe para la aritmética y para la lectura por índice, y tenían
+el mismo orden:
+
+| programa, con una llamada que escribe lo que tiene a su izquierda | `zytw`, antes | los tres, ahora |
+|---|---|---|
+| `datos$+ meter()` · `datos[1]$~ meter()` · `datos$-[meter()]` | `[1, 2, 3, 99, 1]` · `[1, 2, 3, 99]` · `[2, 3, 99]` | `[1, 2, 3, 1]` · `[1, 2, 3]` · `[2, 3]` |
+| `d$+ meter(d<~)` · `d[1]$~ meter(d<~)` · `d$-[meter(d<~)]` | lo mismo | lo mismo |
+| `n = n + tocar()`, con `n = 5` y `tocar` que le suma 10 | `16` | `6` |
+| `n = n * tocar()` | `15` | `5` |
+| `x = x + inc(x<~)` | `16` | `6` |
+| `datos[meter()]`, con `meter` que reemplaza `datos` | el primero de la **nueva** ([`ZYTW-014`](zytw.md)) | el primero de la leída |
+| `m[(cambia())>1]$~ 5` — también la VM | edita lo que `cambia` escribió | `[[5, 2], [3, 4]]` |
+
+Editar en el sitio no se pierde: el coste de las ediciones queda como estaba (matriz de [`ZYVM-013`](zyvm.md)).
+
 ### Qué lo sujeta
 
-`runtime-modules-scripts/edit-whose-operand-writes-the-same-state`, con `open_finding = "GLB-115"`, sin `expect`:
-la respuesta no está decidida. Y, para cualquier arreglo, `runtime-modules-scripts/module-state-after-a-failed-edit`
-(`expect = "ok"`): una edición que falla, capturada, deja el estado como estaba — hoy en los tres.
+`runtime-modules-scripts/edit-whose-operand-writes-the-same-state`, ya sin deuda y con oráculo;
+`module-state-read-before-a-later-operand-writes-it` (aritmética, lectura por índice, edición honda) y
+`runtime-functions-hof/self-assignment-whose-operand-writes-the-receiver` (las mismas sobre una variable local,
+por `<~`), las dos con oráculo. Con los motores de antes, las tres dan DIVERGE. Y
+`runtime-modules-scripts/module-state-after-a-failed-edit`: una edición que falla deja el estado como estaba.
 
 ---
 
@@ -8307,7 +8341,7 @@ respuestas de la tabla las fijan hoy `runtime-functions-hof/output-parameter-*` 
 
 ## GLB-118 — `a$++ x y` como sentencia copia la colección entera, en el TW y en la VM
 
-**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: corregirlo no cambia ninguna salida
+**Estado:** **corregido 2026-10-10** — no cambia ninguna salida
 **Encontrado por:** al cerrar [`ZYVM-003`](zyvm.md), midiendo qué ediciones seguían copiando
 **Familia:** [`ZYVM-013`](zyvm.md), [`ZYVM-003`](zyvm.md), [`ZYJS-014`](zyjs.md) — una edición que construye una
 colección nueva aunque su resultado vuelva a su receptor
@@ -8350,9 +8384,24 @@ acumular varios valores por vuelta, y cuesta el cuadrado.
 
 Lo mismo que para las otras tres ediciones: cuando el resultado vuelve a su propio receptor, añadir sobre él.
 
+### Corrección (2026-10-10)
+
+- **VM:** `ConcatBuild` cuyo destino es su propia base —lo que el compilador emite para la sentencia— añade sobre
+  el array donde está. Sobre el estado de un módulo, con el mismo `DetachGlobal` de las otras ediciones.
+- **TW:** un camino propio en la asignación, como el de `$+`: los elementos se evalúan una vez y se añaden a la
+  variable en su sitio.
+
+| añadir dos elementos, 16 000 veces | antes | ahora |
+|---|---:|---:|
+| `zytw`, variable local | 23 338 M | 56 M |
+| `zytw`, estado de un módulo | 23 334 M | 61 M |
+| `zyvm`, variable local | 9 382 M | 16 M |
+| `zyvm`, estado de un módulo | 9 386 M | 23 M |
+
 ### Qué lo sujeta
 
-`zyquality/cost` `growth/append-several-local`, con `open_finding` para `zytw` y `zyvm` (y `ZYJS-014` para `zyjs`).
+`zyquality/cost` `growth/append-several-local`, ya sin deuda para `zytw` y `zyvm` y medido donde antes tardaba
+minutos (200 000 y 600 000); la de `zyjs` sigue: [`ZYJS-014`](zyjs.md).
 
 ---
 
