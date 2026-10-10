@@ -8151,16 +8151,46 @@ antes de evaluar el operando, edita esa copia y la guarda encima del estado.
 Sólo puede pasar con el estado de un módulo: una función no escribe las variables de quien la llama (MEM-2) y
 una lambda captura por valor, así que en una variable local el operando no tiene cómo tocar al receptor.
 
+### Medido de nuevo, 2026-10-10 — el cuadro entero
+
+La primera medición miró tres operadores y sacó una conclusión que no se sostiene: que el TW conserva la escritura
+del operando. La conserva **sólo en los tres que tienen camino rápido** (`B3`):
+
+| edición, sobre estado de módulo | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `datos$+ meter()`, `datos[1]$~ meter()`, `datos$-[meter()]` | conserva el `99` | lo pierde | lo pierde |
+| `datos$+[meter()] 7`, `datos$- meter()`, `datos$-- meter()`, `datos$-[meter()..2]`, `datos$++ meter()` | lo pierde | lo pierde | lo pierde |
+
+Y sobre una variable local, donde el operando la escribe a través de `<~` (`d$+ meter(d<~)`):
+
+| edición, sobre una variable local | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `d$+ meter(d<~)`, `d[1]$~ meter(d<~)`, `d$-[meter(d<~)]` | conserva el `99` | conserva el `99` | lo pierde |
+| `d$+[meter(d<~)] 7`, `d$- meter(d<~)` | lo pierde | conserva el `99` | lo pierde |
+| escrito entero: `d = d$+ meter(d<~)` | conserva el `99` | conserva el `99` | lo pierde |
+
+Tres motores, tres respuestas, y sólo `zyjs` es coherente consigo mismo. La regla que ya tiene el lenguaje para una
+expresión cualquiera es la de izquierda a derecha —`x + inc(x<~)` es `6` en el TW y en `zyjs`; la VM da `16` y eso
+es [`ZYVM-015`](zyvm.md)—, y bajo esa regla `d = d$+ meter(d<~)` lee `d` primero: el `99` lo pisa la asignación,
+como el `+10` en `x = x + inc(x<~)`. Lo del TW es su optimización asomando, no un diseño: en él `e = d$+ meter(d<~)`
+da `[1, 2, 3, 1]` y `d = d$+ meter(d<~)` da `[1, 2, 3, 99, 1]`, la misma expresión con dos valores según a quién se
+asigne.
+
 ### Qué hay que decidir
 
-- que la edición se aplique al receptor **tal como está cuando se ejecuta**, después de evaluar sus operandos, como
-  hace el TW (Recomendado): una edición descartada *modifica* —no es «leer, calcular y guardar»—, y la otra
-  respuesta pierde una escritura sin decir nada. Es también la forma que deja a la VM editar en el sitio;
-- que la edición use el valor de **antes** de evaluar el operando, como la VM y `zyjs`: es lo que da leer
-  `datos$+ meter()` como `datos = datos$+ meter()` de izquierda a derecha.
+El autor aprobó el 2026-10-10 la primera opción de abajo, recomendada entonces con el cuadro incompleto. Con el
+cuadro entero la recomendación cambia, y se vuelve a preguntar:
 
-Ninguna premisa lo decide: `PREMISES.md` no habla del orden entre el receptor y el operando de una edición, y el
-eje `evaluation-order` de ZyDDT ordena los efectos entre operandos, no esto.
+- **de izquierda a derecha también aquí (Recomendado ahora):** `x <edición> args` es azúcar de `x = x <edición>
+  args`, como dice `COLLECTIONS.md`, y el receptor se lee primero. Es lo que hacen 21 de las 24 combinaciones de
+  motor y operador sobre estado de módulo, lo que hace `zyjs` siempre, y una sola regla para toda expresión. Cambian
+  los tres caminos rápidos del TW y la lectura tardía de la VM (ZYVM-015). No impide editar en el sitio: el motor
+  sólo necesita la copia cuando un operando puede escribir al receptor, y eso se ve en el programa.
+- **la sentencia de edición es una excepción:** evalúa sus operandos y después modifica al receptor tal como esté.
+  Entonces `d$+ f(d<~)` y `d = d$+ f(d<~)` dejan de ser lo mismo, y cambian los tres motores: el TW en cinco
+  operadores, la VM sobre estado de módulo, `zyjs` en todos.
+
+Ninguna premisa lo decide: `PREMISES.md` no habla del orden entre el receptor y el operando de una edición.
 
 ### Qué lo sujeta
 
