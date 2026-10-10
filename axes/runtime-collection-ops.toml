@@ -1678,6 +1678,38 @@ q = sorted(v, key=lambda t: -t[0])
 print("".join(f"{a}:{b} " for a, b in q))
 """
 
+# ── Arithmetic in the index of `$-[…]` (added 2026-10-10) ────────────────────
+#
+# `a$-[i - 1]`: the Rust parser refuses it (`expected ']', '..', or ':' after
+# index`) and zyjs removes the element. Every other bracket takes the same
+# expression in the three engines — `a$+[i - 1] v`, `a[i - 1]`, `a[i - 1]$~ v`,
+# `a$[i - 1..i]` — and `a$-[(i - 1)]`, parenthesised, too (GLB-116, filed).
+
+[[cell]]
+id   = "remove-by-an-arithmetic-index"
+what = "`a$-[i - 1]`: refused by the Rust parser, run by zyjs; parenthesised, and in every other bracket, the three take it (GLB-116)"
+src  = """
+a = [10, 20, 30, 40]
+i = 3
+b = a$-[i - 1]
+>> b ¶
+"""
+open_finding = "GLB-116"
+
+[[cell]]
+id     = "arithmetic-index-in-the-other-brackets"
+what   = "the control: `a$-[(i - 1)]`, `a$+[i - 1] 5`, `a[i - 1]`, `a[i - 1]$~ 5` and `a$[i - 1..i]` are taken by all three (GLB-116)"
+expect = "ok"
+src    = """
+a = [10, 20, 30, 40]
+i = 3
+>> a$-[(i - 1)] ¶
+>> a$+[i - 1] 5 ¶
+>> a[i - 1] ¶
+>> a[i - 1]$~ 5 ¶
+>> a$[i - 1..i] ¶
+"""
+
 # ── The empty pattern (added 2026-10-02, decided 2026-10-03) ───────────────
 #
 # Two of the eight cases ZyQuality seeded on 2026-08-07 for an oracle phase that

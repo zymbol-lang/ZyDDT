@@ -296,6 +296,32 @@ con el límite entre lineal (4,0) y cuadrático (16,0). Marcado
 corrida con su ratio y no enrojece el gate: la deuda escrita no es una
 regresión. El día que baje de 6,0 el runner pide cerrar la ficha.
 
+### Medido de nuevo, 2026-10-10 — no es sólo el `$+`
+
+Instrucciones (`perf stat -e instructions:u`, binario de release), con el estado en un módulo y el mismo
+programa a N = 4000 y N = 16 000:
+
+| edición sobre el estado del módulo | `zytw` | `zyvm` | crece ×4 en la VM |
+|---|---:|---:|---:|
+| añadir, `datos$+ i`, N veces | 11 M → 34 M | 304 M → **4 710 M** | ×15,5 |
+| actualizar **un** elemento, `tabla[k]$~ i`, 4000 veces sobre un array de N | 25 M → 45 M | 906 M → **7 088 M** | ×7,8 |
+| quitar del final, `datos$-[datos$#]`, 2000 veces | 16 M → 40 M | 524 M → **5 794 M** | ×11 |
+| control: un contador, `cuenta += 1` | 8 M → 21 M | 7 M → 15 M | ×2,4 |
+| control: un diccionario de dos campos, `ficha.a$~ i` | 18 M → 63 M | 13 M → 42 M | ×3,2 |
+
+Toda edición en el sitio copia la colección entera, no sólo la que añade: actualizar una casilla de un tablero
+guardado en un módulo cuesta proporcional al tablero. El contador y el diccionario pequeño no lo sufren.
+
+Dos cosas que condicionan el arreglo:
+
+- **El orden.** El TW no copia porque evalúa el operando y después edita en la ranura; la VM lee el receptor antes.
+  Cuando el operando escribe el mismo estado las dos respuestas difieren, y eso es
+  [`GLB-115`](GLOBAL.md), sin decidir.
+- **El fallo.** Varias instrucciones de edición sacan el valor de su registro antes de validar (`ArrayRemove` y
+  `DeepSet` hacen `mem::replace` y lanzan el error con el valor ya soltado). Hoy no importa, porque la ranura global
+  guarda su propia copia; en cuanto la edición sea la única dueña, una edición fallida perdería el estado. Lo sujeta
+  desde hoy `runtime-modules-scripts/module-state-after-a-failed-edit`.
+
 ---
 
 ## ZYVM-004 — Una función llamada por `$>`, `$|` o `$<` corre en un segundo intérprete que se salta 49 instrucciones
@@ -753,6 +779,22 @@ con colecciones dentro— que dan el mismo resultado que el TW y un pico de memo
 
 Lo que **no** se hizo, y mantiene la ficha abierta: escribir un registro (`wreg!`, `reg_set`), el ~11 % de todo
 programa, y reutilizar los temporales del compilador (`alloc_temp`).
+
+### Medido de nuevo, 2026-10-10 — con símbolos
+
+Un binario de release compilado aparte con símbolos (`strip = false`, `debug = 1`), `perf record`:
+
+| programa, en la VM | `VM::exec` | `drop_glue<Value>` |
+|---|---:|---:|
+| `fib(30)` | 85 % | **12 %** |
+| una generación de Vida con una llamada por celda, lado 160 | 74 % | **20 %** |
+| un bucle de 2 000 000 de vueltas en el nivel de arriba | 84 % | **14 %** |
+| GO, una partida contra sí mismo (`自戦試験`) | 49 % | **13 %** |
+| Chaturanga, la búsqueda (`गतिपरीक्षा`) | 64 % | **10 %** |
+
+Soltar el valor anterior al escribir un registro sigue costando entre el 10 y el 20 %, también en las
+aplicaciones. La llamada en sí (la diferencia entre la versión con llamada y la versión en línea) es ya el 5,5 %
+de las instrucciones, así que lo que queda por ganar reutilizando temporales es poco.
 
 ---
 

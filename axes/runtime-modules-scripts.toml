@@ -582,3 +582,79 @@ src    = """
 v = 5
 >> v.f(1) ¶
 """
+
+# ── An edit whose operand writes the same module state (added 2026-10-10) ───
+#
+# `datos$+ meter()` where `meter` appends to `datos` too. The tree-walker
+# evaluates the operand and then edits the state as it stands — the operand's
+# write is kept. The VM and zyjs read the receiver first, edit that snapshot and
+# store it over the state — the operand's write is lost, silently (GLB-115,
+# filed, undecided). No `expect`: which one the language means is the author's.
+# Found measuring ZYVM-003, whose fix has to implement one of the two.
+
+[[cell]]
+id   = "edit-whose-operand-writes-the-same-state"
+what = "`datos$+ meter()`, `datos[1]$~ meter()` and `datos$-[meter()]` where `meter` appends to `datos`: the tree-walker keeps that write, the VM and zyjs lose it (GLB-115)"
+src  = """
+<# ./mod/orden => O
+O::anexar()
+>> O::ver() ¶
+O::reiniciar()
+O::tocar()
+>> O::ver() ¶
+O::reiniciar()
+O::quitar()
+>> O::ver() ¶
+"""
+open_finding = "GLB-115"
+[cell.files]
+"mod/orden.zy" = """
+# orden {
+    #> { anexar, tocar, quitar, ver, reiniciar }
+    datos = [1, 2, 3]
+
+    meter() {
+        datos$+ 99
+        <~ 1
+    }
+    anexar() { datos$+ meter() }
+    tocar()  { datos[1]$~ meter() }
+    quitar() { datos$-[meter()] }
+    ver() { <~ datos }
+    reiniciar() { datos = [1, 2, 3] }
+}
+"""
+
+# What ZYVM-003's fix must not break, whichever way GLB-115 goes: an edit of
+# module state that FAILS, caught, leaves the state as it was. The three agree
+# today; the VM's edit instructions take the value out of the register before
+# they validate, which is harmless only while the global slot keeps its own copy.
+
+[[cell]]
+id     = "module-state-after-a-failed-edit"
+what   = "an update, a removal, an insertion and a path into a scalar that fail on module state, each caught: the state is unchanged"
+expect = "ok"
+src    = """
+<# ./mod/atom => A
+!? { A::tocar_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+!? { A::quitar_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+!? { A::insertar_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+!? { A::camino_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+"""
+[cell.files]
+"mod/atom.zy" = """
+# atom {
+    #> { tocar_mal, quitar_mal, insertar_mal, camino_mal, ver }
+    tabla = [10, 20, 30]
+
+    tocar_mal()    { tabla[99]$~ 7 }
+    quitar_mal()   { tabla$-[99] }
+    insertar_mal() { tabla$+[99] 7 }
+    camino_mal()   { tabla[1>2]$~ 7 }
+    ver() { <~ tabla }
+}
+"""

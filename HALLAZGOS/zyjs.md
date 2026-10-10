@@ -920,6 +920,21 @@ escala en que se nota.
 motor necesita minutos. Marcado `open_finding = { zyjs = "ZYJS-014" }`: se
 reporta KNOWN con su ratio en cada corrida y no enrojece el gate.
 
+### Medido, 2026-10-10 — lo que la ficha pedía antes de decidir
+
+Una copia del motor con un contador en `$+` y en `$~` (cuántas ediciones, cuántos elementos copiados, el array más
+largo), sobre los 382 `.zy` de `web/examples/` y de las suites de las aplicaciones:
+
+- sólo **28** editan algún array;
+- el array más largo editado tiene **360** elementos (GO, `性能試験`);
+- el que más copia, una partida de GO contra sí mismo, hace 225 268 ediciones y copia 759 318 elementos: 3,4 por
+  edición.
+
+A esa escala la copia no se nota. El único programa real donde sí: `ZyBF/pesado2.zy`, que actualiza una cinta de 300
+celdas 419 430 veces — **6,35 s en `zyjs`, 0,33 s en la VM** y 0,60 s en el TW.
+
+No es sólo `$+`: `$~`, insertar y quitar copian igual (`[...col.v]` en cada uno).
+
 ---
 
 ## ZYJS-015 — `@!outer` se aceptaba y se ejecutaba como `@:outer!`
