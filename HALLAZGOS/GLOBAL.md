@@ -8303,3 +8303,113 @@ Las tres, en `scratchpad/decisiones/salida/LEEME.md` (S1, S2, S3), con sus progr
 respuestas de la tabla las fijan hoy `runtime-functions-hof/output-parameter-*` (tres celdas nuevas, `expect =
 "ok"`, que afirman lo que los tres motores hacen hoy): si la decisión las cambia, cambian con ella.
 
+---
+
+## GLB-118 — `a$++ x y` como sentencia copia la colección entera, en el TW y en la VM
+
+**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: corregirlo no cambia ninguna salida
+**Encontrado por:** al cerrar [`ZYVM-003`](zyvm.md), midiendo qué ediciones seguían copiando
+**Familia:** [`ZYVM-013`](zyvm.md), [`ZYVM-003`](zyvm.md), [`ZYJS-014`](zyjs.md) — una edición que construye una
+colección nueva aunque su resultado vuelva a su receptor
+
+```zymbol
+correr(n) {
+    t = []
+    @ i:1..n { t$++ i i }
+    <~ t$#
+}
+>> correr(16000) ¶
+```
+
+Instrucciones (`perf stat -e instructions:u`), N = 4000 → 16 000:
+
+| añadir dos elementos, N veces | `zytw` | `zyvm` | crece ×4 |
+|---|---:|---:|---:|
+| `t$++ i i`, variable local | 1 468 M → **23 338 M** | 594 M → **9 382 M** | ×15,9 |
+| `t$++ i i`, estado de un módulo | 1 468 M → **23 334 M** | 594 M → **9 386 M** | ×15,9 |
+| control: `t$+ i`, dos veces | 31 M a 16 000 | 14 M a 16 000 | ×2,6 |
+
+`$++` es la edición que añade varios elementos de una vez, y `COLLECTIONS.md` la cuenta en la familia: usada como
+sentencia, modifica. En los dos motores de Rust construye una colección nueva cada vez.
+
+### Causa
+
+- **VM:** `ConcatBuild(dst, base, items)` hace `arr.as_ref().clone()` siempre.
+- **TW:** `eval_concat_build` evalúa la base —un segundo dueño del `Rc`— y hace `Rc::make_mut(&mut arr).push(v)`,
+  que copia en el primer elemento. No tiene camino rápido, como sí lo tienen `$+ v`, `[i]$~ v` y `$-[i]`.
+
+Sobre una cadena (`s$++ "a" i`) el coste es otro asunto: una cadena se copia al crecer en los tres motores, con
+cualquier operador.
+
+### Alcance
+
+Pequeño hoy: ninguna de las aplicaciones LDV usa `$++` como sentencia, y el corpus una vez. Es la forma natural de
+acumular varios valores por vuelta, y cuesta el cuadrado.
+
+### Arreglo propuesto
+
+Lo mismo que para las otras tres ediciones: cuando el resultado vuelve a su propio receptor, añadir sobre él.
+
+### Qué lo sujeta
+
+`zyquality/cost` `growth/append-several-local`, con `open_finding` para `zytw` y `zyvm` (y `ZYJS-014` para `zyjs`).
+
+---
+
+## GLB-119 — La variable de un bucle o un nombre desestructurado que se llama como el estado del módulo: el TW y `zyjs` escriben el estado, la VM usa un local
+
+**Estado:** **abierto** — pendiente de decisión del autor (2026-10-10)
+**Encontrado por:** la sonda de [`ZYVM-018`](zyvm.md)
+**Familia:** [`ZYVM-018`](zyvm.md) — el parámetro, que no necesitaba decisión
+
+```zymbol
+// mod/vuelta.zy
+# vuelta {
+    #> { bucle, destr, ver, reiniciar }
+    n = 100
+
+    bucle() {
+        s = 0
+        @ n:1..3 {
+            s = s + n
+        }
+        <~ s
+    }
+    destr() {
+        [n, m] = [7, 8]
+        n = n + 1
+        <~ n + m
+    }
+    ver() { <~ n }
+    reiniciar() { n = 100 }
+}
+```
+
+| | `zytw`, `zyjs` | `zyvm` |
+|---|---|---|
+| `bucle()`, y después `ver()` | `6`, y el `n` del módulo queda en **`3`** | `6`, y el `n` del módulo sigue en `100` |
+| `destr()`, y después `ver()` | **`16`**, `n` del módulo `8` | **`15`**, `n` del módulo `8` |
+| `@ n:1..3 { n = n * 10 }`, y después `ver()` | `n` del módulo `30` | `n` del módulo `30` |
+
+Dentro de una función de un módulo, `n = …` escribe el estado del módulo: es lo que significa el estado. La
+pregunta es si las otras maneras de dar valor a un nombre hacen lo mismo:
+
+- en el **TW** y en **`zyjs`** sí: la variable del bucle y el patrón de una desestructuración escriben el `n` del
+  módulo, igual que una asignación;
+- en la **VM** no: le dan a `n` un registro propio. Las lecturas posteriores salen de ese registro y las
+  asignaciones posteriores van al estado, así que `destr()` suma un `n` que ya no es el que acaba de escribir
+  (`15`).
+
+La respuesta de la VM en `destr()` es un error se decida lo que se decida: lee de un sitio y escribe en otro.
+
+### Qué hay que decidir
+
+- que escriban el estado del módulo, como una asignación (lo que hacen el TW y `zyjs`): una sola regla —«dar
+  valor a un nombre del módulo es escribir su estado»— y la VM se corrige;
+- que la variable de un bucle sea siempre local a su bucle, y entonces tapa al estado del módulo mientras dura:
+  cambian el TW y `zyjs`, y hace falta decir qué pasa con la desestructuración.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/loop-variable-or-destructured-name-that-is-module-state`, con `open_finding = "GLB-119"`.
+

@@ -3139,3 +3139,41 @@ variable`, ninguno dado por Rust —los nueve de arriba y dos más, de la misma 
 `unused/name-read-as-a-match-pattern-is-a-read`, ya sin deuda;
 `array-read-as-a-match-pattern-is-a-read` (la contención) y `name-read-in-an-or-pattern-is-a-read` (un `||`
 en un `??` usado como valor), que con el `zyjs` de antes dan WRONG.
+
+---
+
+## ZYJS-056 — `(-> 1)`: `zyjs` lo lee como una lambda sin parámetros y lo ejecuta
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: la gramática no tiene esa forma
+**Encontrado por:** una sonda mal escrita, al corregir [`ZYVM-003`](zyvm.md)
+
+```zymbol
+f = (-> 1)
+>> f() ¶
+```
+
+`zytw`, `zyvm` y `zymbol check`: `expected expression, found '->'`. **`zyjs`: `1`.**
+
+La gramática (`interpreter/IMPLEMENTATION.md`, § 8) da dos formas con paréntesis: `(x -> expr)`, con un parámetro
+dentro, y `(a, b) -> expr`, con la lista cerrada antes de la flecha; la de ningún parámetro es `() -> expr`.
+`(-> 1)` no es ninguna. Un programa escrito en el playground con esa forma fallaba fuera de él.
+
+### Causa
+
+`parseLambda`: el bucle que lee los parámetros dentro del paréntesis termina igual al llegar a `)` que a `->`, y
+la forma envuelta —`(params -> cuerpo)`— no comprobaba haber leído alguno.
+
+### Corrección
+
+La forma envuelta con cero parámetros se rechaza con las palabras de Rust, `expected expression, found '->'`.
+
+| forma | antes, `zyjs` | ahora, los tres |
+|---|---|---|
+| `(-> 1)` | la ejecuta | `expected expression, found '->'` |
+| `() -> 1` · `(x -> x + 1)` · `(a, b) -> a + b` · `() -> { <~ 7 }` | las ejecuta | las ejecuta |
+
+Ningún `.zy` del workspace usaba la forma.
+
+### Qué lo sujeta
+
+`zyquality/reject/functions/02_wrapped_lambda_without_a_parameter.zy`: 51 formas rechazadas por los tres.

@@ -213,7 +213,8 @@ para el `-` unario, que la matriz de operadores **binarios** no cruza.
 
 ## ZYVM-003 — Acumular en el estado de un módulo es O(n²) en la VM y O(n) en el tree-walker
 
-**Estado:** abierto
+**Estado:** **corregido 2026-10-10** — la edición saca el valor de la ranura del módulo y es su única dueña; el
+orden lo decidió el autor ese día en [`GLB-115`](GLOBAL.md): de izquierda a derecha
 **Encontrado por:** la medición del auto-free del 2026-09-12, **no por una celda** — el programa apareció como control de otro experimento
 **Familia:** `HLZ-012` / `HLZ-014` (el copy-on-write de los agregados). Es ese mecanismo funcionando en contra
 
@@ -321,6 +322,51 @@ Dos cosas que condicionan el arreglo:
   `DeepSet` hacen `mem::replace` y lanzan el error con el valor ya soltado). Hoy no importa, porque la ranura global
   guarda su propia copia; en cuanto la edición sea la única dueña, una edición fallida perdería el estado. Lo sujeta
   desde hoy `runtime-modules-scripts/module-state-after-a-failed-edit`.
+
+### Corrección (2026-10-10)
+
+Una edición cuyo resultado vuelve a su propio receptor —`t[i]$~ v`, `t$-[i]`, `t$+ v`, escrita como sentencia o
+como `t = t…`— y cuyo receptor es estado de un módulo se compila así: `LoadGlobal`, los operandos,
+`DetachGlobal(g, t)`, la edición sobre `t`, `StoreGlobal(g, t)`.
+
+- **`DetachGlobal`** vacía la ranura **sólo si sigue guardando el mismo valor que se cargó** (`Rc::ptr_eq`). Si un
+  operando escribió el estado entre medias, la ranura ya es otro valor: la edición corre sobre lo leído y el
+  `StoreGlobal` lo pisa. Es el orden de izquierda a derecha de `GLB-115`, sin ningún caso especial.
+- **El fallo:** si la edición lanza un error, el valor vuelve a la ranura antes de que nadie lo capture. Y cada
+  instrucción de edición valida entera antes de escribir: `DeepSet` recorre el camino completo primero (una clave
+  nueva de un diccionario se añade sólo si el resto del camino existe) y `ArrayRemove` comprueba el índice sobre
+  el valor en su sitio.
+- **Los temporales de la propia sentencia:** `tabla[k]$~ tabla[k] + 1` y `t$-[t$#]` cargan el estado en un temporal
+  para calcular el operando, y ese temporal seguía siendo un segundo dueño. El compilador apunta los temporales en
+  que la sentencia cargó ese estado y limpia, justo antes de editar, los que la edición no usa.
+
+Instrucciones en la VM, los mismos programas de la tabla de arriba, N = 4000 → 16 000:
+
+| edición sobre el estado del módulo | antes | ahora | crece ×4, ahora |
+|---|---:|---:|---:|
+| añadir, `datos$+ i`, N veces | 304 M → 4 710 M | 7,9 M → 20,9 M | ×2,7 |
+| actualizar un elemento, 4000 veces | 906 M → 7 088 M | 15,0 M → 28,6 M | ×1,9 |
+| quitar del final, 2000 veces | 524 M → 5 794 M | 10,7 M → 23,7 M | ×2,2 |
+| control: un contador | 7 M → 15 M | 6,4 M → 15,0 M | ×2,4 |
+| control: un diccionario de dos campos | 13 M → 42 M | 10,2 M → 30,4 M | ×3,0 |
+
+El TW, en los mismos: 34 M, 46 M y 40 M a N = 16 000. La VM queda por debajo en los tres.
+
+Una carga real: `ZyBF/pesado2.zy` —419 430 actualizaciones de una cinta de 300 celdas— pasa en la VM de 3 719 M de
+instrucciones a 1 190 M (el TW, 6 794 M).
+
+No cambia ninguna salida: el consenso del corpus, las nueve aplicaciones y ZyDDT quedan como estaban.
+
+**Lo que no cubre.** Las ediciones que recorren la colección de todos modos (`$+[i]`, `$- v`, `$-- v`,
+`$-[a..b]`) siguen construyendo el resultado: su coste ya es proporcional al tamaño. `$++` es otra cosa —añade
+al final y copia—, en los dos motores de Rust: [`GLB-118`](GLOBAL.md).
+
+### Qué lo sujeta ahora
+
+`zyquality/cost`, `growth/append-module-state` y `growth/update-module-state`, ya sin deuda y con la VM medida a
+tres veces el tamaño del TW —por debajo de eso su corrida no llega al suelo de 40 ms—;
+`runtime-modules-scripts/module-state-after-a-failed-edit` para el fallo, y
+`edit-whose-operand-writes-the-same-state` para el orden.
 
 ---
 
@@ -954,7 +1000,7 @@ Dos sitios, uno por cada manera de llegar a la lambda:
 
 ## ZYVM-013 — `t[i]$~ v` y `t$-[i]` copian la colección entera en la VM, también sobre una variable local
 
-**Estado:** **abierto** — sólo documentado (2026-10-10); corregirlo no cambia ninguna salida
+**Estado:** **corregido 2026-10-10** — no cambia ninguna salida
 **Encontrado por:** el control de una medición de `<~` (2026-10-10): las mismas escrituras **en línea**, sin
 ninguna llamada, costaban lo mismo que a través de un parámetro de salida
 **Familia:** [`ZYVM-003`](zyvm.md) — el mismo `Rc` con dos dueños en el momento de escribir
@@ -999,15 +1045,41 @@ sea atómica ante el fallo —validar antes de sacar el valor—: hoy `DeepSet` 
 si el índice es malo, lanzan el error con el valor ya soltado, lo que sólo es inocuo porque escriben sobre una
 copia.
 
+### Corrección (2026-10-10)
+
+La forma que modifica opera sobre el registro de la propia variable: sin `CopyReg` para `t[i]$~ v` (y sus caminos
+`t[i>j]$~ v`, `t.campo$~ v`), y `ArrayRemove` directo para `t$-[i]`. Las dos instrucciones validan antes de
+escribir, así que una edición que falla deja la variable como estaba.
+
+Dos cosas que hubo que cuidar:
+
+- **Una variable que la misma sentencia pasa como `<~`** (`d[1]$~ meter(d<~)`) no se edita en el sitio: su lectura
+  queda fijada antes de la llamada ([`ZYVM-015`](zyvm.md)) y la edición corre sobre esa copia, como antes. Es el
+  orden de izquierda a derecha de [`GLB-115`](GLOBAL.md).
+- **El nivel de arriba de un programa.** Cada variable del script tiene una ranura espejo que el cuerpo del
+  programa reescribe en cada asignación, y esa ranura era un segundo dueño: la edición copiaba igual. Ahora la
+  ranura se suelta durante la edición y se reescribe después, como el estado de un módulo; si la edición falla,
+  recibe de vuelta el valor intacto.
+
+Instrucciones en la VM, 2000 ediciones sobre 16 000 elementos:
+
+| edición | receptor | antes | ahora | `zytw` |
+|---|---|---:|---:|---:|
+| `t[i]$~ k` | variable local | 1 202 M | 16 M | 33 M |
+| `t$-[t$#]` | variable local | 1 096 M | 14 M | 31 M |
+| `t[i]$~ k` | nivel de arriba | 1 201 M | 16 M | 33 M |
+| `t$-[t$#]` | nivel de arriba | 1 097 M | 15 M | 31 M |
+| `t$+ k` | cualquiera de las dos | 14 M | 14 M | 31 M |
+
 ### Qué lo sujeta
 
-`zyquality/cost` `growth/update-local`, con `open_finding = { zyvm = "ZYVM-013" }`.
+`zyquality/cost` `growth/update-local`, ya sin deuda para la VM (la de `zyjs` sigue: [`ZYJS-014`](zyjs.md)).
 
 ---
 
 ## ZYVM-014 — La VM pierde lo que una función escribe en un parámetro `<~` cuando el argumento es estado de un módulo
 
-**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: MEM-5 dice que vuelve modificado
+**Estado:** **corregido 2026-10-10** — sin decisión: MEM-5 dice que vuelve modificado
 **Encontrado por:** una sonda de `<~` (2026-10-10)
 
 ```zymbol
@@ -1036,15 +1108,27 @@ Sin localizar con un parche. La escritura de vuelta de un parámetro de salida l
 llamante)*; cuando el argumento es una global de módulo, su valor está en un temporal cargado con `LoadGlobal`, y
 la vuelta escribe en ese temporal, no en la ranura.
 
+### Corrección (2026-10-10)
+
+La causa era la supuesta. Después de la llamada, por cada argumento de salida que es estado de un módulo y no
+tiene registro propio, el compilador emite `StoreGlobal(g, temporal)`: lo que la función escribió en el temporal
+llega a la ranura.
+
+| programa | antes, VM | ahora, los tres |
+|---|---|---|
+| `correr()` · `ver()` | `[1, 2, 3]` | `[1, 2, 3, 9]` |
+| dos veces | `[1, 2, 3]` | `[1, 2, 3, 9, 9]` |
+
 ### Qué lo sujeta
 
-`runtime-modules-scripts/output-argument-that-is-module-state`, con `open_finding = "ZYVM-014"`.
+`runtime-modules-scripts/output-argument-that-is-module-state`, ya sin deuda y con un oráculo en Python. Con la VM
+de antes da DIVERGE.
 
 ---
 
 ## ZYVM-015 — La VM lee una variable cuando se ejecuta el operador, no cuando se evalúa el operando: un `<~` posterior cambia lo ya leído
 
-**Estado:** **abierto** — sólo documentado (2026-10-10); sin decisión pendiente: el orden es de izquierda a derecha
+**Estado:** **corregido 2026-10-10** — sin decisión: el orden es de izquierda a derecha
 **Encontrado por:** al medir [`GLB-115`](GLOBAL.md), buscando si la pregunta de las ediciones era más general
 **Familia:** el eje `evaluation-order` de ZyDDT — *«sub-expressions with effects run left to right»*
 
@@ -1077,7 +1161,164 @@ emite al evaluarse, y por eso ahí coincide.
 Cuando un operando ya evaluado es una variable que un operando posterior de la misma expresión recibe como `<~`,
 fijar su valor en un temporal al evaluarlo. El compilador lo sabe: el `<~` está escrito en la llamada.
 
+### Corrección (2026-10-10)
+
+La propuesta, tal cual. Al compilar una sentencia el compilador reúne los nombres que **esa** sentencia pasa como
+`<~` (`names_written_through_output`, en `zymbol-semantic`); una lectura de uno de esos nombres copia el registro a
+un temporal en el momento de evaluarse. El propio argumento de salida no se fija: ése tiene que ser el registro.
+Una sentencia que no pasa nada como `<~` —casi todas— se compila igual que antes, sin una instrucción más.
+
+| programa, con `x = 5` | antes, VM | ahora, los tres |
+|---|---|---|
+| `y = x + inc(x<~)` | `16` | `6` |
+| `t = (x, inc(x<~), x)` | `(15, 1, 15)` | `(5, 1, 15)` |
+| `e = d$+ meter(d<~)` | `[1, 2, 3, 99, 1]` | `[1, 2, 3, 1]` |
+| control: `z = inc(x<~) + x` | `16` | `16` |
+
 ### Qué lo sujeta
 
-`runtime-functions-hof/variable-read-before-a-later-operand-writes-it`, con `open_finding = "ZYVM-015"`.
+`runtime-functions-hof/variable-read-before-a-later-operand-writes-it`, ya sin deuda y con un oráculo en Python.
+Con la VM de antes da DIVERGE.
+
+---
+
+## ZYVM-016 — Una tupla guardada como estado de un módulo se edita en el sitio: la VM no la protege
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: COL-4, *«a tuple cannot be modified — the check is on
+the receiver»*
+**Encontrado por:** un barrido de tipos × receptor (local, nivel de arriba, estado de módulo) al corregir
+[`ZYVM-003`](zyvm.md); los cambios de ese arreglo no lo causaron: la VM de antes daba lo mismo
+
+```zymbol
+// mod/fija.zy
+# fija {
+    #> { probar }
+    t = (1, 2, 3)
+
+    probar() {
+        t$+ 4
+        >> t ¶
+    }
+}
+```
+
+`zytw` y `zyjs`: `cannot modify tuple 't': tuples are immutable`. **`zyvm`: `(1, 2, 3, 4)`.**
+
+| edición, como sentencia, sobre una tupla | local o nivel de arriba, los tres | estado de módulo: `zytw`, `zyjs` | estado de módulo: `zyvm` |
+|---|---|---|---|
+| `t$+ 4` · `t$-[1]` · `t$- 1` · `t$-- 1` · `t$+[1] 0` · `t$++ 7 8` · `t$-[1..2]` | rechazada | rechazada | **la aplica** |
+| `t[1]$~ 9` | rechazada | rechazada | rechazada |
+| control: `u = t$+ 4`, que construye | `(1, 2, 3, 4)` | `(1, 2, 3, 4)` | `(1, 2, 3, 4)` |
+
+### Causa
+
+El compilador emite la comprobación (`AssertMutable`) sobre el **registro** del receptor, dentro de un
+`if let Ok(r) = ctx.get_reg(nombre)`. El estado de un módulo no tiene registro, así que la comprobación no se
+emitía. `$~` se salvaba porque `DeepSetInPlace` se guarda a sí misma.
+
+### Corrección
+
+Para un receptor que es estado de módulo: `LoadGlobal` a un temporal, `AssertMutable`, y el temporal se limpia en
+el acto — una referencia que quedara viva haría copiar a la edición que viene después.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/tuple-held-as-module-state-is-not-edited`, con un oráculo que dice qué imprime cada
+línea: tres motores que dejaran pasar la edición coincidirían entre sí. Con la VM de antes da DIVERGE.
+
+---
+
+## ZYVM-017 — `d$- v` y `d$-- v` sobre un diccionario: la VM los rechaza
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: lo dice `COLLECTIONS.md`
+**Encontrado por:** el mismo barrido de tipos de [`ZYVM-016`](zyvm.md)
+
+```zymbol
+d = #(a: 1, b: 2, c: 2)
+>> d$- 2 ¶
+>> d$-- 2 ¶
+```
+
+| | `zytw`, `zyjs` | `zyvm` |
+|---|---|---|
+| `d$- 2` | `#(a: 1, c: 2)` | **`$- requires an array, tuple, or string, got #(a: Int, b: Int, c: Int)`** |
+| `d$-- 2` | `#(a: 1)` | **`$-- requires an array, tuple, or string, got …`** |
+| control: `d$-["b"]`, por su dirección | `#(a: 1, c: 2)` | `#(a: 1, c: 2)` |
+
+`zymbol-design/COLLECTIONS.md`: `$-[…]` quita por dirección, *«which leaves `$- value` free to keep meaning "by
+value" in both collections»*. Un programa que quita de un diccionario por valor corría en el TW y en el navegador y
+fallaba en la VM, que es el futuro motor por defecto.
+
+### Corrección
+
+`ArrayRemoveValue` y `ArrayRemoveAll` reciben el brazo del diccionario: la primera entrada que guarda el valor, o
+todas, en orden de inserción — lo que ya hacían el TW y `zyjs`.
+
+Queda una cosa sin tocar, igual en los tres: el mensaje de las otras colecciones dice *«requires an array, tuple,
+or string»* y no nombra al diccionario, que sí vale.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/remove-by-value-from-a-dictionary`, con un diccionario de Python como oráculo (también
+guarda el orden de inserción). Con la VM de antes da WRONG.
+
+---
+
+## ZYVM-018 — Un parámetro que se llama como el estado del módulo: la VM lo lee del parámetro y lo escribe en el estado
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: un parámetro es de su función
+**Encontrado por:** revisando el arreglo de [`ZYVM-003`](zyvm.md), que da prioridad al registro local al editar,
+contra `store_to_name`, que daba prioridad al estado del módulo al escribir
+**Familia:** [`GLB-119`](GLOBAL.md) (la variable de un bucle y el nombre desestructurado, sin decidir) y
+[`ZYTW-008`](zytw.md) (el TW, al llamar)
+
+```zymbol
+// mod/sombra.zy
+# sombra {
+    #> { asignar, ver }
+    datos = [1, 2, 3]
+
+    asignar(datos) {
+        datos = [0]
+        <~ datos
+    }
+    ver() { <~ datos }
+}
+```
+
+```zymbol
+<# ./mod/sombra => S
+>> S::asignar([10, 20]) " " S::ver() ¶
+```
+
+`zytw` y `zyjs`: `[0] [1, 2, 3]`. **`zyvm`: `[10, 20] [0]`** — la función devuelve el argumento sin tocar y el
+estado del módulo queda reemplazado. Sin aviso.
+
+| en una función del módulo, con un parámetro `datos` o `n` | `zytw`, `zyjs` | `zyvm`, antes |
+|---|---|---|
+| `datos = [0]` · `<~ datos` | `[0]`, estado intacto | `[10, 20]`, estado `[0]` |
+| `n = n + 1` · `n += 1` · `<~ n`, con `n = 1` | `3`, estado `100` | `1`, estado `2` |
+| `datos[1]$~ 9` · `<~ datos` | `[9, 20]`, estado intacto | `[10, 20]`, estado `[9, 20]` |
+| `datos$-[1]` · `<~ datos` | `[20]`, estado intacto | `[10, 20]`, estado `[20]` |
+| una lambda de bloque `(n) -> { n = n + 1  <~ n }`, llamada con `5` | `6`, estado `100` | `5`, estado `6` |
+| control: `datos$+ 7` · `<~ datos` | `[10, 20, 7]`, intacto | `[10, 20, 7]`, intacto |
+
+### Causa
+
+Las lecturas buscan primero el registro local y después el estado del módulo; `store_to_name`, por donde pasa toda
+escritura, buscaba primero el estado del módulo. Un nombre que es las dos cosas se leía de un sitio y se escribía
+en otro. `$+` se salvaba porque su camino rápido escribe en el registro.
+
+### Corrección
+
+El contexto de cada función guarda los nombres de sus parámetros —los de una función, los de una lambda—, y
+`store_to_name` no escribe en el estado del módulo un nombre que es parámetro.
+
+No se extiende a los demás nombres con registro —la variable de un bucle, un nombre desestructurado—: ahí los
+motores no coinciden y hace falta decidir ([`GLB-119`](GLOBAL.md)). Esos casos quedan exactamente como estaban.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/parameter-named-like-module-state-is-the-function-s-own`, con un oráculo en Python, donde
+un parámetro tapa a una global del mismo modo. Con la VM de antes da DIVERGE.
 
