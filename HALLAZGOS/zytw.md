@@ -590,8 +590,8 @@ la sentencia: un motor que une lo dice. Con el TW de antes da DIVERGE.
 
 ## ZYTW-010 — Llamar a una función de un módulo cuesta el tamaño del estado del módulo
 
-**Estado:** **abierto** — la mitad de lectura, corregida el 2026-10-10; la de escritura pide una decisión sobre el
-TW
+**Estado:** **abierto** — deuda declarada. La mitad de lectura, corregida el 2026-10-10; la de escritura,
+**decidido por el autor el 2026-10-10: no se corrige**, porque la VM va a relevar al TW como motor por defecto
 **Encontrado por:** leyendo cómo sincroniza el TW el estado de un módulo, para [`ZYTW-008`](zytw.md), y midiéndolo
 **Familia:** [`ZYVM-003`](zyvm.md), ya cerrado — allí copiaba cada edición; aquí, cada llamada
 
@@ -655,10 +655,18 @@ ellos la clase de fallo de [`ZYTW-008`](zytw.md) y [`ZYTW-013`](zytw.md), que so
 - **no hacerlo:** la VM va a ser el motor por defecto y ya no lo tiene; el TW queda con una llamada que cuesta el
   tamaño del estado cuando escribe, declarada.
 
+### Decisión (2026-10-10)
+
+El autor: **no hacerlo**. La VM pasa a ser el motor por defecto —en esta versión o en una próxima, sin fijar— y ya
+guarda el estado de un módulo en un solo sitio. Reescribir cómo el TW resuelve nombres dentro de un módulo no
+compensa para un motor que deja de ser el de por defecto.
+
+Queda como deuda **declarada**: la ficha sigue abierta, el caso de coste la muestra `KNOWN` en cada corrida con su
+ratio, y no enrojece la puerta. Si el relevo no llega, esta ficha es la que hay que reabrir.
+
 ### Qué lo sujeta
 
-`zyquality/cost`: `growth/module-call-that-reads-one-cell`, en verde (`zytw` y `zyvm`; `zyjs` entra cuando cierre
-[`ZYJS-014`](zyjs.md), porque allí construir la tabla ya es cuadrático y es lo único que mediría), y
+`zyquality/cost`: `growth/module-call-that-reads-one-cell`, en verde en los tres, y
 `growth/module-call-that-writes-one-cell`, con `open_finding = { zytw = "ZYTW-010" }`.
 
 ---

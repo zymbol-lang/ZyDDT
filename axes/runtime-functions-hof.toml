@@ -566,6 +566,7 @@ src    = """
 
 [[cell]]
 id     = "output-parameter-after-a-failed-call"
+premise = "MEM-5"
 what   = "the callee writes its `<~` parameter and then fails, caught by the caller: what it wrote is written — at one level, through two, with a scalar, and after a `$!!` (GLB-117, S1)"
 expect = "ok"
 oracle_literal_ok = "`falla` is the observable of a path; the collections are computed on both sides"
@@ -653,6 +654,7 @@ _r = propaga(d<~)
 
 [[cell]]
 id     = "output-parameter-same-variable-twice"
+premise = "MEM-5"
 what   = "`h(e<~, e<~)`: one variable cannot be two output parameters of one call. It was copied into both and the second write-back discarded the first, `[0, 2]`; it is refused (GLB-117, S2)"
 expect = "error"
 src    = """
@@ -667,6 +669,7 @@ h(e<~, e<~)
 
 [[cell]]
 id     = "output-parameter-also-passed-by-value"
+premise = "MEM-5"
 what   = "the control of S2: once as output and once by value is a call like any other, and the by-value argument holds what the variable held before the call"
 expect = "ok"
 src    = """
