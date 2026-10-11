@@ -1370,3 +1370,247 @@ print(show(z), show(w), show(datos), len(datos))
 }
 """
 
+
+# A module's state lives in one place. The tree-walker used to hand every frame
+# a copy of the variables its body names and write back, on the way out, the
+# ones that had changed (ZYTW-010): a frame that FAILED dropped its copy, and
+# with it everything it had written before failing. The VM and zyjs kept it.
+
+[[cell]]
+id     = "module-state-written-before-a-failure-stays-written"
+what   = "a function of a module edits a cell, adds to a counter, and then fails: caught outside, both writes are there (ZYTW-010)"
+expect = "ok"
+src    = """
+<# ./mod/antes => A
+!? { A::falla(2) } :! { >> A::total() ¶ }
+>> A::leer(2) " " A::total() ¶
+!? { A::falla_dentro(3) } :! { >> A::total() ¶ }
+>> A::leer(3) " " A::total() ¶
+"""
+oracle.py = """
+t, n = [0, 0, 0, 0], 0
+def falla(i):
+    global n
+    t[i - 1] = 99
+    n += 100
+    raise IndexError
+def falla_dentro(i):
+    global n
+    n += 1
+    falla(i)
+for f, i in ((falla, 2), (falla_dentro, 3)):
+    try: f(i)
+    except IndexError: print(n)
+    print(t[i - 1], n)
+"""
+[cell.files]
+"mod/antes.zy" = """
+# antes {
+    #> { falla, falla_dentro, leer, total }
+    t = [0, 0, 0, 0]
+    n = 0
+
+    falla(i) {
+        t[i]$~ 99
+        n += 100
+        x = t[1000]
+        <~ x
+    }
+    falla_dentro(i) {
+        n += 1
+        <~ falla(i)
+    }
+    leer(i) { <~ t[i] }
+    total() { <~ n }
+}
+"""
+
+# The hot mark on a name that is module state. GLB-119 decided that giving a
+# value to a name of the module writes its state, however the value gets there;
+# `n° = …` is one more way, and the VM gave it a register of its own (ZYVM-020).
+
+[[cell]]
+id     = "hot-assignment-to-a-name-that-is-module-state"
+what   = "`n° = n + i` and `°n = n + i` in a loop, inside a module whose state has `n`: each writes the state (ZYVM-020)"
+expect = "ok"
+src    = """
+<# ./mod/calor => C
+>> C::despues() " " C::ver() ¶
+>> C::antes() " " C::ver() ¶
+"""
+oracle.py = """
+n = 10
+for i in (1, 2, 3): n = n + i
+print(n, n)
+for i in (1, 2, 3): n = n + i
+print(n, n)
+"""
+[cell.files]
+"mod/calor.zy" = """
+# calor {
+    #> { despues, antes, ver }
+    n = 10
+
+    despues() {
+        @ i:1..3 { n° = n + i }
+        <~ n
+    }
+    antes() {
+        @ i:1..3 { °n = n + i }
+        <~ n
+    }
+    ver() { <~ n }
+}
+"""
+
+# A lambda written in a function of a module captures the module's state as it
+# captures anything else: by value, when it is written. Decided by the author on
+# 2026-10-10 (ZYVM-021). The tree-walker and zyjs did that; in the VM a name that
+# is module state has no register, so the body loaded it from the module's slot
+# when it ran and saw whatever was there by then.
+
+[[cell]]
+id     = "lambda-in-a-module-function-captures-module-state"
+what   = "a lambda in a function of a module names the module's state: it reads what the state held when the lambda was written, its own writes stay inside it, and one stored in the module keeps what it captured (ZYVM-021)"
+expect = "ok"
+src    = """
+<# ./mod/captura => K
+>> K::lee() " " K::ver() ¶
+>> K::escribe() " " K::ver() ¶
+>> K::anidada() " " K::ver() ¶
+>> K::param() ¶
+>> K::hof() ¶
+>> K::guardada() ¶
+>> K::usar() " " K::usar() ¶
+>> K::bloque() " " K::ver() ¶
+"""
+oracle.py = """
+t, n, g = [5, 6], 10, None
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    if isinstance(v, tuple): return "(" + ", ".join(show(x) for x in v) + ")"
+    return str(v)
+def ver(): return (t, n)
+def lee():
+    global n
+    f = (lambda t0, n0: lambda k: t0[k - 1] + n0)(list(t), n)
+    t[0] = 500
+    n = 1000
+    return f(1)
+def escribe():
+    def f(k, n0=n): return n0 + k
+    return (f(7), n)
+def anidada():
+    global n
+    h = (lambda n0: lambda b: n0 + 1 + b)(n)
+    n = 0
+    return h(2)
+def param(): return 4 * 2
+def hof(): return [x + n for x in [1, 2, 3]]
+def guardada():
+    global g
+    g = (lambda n0: lambda k: n0 + k)(n)
+    return 0
+def usar():
+    global n
+    n = n + 1
+    return g(1)
+def bloque(): return (99 + 1, n)
+print(show(lee()), show(ver()))
+print(show(escribe()), show(ver()))
+print(show(anidada()), show(ver()))
+print(param())
+print(show(hof()))
+print(guardada())
+a = usar(); b = usar()
+print(a, b)
+print(show(bloque()), show(ver()))
+"""
+[cell.files]
+"mod/captura.zy" = """
+# captura {
+    #> { lee, escribe, anidada, param, hof, guardada, usar, bloque, ver }
+    t = [5, 6]
+    n = 10
+    g = 0
+
+    ver() { <~ (t, n) }
+    lee() {
+        f = k -> t[k] + n
+        t[1]$~ 500
+        n = 1000
+        <~ f(1)
+    }
+    escribe() {
+        f = (k) -> {
+            n = n + k
+            <~ n
+        }
+        r = f(7)
+        <~ (r, n)
+    }
+    anidada() {
+        f = a -> (b -> n + a + b)
+        h = f(1)
+        n = 0
+        <~ h(2)
+    }
+    param() {
+        f = (n) -> n * 2
+        <~ f(4)
+    }
+    hof() {
+        r = [1, 2, 3]$> (x -> x + n)
+        <~ r
+    }
+    guardada() {
+        g = k -> n + k
+        <~ 0
+    }
+    usar() {
+        n = n + 1
+        <~ g(1)
+    }
+    bloque() {
+        f = (k) -> {
+            n = 99
+            <~ n + k
+        }
+        r = f(1)
+        <~ (r, n)
+    }
+}
+"""
+
+# One the engines do not agree about, found on 2026-10-10 by the probe that
+# compared the tree-walker before and after ZYTW-010. It has no `expect`: what
+# is missing is the decision, and a cell must not invent it.
+
+[[cell]]
+id     = "destroying-module-state-inside-a-function"
+what   = "`\\ nota` in a function of a module, with `nota` the module's state: does the module still have it on the next call? (ZYJS-060)"
+src    = """
+<# ./mod/fin => F
+>> F::anida() ¶
+>> F::destruye() ¶
+>> F::anida() ¶
+"""
+open_finding = "ZYJS-060"
+[cell.files]
+"mod/fin.zy" = """
+# fin {
+    #> { anida, destruye }
+    nota = "inicio"
+
+    _escribe() { nota = "interno" }
+    anida() {
+        nota = "externo"
+        _escribe()
+        <~ nota
+    }
+    destruye() {
+        \\ nota
+        <~ 1
+    }
+}
+"""
