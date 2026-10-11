@@ -944,3 +944,54 @@ print("refused")
 u = (f(),) + t[1:]
 print(f"({t[0]}, {t[1]}) ({u[0]}, {u[1]})")
 """
+
+# ── A block lambda that ends without `<~` — ZYTW-015, decided 2026-10-11 ─────
+#
+# It gives `##_`, as a named function that ends without `<~` always has. The
+# tree-walker alone refused it (`block lambda must use <~ to return value`),
+# on the natural shape of a callback, and for a month the only record of it was
+# a paragraph in a release plan: no file in the corpus wrote the form, so the
+# consensus had nothing to disagree about. These four are that file.
+
+[[cell]]
+id     = "block-lambda-called-for-its-effect"
+expect = "ok"
+what   = "a block lambda with no `<~`, called as a statement: the effect happens and the program goes on (ZYTW-015)"
+src    = """
+lam = () -> { >> "efecto" ¶ }
+lam()
+>> "sigo" ¶
+"""
+
+[[cell]]
+id     = "block-lambda-without-return-is-unit"
+expect = "ok"
+what   = "its value is `##_`, as a named function's is"
+src    = """
+lam = () -> { >> "efecto" ¶ }
+f() { >> "efecto" ¶ }
+v = lam()
+w = f()
+>> (v == ##_) " " (w == ##_) ¶
+"""
+
+[[cell]]
+id     = "block-lambda-returns-on-one-path"
+expect = "ok"
+what   = "a `<~` on one path only: the other path gives `##_`"
+src    = """
+lam = x -> { ? x > 0 { <~ "pos" } }
+>> lam(1) ¶
+v = lam(-1)
+>> (v == ##_) ¶
+"""
+
+[[cell]]
+id     = "block-lambda-as-a-callback"
+expect = "ok"
+what   = "`$>` with a block lambda called for its effect walks the whole collection"
+src    = """
+xs = [1, 2]
+ys = xs$> (x -> { >> x ¶ })
+>> ys$# ¶
+"""

@@ -937,3 +937,46 @@ camino general, que evalúa la colección primero. Si no, que es casi siempre, s
 
 `runtime-functions-hof/self-assignment-whose-operand-writes-the-receiver` y
 `runtime-modules-scripts/module-state-read-before-a-later-operand-writes-it`.
+
+---
+
+## ZYTW-015 — Una lambda de bloque que termina sin `<~`: el TW aborta donde la VM y zyjs dan `##_`
+
+**Estado:** **corregido 2026-10-11** — decidido por el autor ese día: da `##_`, como una función con nombre
+**Encontrado por:** la auditoría de `interpreter/LLM.md` del 2026-09-07 (`IMPL_V009.md` § E.1). Estuvo un mes
+escrita en un plan y sin ficha: ningún fichero del corpus escribía la forma
+**Familia:** [`ZYTW-001`](zytw.md) (el analizador no entraba en el cuerpo de una lambda de bloque)
+
+```zymbol
+lam = () -> { >> "efecto" ¶ }
+lam()
+>> "sigo" ¶
+```
+
+| | antes | |
+|---|---|---|
+| `zytw` | `efecto`, y `Runtime error: block lambda must use <~ to return value` | `rc 1` |
+| `zyvm`, `zyjs` | `efecto`, `sigo` | `rc 0` |
+| `zymbol check` | *No errors or warnings* | |
+
+Medido con cuatro formas el día de la decisión — la llamada como sentencia, el valor (`v = lam()`), un `<~` en
+un solo camino y `xs$> (x -> { >> x ¶ })`—: el TW abortaba en las cuatro, y en las cuatro la VM y zyjs seguían
+con `##_`. La misma forma con nombre, `f() { >> "efecto" ¶ }`, da `##_` en los tres.
+
+El 2026-09-07 el TW salía con `rc 0` tras abortar; el 2026-10-11 ya salía con 1. La divergencia era la misma.
+
+### Qué se decidió
+
+Devuelve `##_`. La alternativa —error en los tres— habría hecho a una lambda más estricta que una función con
+nombre y habría obligado a todo callback llamado por su efecto a terminar en `<~ ##_`.
+
+### Qué cambió
+
+`functions_lambda.rs`: la rama que distinguía `is_named` desaparece; un cuerpo que termina sin `<~` da
+`Value::Unit`, tenga nombre o no. El mensaje `block lambda must use <~ to return value` ya no existe.
+
+### Qué lo sujeta
+
+Cuatro celdas en `axes/runtime-functions-hof.toml` (`block-lambda-called-for-its-effect`,
+`…-without-return-is-unit`, `…-returns-on-one-path`, `…-as-a-callback`) y
+`zyquality/corpus/lambdas/15_block_without_return.zy` con su golden.
