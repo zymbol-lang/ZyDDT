@@ -8855,3 +8855,141 @@ Los tres dicen lo mismo, en la asignación y en la cabecera de un bucle: `a dict
 ### Qué lo sujeta
 
 `refusal/positional-pattern-under-the-dictionary-mark`, `…-in-a-loop-head` y `refusal/empty-dictionary-pattern`.
+
+---
+
+## GLB-124 — Un identificador como patrón de `??` no se comprobaba como lectura: `check` calla y cada motor responde lo suyo
+
+**Estado:** **corregido 2026-10-11**, el día en que se encontró — sin decisión nueva: es MEM-2, y la regla de
+que un nombre tiene que existir
+**Encontrado por:** `zyquality/docs/llm_verify.py` en su primera corrida — por una sonda de `LLM.md` § 5 que
+estaba **mal escrita** (leía una variable del fichero desde una función)
+**Familia:** MEM-2; las «zonas ciegas» del analizador ([`ZYTW-001`](zytw.md), [`GLB-075`](GLOBAL.md),
+[`GLB-112`](GLOBAL.md)) — séptima aparición de la misma forma: un brazo de la inferencia que no mira su operando
+
+```zymbol
+dias = [1, 2, 3]
+nota(s) {
+    <~ ?? s {
+        dias => "wk"
+        _ => "F"
+    }
+}
+>> "antes" ¶
+>> nota(2) ¶
+```
+
+| | antes |
+|---|---|
+| `zymbol check` | *No errors or warnings* |
+| `zytw` | `antes`, y `Runtime error: undefined variable 'dias' in match pattern` |
+| `zyvm` | `error: undefined variable 'dias'` — al compilar, sin imprimir nada |
+| `zyjs` | `antes`, `wk` — **lee la variable del fichero**, que MEM-2 dice que no ve |
+
+Con un nombre que no existe en ninguna parte (`nadie => …` en el fichero) pasaba lo mismo: `check` callaba, el TW
+fallaba al ejecutar el `??`, la VM al compilar, y zyjs decía `'nadie' is undefined — did you mean 'nadie°'`.
+
+### Por qué
+
+`check_pattern_type` (`type_check.rs`) tenía para `Pattern::Ident` un brazo vacío, con el comentario
+*«Identifier patterns are resolved at runtime — accept any scrutinee type»*. Aceptar cualquier tipo de sujeto es
+correcto; no mirar el nombre no lo era. La pasada de variables sin usar sí lo marcaba usado
+(`variable_analysis.rs`), así que tampoco avisaba de nada. En zyjs, `checkMatchPattern` hacía `lookup` —marcar
+usado— y no la comprobación de alcance.
+
+### Qué cambió
+
+- **Analizador**: el brazo infiere el identificador como cualquier lectura. Sale `'dias' is read from outside
+  this function` o `undefined variable 'nadie'`, antes de ejecutar, igual en `check` y en los dos motores.
+- **`zyjs`**: `checkMatchPattern` pasa cada nombre por `checkExpr`, en el patrón, dentro de un patrón de lista y
+  en las alternativas de `||`; el de lista no llevaba línea y ahora lleva la del brazo.
+
+Ningún programa del corpus, de las aplicaciones ni de los ejemplos lo escribía: los 332 de `test_check` siguen
+de acuerdo.
+
+### Qué lo sujeta
+
+Cuatro celdas en `axes/refusal.toml`: `match-identifier-pattern-reads-the-file-from-a-function`,
+`match-list-pattern-reads-the-file-from-a-function`, `match-identifier-pattern-that-is-nothing` y el control
+`match-identifier-pattern-through-a-parameter`. Las tres primeras declaran `premise = "MEM-2"`; la sección
+*Held by* de MEM-2 en `PREMISES.md` no las nombra, y añadirlas es del autor.
+
+---
+
+## GLB-125 — Un identificador de patrón que nombra una función o un módulo: `check` calla y los tres motores difieren
+
+**Estado:** **corregido 2026-10-11** — decidido por el autor ese día, un caso cada vez: una función es un valor
+y el patrón la compara por identidad; un módulo no es un valor y se rechaza antes de ejecutar. Estuvo abierta
+unas horas, como deuda declarada con dos celdas `open_finding`
+**Encontrado por:** `zyq suite` (suite `reach`), al corregir [`GLB-124`](GLOBAL.md): el mensaje del tree-walker
+`undefined variable '{}' in match pattern` dejó de provocarlo nada, y al buscar qué lo provoca todavía salió esto
+**Familia:** [`GLB-124`](GLOBAL.md); la identidad de funciones bajo `==` (v0.0.9)
+
+```zymbol
+f(x) { <~ x }
+r = ?? 5 {
+    f => "fn"
+    _ => "otro"
+}
+>> r ¶
+```
+
+| | |
+|---|---|
+| `zymbol check` | *No errors or warnings* |
+| `zytw` | `Runtime error: undefined variable 'f' in match pattern` |
+| `zyvm` | `error: undefined variable 'f'` — al compilar |
+| `zyjs` | `otro` — compara el 5 con la función, y no son iguales |
+
+Con un alias de módulo (`<# std/math => M` y `M => …`) pasa lo mismo, más el aviso `import 'M' is never used`.
+
+### Por qué no se corrigió con GLB-124
+
+Porque no es el mismo caso. Allí el nombre era una variable que la función no puede ver, y MEM-2 ya lo decide.
+Aquí el nombre **existe y está a la vista**: lo que falta decidir es qué significa. Hay dos lecturas, y las dos
+tienen dónde apoyarse:
+
+- **Es una comparación válida.** `==` sobre funciones es identidad desde la v0.0.9, así que `?? g { f => … }`
+  pregunta «¿es `g` la función `f`?». Es lo que hace `zyjs`. Cambiarían los dos Rust.
+- **No es un valor que un patrón compare.** Un patrón de identificador lee una *variable*; una función o un
+  módulo no lo son. Sería un error estático en los tres. Cambiarían el analizador y `zyjs`.
+
+Para un alias de módulo sólo cabe la segunda: un módulo no es un valor (GUIDE § 2, *Non-value types*).
+
+### Lo que se midió antes de decidir, y cambió la pregunta
+
+El mismo patrón, con el nombre en una **variable**, ya funcionaba en los tres y comparaba por identidad:
+
+```zymbol
+lam = x -> x
+k = lam
+>> (?? k { lam => "es lam" _ => "otro" }) ¶     // es lam, en los tres
+es(v, w) { <~ ?? v { w => "igual" _ => "distinta" } }
+>> es(f, f) " " es(f, g) ¶                      // igual distinta, en los tres
+```
+
+Así que la primera lectura no era una regla nueva sino un hueco de búsqueda: los dos Rust buscaban el nombre
+entre las variables y no entre las funciones. Rechazar `f =>` habría prohibido una comparación que `h = f`
+seguido de `h =>` hace legal.
+
+### Qué se decidió y qué cambió
+
+**La función: es una comparación.** `zytw` (`match_stmt.rs`) busca el nombre entre las funciones cuando no es una
+variable; `zyvm` (`compile_ident_pattern_test`) lo compila como compila el identificador en una expresión. `zyjs`
+ya lo hacía.
+
+**El módulo: no es un valor, en ningún sitio.** Al medir el patrón salió que el hueco era más ancho: `x = M`,
+`M == M` y `f(M)` pasaban `check` igual, y cada motor respondía lo suyo (el TW `'M' is undefined — did you mean
+'M°'`, la VM `undefined variable 'M'`, zyjs seguía). El brazo de `infer_expr` para un alias devolvía `Any` «porque
+es válido como objeto de un acceso a miembro». Ahora un alias suelto es `'M' is a module, not a value`, con la
+ayuda que nombra `M::name(…)` y `M.NAME`; el objeto de un acceso a miembro no pasa por ahí. En `zyjs`,
+`E_MODULE_VALUE`, y `FieldAccess` y la llamada cualificada marcan el alias usado sin leerlo como valor.
+
+Barrido antes de dar el cambio por bueno: 0 de 1 292 programas del workspace reciben el error nuevo, y los 332
+ejemplos del playground siguen de acuerdo con Rust.
+
+### Qué lo sujeta
+
+`refusal/match-identifier-pattern-names-a-function` (ahora `expect = "ok"`),
+`…-holds-a-function`, `…-names-a-module`, `refusal/module-alias-assigned`, `…-compared`, `…-as-an-argument` y el
+control `refusal/module-alias-reached-through-its-members`.

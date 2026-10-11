@@ -1127,6 +1127,72 @@ ps = [#(k: 1, v: 2), #(k: 3, v: 4)]
 >> ¶
 '''
 
+# ── An identifier in a `??` pattern is a read — GLB-124, found 2026-10-11 ────
+#
+# `?? s { tope => … }` compares the scrutinee with what `tope` holds, so the
+# pattern reads the name. The type checker never looked at it: a name that did
+# not exist, or a file variable named from inside a function, passed `check`
+# and then met three answers — the tree-walker failed half way through the
+# output, the VM refused to compile, and zyjs read the variable MEM-2 says it
+# cannot see. Found by a probe of `LLM.md` § 5 that was itself written wrong.
+
+[[cell]]
+id      = "match-identifier-pattern-reads-the-file-from-a-function"
+premise = "MEM-2"
+what    = "an identifier pattern naming a file variable, inside a named function: refused before running (GLB-124)"
+src     = '''
+dias = [1, 2, 3]
+nota(s) {
+    <~ ?? s {
+        dias => "wk"
+        _ => "F"
+    }
+}
+>> "antes" ¶
+>> nota(2) ¶
+'''
+
+[[cell]]
+id      = "match-list-pattern-reads-the-file-from-a-function"
+premise = "MEM-2"
+what    = "the same name inside a list pattern"
+src     = '''
+uno = 1
+f(v) {
+    <~ ?? v { [uno] => "lista" _ => "F" }
+}
+>> f([1]) ¶
+'''
+
+[[cell]]
+id   = "match-identifier-pattern-that-is-nothing"
+what = "an identifier pattern naming nothing at all is `undefined variable`, statically"
+src  = '''
+r = ?? 5 {
+    nadie => "x"
+    _ => "F"
+}
+>> r ¶
+'''
+
+[[cell]]
+id      = "match-identifier-pattern-through-a-parameter"
+premise = "MEM-2"
+expect  = "ok"
+what    = "the control: the name arrives as a parameter, and at file level it is in view"
+src     = '''
+dias = [1, 2]
+r = ?? 2 {
+    dias => "wk"
+    _ => "F"
+}
+>> r ¶
+nota(s, ds) {
+    <~ ?? s { ds => "wk" _ => "F" }
+}
+>> nota(1, dias) ¶
+'''
+
 # ── `#(a, b) = t` — GLB-123, decided 2026-10-11 ─────────────────────────────
 #
 # The other half of GLB-122. `#(` says "dictionary", so what is inside is
@@ -1155,4 +1221,117 @@ what = "`#() = d` names nothing to take out"
 src  = '''
 #() = #()
 >> "fin" ¶
+'''
+
+# ── A hot name is not a pattern — ZYJS-062, found 2026-10-11 ────────────────
+
+[[cell]]
+id   = "hot-name-as-a-match-pattern"
+what = "`?? v { acc° => … }`: a hot name would create what the pattern compares with (ZYJS-062)"
+src  = '''
+r = ?? 5 {
+    acc° => "hot"
+    _ => "otro"
+}
+>> r ¶
+'''
+
+# ── A function is a value and a module is not — GLB-125, decided 2026-10-11 ──
+#
+# `f =>` with `f` a function passed `check` and then met three answers: the
+# tree-walker failed when the `??` ran, the VM refused to compile, zyjs compared.
+# Two cases, and they were decided apart.
+#
+# A FUNCTION is a value everywhere else — `h = f`, `h == f`, `xs$> f` — and
+# `?? h { g => … }` with `g` a VARIABLE holding one already matched by identity
+# in all three. Writing the declared name instead only failed because the two
+# Rust engines looked the name up among the variables. It is a comparison.
+#
+# A MODULE is not a value (GUIDE § 2, non-value types), and measuring the
+# pattern showed the hole was wider than the pattern: `x = M` and `M == M`
+# passed `check` the same way. A bare alias is refused wherever it stands as a
+# value; `M.NAME` and `M::f()` reach into the module and are untouched.
+
+[[cell]]
+id     = "match-identifier-pattern-names-a-function"
+expect = "ok"
+what   = "`?? h { f => … }` with `f` a function: a comparison by identity, as `==` is (GLB-125)"
+src    = '''
+f(x) { <~ x }
+g(x) { <~ x }
+h = f
+>> (?? h { f => "es f" _ => "otro" }) ¶
+>> (?? h { g => "es g" _ => "otro" }) ¶
+>> (?? 5 { f => "fn" _ => "otro" }) ¶
+r = ?? [f] {
+    [g] => "g"
+    [f] => "lista f"
+    _ => "otro"
+}
+>> r ¶
+dentro(v) { <~ ?? v { g => "g" f => "f" _ => "otro" } }
+>> dentro(f) " " dentro(g) " " dentro(1) ¶
+'''
+
+[[cell]]
+id     = "match-identifier-pattern-holds-a-function"
+expect = "ok"
+what   = "the control that already held: the same comparison through a variable and through a parameter"
+src    = '''
+f(x) { <~ x }
+g(x) { <~ x }
+lam = x -> x
+k = lam
+>> (?? k { lam => "es lam" _ => "otro" }) ¶
+es(v, w) { <~ ?? v { w => "igual" _ => "distinta" } }
+>> es(f, f) " " es(f, g) ¶
+'''
+
+[[cell]]
+id   = "match-identifier-pattern-names-a-module"
+what = "`?? 5 { M => … }` with `M` a module alias: a module is not a value (GLB-125)"
+src  = '''
+<# std/math => M
+r = ?? 5 {
+    M => "mod"
+    _ => "otro"
+}
+>> r ¶
+'''
+
+[[cell]]
+id   = "module-alias-assigned"
+what = "`x = M`: the same refusal — the hole was wider than the pattern"
+src  = '''
+<# std/math => M
+x = M
+>> "fin" ¶
+'''
+
+[[cell]]
+id   = "module-alias-compared"
+what = "`M == M`"
+src  = '''
+<# std/math => M
+>> (M == M) ¶
+'''
+
+[[cell]]
+id   = "module-alias-as-an-argument"
+what = "`f(M)`"
+src  = '''
+<# std/math => M
+f(v) { <~ 1 }
+>> f(M) ¶
+'''
+
+[[cell]]
+id     = "module-alias-reached-through-its-members"
+expect = "ok"
+what   = "the control: `M.NAME` and `M::f()` reach into a module, and a dictionary key may be spelled like the alias"
+src    = '''
+<# std/math => M
+>> (M.PI > 3.0) " " M::abs(-2) ¶
+d = #(M: 1)
+>> d.M ¶
 '''
