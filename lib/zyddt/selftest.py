@@ -446,6 +446,21 @@ def _():
     assert Fi.state_of("**la cascada corregida…") == "other"
 
 
+@case("findings/a-summary-may-be-incomplete-and-may-not-contradict",
+      "a row or an «abiertos:» sentence that names a closed ficha open is stale; a missing row is not")
+def _():
+    from zyddt import findings as Fi
+    text = ("| [`XX-1`](#xx-1) | **abierto** | a |\n"
+            "| [`XX-2`](#xx-2) | **corregido 2026-01-01** | b |\n"
+            "| ~~`XX-3`~~ | **reencaminado** | c |\n"
+            "\n**Dos abiertos: `XX-1` y `XX-4`.** `XX-2` se corrigió.\n"
+            "\n## XX-1 — t\n\n| [`XX-2`](#xx-2) | **abierto** | below the first ficha: not the summary |\n")
+    states = {"XX-1": "closed", "XX-2": "closed", "XX-3": "rerouted", "XX-4": "open", "XX-5": "open"}
+    assert Fi.stale_summary(text, states) == [(1, "XX-1", "open", "closed"),
+                                              (5, "XX-1", "open", "closed")]
+    assert Fi.stale_summary(text, dict(states, **{"XX-1": "open"})) == []
+
+
 @case("debt/no-declaration-changes-nothing", "a cell with no open_finding is judged as before")
 def _():
     assert C.debt(None, True, frozenset({"zyjs"})) == (None, [])

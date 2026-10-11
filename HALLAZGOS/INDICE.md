@@ -17,7 +17,9 @@
 > **El estado vivo no está en este documento.** Lo calcula `./bin/zyddt findings`
 > —también dentro de `suite`— a partir de la línea **Estado** de cada ficha: qué
 > está abierto, qué celda o qué caso de `zyquality/cost/` lo sujeta, qué no vigila
-> nada, y en rojo la ficha cerrada que todavía se declara como deuda. Las
+> nada, y en rojo la ficha cerrada que todavía se declara como deuda — y, desde
+> el 2026-10-10, la fila o la frase «N abiertos» de la cabecera de un fichero que
+> contradiga a su ficha (`STALE SUMMARY`): siete lo hacían ese día. Las
 > secciones «Estado — fecha» de abajo son la historia de cada día, con sus cifras.
 > Las tablas que se llevaban a mano se pudrieron: la de `GLOBAL.md` se paró en
 > `GLB-007`, y seis fichas siguieron diciendo «abierto» con todas sus partes
