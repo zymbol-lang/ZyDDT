@@ -1074,3 +1074,85 @@ i = 1
 s = s + 1  i++
 >> s " " i ¶
 """
+
+# ── The dictionary pattern is written `#(…)` — GLB-122, decided 2026-10-11 ───
+#
+# The literal `(a: 1)` has been refused since v0.0.9 (`reject/collections/06`).
+# The PATTERN on the other side of `=` was not migrated and kept running in all
+# three engines, which is the second spelling the mark was introduced to end.
+# Nothing in the corpus, the applications, the examples or the documents wrote
+# it, so nothing could disagree.
+
+[[cell]]
+id     = "dictionary-pattern-without-the-mark"
+what   = "`(name: n, age: y) = person` — a dictionary pattern is written `#(…)` (GLB-122)"
+src    = '''
+person = #(name: "A", age: 3)
+(name: n, age: y) = person
+>> n y ¶
+'''
+
+[[cell]]
+id     = "dictionary-pattern-without-the-mark-in-a-loop-head"
+what   = "the same pattern in a loop head, `@ (k: a, v: b):ps`"
+src    = '''
+ps = [#(k: 1, v: 2)]
+@ (k: a, v: b):ps { >> a b ¶ }
+'''
+
+[[cell]]
+id     = "dictionary-pattern-with-the-mark"
+expect = "ok"
+what   = "the control: `#(name: n, age: y) = person` takes a dictionary apart, and `(a, b)` a tuple"
+src    = '''
+person = #(name: "A", age: 3)
+#(name: n, age: y) = person
+(a, b) = (1, 2)
+>> n y a b ¶
+'''
+
+[[cell]]
+id     = "dictionary-pattern-with-the-mark-in-a-loop-head"
+expect = "ok"
+what   = "and in a loop head: `@ #(k: a, v: b):ps` — the form the refusal points at has to exist"
+# It did not, in any engine. The Rust parser took the BARE pattern here and
+# zyjs took neither, so refusing the bare one would have left no spelling at
+# all. The grammar already listed `dictionary_destructure` under `loop_pattern`.
+src    = '''
+ps = [#(k: 1, v: 2), #(k: 3, v: 4)]
+@ #(k: a, v: b):ps { >> a b " " }
+>> ¶
+@ (x, y):[(1, 2)] { >> x y ¶ }
+@ (3) { >> "." }
+>> ¶
+'''
+
+# ── `#(a, b) = t` — GLB-123, decided 2026-10-11 ─────────────────────────────
+#
+# The other half of GLB-122. `#(` says "dictionary", so what is inside is
+# `key: name` pairs; a positional pattern under that mark took a tuple apart in
+# the two Rust engines and was refused by zyjs with the words of a missing `:`.
+
+[[cell]]
+id   = "positional-pattern-under-the-dictionary-mark"
+what = "`#(a, b) = (1, 2)`: a dictionary pattern takes `key: name` pairs (GLB-123)"
+src  = '''
+#(a, b) = (1, 2)
+>> a b ¶
+'''
+
+[[cell]]
+id   = "positional-pattern-under-the-dictionary-mark-in-a-loop-head"
+what = "the same in a loop head, `@ #(a, b):ps`"
+src  = '''
+ps = [(1, 2)]
+@ #(a, b):ps { >> a b ¶ }
+'''
+
+[[cell]]
+id   = "empty-dictionary-pattern"
+what = "`#() = d` names nothing to take out"
+src  = '''
+#() = #()
+>> "fin" ¶
+'''

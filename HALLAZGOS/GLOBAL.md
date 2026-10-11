@@ -8777,3 +8777,81 @@ eligió la primera. No se definió ninguna veracidad, ni la de un motor ni una c
 fichero y a través de un parámetro, y en el bloque de una lambda) = 65 celdas `expect = "error"`, más ocho a
 mano: que un Bool sigue sirviendo, que el rechazo en ejecución es un `##Type` que un `!?` recoge, que ningún
 bloque corre antes del rechazo y que un `_?` que no se alcanza no se pregunta. 73 de 73.
+
+---
+
+## GLB-122 — El patrón de diccionario sin marca, `(name: n) = d`, siguió corriendo cuando el literal se rechazó
+
+**Estado:** **corregido 2026-10-11** — decidido por el autor ese día: se rechaza, como el literal
+**Encontrado por:** la pasada de documentación de la v0.0.9 (`interpreter/IMPL_V009.md` § E.2, 2026-09-07).
+Estuvo un mes escrito en un plan y sin ficha
+**Familia:** [`GAP-ZYB-003`](../../ZyBank/HALLAZGOS.md) y `GAP-ZYB-004` (la marca `#(…)`),
+`zyquality/reject/collections/06_dict_sin_marca.zy`
+
+```zymbol
+person = #(name: "A", age: 3)
+(name: n, age: y) = person
+>> n y ¶
+```
+
+Los tres motores imprimían `A3`, sin aviso. El literal `d = (a: 1)` se rechaza desde la v0.0.9 con la razón
+escrita en su caso de `reject/`: *dos grafías de una cosa es lo que la marca vino a terminar*. El patrón, al
+otro lado del `=`, era esa segunda grafía.
+
+Medido antes de decidir: 0 usos en el corpus, los ejemplos, las nueve aplicaciones, el curso y los documentos.
+
+### Qué cambió
+
+- **Parser compartido** (`parse_tuple_destructure_pattern`): `a dictionary pattern is written` `#(…)`, con la
+  ayuda que nombra la forma. Cubre la asignación y la cabecera de un bucle, que comparten el patrón.
+- **`zyjs`**: el mismo rechazo en `parseTupleDestruct` y en `parseTupleDestructPattern`. En la cabecera de un
+  bucle decía `Expected IDENT, got ':'`.
+
+### Qué lo sujeta
+
+`refusal/dictionary-pattern-without-the-mark`, `…-in-a-loop-head` y el control `…-with-the-mark`;
+`zyquality/reject/patterns/05_dict_pattern_sin_marca.zy` lleva la forma con su razón.
+
+### La cabecera del bucle: la regla reubica la forma, no la quita
+
+`@ (k: a, v: b):filas` era, en los dos Rust, la única grafía del patrón de diccionario en la cabecera de un
+bucle; `@ #(k: a, v: b):filas` no la aceptaba ningún motor, y zyjs no aceptaba ninguna de las dos. Rechazar la
+primera sin admitir la segunda habría dejado la forma sin grafía. La gramática normativa
+(`zymbol-lang.ebnf`, `loop_pattern`) ya listaba `dictionary_destructure`, que se escribe `#(`: describía un
+parser que no existía. Se admite en los tres (`refusal/dictionary-pattern-with-the-mark-in-a-loop-head`).
+
+### La forma vecina
+
+La inversa —un patrón posicional con la marca del diccionario, `#(a, b) = (1, 2)`— salió al medir esta y es
+[`GLB-123`](GLOBAL.md).
+
+---
+
+## GLB-123 — `#(a, b) = (1, 2)`: un patrón posicional bajo la marca del diccionario corre en Rust y zyjs lo rechaza
+
+**Estado:** **corregido 2026-10-11** — decidido por el autor ese día: se rechaza
+**Encontrado por:** la medición de [`GLB-122`](GLOBAL.md), al probar su control
+**Familia:** [`GLB-122`](GLOBAL.md) — es la otra mitad de la misma regla: la marca y la forma coinciden
+
+```zymbol
+#(a, b) = (1, 2)
+>> a b ¶
+```
+
+| | antes |
+|---|---|
+| `zytw`, `zyvm` | `12` |
+| `zyjs` | `error: expected ':' after field name in named tuple destructure` |
+
+Con un diccionario a la derecha —`#(a, b) = #(x: 1, y: 2)`— los dos Rust avisaban `tuple '( … )' pattern
+requires a tuple, got ##(` y seguían. `#(` abría el patrón y el `:` que faltaba decidía que era posicional: una
+segunda grafía de `(a, b)`. 0 usos en el corpus, los ejemplos, las aplicaciones y el curso.
+
+### Qué cambió
+
+Los tres dicen lo mismo, en la asignación y en la cabecera de un bucle: `a dictionary pattern takes` `key: name`
+`pairs`, con la ayuda que nombra las dos formas. `#() = d`, que no nombra nada, cae en el mismo rechazo.
+
+### Qué lo sujeta
+
+`refusal/positional-pattern-under-the-dictionary-mark`, `…-in-a-loop-head` y `refusal/empty-dictionary-pattern`.
