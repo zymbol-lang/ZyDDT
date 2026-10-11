@@ -192,12 +192,14 @@ x = "a"
 """
 
 [[cell]]
-id   = "a-condition-on-an-emptied-variable"
-what = "the condition check still sees Unit, not the Int it held"
+id     = "a-condition-on-an-emptied-variable"
+expect = "error"
+what   = "the condition check sees Unit, not the Int the name held — and refuses it"
 # Not a type change: kept here because it is the other half of the rule — the
-# emptied name is Unit for every check but this one. ZYJS-036, open: zyjs gives
-# no condition warning for a name that holds Unit.
-src  = """
+# emptied name is Unit for every check, this one included (ZYJS-036). Until
+# 2026-10-11 the check was a warning and this cell expected `warn`; a condition
+# that is not a Bool is an error since GLB-121.
+src    = """
 x = 1
 x = ##_
 ? x {

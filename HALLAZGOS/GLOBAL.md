@@ -8700,3 +8700,80 @@ y un conjunto de nombres muertos. `lifetime/read-module-state-another-function-d
 `lifetime/destroy-module-state-twice-across-calls`, que afirman el error sin `!?`. En el corpus,
 `modules_scope/destruir_estado.zy` con su módulo, para el consenso y el playground. MEM-8 no cambia de texto: su
 «Held by» ya nombra `lifetime/*`.
+
+---
+
+## GLB-121 — `?` con una condición que no es Bool: tres motores, tres tablas de verdad, y un solo aviso
+
+**Estado:** **corregido 2026-10-11** — decidido por el autor ese día: una condición es un Bool y nada más. Donde
+el analizador conoce el tipo, el programa se rechaza antes de ejecutar; donde no, es un `##Type` en ejecución
+**Encontrado por:** `interpreter/AGENTIC.md` § G10 (2026-09-11), que lo tenía medido con siete valores y marcado
+`open`. Llegó hasta aquí sin ficha ni celda: `zyddt findings` decía «0 abiertos» con esto vivo
+**Familia:** `DM-05` (cerrada el 2026-09-04 comprobando el aviso y no la rama), [`ZYVM-001`](zyvm.md),
+[`GLB-091`](GLOBAL.md), [`GLB-080`](GLOBAL.md), [`GLB-024`](GLOBAL.md) — la regla «no hay truthiness», cerrada
+ya cuatro veces en otras tantas superficies
+
+```zymbol
+x = [1, 2]
+? x { >> "SI" ¶ } _ { >> "NO" ¶ }
+```
+
+### Qué se observaba
+
+Medido el 2026-10-11 sobre `d736ae6`, los tres con `rc 0` y los tres con el mismo aviso
+(`if condition should be Bool, got …`):
+
+| `x` | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `5` | SI | SI | SI |
+| `0` | NO | NO | NO |
+| `[1,2]` | NO | **SI** | **SI** |
+| `[]` | NO | **SI** | **SI** |
+| `1.5` | NO | **SI** | **SI** |
+| `0.0` | NO | **SI** | NO |
+| `""` | NO | **SI** | NO |
+| `"a"` | SI | SI | SI |
+| `'c'` | NO | **SI** | **SI** |
+| `(1,2)` | NO | **SI** | **SI** |
+| `#()` | NO | **SI** | **SI** |
+| `#(a: 1)` | NO | **SI** | **SI** |
+| `##_` | NO | NO | NO |
+
+Nueve de trece divergen. Cada motor tenía una tabla propia:
+
+- **`zytw`** (`is_truthy`): verdadero un Int distinto de 0 y una String no vacía; falso todo lo demás.
+- **`zyvm`** (`JumpIfNot` leyendo `is_truthy()`): verdadero todo menos 0 y Unit.
+- **`zyjs`** (`truthy`): las reglas del anfitrión, con `[]` verdadero.
+
+### Por qué no lo veía nada
+
+- El **corpus** no escribe la forma: 0 de 1 292 programas del workspace (corpus, ejemplos, las nueve
+  aplicaciones, el curso) provocaban el aviso el día de la decisión.
+- La **matriz** no tenía eje: nadie había declarado «la condición de `?`» como dimensión.
+- `DM-05` cubría *un Int como condición* y se cerró con «los tres avisan». Avisan, igual — y con un Int además
+  coinciden en la rama. Es el movimiento 3 de `HOW_TO_CHANGE_ZYMBOL.md`, y el plan de la v0.0.10
+  (`interpreter/IMPL_V0010.md` § E.4, primera redacción) **lo repitió el mismo día**: sondeó `x = 5`, vio a los
+  tres de acuerdo y escribió que la divergencia ya no existía. El barrido de tipos lo deshizo una hora después.
+
+### Qué se decidió
+
+Tres opciones, con la tabla delante: error `##Type`; deuda declarada; definir una tabla de verdad. El autor
+eligió la primera. No se definió ninguna veracidad, ni la de un motor ni una cuarta.
+
+### Qué cambió
+
+- **Analizador** (`type_check.rs`): el aviso pasa a error — `a condition must be a Bool, got <tipo>`, la misma
+  frase para `?` y para `_?` (antes eran dos).
+- **`zytw`** (`if_stmt.rs`): `is_truthy` desaparece; `Interpreter::condition` devuelve el Bool o un `##Type`.
+- **`zyvm`**: instrucción nueva `JumpIfNotCond`, el salto de `?` y `_?`. `JumpIfNot` sigue siendo el de los bucles
+  y `??`, cuyos registros ya son Bool. Sin despacho de más: sustituye al salto, no se le antepone.
+- **`zyjs`**: `E_COND_TYPE` (antes el aviso `W_COND_TYPE`) en el analizador y `Interpreter.condition` en
+  ejecución. El error se sitúa en la línea de la **sentencia**: en un `_?` es la de su `?`, y la primera
+  corrida del eje encontró a zyjs dando la de la condición.
+
+### Qué lo sujeta
+
+`axes/condition.toml`: 13 tipos × 5 sitios (la condición de `?` y de `_?`, con el valor en una variable del
+fichero y a través de un parámetro, y en el bloque de una lambda) = 65 celdas `expect = "error"`, más ocho a
+mano: que un Bool sigue sirviendo, que el rechazo en ejecución es un `##Type` que un `!?` recoge, que ningún
+bloque corre antes del rechazo y que un `_?` que no se alcanza no se pregunta. 73 de 73.
