@@ -7,11 +7,13 @@
 |---|---|---|
 | [`ZYVM-001`](#zyvm-001--la-vm-ejecuta-lo-que-el-tree-walker-rechaza-40-celdas) | **corregido 2026-08-30** | ejecutaba y contestaba donde `zytw` rechaza — 40 celdas |
 | [`ZYVM-002`](#zyvm-002--el-diagnóstico-de---nombra-al-operador--10-celdas) | **corregido 2026-08-30** | el rechazo de `-` citaba al operador `+` |
-| [`ZYVM-003`](#zyvm-003--acumular-en-el-estado-de-un-módulo-es-on-en-la-vm-y-on-en-el-tree-walker) | **abierto** | acumular en el estado de un módulo es cuadrático: 3,3 s donde el TW tarda 0,013 s |
+| [`ZYVM-003`](#zyvm-003--acumular-en-el-estado-de-un-módulo-es-on-en-la-vm-y-on-en-el-tree-walker) | **corregido 2026-10-10** | acumular en el estado de un módulo era cuadrático: 3,3 s donde el TW tardaba 0,013 s |
 | [`ZYVM-004`](#zyvm-004--una-función-llamada-por----o--corre-en-un-segundo-intérprete-que-se-salta-49-instrucciones) | **corregido 2026-09-14** | una función llamada por `$>`, `$|` o `$<` corría en un segundo intérprete que se saltaba 49 instrucciones |
-| [`ZYVM-010`](#zyvm-010--soltar-valores-cuesta-entre-el-11-y-el-17--del-tiempo-de-la-vm) | **abierto** | soltar el valor viejo en cada escritura de registro, y desmontar marcos que nunca reutilizan un temporal: 11–17 % del tiempo |
+| [`ZYVM-010`](#zyvm-010--soltar-valores-cuesta-entre-el-11-y-el-17--del-tiempo-de-la-vm) | **corregido 2026-10-10** | soltar valores al desmontar el marco y al escribir un registro, y un marco que medía todos los temporales que la función pidió alguna vez |
+| [`ZYVM-020`](#zyvm-020--n--sobre-un-nombre-que-es-estado-del-módulo-la-vm-le-da-un-registro-propio) | **corregido 2026-10-10** | `n° = n + i` con `n` estado del módulo: 3 donde los otros dos dan 16 |
+| [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
 
-**Dos abiertos: `ZYVM-003` y `ZYVM-010`.**
+**Ninguno abierto.** La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
 Las chinchetas que los sujetan:
 
@@ -675,8 +677,9 @@ sin imprimir nada. Ahora son dos pasos: el valor a `dst` y después el bloque.
 
 ## ZYVM-010 — Soltar valores cuesta entre el 11 y el 17 % del tiempo de la VM
 
-**Estado:** abierto — la parte del marco (`IDEA-BEN-002`) **aplicada el 2026-10-09** y la escritura de un registro
-el **2026-10-10**; queda abierta sólo la reutilización de temporales del compilador, aplazada por el autor (R4)
+**Estado:** **corregido 2026-10-10** — en tres partes: el marco (`IDEA-BEN-002`, 2026-10-09), la escritura de un
+registro (2026-10-10) y la reutilización de temporales del compilador, aplazada como R4 y pedida por el autor el
+mismo 2026-10-10 al ver lo que costaba en una función larga (ver «La parte que quedaba, corregida»)
 **Encontrado por:** el perfil de [`IDEA-GOL-007`](../../GoL/HALLAZGOS.md) (el
 coste de una llamada por celda), el 2026-10-01, **no por una celda**
 **Familia:** ninguna con nombre todavía. Es coste, no semántica: los tres
@@ -754,8 +757,10 @@ dice cuánto hay que ganar con el primero.
 
 ### Qué lo sujeta
 
-Nada todavía. La celda `call/function-in-hot-loop` (`time-ratio`, límite 1,30)
-vigila la llamada; el coste de soltar en cada escritura no tiene celda.
+El 2026-10-01, nada: la celda `call/function-in-hot-loop` (`time-ratio`, límite 1,30)
+vigilaba la llamada y el coste de soltar en cada escritura no tenía celda. Desde el
+2026-10-10, `zyquality/cost` `call/frame-as-large-as-every-temporary` — ver «La parte
+que quedaba», al final de la ficha.
 
 ### Lo que añadió una medición de fuera (ZyBench, documentado el 2026-10-08)
 
@@ -870,6 +875,91 @@ las nueve aplicaciones, y las dos sondas de memoria con el pico plano (11,2 MB).
 
 Lo que mantiene la ficha abierta: reutilizar los temporales del compilador (`alloc_temp`). Aplazado: la llamada
 entera es el 5,5 % de las instrucciones, y reutilizar un registro que sigue vivo es un error de valores silencioso.
+
+### La parte que quedaba: primero sujeta (2026-10-10)
+
+Hasta ese día `zyddt findings` decía de esta ficha *«watched by nothing»*: abierta, y sin nada que la mirara. La
+parte aplazada se puede medir sola, con dos programas que **ejecutan las mismas instrucciones**:
+
+```zymbol
+paso(x, a, b) {
+    ? x < 0 {
+        >> ((x + a) * (b + 1) - (a * 2 + b)) % 97 ¶
+        // … y 63 sentencias más como esa en el sujeto; sólo esta en el control
+    }
+    <~ x + a
+}
+
+s = 0
+@ i:1..N { s = paso(i % 7, s % 3, 2) % 1000 }
+>> s ¶
+```
+
+`x` nunca es negativo, así que la rama no corre en ninguno de los dos, y ninguna de sus sentencias declara una
+variable: lo único que cambia es cuántos temporales pidió el cuerpo. `alloc_temp` sólo avanza `next_reg`, el marco
+tiene un registro por cada uno, y cada llamada lo rellena entero al entrar y lo recorre al salir.
+
+| 2 000 000 de llamadas (`zytw` 400 000, `zyjs` 200 000) | control, 1 sentencia | sujeto, 64 | razón |
+|---|---:|---:|---:|
+| `zyvm` | 295 ms | 816 ms | **2,76** |
+| `zytw` | 453 ms | 451 ms | 0,99 |
+| `zyjs` | 1 656 ms | 1 685 ms | 1,02 |
+
+Con 16 sentencias y una variable en cada una la VM da 1,6; con 64, 3,3. El 5,5 % de arriba es lo que cuesta la
+llamada en una función pequeña (`vecinos`, 34 registros); esto es lo que cuesta en una función **larga**, la
+llame quien la llame y corra o no la mayor parte de su cuerpo.
+
+`zyquality/cost`: `call/frame-as-large-as-every-temporary` (`time-ratio`, límite 1,30). Se declaró con
+`open_finding = { zyvm = "ZYVM-010" }` y salió `KNOWN`; horas después salió `DEBT PAID`, en rojo, que es lo que
+tiene que pasar el día que una deuda se paga.
+
+### La parte que quedaba, corregida (2026-10-10)
+
+Pedido por el autor ese día, con la tabla de arriba delante: el 5,5 % que justificaba aplazarlo era el de una
+función pequeña.
+
+`crates/zymbol-compiler/src/lib.rs`. Un temporal pertenece a la sentencia que se está compilando.
+`compile_stmt` anota cuántos hay vivos al empezar y, al terminar, devuelve los suyos a un fondo
+(`FunctionCtx::free_temps`); `alloc_temp` saca del fondo antes de pedir un registro nuevo. Una sentencia anidada
+devuelve sólo los suyos: los del bucle o del `!?` que la contiene —el iterador, el registro del error— siguen
+siendo de quien los pidió hasta que esa sentencia acaba.
+
+Lo que hubo que mirar antes, porque reutilizar un registro que sigue vivo es un valor equivocado y callado:
+
+- **Dos registros contiguos.** `ArraySlice`, `StrSlice`, `ArrayRemoveRange` y sus formas de cuenta, y
+  `NavRangeCheck`, reciben un registro y leen el siguiente. Dos registros devueltos por separado no son vecinos:
+  esos tres sitios piden su pareja con `alloc_temp_pair`, que nunca sale del fondo.
+- **Un temporal con nombre.** `<< x` y `<<| x` ligaban un temporal a la variable cuando era nueva. Ahora piden
+  un registro de variable; y al devolver, un registro al que algún nombre apunta se salta, lo haya pedido quien
+  lo haya pedido.
+- **El tipo que se sabía.** `reg_types` guarda lo que el compilador dedujo de un registro, y elige con ello la
+  instrucción (`StrLen` o la longitud de un array). Al reutilizar, el tipo vuelve a «desconocido».
+- **Encontrar `Unit` sin haberlo escrito.** Un registro nuevo vale `Unit`; uno reutilizado, lo que dejó el
+  anterior. La regla queda escrita en `alloc_temp`: un temporal se escribe antes de leerse, siempre.
+
+Las dos últimas no se demuestran leyendo. `ZYMBOL_POISON_TEMPS=1` hace que el compilador escriba un valor que
+ningún programa calcula (5 333 666 999) en cada temporal al acabar su sentencia: lo que lea un temporal después
+de devolverlo, o cuente con un `Unit` que no escribió, lo saca por la salida en vez de dar una respuesta
+verosímil. Con el veneno puesto: el consenso del corpus (673 de 679 de acuerdo, 0 divergen), los goldens bajo la
+VM, las nueve aplicaciones y los 45 ejes de ZyDDT, sin una diferencia.
+
+| 2 000 000 de llamadas | control, 1 sentencia | sujeto, 64 | razón |
+|---|---:|---:|---:|
+| `zyvm`, antes | 295 ms | 816 ms | 2,76 |
+| `zyvm`, ahora | 279 ms | 277 ms | **0,99** |
+
+**Lo que no cambia, y no es deuda:** las variables. Un bloque con 64 variables propias las tiene vivas a la vez,
+y su marco las necesita: la misma sonda con una variable por sentencia baja de 3,3 a 1,5, no a 1,0. Lo que sí
+sería reutilizable —el registro de una variable de un bloque que ya terminó, para el bloque hermano— no se
+tocó: una variable se lee por nombre desde más sitios que un temporal (`\`, la marca caliente, el espejo de las
+variables del fichero), y no hay medición de que cueste en ningún programa real.
+
+### Qué lo sujeta
+
+`zyquality/cost`: `call/frame-as-large-as-every-temporary`, en verde en los tres y ya sin deuda declarada, y
+`call/function-in-hot-loop`. `crates/zymbol-compiler/tests/compile_smoke.rs`:
+`a_statement_hands_its_temporaries_back` (64 sentencias caben en el marco de una) y
+`a_slice_keeps_its_bounds_adjacent_among_reused_temporaries`. `cargo test --release`: 1062 y 4 ignorados.
 
 ---
 
@@ -1353,3 +1443,119 @@ menos `$~`, que se dejaba a `DeepSetInPlace` — la instrucción que escribe, qu
 ### Qué lo sujeta
 
 `runtime-functions-hof/tuple-edit-is-refused-before-its-operand-runs`. Con la VM de antes da DIVERGE.
+
+---
+
+## ZYVM-020 — `n° = …` sobre un nombre que es estado del módulo: la VM le da un registro propio
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: es la regla de [`GLB-119`](GLOBAL.md)
+**Encontrado por:** la sonda que comparó el TW antes y después de [`ZYTW-010`](zytw.md), que también corrió en la VM
+**Familia:** [`GLB-119`](GLOBAL.md) — dar valor a un nombre del módulo escribe su estado, llegue el valor como llegue
+
+```zymbol
+# calor {
+    #> { despues, ver }
+    n = 10
+
+    despues() {
+        @ i:1..3 { n° = n + i }
+        <~ n
+    }
+    ver() { <~ n }
+}
+```
+
+```zymbol
+<# ./mod/calor => C
+>> C::despues() " " C::ver() ¶
+```
+
+| | salida |
+|---|---|
+| `zytw`, `zyjs` | `16 16` |
+| `zyvm`, antes | `3 3` |
+
+La misma función con `n` local da 16 en los tres, y sin la marca (`n = n + i`) también.
+
+### Causa
+
+Una asignación con marca caliente a un nombre **nuevo** le reserva un registro y lo inicia con el elemento neutro
+de la operación. «Nuevo» se decidía con `ctx.get_reg(name).is_err()`, y un nombre que es estado del módulo no
+tiene registro: se le daba uno, iniciado a cero, la suma corría sobre él y lo que resultaba se escribía en el
+estado. Es la mitad de `GLB-119` que aquel arreglo no alcanzó: allí eran los bucles y la desestructuración.
+
+### Corrección
+
+`Statement::Assignment` no hace esa reserva cuando el nombre es estado del módulo y no un parámetro: la
+asignación sigue el camino de cualquier otra, que escribe el estado.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/hot-assignment-to-a-name-that-is-module-state`, con oráculo: las dos marcas, `n°` y `°n`.
+
+---
+
+## ZYVM-021 — Una lambda escrita en una función de un módulo lee el estado del módulo como está, no como lo capturó
+
+**Estado:** **corregido 2026-10-10** — decidido por el autor ese día: la lambda **captura**, como con cualquier otro nombre
+**Encontrado por:** la misma sonda, 2026-10-10
+**Familia:** [`ZYVM-020`](zyvm.md), [`GLB-119`](GLOBAL.md) — otra forma en que un nombre que es estado del módulo no sigue en la VM el camino de un nombre cualquiera
+
+```zymbol
+# captura {
+    #> { captura }
+    t = [5, 6]
+
+    captura() {
+        f = k -> t[k]
+        t[1]$~ 500
+        <~ f(1)
+    }
+}
+```
+
+```zymbol
+<# ./mod/captura => K
+>> K::captura() ¶
+```
+
+| | salida |
+|---|---|
+| `zytw`, `zyjs` | `5` |
+| `zyvm`, antes | `500` |
+
+Con `t` local a la función —`u = [5, 6]  f = k -> u[k]  u[1]$~ 500  <~ f(1)`— los tres dan `5`: la lambda
+capturó el valor que `u` tenía cuando se escribió.
+
+### Qué pasa
+
+En el TW y en `zyjs` una lambda captura por valor lo que nombra de fuera, y el estado del módulo es una de esas
+cosas. En la VM un nombre que es estado del módulo no tiene registro (`GLB-119`); lo que se observa es que la
+lambda lee lo que la ranura del módulo tiene cuando corre. El camino exacto en el compilador no se ha leído.
+
+### Qué había que decidir
+
+- **captura**, como un local: es lo que hacen dos motores y lo que hace la VM con cualquier otro nombre. La
+  lambda es entonces la misma cosa dentro y fuera de un módulo.
+- **el estado vivo**: es lo que hace una *función* del módulo, que lee el estado cuando corre. Una lambda
+  guardada y llamada más tarde vería lo que el módulo tenga ese día.
+
+### Decisión y corrección (2026-10-10)
+
+El autor: **captura**.
+
+`compile_lambda` busca las variables libres del cuerpo entre los nombres que tienen registro en la función que
+la contiene, y un nombre que es estado del módulo no tiene ninguno. Ahora, mientras dura esa búsqueda, los
+nombres del estado del módulo cuentan como si lo tuvieran; los que el cuerpo nombra se cargan de la ranura del
+módulo **donde la lambda se escribe** y viajan en la clausura como cualquier otra captura. Dentro de la lambda el
+nombre es suyo, como un parámetro: lo lee de su registro y lo escribe en su registro — una lambda sólo escribe
+los nombres que declara — , también cuando lo asigna antes de leerlo.
+
+Las ocho formas de la celda, que los tres motores contestan igual: lectura después de
+editar el estado, escritura dentro de la lambda, lambda que devuelve otra lambda, parámetro que se llama como el
+estado, lambda pasada a `$>`, lambda guardada **en** el estado del módulo y llamada desde otra función, y
+asignación antes de la lectura.
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/lambda-in-a-module-function-captures-module-state`, con oráculo.

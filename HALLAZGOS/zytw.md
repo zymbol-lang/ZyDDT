@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Uno abierto: `ZYTW-004`.** `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Ninguno abierto.** `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -590,8 +590,8 @@ la sentencia: un motor que une lo dice. Con el TW de antes da DIVERGE.
 
 ## ZYTW-010 — Llamar a una función de un módulo cuesta el tamaño del estado del módulo
 
-**Estado:** **abierto** — deuda declarada. La mitad de lectura, corregida el 2026-10-10; la de escritura,
-**decidido por el autor el 2026-10-10: no se corrige**, porque la VM va a relevar al TW como motor por defecto
+**Estado:** **corregido 2026-10-10** — la mitad de lectura por la mañana; la de escritura, que el autor había decidido
+no corregir ese mismo día, la pidió horas después: el estado de un módulo vive ya en un solo sitio
 **Encontrado por:** leyendo cómo sincroniza el TW el estado de un módulo, para [`ZYTW-008`](zytw.md), y midiéndolo
 **Familia:** [`ZYVM-003`](zyvm.md), ya cerrado — allí copiaba cada edición; aquí, cada llamada
 
@@ -664,10 +664,78 @@ compensa para un motor que deja de ser el de por defecto.
 Queda como deuda **declarada**: la ficha sigue abierta, el caso de coste la muestra `KNOWN` en cada corrida con su
 ratio, y no enrojece la puerta. Si el relevo no llega, esta ficha es la que hay que reabrir.
 
+### La decisión, revocada, y la mitad de escritura (2026-10-10)
+
+El autor, ese mismo día: **hacerlo**. La deuda había quedado declarada y a la vista — 13,76 con límite 6,00 en
+cada corrida — y es así como se vuelve a mirar.
+
+No se reescribió cómo el TW resuelve un nombre. Se cambió **dónde está la tabla**: mientras corre un marco de un
+módulo, la tabla de variables de ese módulo (`LoadedModule::all_variables`) *es* el ámbito más externo del marco
+—`scope_stack[0]`—, movida fuera del almacén, y los ámbitos propios del marco empiezan en el índice 1. Toda
+búsqueda que ya recorría la pila de ámbitos de dentro afuera encuentra el estado del módulo al final, en su único
+sitio; una edición es la única dueña de la colección y escribe en el sitio; un parámetro o un local del mismo
+nombre lo tapa por estar más adentro.
+
+La tabla está en el marco **sólo mientras ese marco es el que corre**. `take_call_state` la devuelve al almacén
+antes de cualquier llamada, y `restore_call_state` la vuelve a sacar: lo que la llamada alcance —el mismo módulo,
+directamente o a través de otros tres— la encuentra allí. Mover un `HashMap` son tres palabras de máquina; no hay
+copia, ni instantánea, ni comparación al salir.
+
+Lo que desaparece: la inyección de las variables que el cuerpo nombra y su caché (`module_var_mentions`), la
+instantánea de cada marco (`frame_module_vars`), el vaciado al entrar en una hermana (`flush_module_frame`,
+MM-12), la escritura de vuelta con su comparación (`still_the_injected`, MM-2) y el refresco del llamante: 279
+líneas fuera de `functions_lambda.rs` y 70 dentro. Con esa maquinaria se va la clase de fallo de [`ZYTW-008`](zytw.md) y
+[`ZYTW-013`](zytw.md).
+
+Lo que hubo que cuidar, porque la tabla del módulo ya no es una copia que se pueda estropear:
+
+- `take_variable` (el `<~ nombre` que mueve en vez de copiar), el auto-free y `\ nombre` no alcanzan el índice 0.
+  `\ nombre` sobre el estado del módulo lo da por terminado **para ese marco**, como antes, y el módulo lo
+  conserva — es lo que hacía cuando destruía su copia, y lo que hace la VM (ver [`ZYJS-060`](zyjs.md)).
+- Las constantes del módulo van en el conjunto de constantes del índice 0. `is_const` no las aplica a un
+  parámetro o a un local que las tape, y `unmark_const` no las toca: antes cada marco tenía su copia de las marcas.
+- La marca caliente sin bucle ancla en el primer ámbito **del marco**, no en la tabla del módulo.
+- Un argumento de salida que es estado del módulo sigue sin prestarse (`is_module_state`): prestarlo lo sacaría
+  de la tabla mientras dura la llamada, y una función del módulo llamada entretanto no lo encontraría.
+- Lo que una función con nombre captura del fichero no tapa una variable del módulo que se llame igual.
+
+| 12 000 llamadas, cada una escribe una casilla de 12 000 | `zytw`, antes | `zytw`, ahora | `zyvm` |
+|---|---:|---:|---:|
+| tiempo | 1 930 ms | 27 ms | 22 ms |
+| razón al cuadruplicar el tamaño | 13,76 | **3,27** | 3,31 |
+
+### Lo que corrigió de paso: lo escrito antes de un fallo
+
+```zymbol
+falla(i) {
+    t[i]$~ 99
+    n += 100
+    x = t[1000]        // falla
+    <~ x
+}
+```
+
+```zymbol
+!? { A::falla(2) } :! { }
+>> A::leer(2) " " A::total() ¶
+```
+
+| | salida |
+|---|---|
+| `zytw`, antes | `0 0` — ninguna de las dos escrituras (en la sonda, `0 1` con el contador en 1 antes de la llamada) |
+| `zyvm`, `zyjs`, y `zytw` ahora | `99 100` |
+
+Un marco que fallaba soltaba su copia, y con ella todo lo que había escrito antes de fallar. No lo veía nada: ni
+el corpus ni ninguna celda escribían el estado de un módulo y fallaban después. Lo encontró la sonda que comparó
+el TW antes y después de este arreglo, con 20 formas de tocar el estado de un módulo, en los tres motores. La
+misma sonda abrió [`ZYVM-020`](zyvm.md) y [`ZYVM-021`](zyvm.md), corregidos ese día, y [`ZYJS-060`](zyjs.md), abierto.
+
 ### Qué lo sujeta
 
-`zyquality/cost`: `growth/module-call-that-reads-one-cell`, en verde en los tres, y
-`growth/module-call-that-writes-one-cell`, con `open_finding = { zytw = "ZYTW-010" }`.
+`zyquality/cost`: `growth/module-call-that-reads-one-cell` y `growth/module-call-that-writes-one-cell`, en verde
+en los tres y sin deuda declarada. `runtime-modules-scripts/module-state-written-before-a-failure-stays-written`,
+con oráculo. Y lo que ya sujetaba el estado de módulo y siguió en verde sin tocarlo: `modules_scope/` del corpus
+(23 ficheros), las celdas de `GLB-119`, `ZYTW-008` y `ZYTW-013`, y las nueve aplicaciones.
 
 ---
 
