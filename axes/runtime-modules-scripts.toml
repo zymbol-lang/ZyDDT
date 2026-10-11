@@ -1581,36 +1581,3 @@ print(show(bloque()), show(ver()))
     }
 }
 """
-
-# One the engines do not agree about, found on 2026-10-10 by the probe that
-# compared the tree-walker before and after ZYTW-010. It has no `expect`: what
-# is missing is the decision, and a cell must not invent it.
-
-[[cell]]
-id     = "destroying-module-state-inside-a-function"
-what   = "`\\ nota` in a function of a module, with `nota` the module's state: does the module still have it on the next call? (ZYJS-060)"
-src    = """
-<# ./mod/fin => F
->> F::anida() ¶
->> F::destruye() ¶
->> F::anida() ¶
-"""
-open_finding = "ZYJS-060"
-[cell.files]
-"mod/fin.zy" = """
-# fin {
-    #> { anida, destruye }
-    nota = "inicio"
-
-    _escribe() { nota = "interno" }
-    anida() {
-        nota = "externo"
-        _escribe()
-        <~ nota
-    }
-    destruye() {
-        \\ nota
-        <~ 1
-    }
-}
-"""

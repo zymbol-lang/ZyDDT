@@ -360,3 +360,264 @@ f() {
 }
 >> f() ¶
 """
+
+# ── A module's state ────────────────────────────────────────────────────────
+#
+# Everything above ends a name of the file, of a function or of a lambda. A
+# variable of a module is none of those: it is shared by the module's functions
+# and outlives every call. Asked on 2026-10-10, the three engines gave three
+# answers — the tree-walker ended it for the one frame that ran the `\\`, the
+# VM did nothing at all, and zyjs ended it for the module and never gave it
+# back. Decided by the author on 2026-10-11 (GLB-120): it is this premise,
+# applied where no engine applied it whole. The state is the module's, so its
+# end is too; reading it is the run-time error a `!?` catches; assigning it
+# gives it back to the module.
+
+[[cell]]
+id     = "destroy-module-state"
+expect = "ok"
+what   = "`\\ c` in a function of a module ends `c` for the module: every function finds it destroyed however it reads it, an assignment from any of them gives it back, a second `\\` is a use after the first — and a branch not taken, a parameter and a lambda's copy end nothing of the module's (GLB-120)"
+oracle_literal_ok = "the steps print the labels the functions return; what the oracle computes is which steps fail and what the state holds after each"
+src    = """
+<# ./mod/fin => F
+t(etq, f) {
+    !? {
+        r = f()
+        >> etq " " r ¶
+    } :! { >> etq " ERROR" ¶ }
+}
+t("01", () -> F::mostrar())
+t("02", () -> F::destruye())
+t("03", () -> F::mostrar())
+t("04", () -> F::lee())
+t("05", () -> F::interp())
+t("06", () -> F::arg())
+t("07", () -> F::escribe("nueva"))
+t("08", () -> F::lee())
+t("09", () -> F::destruye())
+t("10", () -> F::comparten())
+t("11", () -> F::lee())
+t("12", () -> F::destruye_y_lee())
+t("13", () -> F::mostrar())
+t("13b", () -> F::escribe("viva"))
+t("14", () -> F::destruye_y_escribe())
+t("15", () -> F::lee())
+t("16", () -> F::destruye())
+t("17", () -> F::destruye())
+t("18", () -> F::escribe("otra"))
+t("19", () -> F::rama(0))
+t("20", () -> F::lee())
+t("21", () -> F::param("x"))
+t("22", () -> F::lee())
+t("23", () -> F::lam())
+t("24", () -> F::lee())
+t("25", () -> F::rama(1))
+t("26", () -> F::lee())
+t("27", () -> F::lista())
+t("28", () -> F::largo())
+t("29", () -> F::indice())
+t("30", () -> F::suma())
+t("31", () -> F::edita())
+t("32", () -> F::edita2())
+t("33", () -> F::recorre())
+t("34", () -> F::presta())
+t("35", () -> F::renace())
+t("36", () -> F::largo())
+t("37", () -> F::bucle())
+t("38", () -> F::largo())
+"""
+oracle.py = """
+class Dead(Exception): pass
+S = {"c": "inicio", "v": [1, 2, 3], "n": 5}
+dead = set()
+def get(k):
+    if k in dead: raise Dead
+    return S[k]
+def put(k, x):
+    dead.discard(k)
+    S[k] = x
+def end(k):
+    if k in dead: raise Dead
+    dead.add(k)
+def destruye(): end("c"); return "destruida"
+def lee(): return get("c")
+def escribe(x): put("c", x); return get("c")
+def comparten(): put("c", "propia"); put("c", "de la hermana"); return get("c")
+def destruye_y_lee(): end("c"); return get("c")
+def destruye_y_escribe(): end("c"); put("c", "renacida"); return get("c")
+def mostrar():
+    try: return get("c")
+    except Dead: return "no hay c"
+def rama(k):
+    if k > 0: end("c")
+    return "rama"
+def param(c): return "param"
+def lam():
+    get("c")            # the lambda captures the value where it is written
+    return "lam"
+def interp(): return "<" + get("c") + ">"
+def arg(): return get("c")
+def lista(): end("v"); return "sin v"
+def largo(): return len(get("v"))
+def indice(): return get("v")[0]
+def suma(): end("n"); put("n", get("n") + 1); return get("n")
+def edita(): get("v").append(4); return len(get("v"))
+def edita2(): get("v")[0] = 9; return get("v")[0]
+def recorre(): return sum(get("v"))
+def presta(): get("v").append(1); return len(get("v"))
+def renace(): put("v", [7]); put("n", 1); return len(get("v")) + get("n")
+def bucle():
+    end("n")
+    for i in (1, 2, 3):
+        put("n", i)
+        get("v").append(i)
+    return get("n")
+steps = [("01", mostrar), ("02", destruye), ("03", mostrar), ("04", lee), ("05", interp), ("06", arg),
+    ("07", lambda: escribe("nueva")), ("08", lee), ("09", destruye), ("10", comparten), ("11", lee),
+    ("12", destruye_y_lee), ("13", mostrar), ("13b", lambda: escribe("viva")), ("14", destruye_y_escribe),
+    ("15", lee), ("16", destruye), ("17", destruye), ("18", lambda: escribe("otra")), ("19", lambda: rama(0)),
+    ("20", lee), ("21", lambda: param("x")), ("22", lee), ("23", lam), ("24", lee), ("25", lambda: rama(1)),
+    ("26", lee), ("27", lista), ("28", largo), ("29", indice), ("30", suma), ("31", edita), ("32", edita2),
+    ("33", recorre), ("34", presta), ("35", renace), ("36", largo), ("37", bucle), ("38", largo)]
+for tag, f in steps:
+    try: print(tag, f())
+    except Dead: print(tag, "ERROR")
+"""
+[cell.files]
+"mod/fin.zy" = """
+# fin {
+    #> { destruye, lee, escribe, comparten, destruye_y_lee, destruye_y_escribe, mostrar, rama, param, lam, interp, largo, indice, arg, suma, lista, edita, edita2, recorre, presta, renace, bucle }
+    c = "inicio"
+    v = [1, 2, 3]
+    n = 5
+
+    destruye() {
+        \\ c
+        <~ "destruida"
+    }
+    lee() { <~ c }
+    escribe(x) {
+        c = x
+        <~ c
+    }
+    _pone() { c = "de la hermana" }
+    comparten() {
+        c = "propia"
+        _pone()
+        <~ c
+    }
+    destruye_y_lee() {
+        \\ c
+        <~ c
+    }
+    destruye_y_escribe() {
+        \\ c
+        c = "renacida"
+        <~ c
+    }
+    mostrar() {
+        !? { <~ c } :! { <~ "no hay c" }
+    }
+    rama(k) {
+        ? k > 0 { \\ c }
+        <~ "rama"
+    }
+    param(c) {
+        \\ c
+        <~ "param"
+    }
+    lam() {
+        g = () -> {
+            \\ c
+            <~ "lam"
+        }
+        <~ g()
+    }
+    interp() { <~ "<{c}>" }
+    _id(x) { <~ x }
+    arg() { <~ _id(c) }
+    lista() {
+        \\ v
+        <~ "sin v"
+    }
+    largo() { <~ v$# }
+    indice() { <~ v[1] }
+    suma() {
+        \\ n
+        n += 1
+        <~ n
+    }
+    edita() {
+        v$+ 4
+        <~ v$#
+    }
+    edita2() {
+        v[1]$~ 9
+        <~ v[1]
+    }
+    recorre() {
+        s = 0
+        @ x:v { s += x }
+        <~ s
+    }
+    _mas(a<~) { a$+ 1 }
+    presta() {
+        _mas(v<~)
+        <~ v$#
+    }
+    renace() {
+        (v, n) = ([7], 1)
+        <~ v$# + n
+    }
+    bucle() {
+        \\ n
+        @ n:1..3 { v$+ n }
+        <~ n
+    }
+}
+"""
+
+[[cell]]
+id     = "read-module-state-another-function-destroyed"
+expect = "error"
+what   = "with no `!?` around it, reading what a sibling destroyed stops the program"
+src    = """
+<# ./mod/corta => F
+>> F::destruye() ¶
+>> F::lee() ¶
+"""
+[cell.files]
+"mod/corta.zy" = """
+# corta {
+    #> { destruye, lee }
+    c = "inicio"
+
+    destruye() {
+        \\ c
+        <~ "destruida"
+    }
+    lee() { <~ c }
+}
+"""
+
+[[cell]]
+id     = "destroy-module-state-twice-across-calls"
+expect = "error"
+what   = "the second call destroys what the first already destroyed: a use after it"
+src    = """
+<# ./mod/corta => F
+>> F::destruye() ¶
+>> F::destruye() ¶
+"""
+[cell.files]
+"mod/corta.zy" = """
+# corta {
+    #> { destruye }
+    c = "inicio"
+
+    destruye() {
+        \\ c
+        <~ "destruida"
+    }
+}
+"""

@@ -689,9 +689,9 @@ líneas fuera de `functions_lambda.rs` y 70 dentro. Con esa maquinaria se va la 
 
 Lo que hubo que cuidar, porque la tabla del módulo ya no es una copia que se pueda estropear:
 
-- `take_variable` (el `<~ nombre` que mueve en vez de copiar), el auto-free y `\ nombre` no alcanzan el índice 0.
-  `\ nombre` sobre el estado del módulo lo da por terminado **para ese marco**, como antes, y el módulo lo
-  conserva — es lo que hacía cuando destruía su copia, y lo que hace la VM (ver [`ZYJS-060`](zyjs.md)).
+- `take_variable` (el `<~ nombre` que mueve en vez de copiar) y el auto-free no alcanzan el índice 0. `\ nombre`
+  tampoco lo alcanzaba ese día: daba el nombre por terminado para el marco, como antes. Al día siguiente pasó a
+  terminarlo para el módulo ([`GLB-120`](GLOBAL.md)).
 - Las constantes del módulo van en el conjunto de constantes del índice 0. `is_const` no las aplica a un
   parámetro o a un local que las tape, y `unmark_const` no las toca: antes cada marco tenía su copia de las marcas.
 - La marca caliente sin bucle ancla en el primer ámbito **del marco**, no en la tabla del módulo.
@@ -728,7 +728,7 @@ falla(i) {
 Un marco que fallaba soltaba su copia, y con ella todo lo que había escrito antes de fallar. No lo veía nada: ni
 el corpus ni ninguna celda escribían el estado de un módulo y fallaban después. Lo encontró la sonda que comparó
 el TW antes y después de este arreglo, con 20 formas de tocar el estado de un módulo, en los tres motores. La
-misma sonda abrió [`ZYVM-020`](zyvm.md) y [`ZYVM-021`](zyvm.md), corregidos ese día, y [`ZYJS-060`](zyjs.md), abierto.
+misma sonda abrió [`ZYVM-020`](zyvm.md) y [`ZYVM-021`](zyvm.md), corregidos ese día, y lo que acabó siendo [`GLB-120`](GLOBAL.md), corregido al día siguiente.
 
 ### Qué lo sujeta
 
