@@ -74,3 +74,39 @@ v = 1
 b = a$^ (v)
 >> b ¶
 """
+
+# ── `nums$> (double)` — ZYJS-061, found 2026-10-11 by `llm_verify` ───────────
+#
+# A named function goes after `$>` and `$|` WITHOUT parentheses, because a `(`
+# there opens a lambda. `LLM.md` rule 11 says so; the Rust parser enforces it;
+# zyjs read the parenthesised name as a grouping and ran it. `$^` had the check
+# since ZYJS-021 and its two neighbours did not.
+
+[[cell]]
+id   = "map-with-a-parenthesised-name"
+what = "`nums$> (double)`: the `(` opens a lambda, and its arrow is missing (ZYJS-061)"
+src  = """
+double(x) { <~ x * 2 }
+nums = [1, 2, 3]
+>> (nums$> (double)) ¶
+"""
+
+[[cell]]
+id   = "filter-with-a-parenthesised-name"
+what = "the same after `$|`"
+src  = """
+par(x) { <~ x > 1 }
+nums = [1, 2, 3]
+>> (nums$| (par)) ¶
+"""
+
+[[cell]]
+id     = "map-and-filter-with-a-bare-name"
+expect = "ok"
+what   = "the control: a named function without parentheses, and a lambda inside them"
+src    = """
+double(x) { <~ x * 2 }
+par(x) { <~ x > 1 }
+nums = [1, 2, 3]
+>> (nums$> double) " " (nums$| par) " " (nums$> (x -> x * 2)) ¶
+"""

@@ -3363,3 +3363,40 @@ de que esto durara días, y meterlos es decisión del autor.
 `zyjs` era el motor que se apartaba de los otros dos en el programa que lo destapó; medido con más programas,
 los tres contestaban distinto y ninguno hacía lo que MEM-8 pide. La ficha, la decisión y la corrección están en
 [`GLB-120`](GLOBAL.md).
+
+---
+
+## ZYJS-061 — `nums$> (double)` corre en zyjs; en Rust el `(` abre una lambda y es un error de sintaxis
+
+**Estado:** **corregido 2026-10-11**, el día en que se encontró
+**Encontrado por:** `zyquality/docs/llm_verify.py` en su primera corrida, con la sonda de la regla 11 de
+`LLM.md` (*«`$>` with a named function takes NO parentheses»*)
+**Familia:** [`ZYJS-021`](zyjs.md), que puso la misma comprobación tras `$^` y no tras sus dos vecinos
+
+```zymbol
+double(x) { <~ x * 2 }
+nums = [1, 2, 3]
+>> (nums$> (double)) ¶
+```
+
+| | |
+|---|---|
+| `zytw`, `zyvm`, `check` | `error: expected '->' in lambda expression`, con su ayuda |
+| `zyjs` | `[2, 4, 6]` |
+
+Lo mismo tras `$|`. zyjs leía `(double)` como una expresión agrupada.
+
+### Qué cambió
+
+El bloque que `$^` tenía en línea pasa a `requireLambdaInParens()` y lo llaman también `$>` y `$|` cuando lo que
+sigue es un `(`. Mismo texto y misma ayuda que Rust.
+
+### Qué lo sujeta
+
+`syntax-functions-lambdas/map-with-a-parenthesised-name`, `…/filter-with-a-parenthesised-name` y el control
+`…/map-and-filter-with-a-bare-name`; la sonda `11b` de `llm_verify`.
+
+### Visto al medirlo, sin corregir
+
+`nums$> (1 -> 2)`: los dos dicen `expected parameter name in lambda`, Rust en la columna 13 y zyjs en la 12.
+La matriz no compara columnas salvo con `--strict-column`.
