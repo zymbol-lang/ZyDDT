@@ -1079,6 +1079,14 @@ def cmd_findings(args, cfg) -> int:
             rc = worse(rc, RED)
         elif state == "other":
             print(R.dim(f"  ?         {fid:<9} no Estado this index can read, in {fname}"))
+    # The table and the «N abiertos» sentence atop each file are kept by hand:
+    # incomplete is allowed, contradicting the ficha below is not.
+    states = {fid: state for _, fid, _, state in fichas}
+    for f in sorted((root / "HALLAZGOS").glob("*.md")):
+        for n, fid, said, real in F.stale_summary(f.read_text(encoding="utf-8"), states):
+            print(R.red(f"  STALE SUMMARY  HALLAZGOS/{f.name}:{n} says {fid} is {said}; "
+                        f"its Estado line says {real}"))
+            rc = worse(rc, RED)
     filed = {fid for _, fid, _, _ in fichas}
     for fid in sorted(set(held) - filed):
         print(R.red(f"  UNFILED   {fid} is declared as debt by {', '.join(held[fid])} "

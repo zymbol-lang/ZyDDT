@@ -48,7 +48,7 @@ retired instead of moving are recorded in `zyquality/dropped.tsv`.
 ./bin/zyddt suite                  # the whole layer, one verdict
 ./bin/zyddt axis [AXIS…]           # generate, run, publish the denominator
 ./bin/zyddt --detail N axis        # how many reds quote their output (default 8)
-./bin/zyddt findings               # HALLAZGOS/: open, closed, what holds each open one
+./bin/zyddt findings               # HALLAZGOS/: open, closed, what holds each open one, and a summary that contradicts its ficha
 ./bin/zyddt premises               # zymbol-design/PREMISES.md against the cells
 ./bin/zyddt pins                   # every pin names a filed finding
 ./bin/zyddt surfaces               # the two lexers: what did they leave unmarked

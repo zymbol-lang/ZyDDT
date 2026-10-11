@@ -30,3 +30,37 @@ def state_of(estado: str) -> str:
         if s.startswith(word):
             return state
     return "other"
+
+
+# ── the hand-kept summary above the fichas ───────────────────────────────────
+#
+# Each engine's file opens with a table of its fichas and a sentence counting
+# the open ones. Nothing read them, and on 2026-10-10 they named seven fichas
+# «abierto» that had been closed for up to four weeks — the same rot that
+# retired the table of GLOBAL.md, in the three files that kept theirs. They are
+# allowed to be INCOMPLETE (a row nobody added says nothing false); what they
+# may not do is contradict the ficha they point at.
+
+HEAD = re.compile(r"^##\s+([A-Z]{2,6}-\d+)\s+—", re.M)
+_ROW = re.compile(r"^\|\s*(?:~~)?\[?`([A-Z]{2,6}-\d+)`[^|]*\|([^|]*)\|")
+_SAID_OPEN = re.compile(r"abiert[oa]s?\s*:\s*((?:`[A-Z]{2,6}-\d+`(?:\s*,\s*|\s+y\s+)?)+)")
+_ID = re.compile(r"`([A-Z]{2,6}-\d+)`")
+
+
+def stale_summary(text: str, states: dict[str, str]) -> list[tuple[int, str, str, str]]:
+    """→ [(line, id, summary says, ficha says)] for every row or «abiertos: …»
+    sentence above the first ficha of `text` that disagrees with `states`."""
+    first = HEAD.search(text)
+    out = []
+    for n, line in enumerate(text[: first.start() if first else len(text)].splitlines(), 1):
+        claims = []
+        row = _ROW.match(line)
+        if row:
+            claims.append((row.group(1), state_of(row.group(2).strip())))
+        for m in _SAID_OPEN.finditer(line):
+            claims += [(fid, "open") for fid in _ID.findall(m.group(1))]
+        for fid, said in claims:
+            real = states.get(fid, "other")
+            if "other" not in (said, real) and said != real:
+                out.append((n, fid, said, real))
+    return out
