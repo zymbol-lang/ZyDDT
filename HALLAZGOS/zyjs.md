@@ -3400,3 +3400,35 @@ sigue es un `(`. Mismo texto y misma ayuda que Rust.
 
 `nums$> (1 -> 2)`: los dos dicen `expected parameter name in lambda`, Rust en la columna 13 y zyjs en la 12.
 La matriz no compara columnas salvo con `--strict-column`.
+
+---
+
+## ZYJS-062 — Un nombre caliente como patrón de `??`: zyjs lo acepta e inventa la variable
+
+**Estado:** **corregido 2026-10-11**, el día en que se encontró
+**Encontrado por:** las sondas vecinas de [`GLB-124`](GLOBAL.md)
+
+```zymbol
+r = ?? 5 {
+    acc° => "hot"
+    _ => "otro"
+}
+>> r ¶
+```
+
+| | |
+|---|---|
+| `zytw`, `zyvm`, `check` | `error: expected pattern, found 'acc°'` |
+| `zyjs` | `otro`, con el aviso `unused variable 'acc'` |
+
+Un patrón de identificador compara con lo que el nombre guarda; un nombre caliente se crea al usarlo, así que el
+patrón crearía aquello con lo que compara. zyjs lo leía como una expresión.
+
+### Qué cambió
+
+`parseMatchPatternPrimary` rechaza un `IDENT` caliente con las palabras de Rust.
+
+### Qué lo sujeta
+
+`refusal/hot-name-as-a-match-pattern`.
+
