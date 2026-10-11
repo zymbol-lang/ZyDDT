@@ -27,9 +27,9 @@
 | [`ZYJS-020`](#zyjs-020--el-lexer-acepta-siete-formas-que-los-dos-rust-rechazan) | **corregido 2026-09-15** | el lexer aceptaba 7 formas que los Rust rechazan, y otras 5 las rechazaba el parser con otro mensaje |
 | [`ZYJS-021`](#zyjs-021--los-errores-de-sintaxis-de-los-operadores--nombran-tokens-y-dos-dicen-object-object) | **corregido 2026-09-15** | los errores de sintaxis de `$` nombraban tokens internos, y dos decían `[object Object]` |
 | [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **corregido 2026-09-15** | un módulo importado con el bloque de exportación mal escrito se cargaba sin error |
-| [`ZYJS-060`](#zyjs-060---nombre-sobre-el-estado-de-un-módulo-dentro-de-una-de-sus-funciones-en-zyjs-el-módulo-lo-pierde) | **abierto** | `\ nombre` sobre el estado de un módulo: el módulo lo pierde, y sus funciones dejan de compartirlo |
+| ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
 
-**Uno abierto: `ZYJS-060`**, sujeto por `runtime-modules-scripts/destroying-module-state-inside-a-function`. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Ninguno abierto.** Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3355,120 +3355,11 @@ de que esto durara días, y meterlos es decisión del autor.
 
 ---
 
-## ZYJS-060 — `\ nombre` sobre el estado de un módulo, dentro de una de sus funciones: en `zyjs` el módulo lo pierde
+## ZYJS-060 — **Reencaminado.** No era sólo de `zyjs`
 
-**Estado:** abierto — hace falta una decisión: qué destruye `\` cuando el nombre es del módulo
-**Encontrado por:** la sonda que comparó el TW antes y después de [`ZYTW-010`](zytw.md), 2026-10-10
-**Familia:** MEM-8 (la destrucción explícita), [`GLB-119`](GLOBAL.md)
+**Estado:** **reencaminado 2026-10-11** → [`GLB-120`](GLOBAL.md)
 
-```zymbol
-# fin {
-    #> { anida, destruye }
-    nota = "inicio"
-
-    _escribe() { nota = "interno" }
-    anida() {
-        nota = "externo"
-        _escribe()
-        <~ nota
-    }
-    destruye() {
-        \ nota
-        <~ 1
-    }
-}
-```
-
-```zymbol
-<# ./mod/fin => F
->> F::anida() ¶
->> F::destruye() ¶
->> F::anida() ¶
-```
-
-| | salida |
-|---|---|
-| `zytw`, `zyvm` | `interno`, `1`, `interno` |
-| `zyjs` | `interno`, `1`, **`externo`** |
-
-### Qué pasa
-
-En los dos Rust el módulo conserva su variable: la siguiente llamada la encuentra (lo que cada uno hace dentro
-de la función que ejecuta el `\` no es lo mismo — ver la tabla de abajo). En `zyjs`, después de
-`destruye()`, `anida` devuelve lo que ella misma escribió y no lo que escribió `_escribe`: las funciones del
-módulo han dejado de compartir `nota`, sin que nada lo diga. Lo que se observa es compatible con que la variable
-salga de la tabla del módulo y cada asignación posterior cree un local; el código de `zymbol.js` no se ha leído.
-
-### Medido después, el mismo día: son tres respuestas, no dos
-
-Cinco programas sobre el mismo módulo, que además de lo de arriba tiene `lee() { <~ nota }`,
-`escribe(v) { nota = v  <~ nota }`, `destruye_y_lee() { \ nota  <~ nota }` y
-`destruye_y_escribe() { \ nota  nota = "renacida"  <~ nota }`:
-
-| después de… | se pide | `zytw` | `zyvm` | `zyjs` |
-|---|---|---|---|---|
-| `destruye()` | `lee()` | `inicio` | `inicio` | error: `use after destruction` |
-| `destruye()` | `escribe("nueva")`, `lee()` | `nueva`, `nueva` | `nueva`, `nueva` | `nueva`, error: `'nota' is undefined` |
-| `destruye()` | `comparten()` | `de la hermana` | `de la hermana` | `propia` |
-| — | `destruye_y_lee()`, `lee()` | error, `inicio` | **`inicio`**, `inicio` | error, error |
-| — | `destruye_y_escribe()`, `lee()` | `renacida`, `renacida` | `renacida`, `renacida` | `renacida`, error: `'nota' is undefined` |
-
-- **`zytw`**: el nombre termina para la función que ejecuta el `\`; el módulo conserva la variable.
-- **`zyvm`**: el `\` sobre el estado de un módulo **no hace nada**. Leer el nombre en la línea siguiente da el
-  valor. Eso contradice a MEM-8 en cualquiera de las lecturas de abajo —*«using the name afterwards is an
-  error»*— y es la forma que `GLB-008` ya encontró una vez para las variables del fichero.
-- **`zyjs`**: la variable muere para el módulo entero, y una asignación posterior no la devuelve al módulo: crea
-  un local en la función que asigna. El módulo ha perdido la variable para siempre.
-
-Con una variable del fichero (`x = …  \ x  >> x`) los tres dan el mismo error. Ninguna de las nueve aplicaciones
-escribe `\ nombre` en ninguna parte.
-
-Esta ficha nació como de `zyjs` y es de los tres: al decidirse, la corrección toca al menos dos motores.
-
-### Qué hay que decidir
-
-- **termina para el marco**, lo que hace el TW. El estado de un módulo no lo puede acortar una de sus
-  funciones; `\` sobre él es, entonces, casi una orden vacía, y quizá debería avisarse.
-- **termina para el módulo**, lo que hace `zyjs` a medias: la variable muere de verdad, y una lectura posterior
-  desde cualquier función es `use after destruction` hasta que alguien la asigne — y esa asignación la devuelve
-  al módulo, no crea un local. Hoy ningún motor hace esto entero.
-- **no se puede**: `\\` sobre un nombre que es estado del módulo, dentro de una función, se rechaza al
-  analizar. El estado de un módulo no es de ninguna de sus funciones, y la orden deja de tener dos lecturas.
-
-### La lectura del autor, y lo que costaría (medido el 2026-10-11, sin implementar)
-
-El autor, el 2026-10-11: una variable destruida se puede volver a construir con ese nombre —no es muy distinto de
-asignarle `##_`—, y quien lee algo que una función puede destruir está obligado a manejar el error:
-`mostrar() { !? { <~ c } :! { <~ "no hay c" } }`. Es la segunda opción de arriba, entera: **termina para el
-módulo, y una asignación la devuelve al módulo.**
-
-**No cambia la premisa.** MEM-8 dice *«`\ x` ends a name's life where it is written, and using the name
-afterwards is an error»*, y `lifetime/destroy-then-reassign` ya sujeta que el nombre vuelve al asignarlo
-(`GUIDE.md`: *«reassignment resurrects the name»*). Con una variable del fichero los tres motores ya hacen
-exactamente eso. Lo que falta es que valga también cuando el nombre es estado de un módulo.
-
-Un programa de 15 líneas contra esa lectura (destruir, leer con y sin `!?`, asignar, leer, que una hermana
-escriba, destruir y leer en la misma función, destruir y asignar, destruir dos veces):
-
-| | líneas que hoy contestan otra cosa | qué le falta |
-|---|---:|---|
-| `zytw` | 4 de 15 | el `\` sólo vale para el marco: otra función lee el valor viejo, y un segundo `\` no falla |
-| `zyvm` | 5 de 15 | el `\` no hace nada: ni la propia función falla al leer |
-| `zyjs` | se detiene en la 6.ª | destruye y falla al leer, pero la asignación siguiente crea un local y el módulo no recupera la variable |
-
-Lo que **no** se rompe: de los 679 ficheros del corpus, 3 usan `\` y ninguno sobre el estado de un módulo; de
-las celdas de ZyDDT, 7 lo usan y ninguna sobre el estado de un módulo salvo la de esta ficha; las nueve
-aplicaciones y los ejemplos del playground no lo escriben; el curso lo usa una vez, sobre locales. Ningún golden
-cambia.
-
-Lo que cuesta al ejecutar: nada para un programa que no escribe `\`. La VM ya sólo comprueba al leer los nombres
-que algún `\` del cuerpo nombra (`destroyable`, ZYVM-005), y el TW ya salta la comprobación cuando no hay nada
-destruido.
-
-Lo que cambia para quien programa: una función de un módulo puede dejar a sus hermanas sin una variable, y eso
-se ve como un error de ejecución en la hermana que la lea — capturable con `!?`, de clase `##_`.
-
-### Qué lo sujeta
-
-`runtime-modules-scripts/destroying-module-state-inside-a-function`, con `open_finding = "ZYJS-060"` y **sin**
-`expect`.
+`\ nombre` sobre el estado de un módulo, dentro de una de sus funciones. Se archivó aquí el 2026-10-10 porque
+`zyjs` era el motor que se apartaba de los otros dos en el programa que lo destapó; medido con más programas,
+los tres contestaban distinto y ninguno hacía lo que MEM-8 pide. La ficha, la decisión y la corrección están en
+[`GLB-120`](GLOBAL.md).
