@@ -1559,3 +1559,78 @@ asignación antes de la lectura.
 ### Qué lo sujeta
 
 `runtime-modules-scripts/lambda-in-a-module-function-captures-module-state`, con oráculo.
+
+## ZYVM-022 — Lo que devuelve una llamada y se usa una vez sobrevive en su registro temporal: la VM tiene dos arrays donde el tree-walker tiene uno
+
+**Estado:** **abierto** — deuda conocida desde la v0.0.8 («VM expression temporaries», `IMPL_V008.md` § B.1), pasada
+al ROADMAP el 2026-08-31 y nunca archivada: ni ficha ni celda, y con la fecha límite que se puso a sí misma pasada
+tres veces. Medida de nuevo el 2026-10-11, tras ZYVM-010, y sigue en pie. Sujeta por el caso
+`autofree/call-result` de `zyquality/cost` (`open_finding`). **Sin decidir**: es del autor si se corrige
+**Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 3.2: el ROADMAP pedía re-medir la deuda de auto-free
+antes de reescribirla y esa medición no tenía dónde vivir
+**Familia:** [`ZYVM-010`](zyvm.md) (el marco de llamada: reutiliza los temporales por sentencia, y esa reutilización es
+justo lo que deja el valor vivo); la deuda hermana, «regiones planas» (`last_use.rs`), no es un hallazgo
+
+```zymbol
+big() {
+    a = []
+    @ i:1..2000000 { a$+ i }
+    <~ a
+}
+x = big()$#
+y = big()$#
+>> x + y ¶
+```
+
+Dos llamadas seguidas; el array de la primera está muerto en cuanto acaba su sentencia, y la segunda podría
+construir el suyo en el mismo sitio. Pico de memoria, mediana de tres, descontados los 8,5 MiB de un proceso vacío:
+
+| forma | `zytw` seq/uno | `zyvm` seq/uno |
+|---|---:|---:|
+| variables con nombre (`autofree/scale`) | 1,00 | 1,00 |
+| los dos vivos a propósito (el control) | 2,01 | 2,05 |
+| **el resultado de una llamada, usado una vez** | 1,00 | **2,05** |
+| una expresión `(a$+ 0)$#` | 1,00 | 0,98 |
+
+En bruto, como lo imprime el arnés: 1,00 y 1,79. En absoluto, el pico de un proceso con un array de 2 000 000 de
+enteros es 37,7 MiB en la VM y 235,9 MiB en el tree-walker: **la VM sigue usando unas seis veces menos**, y con la
+deuda (68 MiB) todavía gana por 3,4 a 1. Lo que se pierde es la ventaja *relativa* de liberar a tiempo, no la
+absoluta.
+
+### Por qué
+
+`emit_auto_free` limpia el registro de una **variable con nombre**. El resultado de `big()` no se liga a ningún
+nombre: cae en un registro temporal, y al acabar la sentencia `release_temps` lo devuelve al *pool* sin tocarlo —
+«holds whatever its last user left», dice `alloc_temp`. El valor sigue vivo hasta que otro temporal reutilice el
+registro, y para entonces la segunda llamada ya ha construido su array dentro de su marco.
+
+El tree-walker no tiene registros: el valor es un `Value` de Rust sin dueño al acabar la expresión, y se suelta
+ahí (1,00, medido).
+
+**La prueba de que es eso y no otra cosa** — `ZYMBOL_POISON_TEMPS=1` hace que `release_temps` escriba un entero en
+cada temporal al acabar su sentencia, y con él puesto el mismo programa da:
+
+| `zyvm` | `call_seq` | `call_one` | razón |
+|---|---:|---:|---:|
+| normal | 68,3 MiB | 37,5 MiB | 1,82 |
+| `ZYMBOL_POISON_TEMPS=1` | 37,7 MiB | 39,2 MiB | **0,96** |
+
+### Lo que costaría corregirlo, medido
+
+La corrección obvia es la del veneno, siempre: una instrucción por temporal liberado y por sentencia. Contado con
+`--count`, la VM ejecuta entre +7,7 % (`ctl_call`: 1 300 015 → 1 400 023 pasos) y +9,1 % (`ctl_arith`: 3 300 015 →
+3 600 023) más. Es el precio máximo y es uniforme, no el de un valor grande. Las salidas son tres, y ninguna se ha
+tomado:
+
+- **Dejarla**, escribiendo la razón en `alloc_temp`. La VM gana igual en absoluto.
+- **Liberar sólo lo que puede ser un agregado**: el compilador lleva un tipo estático por registro (`reg_types`,
+  de mejor esfuerzo), y un temporal que es `Int`/`Float`/`Bool` no pesa. Reduce el coste a las llamadas y a las
+  expresiones de tipo desconocido; cuánto, no se ha medido.
+- **Liberar en la última lectura** (la receta de `IMPL_V008.md` § B.1): la instrucción que consume el temporal por
+  última vez lo toma en vez de copiarlo. Es el cambio de asignador de registros que la v0.0.8 describía.
+
+### Qué lo sujeta
+
+`autofree/call-result` en `zyquality/cost/cost.toml`, con `open_finding = { zyvm = "ZYVM-022" }`: el día que la VM
+pase, el caso se pone en rojo hasta que esta ficha se cierre y la marca se quite. Los dos programas son
+`casos/autofree_resultado_uno.zy` y `casos/autofree_resultado_secuencial.zy`.
