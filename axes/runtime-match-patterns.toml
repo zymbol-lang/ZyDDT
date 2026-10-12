@@ -1,0 +1,414 @@
+# The runtime-match-patterns axis — Phase C, family C8 of the diagnostics plan.
+#
+# `??` and the destructuring patterns: the runtime diagnostics no program
+# provoked on 2026-09-14. `<id>` raises it, `<id>-met` catches it and prints the
+# family.
+#
+# One of them is not an error: the tree-walker warns AT RUN TIME when a `??`
+# whose arms produce values is used as a statement. It gets one cell, expecting
+# `warn`, and no `-met` — there is nothing to catch. Its second line
+# (`--> consider assigning to a variable`) is provoked by the same cell.
+#
+# Two of this family have no cell because nothing reaches them; the reasons
+# are in the queue.
+
+id      = "runtime-match-patterns"
+what    = "the runtime diagnostics of `??` and destructuring patterns: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "match-with-values-used-as-a-statement"
+expect = "warn"
+what   = "a `??` whose arms give values, used as a statement, is worth a warning"
+src    = """
+t(v) {
+    ?? v { 1 => "uno" _ => "otro" }
+    <~ 1
+}
+>> t(2) ¶
+"""
+
+[[cell]]
+id     = "array-pattern-requires-an-array"
+expect = "error"
+what   = "array pattern '[ … ]' requires an array, got {}"
+src    = """
+t(v) {
+    [a, b] = v
+    <~ a + b
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "array-pattern-requires-an-array-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    [a, b] = v
+    <~ a + b
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "no-pattern-matched-in-match-expression"
+expect = "error"
+what   = "no pattern matched in match expression"
+src    = """
+t(v) {
+    <~ ?? v { 1 => "uno" }
+}
+>> t(2) ¶
+"""
+
+[[cell]]
+id     = "no-pattern-matched-in-match-expression-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ?? v { 1 => "uno" }
+}
+!? {
+    >> t(2) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tuple-pattern-requires-a-tuple"
+expect = "error"
+what   = "tuple pattern '( … )' requires a tuple, got {}"
+src    = """
+t(v) {
+    (a, b) = v
+    <~ a + b
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "tuple-pattern-requires-a-tuple-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    (a, b) = v
+    <~ a + b
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "match-arm-with-a-negative-literal"
+expect = "ok"
+what   = "`-1 => …` is a pattern: a negative number is a literal (GLB-062, decided 2026-09-26)"
+src    = """
+x = -1
+r = ?? x { -1 => "menos uno"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-value-and-a-block"
+expect = "ok"
+what   = "`pattern => value { block }`: an arm with a value and a side-effect block"
+# ZYJS-038, kept by the author on 2026-09-26: the value first, then the block,
+# and the arm gives the value. zyjs did not parse it, and the VM compiled the
+# value and dropped the block (ZYVM-009); both fixed.
+src    = """
+g = ?? 92 {
+    90..100 => 'A' { >> "bien" ¶ }
+    _       => '?' { >> "otro" ¶ }
+}
+>> g ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-negative-decimal"
+expect = "ok"
+what   = "`-1.5 => …` — and a decimal pattern at all, which the VM never matched (ZYVM-007)"
+src    = """
+x = -1.5
+r = ?? x { -1.5 => "menos uno y medio"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-negative-range"
+expect = "ok"
+what   = "`-5..-1 => …`, both ends negative"
+src    = """
+x = -3
+r = ?? x { -5..-1 => "entre"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-in-parentheses-is-not-a-pattern"
+expect = "error"
+what   = "`(3) => …` is refused in all three: a pattern is not an expression (GLB-062)"
+src    = """
+x = 3
+r = ?? x { (3) => "tres"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-a-sign-before-a-name-is-not-a-pattern"
+expect = "error"
+what   = "`-y => …`: only a sign in front of a number makes a pattern"
+src    = """
+y = 1
+x = -1
+r = ?? x { -y => "menos y"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-with-an-integer-beyond-32-bits"
+expect = "ok"
+what   = "`3000000000 => …` matches only itself — the VM truncated it to 32 bits (ZYVM-007)"
+src    = """
+x = -1294967296
+r = ?? x { 3000000000 => "falso"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-list-with-a-decimal-element"
+expect = "ok"
+what   = "a decimal element of a list pattern is compared — the VM let it match anything (ZYVM-007)"
+src    = """
+x = [9.9, 2]
+r = ?? x { [1.5, 2] => "no debe"  _ => "otro" }
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-arm-value-comes-before-its-block"
+expect = "ok"
+what   = "`x + 1 { … x = 5 }`: the value is computed first, the block then runs, and the arm gives the value"
+src    = """
+x = 0
+g = ?? 92 {
+    90..100 => x + 1 { >> "bloque, x=" x ¶
+    x = 5 }
+    _ => 0 { >> "otro" ¶ }
+}
+>> g " " x ¶
+"""
+
+[[cell]]
+id     = "match-block-arm-is-analysed-even-when-it-does-not-run"
+expect = "error"
+what   = "an undefined name inside a block arm that never runs is refused before running"
+# zyjs never analysed a block arm: `>> nada` there failed only at run time, or
+# not at all when the arm did not run (step P4.8).
+src    = """
+x = 2
+?? x {
+    1 => { >> nada ¶ }
+    _ => { >> "otro" ¶ }
+}
+"""
+
+# ── A `??` statement no arm matches (added 2026-10-06) ──────────────────────
+#
+# Measured beside GLB-101: as a value (`r = ?? 2 { 1 => "uno" }`) all three
+# engines fail with `no pattern matched in match expression`; written as a
+# statement, zyjs went on to the next line, and only the Rust engines failed.
+# ZYJS-051, corrected 2026-10-07: zyjs fails there too. A block arm, so nothing
+# warns about a discarded value; `-met` holds the family the catch receives.
+# The VM gave the line of the last statement in an arm, the other two the line
+# of the `??` — the line of the statement, the rule of every runtime error
+# (ZYVM-011, corrected 2026-10-07). The cells after `-met` are the forms the VM
+# also placed wrong: a value with a block arm, a `?` inside an arm, a loop.
+
+[[cell]]
+id     = "match-statement-no-arm-matches"
+expect = "error"
+what   = "a `??` statement whose value no arm matches fails, as the same `??` does as a value — zyjs went on (ZYJS-051)"
+src    = """
+f(v) {
+    ?? v {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+    <~ 99
+}
+>> f(1) ¶
+>> f(2) ¶
+"""
+
+[[cell]]
+id     = "match-statement-no-arm-matches-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received: `##_`, in the three engines"
+src    = """
+v = 2
+!? {
+    ?? v {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+} :! {
+    >> (_err#?)[1] ¶
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "match-value-no-arm-matches-after-a-block-arm"
+expect = "error"
+what   = "`r = ?? v { 1 => \"x\" { … } }` with no arm for 2: the error is at the line of the statement, not of the arm's `>>` (ZYVM-011)"
+src    = """
+v = 2
+r = ?? v {
+    1 => "x" {
+        >> "a" ¶
+    }
+}
+>> r ¶
+"""
+
+[[cell]]
+id     = "match-statement-no-arm-matches-past-a-nested-if"
+expect = "error"
+what   = "the last arm holds a `?`: the error is still at the line of the `??` (ZYVM-011)"
+src    = """
+v = 2
+?? v {
+    1 => {
+        ? v > 0 {
+            >> "pos" ¶
+        }
+    }
+    3 => {
+        >> "tres" ¶
+    }
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "match-statement-no-arm-matches-in-a-loop"
+expect = "error"
+what   = "in the body of a `@`, the second turn fails at the line of the `??`, after the first printed `uno` (ZYVM-011)"
+src    = """
+@ i:1..3 {
+    ?? i {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+}
+>> "fin" ¶
+"""
+
+# ── A top-level `<~` inside a `??` that gives a value (added 2026-10-07) ────
+#
+# Measured beside ZYVM-011. A top-level `<~` ends the program and its value is
+# the exit status: alone, and inside a `??` statement, the three engines exit
+# with it. Inside a `??` whose value is used, the VM still does; the tree-walker
+# went on with the `??` worth Unit, and zyjs failed with `Runtime error: [object
+# Object]` (GLB-107, corrected 2026-10-07: the signal leaves the expression in
+# the tree-walker, and a statement takes a thrown one in zyjs). The same
+# unwinding serves a `<~` inside a function and an `@!` inside a loop — the
+# three cells after the first two.
+
+[[cell]]
+id     = "top-level-return-inside-a-match-value-exits"
+expect = "ok"
+what   = "`x = ?? v { 1 => { <~ 5 } }` at the top level ends the program with status 5 — zyjs fails with `[object Object]` (GLB-107)"
+src    = """
+v = 1
+x = ?? v {
+    1 => {
+        <~ 5
+    }
+}
+>> x ¶
+"""
+
+[[cell]]
+id     = "top-level-return-inside-a-match-operand-exits"
+expect = "ok"
+what   = "`x = 1 + (?? v { 1 => { <~ 7 } })` ends the program with status 7 in the VM; the TW goes on and fails at the `+` (GLB-107)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => {
+        <~ 7
+    }
+})
+>> x ¶
+"""
+
+[[cell]]
+id     = "return-inside-a-match-operand-returns-from-the-function"
+expect = "ok"
+what   = "in a function, `x = 1 + (?? v { 1 => { <~ 5 } … })` returns 5 — the tree-walker went on and failed at the `+` (GLB-107)"
+src    = """
+f(v) {
+    x = 1 + (?? v {
+        1 => {
+            <~ 5
+        }
+        _ => 0
+    })
+    >> x ¶
+    <~ 9
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id     = "break-inside-a-match-operand-leaves-the-loop"
+expect = "ok"
+what   = "an `@!` in the arm of a `??` operand leaves the loop: `1`, then `9` — the tree-walker failed at the `+`, zyjs with `[object Object]` (GLB-107)"
+src    = """
+f(v) {
+    @ i:1..3 {
+        x = 1 + (?? i {
+            2 => {
+                @!
+            }
+            _ => 0
+        })
+        >> x ¶
+    }
+    <~ 9
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id     = "return-inside-a-match-element-skips-the-output"
+expect = "ok"
+what   = "`>> [1, (?? v { 1 => { <~ 5 } … })] ¶` returns 5 and prints nothing — the tree-walker printed `[1, ()]` first (GLB-107)"
+src    = """
+f(v) {
+    >> [1, (?? v {
+        1 => {
+            <~ 5
+        }
+        _ => 0
+    })] ¶
+    <~ 9
+}
+>> f(1) ¶
+"""

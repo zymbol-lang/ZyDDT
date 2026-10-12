@@ -1,11 +1,11 @@
 # Cells where every engine does the same thing and says it differently.
-# Recorded by `zyddt axis --regen-baseline`, which is deliberate and
-# separate: this file may shrink on its own, and may never grow on its
-# own. A line appearing here that was not written on purpose is a new
-# one-sided message, which is the thing zyquality/messages/ counts
-# statically and this counts as it is actually emitted.
-refusal/arity-inside-a-collection-operand
-
+# Edited BY HAND, and only by hand (GLB-040, decided 2026-09-25): there is
+# no command that rewrites it. A split that is not listed is RED (`NEW
+# WORDING`), and so is an entry whose cell agrees now or no longer exists
+# (`STALE WORDING`) — remove it in the step that healed it. An entry is
+# added only with a comment saying who accepted the difference and why.
+# This is what zyquality/messages/ counts statically, as it is actually
+# emitted.
 # refusal/arity-inside-a-collection-operand — anotada el 2026-08-30.
 #
 # Los tres rechazan y dicen lo mismo; los dos motores Rust añaden además
@@ -20,3 +20,48 @@ refusal/arity-inside-a-collection-operand
 #
 # Lo que sí se arregló en el mismo commit: a zyjs le faltaba la LÍNEA en este
 # diagnóstico —los nodos `Call` y `CallExpr` no llevaban `line`— y ya la lleva.
+# isolation/output-parameter-unmarked-at-call — anotadas el 2026-09-12.
+# isolation/output-mark-without-an-output-parameter
+#
+# Las dos mitades de la marca `<~`. Los tres motores rechazan y dicen la MISMA
+# frase; el reparto es el de siempre: los dos motores Rust añaden la línea
+# `= help:` y zyjs no. Misma familia que la entrada de arriba y misma razón para
+# no cerrarla barata — salvo que aquí el `help` no exige inferencia, sólo texto,
+# así que es más barata de lo que parece y merece una decisión propia.
+#
+# `--regen-baseline` REESCRIBÍA este fichero entero sin conservar comentarios:
+# el bloque de arriba se perdió así el 2026-09-12 y se repuso a mano. La opción
+# se retiró el 2026-09-25 (GLB-040).
+# refusal/arity-inside-a-lambda-block — anotadas el 2026-09-12.
+# refusal/output-mark-missing-inside-a-lambda-block
+#
+# Las dos mitades del hueco que ZYTW-001 destapó: hasta ese día el analizador no
+# entraba en un `-> { … }`, así que una aridad mal y una marca `<~` ausente
+# escritas ahí dentro eran silencio. Los tres motores las rechazan ya; el reparto
+# es el de siempre — los dos de Rust añaden la línea `= help:` y zyjs no, misma
+# familia que `refusal/arity-inside-a-collection-operand`.
+
+# isolation/const-cannot-be-reassigned — anotadas el 2026-09-13.
+# isolation/underscore-is-invisible-outside  (quitada el 2026-09-25: GLB-039 la curó)
+# isolation/underscore-is-invisible-inside
+#
+# Las tres mitades que faltaban de MEM-1 y MEM-6. Los tres motores rechazan y
+# dicen la misma frase; el reparto es el de siempre — los dos de Rust añaden la
+# línea `= help:` y zyjs no. Misma familia que el resto de este fichero, y la
+# misma razón para no cerrarla barata: el `help` no es redacción, es una guía que
+# cada motor decide si sabe dar.
+
+# Quitadas a mano el 2026-09-25 (GLB-040, paso G5.3): `zyjs` da ya la misma
+# ayuda —y, en las de `_`, la misma nota— que los dos Rust.
+#   isolation/const-cannot-be-reassigned
+#   isolation/output-mark-without-an-output-parameter
+#   isolation/output-parameter-unmarked-at-call
+#   isolation/underscore-is-invisible-inside
+#   refusal/output-mark-missing-inside-a-lambda-block
+
+# Quitadas a mano el 2026-09-25 (GLB-040, paso G5.4): la ayuda de la aridad
+# escribe ya la firma con los nombres de los parámetros, `expected signature:
+# g(a, b)`, en los dos motores —en vez de los tipos inferidos, que zyjs no podía
+# dar—. Con ellas, este fichero se queda sin entradas.
+#   refusal/arity-inside-a-collection-operand
+#   refusal/arity-inside-a-lambda-block

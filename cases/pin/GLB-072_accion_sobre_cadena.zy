@@ -1,4 +1,4 @@
-// PIN ZYQ-002 — an exception made to preserve a message became a hole in the rule.
+// PIN GLB-072 — an exception made to preserve a message became a hole in the rule.
 //
 // `arr[i][j]` was closed on 2026-09-06. The first cut let `$~` through, so that
 // `d["x"]["y"]$~ 9` would keep printing the wording already recorded for it
@@ -22,6 +22,10 @@
 //
 // The lesson is the one worth pinning: an exception carved out to protect a
 // MESSAGE is an exception in the RULE.
+//
+// Filed as GLB-072 on 2026-10-02, in HALLAZGOS/GLOBAL.md. Until then this pin
+// was called ZYQ-002 — an id of a series nobody declared, naming a finding
+// nobody had filed. `zyddt pins` refuses that now.
 arr = [[1,2,3],[4,5,6],[7,8,9]]
 arr[1][1] $~ 0
 >> arr ¶

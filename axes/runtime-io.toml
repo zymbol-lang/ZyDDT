@@ -1,0 +1,235 @@
+# The runtime-io axis — Phase C, family C12 of the diagnostics plan.
+#
+# Input, the positioned output `>>~` and the alternate screen `>>|`: the
+# runtime diagnostics no program provoked on 2026-09-14. `<id>` raises it,
+# `<id>-met` catches it and prints the family.
+#
+# A cell runs with an EMPTY stdin that is not a terminal, and that decides what
+# can be asked here:
+#
+#   · end of input — yes: the empty stdin is exactly that. Its catch is already
+#     held by error-flow/input-eof-is-catchable, so it has no `-met` here.
+#   · `>>|` without a terminal — yes: raw mode cannot be enabled on a pipe.
+#   · a stdin that is not UTF-8, and a stdout closed under the program — no: a
+#     cell cannot give stdin or close stdout. Both were reproduced by hand; the
+#     commands are in zyquality/messages/queue/runtime.tsv.
+#   · raw mode or the alternate screen failing half way — no: that needs a
+#     terminal that breaks while in use.
+
+id      = "runtime-io"
+what    = "the runtime diagnostics of input, positioned output and the alternate screen: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "positioned-output-slot-must-be-int"
+expect = "error"
+what   = ">>~ slot expects Int, got {}"
+src    = """
+t(v) {
+    >>~ (v, 1) > "x"
+    <~ 1
+}
+>> t("a") ¶
+"""
+
+[[cell]]
+id     = "positioned-output-slot-must-be-int-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    >>~ (v, 1) > "x"
+    <~ 1
+}
+!? {
+    >> t("a") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+# GLB-042 (corrected 2026-10-05): a slot that is not an Int is a wrong TYPE, so
+# by D1 it is a `##Type`, and the message names the type (GLB-033). The three
+# engines raised `##_` and printed the value. The cell above prints the kind and
+# only asks that the engines agree; this one asserts it. The text is held by the
+# golden of zyquality/corpus/errors/runtime/output_slot_type.
+
+[[cell]]
+id     = "positioned-output-slot-is-a-type-error"
+expect = "ok"
+what   = "a `>>~` slot that is a String is caught by `:! ##Type`, as D1 says a wrong type is (GLB-042)"
+src    = """
+!? {
+    >>~ ("fila", 1) > "A"
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+[[cell]]
+id     = "end-of-input"
+expect = "error"
+what   = "end of input while waiting for {}"
+src    = """
+<< n
+>> n ¶
+"""
+
+[[cell]]
+id     = "alternate-screen-without-a-terminal"
+expect = "error"
+what   = "failed to enable raw mode: {}"
+src    = """
+>>| {
+    >> "dentro" ¶
+}
+>> "fuera" ¶
+"""
+
+[[cell]]
+id     = "alternate-screen-without-a-terminal-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    >>| {
+        >> "dentro" ¶
+    }
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "undefined-variable-in-input-prompt"
+expect = "error"
+what   = "undefined variable in input prompt: '{}'"
+src    = """
+<< "Nombre {nadie}: " n
+>> n ¶
+"""
+
+[[cell]]
+id     = "undefined-variable-in-input-prompt-met"
+expect = "error"
+what   = "and inside `!?` it is still refused: since 2026-09-15 (GLB-018 A) an undefined `{name}` is a static error, which no catch can meet — this cell asked for the family the catch received, and that question stopped having an answer"
+src    = """
+!? {
+    << "Nombre {nadie}: " n
+    >> n ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "input-prompt-interpolation-is-a-use"
+expect = "ok"
+what   = "a variable read only inside a `<<` prompt is used: no `unused variable` warning (found in step 1.6, 2026-09-15)"
+src    = """
+x = "Ana"
+!? {
+    << "Hola {x}: " n
+    >> n ¶
+} :! {
+    >> "fin" ¶
+}
+"""
+
+[[cell]]
+id     = "named-function-in-interpolation"
+expect = "ok"
+what   = "a named function inside `{…}` becomes the same text in every engine — the Rust engines printed `{f}` as written, zyjs `<funct/1>`, while a lambda and juxtaposition give `<…/1>` in all three (found in step 1.6, 2026-09-15)"
+src    = """
+f(p) { <~ p }
+>> "f={f}" ¶
+"""
+
+[[cell]]
+id     = "destroyed-name-in-interpolation"
+expect = "error"
+what   = "a name read in `{…}` after `\\ name` is a use after destruction, as `>> name` is — all three printed `{x}` silently (found in step 1.11, 2026-09-15; GLB-025)"
+src    = """
+x = "dato"
+>> x ¶
+\\ x
+>> "leo {x}" ¶
+"""
+
+# ── The type of a name read by `<<` (added 2026-10-06) ──────────────────────
+#
+# Measured beside GLB-096. `<< n` reads text, a String; `<< ### n` an Int and
+# `<< ##. n` a Float (the table of GUIDE § Input `<<`); `<< #|n|` a number when
+# the line is one and text when it is not, so what that name holds is decided
+# by the input. The Rust analyser typed every one of them as String — "Input
+# always produces a string" — and warned on arithmetic that runs. GLB-098,
+# corrected 2026-10-06: the name holds what the marker reads, and `#|…|` is
+# "cannot tell". zyjs typed none and was silent on all; ZYJS-049, corrected the
+# same day, gives it the same types. Without a line
+# to read, the `<<` fails at its end of input, which the `!?` meets: the warning
+# is what each cell asserts.
+
+[[cell]]
+id     = "numeric-input-in-arithmetic"
+expect = "ok"
+what   = "`<< #|f|` then `f * 2` is the program `#|…|` exists for: no `non-numeric type: String` — the Rust analyser types every input as a String (GLB-098)"
+src    = """
+!? {
+    << #|f|
+    >> (f * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+
+[[cell]]
+id     = "typed-integer-input-in-arithmetic"
+expect = "ok"
+what   = "`<< ### n` reads an Int — the marker validates it — so `n * 2` warns nothing; Rust says `non-numeric type: String` (GLB-098)"
+src    = """
+!? {
+    << ### n
+    >> (n * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+
+[[cell]]
+id     = "typed-float-input-in-arithmetic"
+expect = "ok"
+what   = "`<< ##. g` reads a Float, so `g * 2` warns nothing; Rust says `non-numeric type: String` (GLB-098)"
+src    = """
+!? {
+    << ##. g
+    >> (g * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+
+[[cell]]
+id     = "typed-char-input-in-arithmetic"
+expect = "warn"
+what   = "`<< ##' c` reads a Char, and `c - 1` warns `non-numeric type: Char` — Rust named it a String (GLB-098); zyjs was silent (ZYJS-049)"
+src    = """
+!? {
+    << ##' c
+    >> (c - 1) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""
+
+[[cell]]
+id     = "text-input-in-arithmetic"
+expect = "warn"
+what   = "`<< f` then `f * 2`: Rust warns `non-numeric type: String`, zyjs did not — a name read by `<<` had no type there (ZYJS-049)"
+src    = """
+!? {
+    << f
+    >> (f * 2) ¶
+} :! {
+    >> "sin entrada" ¶
+}
+"""

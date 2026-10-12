@@ -1,0 +1,195 @@
+# The condition axis — a `?` or `_?` condition is a Bool and nothing else.
+#
+# "There is no truthiness" was decided for the loop specifier in v0.0.9, for
+# `&&` / `||` / `!` (ZYVM-001, GLB-091), for the `$|` predicate (GLB-080) and
+# for the `$^` comparator (GLB-024). The condition of `?` was the surface that
+# was never closed, and it was the widest: on 2026-10-11 nine of thirteen types
+# took a different branch depending on the engine (GLB-121) —
+#
+#     the tree-walker   true for an Int that is not 0 and a String that is not
+#                       empty, false for everything else
+#     the VM            true for everything but 0 and Unit
+#     zyjs              its host's rules, with `[]` true
+#
+# — all three under one identical warning, and all three exiting 0.
+#
+# ── Why this is an axis and not thirteen cells ───────────────────────────────
+#
+# Because the finding hid behind a representative. `DM-05` covered *an Int as a
+# `?` condition* and was closed on 2026-09-04 with "the three warn": they did,
+# and with an Int they also agreed on the branch. Four of the first seven types
+# tried after that diverged. The type is the dimension, so it is crossed; and
+# the place the condition is written is crossed with it, because `_?` was a
+# second site in every engine and a lambda body a third.
+#
+# ── Why `expect = "error"` is legitimate here ───────────────────────────────
+#
+# Same argument as `chained-index.toml`: the assertion is about the CATEGORY of
+# the answer. Three engines that each read a non-Bool their own way would be
+# caught by a differential — but three that agreed on ONE truthiness table
+# would be a perfectly green row, and the decision is that there is no table.
+# Whether the refusal is static or at run time is not asserted here: where the
+# analyser knows the type it is refused before running, and through a
+# parameter it is a `##Type` when the value arrives. The cells at the end pin
+# that second half down.
+
+id      = "condition"
+what    = "a `?` / `_?` condition that is not a Bool is refused, whatever its type and wherever it is written (GLB-121)"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[dimension]]
+name = "value"
+# Every type a value can have except Bool, and for the types where a
+# truthiness table would draw a line — a number, a string, a collection — one
+# value on each side of it. `5` and `"a"` are the two the three engines agreed
+# on, which is how the divergence stayed hidden.
+values = [
+  { id = "int",          what = "an Int that is not 0",   lit = '5' },
+  { id = "zero",         what = "the Int 0",              lit = '0' },
+  { id = "float",        what = "a Float",                lit = '1.5' },
+  { id = "float-zero",   what = "the Float 0.0",          lit = '0.0' },
+  { id = "string",       what = "a String",               lit = '"a"' },
+  { id = "empty-string", what = "the empty String",       lit = '""' },
+  { id = "char",         what = "a Char",                 lit = "'c'" },
+  { id = "array",        what = "an Array",               lit = '[1, 2]' },
+  { id = "empty-array",  what = "the empty Array",        lit = '[]' },
+  { id = "tuple",        what = "a Tuple",                lit = '(1, 2)' },
+  { id = "dictionary",   what = "a Dictionary",           lit = '#(a: 1)' },
+  { id = "empty-dict",   what = "the empty Dictionary",   lit = '#()' },
+  { id = "unit",         what = "Unit",                   lit = '##_' },
+]
+
+[[dimension]]
+name = "site"
+# Where the condition is written, and how its value gets there. A name bound at
+# file level is a type the analyser knows; a parameter is one it does not.
+values = [
+  { id = "if",            what = "the condition of `?`",                       stmt = "? x { >> \"si\" ¶ } _ { >> \"no\" ¶ }" },
+  { id = "else-if",       what = "the condition of `_?`",                      stmt = "? n > 2 { >> \"nunca\" ¶ } _? x { >> \"si\" ¶ } _ { >> \"no\" ¶ }" },
+  { id = "if-param",      what = "the condition of `?`, through a parameter",  stmt = "t(v) {\n    ? v { <~ \"si\" }\n    <~ \"no\"\n}\n>> t(x) ¶" },
+  { id = "else-if-param", what = "the condition of `_?`, through a parameter", stmt = "t(v, k) {\n    ? k > 2 { <~ \"nunca\" }\n    _? v { <~ \"si\" }\n    <~ \"no\"\n}\n>> t(x, n) ¶" },
+  { id = "lambda",        what = "the condition of `?` in a lambda's block",   stmt = "g = v -> {\n    ? v { <~ \"si\" }\n    <~ \"no\"\n}\n>> g(x) ¶" },
+]
+
+[matrix]
+id   = "«value.id»-«site.id»"
+what = "«value.what» as «site.what»"
+src  = """
+n = 1
+x = «value.lit»
+«site.stmt»
+>> n ¶
+"""
+
+# ── Points the template cannot reach ────────────────────────────────────────
+#
+# The matrix asserts that a non-Bool is refused. These assert the other three
+# things the decision says: that a Bool still works, that the run-time refusal
+# is a `##Type` a `!?` can meet, and that it happens at the condition and not
+# after the branch was already taken.
+
+[[cell]]
+id     = "bool-true"
+expect = "ok"
+what   = "`#1` as a condition runs the block"
+src    = """
+x = #1
+? x { >> "si" ¶ } _ { >> "no" ¶ }
+"""
+
+[[cell]]
+id     = "bool-false-then-else-if"
+expect = "ok"
+what   = "`#0` skips to a `_?` whose Bool decides"
+src    = """
+x = #0
+y = #1
+? x { >> "uno" ¶ } _? y { >> "dos" ¶ } _ { >> "tres" ¶ }
+"""
+
+[[cell]]
+id     = "comparison"
+expect = "ok"
+what   = "the way to ask a collection: `? xs$# > 0` is a Bool"
+src    = """
+xs = [1, 2]
+? xs$# > 0 { >> "si" ¶ } _ { >> "no" ¶ }
+"""
+
+[[cell]]
+id     = "bool-through-a-parameter"
+expect = "ok"
+what   = "a Bool that arrives through a parameter is a condition like any other"
+src    = """
+t(v) {
+    ? v { <~ "si" }
+    <~ "no"
+}
+>> t(#1) ¶
+>> t(#0) ¶
+"""
+
+[[cell]]
+id     = "met-as-type"
+expect = "ok"
+what   = "through a parameter the refusal is a `##Type` at run time, and a `!?` meets it"
+src    = """
+t(v) {
+    ? v { <~ "si" }
+    <~ "no"
+}
+!? {
+    >> t([1, 2]) ¶
+} :! ##Type {
+    >> "Type" ¶
+} :! {
+    >> "otra familia" ¶
+}
+"""
+
+[[cell]]
+id     = "met-in-else-if"
+expect = "ok"
+what   = "the same in a `_?`: the first condition was a Bool and false, the second is refused"
+src    = """
+t(v, k) {
+    ? k > 2 { <~ "nunca" }
+    _? v { <~ "si" }
+    <~ "no"
+}
+!? {
+    >> t(1.5, 1) ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+[[cell]]
+id     = "no-branch-ran"
+expect = "ok"
+what   = "neither block runs before the refusal — the engines used to pick one each"
+src    = """
+t(v) {
+    ? v { >> "bloque" ¶ } _ { >> "otro" ¶ }
+    <~ 0
+}
+!? {
+    t("")
+} :! ##Type {
+    >> "ninguno" ¶
+}
+"""
+
+[[cell]]
+id     = "else-if-not-reached"
+expect = "ok"
+what   = "a `_?` that is not reached is not asked: its non-Bool never arrives"
+src    = """
+t(v, k) {
+    ? k > 0 { <~ "primero" }
+    _? v { <~ "si" }
+    <~ "no"
+}
+>> t([1], 1) ¶
+"""

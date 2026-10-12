@@ -1,0 +1,50 @@
+# The syntax-literals axis — Phase B, family B5 of the diagnostics plan.
+#
+# An array, a tuple or a dictionary literal left open or written wrong: the
+# parser diagnostics no program provoked on 2026-09-14. Every cell expects
+# `error` and also provokes the `help:` line of its diagnostic.
+
+id      = "syntax-literals"
+what    = "the parser diagnostics of collection literals: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "array-literal-left-open"
+what = "expected ']' to close array literal — with its help"
+src  = """
+a = [1, 2
+>> a ¶
+"""
+
+[[cell]]
+id   = "dictionary-key-is-not-a-name"
+what = "expected a key in the dictionary"
+src  = """
+d = #(1: 2)
+>> d ¶
+"""
+
+[[cell]]
+id   = "dictionary-key-without-colon"
+what = "expected ':' after the key"
+src  = """
+d = #(a 2)
+>> d ¶
+"""
+
+[[cell]]
+id   = "dictionary-left-open"
+what = "expected ')' to close the dictionary — with its help"
+src  = """
+d = #(a: 2
+>> d ¶
+"""
+
+[[cell]]
+id   = "tuple-left-open"
+what = "expected ')' to close tuple — with its help"
+src  = """
+t = (1, 2
+>> t ¶
+"""

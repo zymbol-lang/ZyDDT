@@ -1,0 +1,209 @@
+# The syntax-modules axis — Phase B, family B13 of the diagnostics plan.
+#
+# A module file written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Each cell imports one broken module, written beside it with
+# `[cell.files]`, and expects `error`. reach.py also checks the module file on
+# its own, which is where its diagnostic appears as a line of its own; when it
+# is imported, the engines report it inside `failed to parse module`.
+#
+# Every module is named like its file, so the only thing wrong with it is the
+# thing the cell asks about (E001 would otherwise join in).
+#
+# Three lines have no cell (reasons in the queue): the checks that a module
+# starts with `#`, an export block with `#>` and an import with `<#`, whose
+# callers have already dispatched on exactly that token.
+
+id      = "syntax-modules"
+what    = "the parser diagnostics of module files: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "const-not-literal"
+what = "E013: constant initializer in module must be a literal — with its help"
+src  = """
+<# ./m/const_not_literal => md
+>> "x" ¶
+"""
+[cell.files]
+"m/const_not_literal.zy" = """
+# const_not_literal {
+    #> { C }
+    C := 1 + 2
+}
+"""
+
+[[cell]]
+id   = "variable-not-literal"
+what = "E013: variable initializer in module must be a literal — with its help"
+src  = """
+<# ./m/variable_not_literal => md
+>> "x" ¶
+"""
+[cell.files]
+"m/variable_not_literal.zy" = """
+# variable_not_literal {
+    #> { f }
+    x = 1 + 2
+    f() {
+        <~ x
+    }
+}
+"""
+
+[[cell]]
+id   = "two-export-blocks"
+what = "duplicate export block in module — with its help"
+src  = """
+<# ./m/two_export_blocks => md
+>> "x" ¶
+"""
+[cell.files]
+"m/two_export_blocks.zy" = """
+# two_export_blocks {
+    #> { f }
+    #> { f }
+    f() {
+        <~ 1
+    }
+}
+"""
+
+[[cell]]
+id   = "import-without-arrow"
+what = "expected '=>' for module alias"
+src  = """
+<# ./m/import_without_arrow => md
+>> "x" ¶
+"""
+[cell.files]
+"m/import_without_arrow.zy" = """
+# import_without_arrow {
+    <# std/math mat
+    #> { f }
+    f() {
+        <~ 1
+    }
+}
+"""
+
+[[cell]]
+id   = "module-without-brace"
+what = "expected '{' after module name — with its help"
+src  = """
+<# ./m/module_without_brace => md
+>> "x" ¶
+"""
+[cell.files]
+"m/module_without_brace.zy" = """
+# module_without_brace [
+    #> { f }
+}
+"""
+
+[[cell]]
+id   = "export-block-left-open"
+what = "expected '}' to close export block"
+src  = """
+<# ./m/export_block_left_open => md
+>> "x" ¶
+"""
+[cell.files]
+"m/export_block_left_open.zy" = """
+# export_block_left_open {
+    #> { f,
+"""
+
+[[cell]]
+id   = "import-alias-not-a-name"
+what = "expected alias name after '=>'"
+src  = """
+<# ./m/import_alias_not_a_name => md
+>> "x" ¶
+"""
+[cell.files]
+"m/import_alias_not_a_name.zy" = """
+# import_alias_not_a_name {
+    <# std/math => 5
+    #> { f }
+    f() {
+        <~ 1
+    }
+}
+"""
+
+[[cell]]
+id   = "export-constant-without-name"
+what = "expected constant name after '.'"
+src  = """
+<# ./m/export_constant_without_name => md
+>> "x" ¶
+"""
+[cell.files]
+"m/export_constant_without_name.zy" = """
+# export_constant_without_name {
+    <# std/math => mat
+    #> { mat. }
+}
+"""
+
+[[cell]]
+id   = "export-item-not-a-name"
+what = "expected identifier in export item"
+src  = """
+<# ./m/export_item_not_a_name => md
+>> "x" ¶
+"""
+[cell.files]
+"m/export_item_not_a_name.zy" = """
+# export_item_not_a_name {
+    #> { 5 }
+}
+"""
+
+[[cell]]
+id   = "export-reexport-without-new-name"
+what = "expected new name after '=>'"
+src  = """
+<# ./m/export_reexport_without_new_name => md
+>> "x" ¶
+"""
+[cell.files]
+"m/export_reexport_without_new_name.zy" = """
+# export_reexport_without_new_name {
+    <# std/math => mat
+    #> { mat::sqrt => }
+}
+"""
+
+[[cell]]
+id   = "export-rename-without-public-name"
+what = "expected public name after '=>'"
+src  = """
+<# ./m/export_rename_without_public_name => md
+>> "x" ¶
+"""
+[cell.files]
+"m/export_rename_without_public_name.zy" = """
+# export_rename_without_public_name {
+    #> { f => }
+    f() {
+        <~ 1
+    }
+}
+"""
+
+[[cell]]
+id   = "export-legacy-rename-separator"
+what = "legacy export rename separator"
+src  = """
+<# ./m/export_legacy_rename_separator => md
+>> "x" ¶
+"""
+[cell.files]
+"m/export_legacy_rename_separator.zy" = """
+# export_legacy_rename_separator {
+    <# std/math => mat
+    #> { mat::sqrt : raiz }
+}
+"""

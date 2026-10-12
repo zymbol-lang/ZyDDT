@@ -71,6 +71,14 @@ drop_source_excerpt = true
 # probe — so only the line survives into the compared record.
 keep_location = "line"
 
+# A path inside the TEXT of a message, not on the `-->` line. Same reason as
+# `keep_location`, in a place that rule did not reach: `failed to parse module:
+# … in '/home/…/m/efecto.zy'` (Rust) against `… in 'generated/…/m/efecto.zy'`
+# (zyjs) is one engine printing an absolute path and another a relative one.
+# Three cells of `modularity` were red over it, which is to say they were
+# comparing where this repository happens to be installed.
+normalise_paths = true
+
 # The column is real information that two of three engines carry.  It is
 # recorded in every observation and excluded from the default cross-engine
 # comparison, because zyjs cannot produce one at all: comparing it would report

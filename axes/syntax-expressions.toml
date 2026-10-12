@@ -1,0 +1,440 @@
+# The syntax-expressions axis — Phase B, family B9 of the diagnostics plan.
+#
+# The parser's core: calls, the pipe, member access, blocks, statements that are
+# not statements. The diagnostics no program provoked on 2026-09-14. Every cell
+# expects `error` and provokes its `help:` line.
+#
+# Four cells write their broken form as the TARGET of a pipe (`x = 5 |> …`):
+# the pipe parses its callable without calls, through a postfix parser of its
+# own, and that parser has its own diagnostics. Inside `>>` a pipe needs
+# parentheses, so these are assignments.
+#
+# `unexpected end of file` has no cell: parse_statement is only called from two
+# loops that stop at the end of the file first.
+
+id      = "syntax-expressions"
+what    = "the parser diagnostics of calls, the pipe, member access, blocks and statements: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "hot-name-outside-an-assignment"
+what = "'°name' is only valid as an assignment target — with its help"
+src  = """
+°x
+"""
+
+[[cell]]
+id   = "module-call-without-parenthesis"
+what = "expected '(' for module function call"
+src  = """
+<# std/math => m
+>> m::sqrt 4 ¶
+"""
+
+[[cell]]
+id   = "call-on-a-group-left-open"
+what = "expected ')' after arguments"
+src  = """
+f(x) {
+    <~ x
+}
+>> (f)(1 ¶
+"""
+
+[[cell]]
+id   = "pipe-target-group-left-open"
+what = "expected ')' after expression — a pipe target"
+src  = """
+f(x) {
+    <~ x
+}
+x = 5 |> (f
+>> x ¶
+"""
+
+[[cell]]
+id   = "call-on-an-expression-left-open"
+what = "expected ')' after function arguments — with the expr(…) help"
+src  = """
+f(x) {
+    <~ 5
+}
+fs = [f]
+x = fs[1](1
+>> x ¶
+"""
+
+[[cell]]
+id   = "call-by-name-left-open"
+what = "expected ')' after function arguments — with the name(…) help"
+src  = """
+f(x) {
+    <~ x
+}
+>> f(1 ¶
+"""
+
+[[cell]]
+id   = "pipe-arguments-left-open"
+what = "expected ')' after pipe arguments — with its help"
+src  = """
+f(a, b) {
+    <~ a + b
+}
+x = 5 |> f(_, 1
+>> x ¶
+"""
+
+[[cell]]
+id   = "pipe-target-index-left-open"
+what = "expected ']' after index — a pipe target, with its help"
+src  = """
+fs = [1]
+x = 5 |> fs[1
+>> x ¶
+"""
+
+[[cell]]
+id   = "block-without-brace"
+what = "expected '{' to start block"
+src  = """
+@ 3 >> 1 ¶
+"""
+
+[[cell]]
+id   = "expression-missing-at-end-of-file"
+what = "expected expression, found end of file"
+src  = """
+x = """
+
+[[cell]]
+id   = "pipe-target-member-without-field"
+what = "expected field name after '.' — a pipe target, with its help"
+src  = """
+d = #(a: 1)
+x = 5 |> d.
+>> x ¶
+"""
+
+[[cell]]
+id   = "module-call-without-function-name"
+what = "expected function name after '::'"
+src  = """
+<# std/math => m
+>> m:: ¶
+"""
+
+[[cell]]
+id   = "edit-of-an-edit"
+what = "this edit has nothing to write into"
+src  = """
+x = [1]
+x$+ 1 $+ 2
+"""
+
+[[cell]]
+id   = "dictionary-literal-as-a-statement"
+what = "unexpected '#(' at statement level — with its help"
+src  = """
+#(a: 1)
+"""
+
+[[cell]]
+id   = "module-with-a-statement-after-its-block"
+what = "unexpected token after module block — with its help"
+src  = """
+<# ./m/extra => e
+>> e::f() ¶
+"""
+[cell.files]
+"m/extra.zy" = """
+# extra {
+    #> { f }
+    f() {
+        <~ 1
+    }
+}
+x = 1
+"""
+
+# ── A prefix `°` read inside an expression (decided 2026-09-25) ──────────────
+#
+# Allowed: it is the accumulator idiom — `filas = °filas$+ fila`, 30 uses in the
+# LDV applications. What GLB-035 refuses is the prefix as OUTPUT (`>> °acc ¶`)
+# and as a statement on its own; a read inside an expression stays. zyjs refused
+# it in the condition of `?` and `_?`, where it parsed without juxtaposition.
+
+[[cell]]
+id     = "prefix-hot-read-on-the-right-of-an-assignment"
+expect = "ok"
+what   = "`y = °x + 1` reads the anchored value"
+src    = """
+x = 1
+y = °x + 1
+>> y ¶
+"""
+
+[[cell]]
+id     = "prefix-hot-read-in-a-condition"
+expect = "ok"
+what   = "`? °x > 0 { … }` — zyjs said `expected '{' to start block`"
+src    = """
+x = 1
+? °x > 0 {
+    >> "si" ¶
+}
+"""
+
+[[cell]]
+id     = "prefix-hot-read-in-an-else-if"
+expect = "ok"
+what   = "the same read in the condition of `_?`"
+# 2026-09-27: `? #0` became `? x == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
+src    = """
+x = 1
+? x == 0 {
+    >> "no" ¶
+} _? °x > 0 {
+    >> "si" ¶
+}
+"""
+
+# ZYJS-035, decided 2026-09-26: an expression that opens with a name is one
+# statement, valid, and it warns `this statement does nothing` — the way a bare
+# `x` already did. zyjs refused `x > 1` at the `>` and ran `x + 1` as `x` and
+# then `+1`; both Rust engines accepted either in silence.
+
+[[cell]]
+id     = "bare-comparison-is-a-statement-that-does-nothing"
+expect = "warn"
+what   = "`x > 1` alone on a line runs, and warns that its value is discarded"
+src    = """
+x = 5
+x > 1
+>> x ¶
+"""
+
+[[cell]]
+id     = "bare-arithmetic-continues-across-a-line"
+expect = "warn"
+what   = "`x` and then `- 1` on the next line is one statement: no binary operator starts one"
+src    = """
+x = 5
+x
+- 1
+>> x ¶
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-sign"
+what = "`-x` starts no statement, like a literal does not"
+# After a block, not after `x = 5`: an assignment's value continues onto the
+# next line, so `x = 5` and then `-x` is `x = 5 - x`.
+src  = """
+x = 5
+? x > 1 { >> x ¶ }
+-x
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-brace"
+what = "a bare block `{ … }` starts no statement"
+src  = """
+{
+    >> "a" ¶
+}
+"""
+
+# ── A group or a bracket left after a complete expression (2026-10-02) ──────
+#
+# The forms two fossils of the ZyQuality corpus were written in (GLB-076).
+# Decided 2026-10-03: a `(` or `[` on the same line right after an operator that
+# takes no operand — `$#`, `$^+`, `$^-`, and `$++` with no item — is refused at
+# parse time in every context and every engine, with a help that says what the
+# program meant. Before, Rust ended the statement in an assignment and indexed
+# or called the result inside `>>`, and zyjs called or indexed it everywhere.
+# One cell per diagnostic, so `reach` sees each one provoked.
+
+[[cell]]
+id   = "stray-group-after-an-expression"
+what = "`[3, 1]$^+ (1)`: `$^+` takes no comparator, and the help names `$^` (GLB-076)"
+src  = """
+x = [3, 1]$^+ (1)
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-an-expression"
+what = "`s$++[1:\"x\"]`: `$++` with no item, then a bracket — not an insertion, and the help names `$+[i]` (GLB-076)"
+src  = """
+s = "abc"
+t = s$++[1:"x"]
+>> t ¶
+"""
+
+[[cell]]
+id   = "stray-group-inside-output"
+what = "the same `(` after `$^+` inside `>>`, where it used to be called at run time (GLB-076)"
+src  = """
+>> [3, 1]$^+ (1) ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-a-sort-ascending"
+what = "`[3, 1]$^+ [1]`: to index the result it goes in parentheses — inside `>>` this indexed before (GLB-076)"
+src  = """
+>> [3, 1]$^+ [1] ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-a-sort-descending"
+what = "`[3, 1]$^- [1]`: the same after `$^-`"
+src  = """
+x = [3, 1]$^- [1]
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-group-after-a-sort-descending"
+what = "`[3, 1]$^- (1)`: `$^-` takes no comparator either"
+src  = """
+x = [3, 1]$^- (1)
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-bracket-after-a-length"
+what = "`a$# [1]`: zyjs indexed the Int and failed at run time (GLB-076)"
+src  = """
+a = [3, 1]
+x = a$# [1]
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-group-after-a-length"
+what = "`a$# (1)`: `$#` takes nothing"
+src  = """
+a = [3, 1]
+>> a$# (1) ¶
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-group"
+what = "a statement that is only `(1)`: not a destructuring, refused with the statement-level diagnostic"
+src  = """
+(1)
+"""
+
+[[cell]]
+id   = "statement-opening-with-a-bracket"
+what = "a statement that is only `[x]`: not a destructuring, refused with the statement-level diagnostic"
+src  = """
+x = 1
+[x]
+"""
+
+# GLB-086, decided 2026-10-03: a `(` on the same line after a `$` operation is a
+# call on its result in every context, as it already was inside `>>` and in
+# zyjs. A literal is never called (BUG-06), so with `1` as the operand the call
+# is on the result, which is not a function: a run-time error in all three.
+
+[[cell]]
+id   = "stray-group-after-an-operand"
+what = "`a$? 1 (2)`: a call on the result of `a$? 1`, which is not a function — Rust used to end the statement in an assignment (GLB-086)"
+src  = """
+a = [1]
+x = a$? 1 (2)
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-group-after-an-append"
+what = "the same after `$+ 3`: a call on the result, refused at run time"
+src  = """
+a = [1, 2]
+x = a$+ 3 (2)
+>> x ¶
+"""
+
+[[cell]]
+id     = "call-in-the-operand-of-a-dollar-operator"
+what   = "the control: with a name as the operand, `f (2)` is a call inside the operand, in every engine"
+expect = "ok"
+src    = """
+a = [1, 2]
+f(n) { <~ n - 1 }
+x = a$? f (2)
+y = a$+ f (2)
+>> x ¶
+>> y ¶
+"""
+
+[[cell]]
+id     = "parenthesized-operation-is-indexed"
+what   = "the control: the operation in parentheses is indexed, in every engine"
+expect = "ok"
+src    = """
+a = [3, 1]
+x = (a$^+)[1]
+>> x ¶
+"""
+oracle.py = """
+print(sorted([3, 1])[0])
+"""
+
+# ── A prefix operator as a juxtaposed operand of an assignment (2026-10-09) ──
+#
+# In `>>`, the three engines took `"a" ###3.7`, `"a" #|"3"|` or `"a" !#1` as
+# juxtaposed operands; in an assignment, after `<~` and among the items of `$++`
+# only zyjs did — the Rust parser's `can_juxtapose` listed literals and names.
+# Decided 2026-10-09 (GLB-114): a prefix operator opens an operand wherever
+# items are juxtaposed. The answers are concatenations, so the oracle is plain
+# string joining.
+
+[[cell]]
+id     = "juxtaposed-cast-in-an-assignment"
+what   = "`x = \"a\" ###n` concatenates the cast, as `>>` does: `a4` (GLB-114)"
+expect = "ok"
+src    = """
+n = 3.7
+x = "a" ###n
+>> x ¶
+"""
+oracle.py = """
+print("a" + str(round(3.7)))
+"""
+
+[[cell]]
+id     = "juxtaposed-cast-in-output"
+what   = "the control: in `>>` the same operand is taken by all three, `a4` (GLB-114)"
+expect = "ok"
+src    = """
+n = 3.7
+>> "a" ###n ¶
+"""
+
+[[cell]]
+id     = "juxtaposed-prefix-operators-in-a-return"
+what   = "after `<~`, a format, a base conversion and `!` open operands too (GLB-114)"
+expect = "ok"
+src    = """
+f(v, ok) {
+    <~ "v=" #,|v| " hex=" 0x|v| " not=" !ok
+}
+>> f(4660, #1) ¶
+"""
+
+[[cell]]
+id     = "juxtaposed-prefix-operators-after-a-concatenation"
+what   = "among the items of `$++`, a cast and `#|…|` open operands too (GLB-114)"
+expect = "ok"
+src    = """
+c = 66
+s = "a"$++ "b" ##'c #|"7"|
+>> s ¶
+"""

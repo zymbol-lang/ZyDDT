@@ -16,7 +16,9 @@
 # cell had landed on the one command the stub happens to get right.
 #
 # That is worse than an engine that cannot do a thing: it is an engine that
-# answers anyway.  A cell chosen badly here would have made a green row out of
+# answers anyway.  (Since 2026-09-29 the stub refuses every command it has no
+# stand-in for — BUG-GOL-014 — so zyjs now fails where it used to answer; the
+# exclusion stays, because failing is still not running the command.)  A cell chosen badly here would have made a green row out of
 # a capability that does not exist.  Each cell below is chosen so the stub
 # cannot coincide with the real answer.
 #
@@ -59,4 +61,105 @@ what = "an echo whose text is not literal"
 src  = '''
 v = <\ "echo $((2 + 3))" \>
 >> v
+'''
+
+[[cell]]
+id   = "shell-exit-status"
+what = "a status other than 0 is a soft ##IO error that carries it (GAP-GOL-011, D2); 0 is the output as before"
+src  = '''
+ver(r) {
+    <~ ?? r {
+        ##IO(m) => ("##IO: " m)
+        _       => ("ok: " r)
+    }
+}
+>> ver(<\ "echo hola" \>) ¶
+>> ver(<\ "exit 3" \>) ¶
+'''
+
+[[cell]]
+id   = "shell-failure-says-stderr"
+what = "a failed command's message is its stderr, or its stdout when stderr is empty"
+src  = '''
+a = <\ "echo por stderr >&2; exit 2" \>
+b = <\ "echo por stdout; exit 4" \>
+>> a ¶
+>> b ¶
+'''
+
+# ── A bare word inside `<\ … \>` (added 2026-10-02) ─────────────────────────
+#
+# Not `shell-*`, on purpose: that rule in exclusions.toml excuses zyjs, and here
+# zyjs is half of the question. Neither program runs a command in a Rust engine
+# — each argument is an expression (GLB-004), so `ls` is a name to look up and
+# `|` is not an operator — which is what makes them askable in a browser.
+
+[[cell]]
+id     = "bare-word-is-a-variable"
+expect = "error"
+what   = "`<\\ ls \\>` with no `ls` defined: an undefined name, refused like `_x = ls`"
+src    = '''
+_x = <\ ls \>
+>> "fin" ¶
+'''
+
+[[cell]]
+id     = "bare-word-pipe-does-not-parse"
+expect = "error"
+what   = "`<\\ ls | wc -l \\>`: `|` between two expressions is not an operator"
+src    = '''
+_x = <\ ls | wc -l \>
+>> "fin" ¶
+'''
+
+# GLB-075 closed (2026-10-02): the arguments of `<\ … \>` are expressions in
+# every engine, so each class of check `infer_expr` carries applies inside it.
+# The three cells below ask the classes the first two did not: a call's arity,
+# a call's `<~` mark, and the plain case of a variable that IS defined.
+# (The cells above are named without `shell-`, which would excuse zyjs.)
+
+[[cell]]
+id     = "bare-word-call-arity-is-checked"
+expect = "error"
+what   = "a call with too few arguments inside `<\\ … \\>` is refused before anything runs"
+src    = '''
+g(a, b) { <~ a + b }
+_x = <\ "echo " g(1) \>
+>> "fin" ¶
+'''
+
+[[cell]]
+id     = "bare-word-call-output-mark-is-checked"
+expect = "error"
+what   = "a call missing its `<~` mark inside `<\\ … \\>` is refused before anything runs"
+src    = '''
+sube(b<~) { b = b + 1 }
+y = 1
+_x = <\ "echo " sube(y) \>
+>> "fin" ¶
+'''
+
+[[cell]]
+id     = "bare-word-defined-variable-is-its-value"
+expect = "ok"
+what   = "`<\\ cmd ' ' \"hola\" \\>` with `cmd` defined: the variable's value, not the text `cmd`"
+src    = '''
+cmd = "echo"
+>> <\ cmd ' ' "hola" \> ¶
+'''
+
+# ── Interpolating a text variable into the command (added 2026-10-02) ──────
+#
+# The question six files of ZyQuality's corpus asked — `<\ cat {archivo} \>` —
+# in a form the language does not have (GLB-004, GLB-075), so none of them ever
+# ran. Retired from the corpus on 2026-10-02 (zyquality/dropped.tsv); this is
+# the point of the matrix they were asking about, written once.
+
+[[cell]]
+id   = "shell-interpolates-a-text-variable"
+what = "a Zymbol text variable interpolated into the command reaches the shell as its text"
+src  = '''
+nombre = "zymbol"
+r = <\ "echo hola {nombre}" \>
+>> r
 '''

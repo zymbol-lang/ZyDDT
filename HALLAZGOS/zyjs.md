@@ -18,8 +18,18 @@
 | [`ZYJS-011`](#zyjs-011--el-acumulador-yuxtapuesto-tiraba-el-resto-de-la-concatenación) | **corregido 2026-08-30** | `s = °s "x"` devolvía sólo `°s` |
 | [`ZYJS-012`](#zyjs-012--la-escritura-profunda-se-queda-en-dos-pasos-cij-k~-v-no-parsea) | **corregido 2026-09-07** | `c[i>j>k]$~ v` no parsea; la LECTURA de tres pasos sí |
 | [`ZYJS-013`](#zyjs-013--los-pasos-del-navegador-no-cuentan-como-uso-de-una-variable) | **corregido 2026-09-07** | `m[i>j]` avisa `unused variable 'i'` |
+| [`ZYJS-014`](#zyjs-014---es-on-en-el-motor-del-navegador) | **corregido 2026-10-10** | `$+` era O(n²) |
+| [`ZYJS-015`](#zyjs-015--outer-se-aceptaba-y-se-ejecutaba-como-outer) | **corregido 2026-09-13** | `@!outer` se aceptaba como `@:outer!` |
+| [`ZYJS-016`](#zyjs-016--elementos-argumentos-y-llamadas-de--se-evalúan-a-la-vez-y-sus-efectos-se-entrelazan) | **corregido 2026-09-14** | elementos, argumentos y llamadas de `$>` se evalúan a la vez: `12a a 12b b` |
+| [`ZYJS-017`](#zyjs-017--un--dentro-de--n--termina-el-programa-en-silencio) | **corregido 2026-09-14** | un `@>` dentro de `@ N` termina el programa, con estado 0 |
+| [`ZYJS-018`](#zyjs-018--el-analizador-no-cuenta-como-uso-lo-escrito-en-los-límites-de-un-corte-ni-en-un-) | **corregido 2026-09-14** | `a$[n..2]` y `"" $++ m` avisan `unused variable` |
+| [`ZYJS-019`](#zyjs-019--termwidth-rechaza-con-otro-texto) | **corregido 2026-09-15** | `term::width` con un número rechazaba con otro texto |
+| [`ZYJS-020`](#zyjs-020--el-lexer-acepta-siete-formas-que-los-dos-rust-rechazan) | **corregido 2026-09-15** | el lexer aceptaba 7 formas que los Rust rechazan, y otras 5 las rechazaba el parser con otro mensaje |
+| [`ZYJS-021`](#zyjs-021--los-errores-de-sintaxis-de-los-operadores--nombran-tokens-y-dos-dicen-object-object) | **corregido 2026-09-15** | los errores de sintaxis de `$` nombraban tokens internos, y dos decían `[object Object]` |
+| [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **corregido 2026-09-15** | un módulo importado con el bloque de exportación mal escrito se cargaba sin error |
+| ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
 
-**Ninguno abierto.** Los dos últimos se encontraron y se cerraron el 2026-09-07, el mismo día, por el eje `addressing`.
+**Ninguno abierto.** Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -853,3 +863,2572 @@ recorría. `checkNavSpec` recorre ahora las cuatro formas — `simple`, `path`,
 sobre `kind`, para que un spec que gane un campo lo recorra la rama que le toque
 en vez de caerse por un `switch`: el defecto que se arregla es exactamente un
 paso que nadie miraba.
+
+---
+
+## ZYJS-014 — `$+` es O(n²) en el motor del navegador
+
+**Estado:** **corregido 2026-10-10** — decidido por el autor el 2026-10-10: con el diseño conservador
+**Encontrado por:** la medición del auto-free del 2026-09-12, como control
+**Familia:** `HLZ-014` — es la nota de `CLAUDE.md` («the browser engine reaches
+the same place by sharing the JavaScript array and **rebuilding it on write**»)
+con su consecuencia medida
+
+### Qué se observa
+
+```zymbol
+a = []
+@ i:1..N { a$+ i }
+>> a$# ¶
+```
+
+| N | `zytw` | `zyvm` | `zyjs` |
+|---:|---:|---:|---:|
+| 5 000 | 0,011 | 0,006 | 0,148 |
+| 20 000 | 0,019 | 0,011 | **2,111** |
+| 200 000 | 0,03 | 0,02 | **no termina en 200 s** |
+
+Cuadruplicar el trabajo multiplica por **14** el tiempo de `zyjs`; los dos
+motores Rust son planos. No es el factor constante que se le supone a un
+intérprete escrito en JavaScript: es otra curva.
+
+### Causa
+
+Probable, sin parche que lo confirme: el modelo de copia al escribir de `zyjs`
+reconstruye el array en cada escritura. Eso da la semántica correcta —y por eso
+los tres motores coinciden en la salida— pero cada `$+` copia lo acumulado.
+
+### Alcance
+
+Todo programa que construya una colección elemento a elemento, que en el
+playground es casi cualquiera. Invisible para el gate por la misma razón que
+`ZYVM-003`: la salida es idéntica en los tres motores, y un diferencial compara
+salidas.
+
+Un dato que conviene medir antes de decidir nada: el playground corre programas
+pequeños, así que puede que esto no le duela a ningún ejemplo real. Lo que no
+puede pasar es que nadie lo sepa.
+
+### Arreglo propuesto
+
+Ninguno todavía: primero medir si algún ejemplo o alguna app LDV alcanza la
+escala en que se nota.
+
+### Qué lo sujeta
+
+`zyquality/cost/`, caso **`growth/append-local`**, desde el 2026-09-12, con
+`n_by_engine = { zyjs = 5000 }` porque a la escala de los motores Rust este
+motor necesita minutos. Marcado `open_finding = { zyjs = "ZYJS-014" }`: se
+reporta KNOWN con su ratio en cada corrida y no enrojece el gate.
+
+### Medido, 2026-10-10 — lo que la ficha pedía antes de decidir
+
+Una copia del motor con un contador en `$+` y en `$~` (cuántas ediciones, cuántos elementos copiados, el array más
+largo), sobre los 382 `.zy` de `web/examples/` y de las suites de las aplicaciones:
+
+- sólo **28** editan algún array;
+- el array más largo editado tiene **360** elementos (GO, `性能試験`);
+- el que más copia, una partida de GO contra sí mismo, hace 225 268 ediciones y copia 759 318 elementos: 3,4 por
+  edición.
+
+A esa escala la copia no se nota. El único programa real donde sí: `ZyBF/pesado2.zy`, que actualiza una cinta de 300
+celdas 419 430 veces — **6,35 s en `zyjs`, 0,33 s en la VM** y 0,60 s en el TW.
+
+No es sólo `$+`: `$~`, insertar y quitar copian igual (`[...col.v]` en cada uno).
+
+### Corrección (2026-10-10)
+
+Una edición escribe donde está el array cuando su variable es la única que lo tiene, y eso lo dice una marca en
+el propio array (`own`).
+
+La regla es conservadora y va en una sola dirección:
+
+- **sólo una edición de una variable, guardada de vuelta en esa variable, produce un array propio**: `a$+ x`,
+  `a[i]$~ v`, `a$-[i]`, `a$++ x y`, como sentencia o escritas enteras (`a = a$+ x`);
+- **cualquier lectura que entrega el array a alguien le quita la marca para siempre**: otro nombre, un argumento,
+  un elemento de otra colección, una captura, un bucle que lo recorre, una interpolación. Todas pasan por
+  `Env.get`, que es donde se quita;
+- **leen sin quitarla** (`Env.peek`) los pocos que no se quedan con nada: la propia edición, `$#`, `$?` y la
+  lectura de un elemento por un índice;
+- un array que nadie marcó es compartido, así que un camino que se le hubiera escapado a esta lista **copia**,
+  como antes.
+
+Y una condición más, por [`GLB-115`](GLOBAL.md): se escribe en el sitio, y se lee sin marcar, sólo junto a
+operandos que no ejecutan código del programa —un literal, un nombre, aritmética, un índice—. El receptor se lee
+antes que sus operandos, y uno que pudiera escribirlo tiene que encontrarlo como estaba: con una llamada en el
+operando se copia, igual que antes.
+
+Con [`GLB-117`](GLOBAL.md): un argumento de salida que es una variable de quien llama se pasa sin quitarle la
+marca, así que la función escribe en el sitio. El estado de un módulo no (S3), ni una variable dada dos veces
+como salida.
+
+| el mismo programa a N y a 4N, segundos | antes | ahora |
+|---|---|---|
+| `a$+ i`, N veces | 5 000 → 20 000: 0,15 → 2,1 (×14) | 100 000 → 400 000: 0,57 → 1,57 (×2,8) |
+| `a$++ i i` | 3 000 → 12 000: ×10,8 | 50 000 → 200 000: ×2,7 |
+| `t[i]$~ k`, N veces sobre N | 5 000 → 20 000: ×17 | 100 000 → 400 000: ×3,1 |
+| una llamada por casilla a un módulo, que escribe | 5 000 → 20 000: ×13 | 40 000 → 160 000: ×2,9 |
+| una llamada por casilla a través de `<~` | 6 000 → 24 000: ×19 | 40 000 → 160 000: ×2,9 |
+
+**Lo que no arregla, y la ficha decía que arreglaría.** `ZyBF/pesado2.zy` tarda lo mismo, 6,5 s. El objetivo
+«por debajo de 1 s» estaba mal planteado: su cinta tiene 300 celdas y copiarla nunca fue lo que costaba. El perfil
+lo dice — 31 % en `eval`, **13,5 % en `performance.now()`** (lo llama `maybeYield` en cada vuelta de un bucle para
+decidir si cede el turno al navegador), 9 % en el recolector. Es el coste de un intérprete `async` de punta a
+punta, no una curva. Mirar el reloj una de cada N vueltas quitaría ese 13 %; cambia cada cuánto responde la
+página y no se ha tocado.
+
+### Qué lo sujeta
+
+`zyquality/cost`: `growth/append-local`, `append-several-local`, `update-local`,
+`module-call-that-writes-one-cell` y `write-through-an-output-parameter`, ya sin deuda para `zyjs` y medidos
+donde antes tardaban minutos; `module-call-that-reads-one-cell` lo incluye desde hoy.
+
+Y lo que no puede romper: `runtime-collection-ops/an-array-edited-in-place-does-not-show-through-another-holder`
+—diez maneras de tener un segundo dueño, contra un oráculo en Python con las copias escritas— y
+`runtime-modules-scripts/module-state-handed-out-is-a-value`. Con la marca desactivada a propósito, las dos dan
+rojo.
+
+---
+
+## ZYJS-015 — `@!outer` se aceptaba y se ejecutaba como `@:outer!`
+
+**Estado:** **corregido 2026-09-13**; queda un aviso de más
+**Encontrado por:** `refusal/modality-before-its-label`, la primera celda de SYM-8
+**Familia:** `ZYJS-001` — el parser aceptando lo que los dos motores Rust rechazan
+
+### Qué se observaba
+
+```zymbol
+@:outer _i:1..3 { >> "vuelta" ¶
+  @!outer }
+>> "fin" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `error: undefined variable 'outer'` |
+| `zyjs` | **imprime `vuelta` y `fin`** — exactamente lo mismo que la forma correcta |
+
+No es que lo tolerase: lo **ejecutaba como si fuera `@:outer!`**, que es la forma
+que SYM-8 existe para distinguir.
+
+### Causa
+
+`parseStatement`, en la rama `BREAK`: tras `@!` tomaba un `IDENT` como etiqueta
+si lo había. La ruptura etiquetada es `AT_BREAK`, dos líneas más abajo, y se
+parsea entera desde el token `@:outer!`.
+
+SYM-8 dice que un `?` o `!` modal es la marca **más a la derecha** del operador y
+que nunca le sigue un argumento ni una etiqueta. Aceptar un identificador ahí era
+admitir un segundo orden para lo mismo.
+
+### Lo que queda
+
+Ya rechaza, y con el mismo texto: `undefined variable 'outer'`. Antes emite un
+aviso que los motores Rust no dan — `this statement does nothing: 'outer' is read
+and discarded` — que es cierto y es de la familia de diagnósticos que sobran en
+este motor. La celda queda en `DIVERGE` por eso, no por el comportamiento.
+
+---
+
+## ZYJS-016 — Elementos, argumentos y llamadas de `$>` se evalúan a la vez, y sus efectos se entrelazan
+
+**Estado:** **corregido 2026-09-14**
+**Encontrado por:** `callable-body/map-lambda-match-str`, 2026-09-14 — imprimía las dos líneas de un `$>` en orden inverso; medido después por `axes/evaluation-order.toml`
+**Gravedad:** alta para el playground: la salida de un programa correcto sale revuelta
+
+### Qué se observa
+
+```zymbol
+p(x) {
+    >> x "a" ¶
+    >> x "b" ¶
+    <~ x
+}
+>> [p(1), p(2)] ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `1a` `1b` `2a` `2b` `[1, 2]` |
+| `zyjs` | **`12a` `a` `12b` `b`** `[1, 2]` |
+
+El valor es correcto y la salida no. Pasa en seis posiciones: los elementos de
+un array, de una tupla y de un diccionario, los argumentos de una llamada, las
+partes de un `$++` y las llamadas de `$>`. No pasa en `$|`, `$<`, el comparador
+de `$^`, los operandos de `+`, los items de un `>>`, los límites de un corte ni
+los pasos de un navegador.
+
+### Causa
+
+`web/src/zymbol/zymbol.js`, siete sitios de la forma
+
+```js
+await Promise.all(expr.items.map(i => this.eval(i, env)))
+```
+
+`Promise.all` no evalúa en orden: **arranca** todas las evaluaciones, y cada una
+corre hasta su primer `await` antes de que empiece la siguiente. Como el motor
+es `async` de punta a punta, cualquier llamada con más de un efecto se parte
+por la mitad.
+
+Cualquier efecto con orden queda expuesto igual: la salida, la entrada `<<`, y
+un parámetro `<~` que un elemento escribe y el siguiente lee.
+
+### Arreglo
+
+Un bucle `for … of` con `await` en cada vuelta, en los siete sitios. No hay
+paralelismo real que perder: el motor corre en un solo hilo.
+
+### Qué lo sujeta
+
+`axes/evaluation-order.toml`, 13 posiciones; y
+`callable-body/map-lambda-match-str`, `callable-body/map-named-match-str`.
+
+---
+
+## ZYJS-017 — Un `@>` dentro de `@ N` termina el programa en silencio
+
+**Estado:** **corregido 2026-09-14**
+**Encontrado por:** `error-flow/continue-disarms-the-catch`, 2026-09-14, por accidente —la celda preguntaba por la VM— y medido después por `axes/loop-jump.toml`
+**Gravedad:** **alta**: el resto del programa no se ejecuta, no hay mensaje y el estado de salida es 0
+
+### Qué se observa
+
+```zymbol
+@ 2 {
+    >> "u" ¶
+    @>
+}
+>> "fin" ¶
+```
+
+`zytw` y `zyvm` imprimen `u`, `u`, `fin`. `zyjs` imprime **`u`** y termina, con
+estado 0. Dentro de una función, la función devuelve `##_`.
+
+### Causa
+
+`web/src/zymbol/zymbol.js`, `execLoop`, la rama del bucle con cuenta: comprueba
+`brk(sig)` y nunca `cnt(sig)`, así que el `@>` cae en
+
+```js
+if (sig instanceof ZyBreak || sig instanceof ZyContinue) return sig;
+```
+
+y sube hasta que nadie lo toma. Las otras cinco clases de bucle sí lo
+comprueban.
+
+### Arreglo
+
+`if (cnt(sig)) continue;` en la rama de la cuenta, como en las otras.
+
+### Qué lo sujeta
+
+`axes/loop-jump.toml`: 6 clases de bucle × `@!`/`@>` × arriba/dentro de una
+función = 24 celdas. Rojas exactamente las dos de `@>` en `@ N`.
+
+---
+
+## ZYJS-018 — El analizador no cuenta como uso lo escrito en los límites de un corte ni en un `$++`
+
+**Estado:** **corregido 2026-09-14**
+**Encontrado por:** `evaluation-order/slice-bounds` y `evaluation-order/build`, 2026-09-14
+**Gravedad:** baja: un aviso falso, en `stderr`. Pero es la misma familia que `ZYJS-013` y que `GLB-001`: un brazo que no desciende apaga todas las comprobaciones de lo que hay debajo
+
+### Qué se observa
+
+```zymbol
+n = 1
+a = [10, 20, 30]
+>> a$[n..2] ¶
+m = 2
+>> "" $++ m ¶
+```
+
+`zyjs` avisa `unused variable 'n'` y `unused variable 'm'`. Los motores Rust no.
+
+### Arreglo
+
+Que el recorrido del analizador de `zyjs` descienda a los límites del corte y a
+las partes del `$++`.
+
+### Qué lo sujeta
+
+`evaluation-order/slice-bounds` y `evaluation-order/build`.
+
+---
+
+## ZYJS-019 — `term::width` rechaza con otro texto
+
+**Estado:** **corregido el 2026-09-15** (paso 2.14): el mensaje añade `, got ###`, el símbolo de tipo del argumento, como en Rust. `runtime-std` queda en 42 de 42 en `AGREE`
+**Encontrado por:** `runtime-std/term-width-expected-a-string-or-char`, paso C10 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** baja: rechaza lo mismo, con otras palabras
+
+`term::width(5)`: los dos Rust dicen
+`term::width: expected a String or Char, got ###`; `zyjs` dice
+
+```
+Runtime error: term::width: expected a String or Char
+```
+
+Las otras 20 funciones de `std/` del mismo paso coinciden palabra por palabra en
+los tres motores, y también en el kind.
+
+---
+
+## ZYJS-020 — El lexer acepta siete formas que los dos Rust rechazan
+
+**Estado:** **corregido el 2026-09-15** (paso 2.1): 11 de 13 en verde. Las dos que quedan no son de `zyjs` (ver «Lo que queda»)
+**Encontrado por:** `axes/syntax-lexer.toml`, paso B3 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** **alta** en el playground: un programa mal escrito corre y enseña un resultado
+
+### Qué se observa
+
+Los 13 diagnósticos del lexer que nada provocaba. `zytw` y `zyvm` los dan los
+13, con las mismas palabras. `zyjs`:
+
+**A. Acepta 7 y ejecuta:**
+
+| forma | `zyjs` |
+|---|---|
+| `/* abierto` (comentario sin cerrar) | programa vacío, estado 0 |
+| `0xD800` (un sustituto no es un carácter) | imprime `�` |
+| `"a{1}"` (una interpolación que no es un nombre) | imprime `a1` |
+| `'\q'` (escape desconocido en un carácter) | imprime `q` |
+| `1٢` (cifras de dos escrituras) | imprime `12` |
+| `1 & 2` (un `&` suelto) | imprime `12` |
+| `c = '` al final del fichero | sólo avisa `unused variable 'c'` |
+
+**B. Rechaza 5 con otro diagnóstico**, porque su lexer no tiene la comprobación
+y el error sale después, en el parser: `#2` → `expected expression, found
+Output`; `1.0e+` → lo mismo; `'ab'` → `undefined variable 'b''`; `</ ./a.zy` →
+`expected expression, found Lt`; `"a{b"` → `invalid character in string
+interpolation`.
+
+Sólo `"a{}b"` coincide en los tres.
+
+### Qué lo sujeta
+
+`axes/syntax-lexer.toml`: 13 celdas, 1 verde.
+
+### Corregido — 2026-09-15
+
+Cada forma, con el texto y la ayuda de los Rust, en `web/src/zymbol/zymbol.js`:
+
+| forma | qué hacía | qué hace |
+|---|---|---|
+| `/* abierto` | fin de fichero, estado 0 | `Unterminated multi-line comment`. Los comentarios **anidan**, como en Rust: `/* a /* b */ c */` era un error de parser en `zyjs` y `/* a /* b */` pasaba sin cerrar |
+| `0xD800`, `0x110000` | `�` | `invalid Unicode code point: 0xD800 (hexadecimal D800)`, en las cuatro bases (`codePointChar`) |
+| `"a{1}"` | `a1` | `invalid character in string interpolation`, con la regla de identificador de `readIdent` y del checker |
+| `"a{b"` | «carácter inválido» | `unterminated string interpolation` |
+| `'\q'` | `q` | `invalid escape sequence: '\q'`: la tabla de Rust (`n t r ' \ 0`) y nada más |
+| `'ab'` | `undefined variable 'b''` | `expected closing ' for char literal` |
+| `c = '` al final | sólo un aviso | `unterminated char literal` |
+| `1٢` | `12` | `mixed digit scripts in numeric literal`, en la parte entera y en la decimal |
+| `1.0e+`, `1e` | el parser tropezaba | `invalid float literal: '1.0e+'` |
+| `#2` | se descartaba sin ruido | `invalid boolean literal: digit 2 is not valid after '#'` |
+| `1 & 2` | `12` | `unexpected character: '&'` |
+
+**Dos cosas que la medición cambió por el camino.**
+- El `consume()` final del lexer descarta todo carácter que no reconoce. Al
+  convertirlo en error para todos los caracteres de operador, `corpus/functions/param_marks.zy`
+  **divergió**: la marca de parámetro `a~` funciona en `zyjs` *porque* el `~`
+  desaparece. Rust sólo da `unexpected character` para `&`, que es el único
+  carácter de operador sin token; la comprobación se quedó en `&`.
+- La expresión regular vieja de la interpolación tenía comillas dentro, y eso
+  desemparejaba el escáner de `zyquality/messages/extract.py`. Al quitarla, el
+  inventario vio por primera vez entero `unmatched '}' in string` con la ayuda
+  pegada al texto, y falló. Ese throw pasó a `ZyStaticError(mensaje, línea,
+  ayuda)`, como los demás, y el inventario cerró además 16 mensajes que ahora
+  casan con los de Rust.
+
+### Lo que queda
+
+- `unterminated-execute-expression`: `zyjs` no implementa `</ ruta />`; el
+  rechazo es otro y la celda queda en `WORDING`.
+- `unterminated-string-interpolation`: en `DIVERGE` **por los Rust**, que dan
+  un segundo diagnóstico falso (`unterminated string literal @4:8`): tras parar
+  en la comilla, la vuelven a leer como apertura de otra cadena. Los Rust también
+  añaden `expected expression, found Error("invalid boolean literal")` detrás de
+  varios errores de lexer, un token interno a la vista. Es trabajo de la F3.
+
+### Lo que sigue desapareciendo en silencio (registrado, sin tocar)
+
+- `~` fuera de su sitio (`1 ~ 2` imprime `12`; Rust: `unexpected token:
+  Tilde`), del que depende `a~`. Celda `refusal/lone-tilde`.
+- `0X41`, el prefijo en mayúscula: `zyjs` lo lee como `A`, y Rust sólo acepta
+  minúscula (`undefined variable 'X41'`). Celda `syntax-lexer/uppercase-base-prefix`.
+- Los caracteres que Rust lee como identificador y `zyjs` descarta o rechaza:
+  `` `x `` y un espacio de ancho cero (Rust: parte del nombre; `zyjs`: no están), o
+  `€` (Rust: identificador; `zyjs`: error). Necesita decisión: `GLB-026`.
+
+### El `~` suelto — corregido el 2026-09-25 (paso P4.5)
+
+El lexer emite ahora un token `TILDE`, como `TokenKind::Tilde` en Rust. El parser lo
+consume detrás del nombre de un parámetro (`a~`) y, al principio de una sentencia,
+lo refusa con el texto de Rust: `unexpected token: '~'`. `1 ~ 2` ya no imprime `12`.
+Barrido de parseo: cambia un solo fichero, el de la celda. `refusal/lone-tilde`,
+verde.
+
+---
+
+## ZYJS-021 — Los errores de sintaxis de los operadores `$` nombran tokens, y dos dicen `[object Object]`
+
+**Estado:** **corregido el 2026-09-15** (pasos 2.3, 2.4 y 2.5). Quedan cinco celdas en `WORDING` que no son de `zyjs` (ver «Textos»)
+**Encontrado por:** `axes/syntax-collection-ops.toml`, paso B4 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** media: rechaza lo que debe, con un texto que no ayuda
+**Familia:** `ZYJS-006` (`[object Object]` en el diagnóstico, cerrado el 2026-08-30 en otro sitio)
+
+Las 16 formas rotas de los operadores `$` las rechazan los tres motores; los dos
+Rust con el mismo texto y su `help:`. `zyjs` nombra el token que esperaba su
+parser y el que encontró:
+
+| forma | Rust | `zyjs` |
+|---|---|---|
+| `a$-[1:2` | `expected ']' after count` + help | `Expected RBRACKET, got '>>'` |
+| `a$< (0 (s, x) -> s + x)` | `expected ',' after initial value` + help | `Expected COMMA, got '('` |
+| `s$~~["a" "b"]` | `expected ':' after pattern` + help | **`Expected COLON, got '[object Object]'`** |
+| `s$~~ "a"` | `expected '[' after $~~` + help | **`Expected LBRACKET, got '[object Object]'`** |
+| `5$~ 9` | `collection update ($~) requires a place to write` | `expected expression, found DUPDATE` |
+| `a$^ x` | `expected comparator lambda after '$^'` | `undefined variable 'x'` |
+
+El `[object Object]` aparece cuando el token encontrado es una cadena: el mensaje
+interpola el objeto del token en vez de su texto.
+
+### Y en los literales (paso B5)
+
+Las 5 formas rotas de array, tupla y diccionario: los tres rechazan, los Rust con
+el mismo texto. `zyjs`: `[1, 2` → `expected expression, found Output`;
+`#(a: 2` y `(1, 2` → `Expected RPAREN, got '>>'`; `#(a 2)` → `expected a key in
+the dictionary` (el mensaje de otra forma); `#(1: 2)` → el mismo diagnóstico con
+la guía dentro del mensaje en vez de en `help:`.
+
+### Y en formato y conversión (paso B6)
+
+9 formas rotas. Seis como las anteriores (`Expected VBAR, got '>>'`). Tres son
+peores: `#.2 5` y `#.|5|` se rechazan **una línea más abajo**, en el `>>`
+siguiente (`expected expression, found Output`); y **`#!2 5` se lee como un `!`
+lógico** aplicado a `2`, que falla en ejecución con `logical NOT requires boolean
+operand` en vez de rechazarse al parsear.
+
+### Y en los filtros de `:!` (paso B7)
+
+`:! #Div { }` → `Expected LBRACE, got '#'`. Y **`:! ## { }` se acepta**: el `!?`
+corre, el filtro sin nombre no casa y el error sale sin capturar.
+
+### Y en funciones y lambdas (paso B8)
+
+**Acepta** `f(a b) { }` —lo lee como dos parámetros y luego la llamada con uno
+falla por aridad— y `a$^ (x y -> #1)`. El comparador sin flecha, `a$^ (v)`, lo
+deja pasar al parsear y falla **en ejecución** (`Expected a function for
+collection operator`). `f(1) + 2` como sentencia: `expected expression, found
+Plus`.
+
+### Y en el núcleo de expresiones (paso B9)
+
+La mayoría como las anteriores (`Expected RPAREN, got '>>'`). Dos más:
+**un módulo con una sentencia detrás de su bloque** (`# extra { … }` y luego
+`x = 1`) se carga sin error, y lo que falla después es `module 'e' does not
+export function 'f'`; y `°x` suelto como sentencia es `undefined variable 'x'`
+en vez de `'°name' is only valid as an assignment target`.
+
+### Y en `??` y `_?` (paso B10)
+
+**Acepta** un patrón de rango con los extremos de tipos distintos —`'a'..5` y
+`1..'z'`— y cae al comodín (`y`). Un brazo sin `=>` vuelve a decir
+`Expected FAT_ARROW, got '[object Object]'`.
+
+### Y en navegación y E/S (pasos B11 y B12)
+
+En navegación, `m[(a 1)>1]` se lee como la yuxtaposición `11` y falla en
+ejecución. En E/S **acepta** un `<\ "echo"` sin cerrar (sólo avisa de la variable
+sin usar) y un `<< #|n` sin cerrar, que se pone a leer la entrada; y
+`<< ###(4 "n: " n` vuelve a decir `[object Object]`.
+
+### Y en variables y desestructuración (paso B14)
+
+**Acepta** `\ 5` (destruir algo que no es un nombre; sólo avisa de `x` sin usar)
+y `x°[1] 5` (una forma indexada sin operador después de un nombre caliente). Las
+formas de desestructuración rotas las rechaza con `Expected IDENT, got '5'` y
+`Expected COLON, got 'y'`.
+
+### Dos más, medidas el 2026-09-15 (paso 1.10)
+
+- **`a$^ f` con `f` una lambda en una variable.** Los Rust exigen el comparador
+  escrito en línea (`expected comparator lambda after '$^'`), y `zyjs` ordena con
+  él. La celda que había, `sort-expects-comparator-lambda`, usaba una `x` sin
+  definir, y `zyjs` la rechazaba por eso (`undefined variable 'x'`) y no por la
+  forma. Celda nueva `syntax-collection-ops/sort-comparator-from-a-variable`,
+  roja.
+- **Parámetros de lambda sin usar.** `(a, b -> 1)` avisa `unused variable 'a'` y
+  `'b'` en `zyjs`, y en los Rust no. Nada dice cuál es lo correcto; salió al
+  escribir la celda de `GLB-024`, donde ese aviso tapaba la pregunta.
+  *Decidido el 2026-09-15:* **no se avisa**, como en los Rust: una lambda recibe
+  los parámetros que la operación le da, los use o no. **Corregido el 2026-09-15
+  (paso 2.13)**, y lo mismo para un alias de módulo sin usar (`ZYJS-022`).
+  Medido en el mismo paso: los Rust **tampoco** avisan de un parámetro sin usar
+  de una **función con nombre** (`f(a, b) { <~ a }`), y `zyjs` sí lo hace.
+  *Decidido el 2026-09-15:* **tampoco se avisa.** **Corregido el 2026-09-15 (paso
+  2.15f):** un parámetro de función con nombre deja de avisarse, y un local de
+  verdad sin usar se sigue avisando igual que en Rust.
+
+### Corregido: lo que aceptaba — 2026-09-15 (paso 2.3)
+
+Quince formas que `zyjs` ejecutaba se rechazan ahora al parsear, con el texto de
+Rust:
+
+| forma | ahora |
+|---|---|
+| `a$^ f`, con `f` en una variable | `expected comparator lambda after '$^', e.g. …` |
+| `a$^ (v)` | `expected '->' in lambda expression` + ayuda |
+| `a$^ (x y -> #1)` | `expected ')' after lambda parameters` + ayuda |
+| `f(a b) { }` | `expected ')' after parameters` + ayuda |
+| `?? c { 'a'..5 => … }`, `1..'z'` | `expected char / integer after '..' in range pattern` |
+| `m::sqrt 4` | `expected '(' for module function call` + ayuda |
+| `m[1>-a]` | `expected integer after '-' in nav index` + ayuda |
+| `m[1>1.5]` | `expected navigation step: a position …` + ayuda |
+| `x = <\ "echo"` sin cerrar | `unterminated bash execute expression` + ayuda |
+| `<< #\|n` sin cerrar | `expected '\|' to close #\|variable\|` + ayuda |
+| `\ 5` | `expected variable name after \` + ayuda |
+| `x°[1] 5`, `x°[1]$~ 5` | `expected '=' after index expression for indexed assignment`, **sin la ayuda de Rust**, que enseña `arr[i] = val` (`GLB-027`) |
+| `:! ## { }` | `expected error type name after '##'`, **sin ayuda**: la de Rust lista 7 de los 11 tipos (`GLB-022`) |
+| `# m { … }` y una sentencia detrás | `unexpected token after module block` + ayuda, dentro de `failed to parse module` |
+
+Los pasos de una ruta de navegación, después de `>`, `;` o `..`, siguen ahora la
+gramática estricta de `parse_nav_atom`: entero, `-`entero, nombre, cadena o
+`( expr )`. El primer átomo sigue siendo una expresión, porque el índice simple
+la admite. **Barrido de parseo** con el `zyjs` anterior y el nuevo sobre los 1189
+`.zy` de los ejemplos, las aplicaciones LDV y el corpus: los mismos 9 errores, y
+ningún fichero deja de parsear. Las 10 `WRONG` de los ejes `syntax-*` son 0.
+
+### Corregido: lo que leía como otra cosa — 2026-09-15 (paso 2.4)
+
+- **`#.2 5`, `#.|5|`**: un `#.` incompleto caía a la rama de las cabeceras
+  antiguas, que se tragaba el resto de la línea, y el error salía una línea más
+  abajo. **`#!2 5`**: el `#` se descartaba y quedaba un NOT lógico, que fallaba
+  en ejecución. Ahora `#.` y `#!` son siempre los operadores de redondeo y
+  truncado, como en el lexer de Rust: `expected '|' after precision`, con la
+  ayuda de cada uno, o `expected a decimal count after '#.'` / `'#!'` **sin
+  ayuda**, porque la de Rust enseña `#..2|value|` y `#!.2|value|` (`GLB-021`).
+  De paso deja de aceptarse `#.nombre {` sin espacio como módulo, que Rust
+  rechaza (el corpus escribe `# .nombre {`).
+- **`m[(a 1)>1]`**: el primer paso entre paréntesis se leía como la
+  yuxtaposición `11`. Si el `)` que lo cierra va seguido de `>` es un paso
+  calculado, como decide `is_nav_index` en Rust, y lleva una expresión y su `)`:
+  `expected ')' after computed index`.
+
+El barrido de parseo sobre los 1189 ficheros sigue en los mismos 9 errores.
+`syntax-format-convert` pasa de 3 `DIVERGE` a 0 y `syntax-index-nav` de 1 a 0.
+
+### Corregido: los textos — 2026-09-15 (paso 2.5)
+
+De las 64 celdas `WORDING` de los ejes `syntax-*`, **59 dan ya en `zyjs` el
+mensaje y la ayuda de Rust, carácter a carácter**. La primera lista sólo tenía 52:
+estaba construida con la salida resumida de `zyddt axis`, que no imprime la línea
+`WORDING` de las celdas que pasan de su límite de detalle. El barrido completo
+enseñó las otras 12, y se sacaron con `--detail 200`. `eat(tipo, mensaje, ayuda)`
+lleva el texto de Rust en cada sitio, y la variante de reserva ya no enseña
+`[object Object]` cuando el token es una cadena. Donde Rust dice cosas distintas
+según el contexto, `zyjs` distingue lo mismo:
+- la `)` de una llamada por nombre, de módulo, sobre una expresión, sobre un
+  paréntesis o en el destino de `|>`;
+- un grupo (`to close grouped expression`) frente a una tupla (`to close tuple`);
+- el `]` de un índice, de una extracción plana, de una estructurada o de un grupo
+  de extracción.
+
+Además, siguiendo la gramática de Rust: una lista de argumentos o de elementos de
+array termina en la primera coma que falta; una sentencia que empieza por una
+llamada es sólo la llamada (`f(1) + 2`: `expected function call`); `$--[` es la
+forma retirada; y una edición sin destino tiene dos titulares, como en Rust:
+`modifying requires a destination with a name` si lo editado es lo que devolvió
+una llamada, y `this edit has nothing to write into` si es otra expresión
+(`x$+ 1 $+ 2`).
+
+Las cinco que quedan no son de `zyjs`:
+- `round-expects-a-decimal-count`, `error-type-with-one-hash` y
+  `hot-index-without-operator`: la ayuda de Rust enseña algo que no es
+  (`GLB-021`, `GLB-022`, `GLB-027`), y `zyjs` da el mensaje sin ella. Se igualan
+  en la F3.
+- `execute-without-a-path` y `unterminated-execute-expression`: `zyjs` no
+  implementa `</ ruta />`.
+
+Barrido de parseo sobre los 1189 ficheros: los mismos 9 errores, dos con el texto
+nuevo. El inventario de mensajes cierra 150. En el barrido completo de ZyDDT los
+rojos bajan de 378 a 289, sin ninguna regresión. Sólo tuvo que ajustarse la forma de
+tres plantillas, para que coincidiera con la de Rust (`'{}'` con el prefijo, no
+`'#,'` escrito).
+
+Registrado por el camino: `x[1] 5` —sin `°`— ejecuta el `5` suelto en `zyjs`
+(celda `refusal/stray-literal-statement`), y los Rust añaden errores en cascada
+(`GLB-028`).
+
+### Qué lo sujeta
+
+`axes/syntax-collection-ops.toml` (16 celdas), `axes/syntax-literals.toml` (5),
+`axes/syntax-format-convert.toml` (9), `axes/syntax-try-catch.toml` (2),
+`axes/syntax-functions-lambdas.toml` (6), `axes/syntax-expressions.toml` (15),
+`axes/syntax-control-flow.toml` (7), `axes/syntax-index-nav.toml` (8),
+`axes/syntax-io.toml` (12) y `axes/syntax-variables.toml` (8).
+
+### El literal suelto — corregido el 2026-09-25 (paso P4.5)
+
+Un literal (número, cadena, carácter o booleano) no empieza una sentencia: `x[1] 5`
+es `x[1]` y luego un `5` que no empieza nada. `zyjs` lo refusa como Rust,
+`unexpected token: '5'`, con la misma ayuda. El primer intento **rompía
+`GoL/εκκίνηση.zy`**, un programa válido. Eso destapó [`ZYJS-037`](zyjs.md), y
+este refuso solo entró cuando ZYJS-037 estuvo arreglado. `refusal/stray-literal-statement`,
+verde.
+
+---
+
+## ZYJS-022 — Un módulo importado con el bloque de exportación mal escrito se carga sin error
+
+**Estado:** **corregido el 2026-09-15** (paso 2.2): los 12 módulos rotos se rechazan. **Las 12 celdas en verde desde el 2026-09-16** (pasos 2.16 y 2.18; ver «Lo que queda»)
+**Encontrado por:** `axes/syntax-modules.toml`, paso B13 del plan de cobertura de diagnósticos, 2026-09-14
+**Gravedad:** media-alta: el módulo roto no se nota hasta que alguien use lo que exporta
+
+Doce módulos rotos, cada uno importado por un programa que no llega a usarlo
+(`<# ./m/x => md` y `>> "x" ¶`). Los dos Rust fallan en los doce al cargar el
+módulo, con el diagnóstico del parser del módulo dentro de `failed to parse
+module`. `zyjs`:
+
+- **acepta 6** —dos bloques `#>`, `#> { 5 }`, `#> { mat. }`,
+  `#> { mat::sqrt => }`, `#> { f => }` y el separador antiguo `#> { mat::sqrt :
+  raiz }`— y sólo avisa `unused variable 'md'`;
+- rechaza los otros 6 (inicializador no literal, `<#` sin `=>`, módulo sin `{`,
+  bloque de exportación sin cerrar, alias que no es nombre) con otra forma.
+
+Todo lo que acepta está dentro del bloque `#>`: su parser de la lista de
+exportación no valida los elementos.
+
+### Qué lo sujeta
+
+`axes/syntax-modules.toml`: 12 celdas, 6 `WRONG` (las aceptadas) y 6 `DIVERGE`.
+
+### Corregido — 2026-09-15
+
+- **El bloque `#>`** se parsea con la gramática y los rechazos de
+  `parse_export_block` de `zymbol-parser/src/modules.rs`: identificador o error
+  (`expected identifier in export item`, con su ayuda), `::`/`.` seguidos de un
+  nombre, `=>` seguido de un nombre (`expected new name after '=>'`, `expected
+  public name after '=>'`), el separador antiguo `:` o `<=` (`legacy export rename
+  separator`) y `expected '}' to close export block`. El bucle viejo saltaba todo
+  token que no esperaba y rellenaba el nombre que faltaba con uno por defecto.
+- **Un solo `#>` por módulo**: `duplicate export block in module`, con su ayuda.
+- **Un módulo que no se lee** se informa como en Rust:
+  `failed to parse module: 1 parse error(s) in '<fichero>'` (o `lexer error(s)`)
+  y el error debajo con su línea y su ayuda. Antes salía el error del parser del
+  módulo sin cabecera, como si fuera del fichero principal (`GLB-017` D). Se
+  construye con las mismas tres piezas que `modules.rs`, y el inventario de
+  mensajes pasó de 16 a 28 mensajes cerrados.
+
+Consensus 660/0, las siete aplicaciones (casi todas con módulos), `test_zyp` y
+los ejemplos del playground siguen en verde.
+
+### Lo que queda (las 12 celdas en `DIVERGE`)
+
+1. **La columna.** El detalle de Rust es `fichero:3:5:` y el de `zyjs`
+   `fichero:3:0:`: los tokens de `zyjs` no llevan columna. ZyDDT compara esas
+   líneas al pie de la letra. **Corregido el 2026-09-16 (paso 2.16),
+   [[ZYJS-024]].**
+2. **Un aviso que sólo da `zyjs`:** `unused variable 'md'` para un alias de
+   módulo importado y no usado, también con un módulo correcto. Los Rust no
+   avisan, y un alias no es una variable. *Decidido el 2026-09-15: no se avisa.*
+   **Corregido el 2026-09-15 (paso 2.13).**
+   Y sobre la columna, *decidido el 2026-09-15*: `zyjs` tendrá columnas (paso 2.16).
+3. `zyjs` añade `--> main.zy:4` detrás del error de carga; los Rust no.
+   **Corregido el 2026-09-16 (paso 2.16).**
+4. E013 (inicializador no literal) sale como `1 semantic error(s)` en `zyjs`,
+   porque lo detecta su checker, y como `1 parse error(s)` en Rust.
+   **Corregido el 2026-09-16 (paso 2.18).**
+
+*Al 2026-09-16, 7 de las 12 celdas están en verde.* Las cinco que quedan no son
+columnas: dos son el E013 del punto 4 (`const-not-literal`,
+`variable-not-literal`, que además no llevan la ayuda), dos enseñan el nombre
+interno del token de `zyjs` (`Expected FAT_ARROW, got 'mat'` y `Expected IDENT,
+got '5'`, donde Rust dice `expected '=>' for module alias` y `expected alias name
+after '=>'` con sus ayudas) y una da otro error distinto (`module-without-brace`:
+Rust refusa `expected '{' after module name` en 1:24 y `zyjs` llega a decir que un
+bloque de exportación va dentro de un módulo, en 2:1).
+
+### Corregido el 2026-09-16 (paso 2.18) — las cinco que quedaban
+
+- **El cuerpo de un módulo se lee como lo lee `parse_module_block`**: elemento a
+  elemento, y cada uno se juzga al leerlo. Un módulo contiene imports, un solo
+  `#>`, constantes, variables y definiciones de función; un enlace se inicializa
+  con un literal. Las tres formas del E013 —constante, variable y «executable
+  statement»— pasan del checker al parser de `zyjs`, con su ayuda y en la
+  posición de Rust (el principio del inicializador, o de la sentencia): salen
+  como `1 parse error(s)` en los tres motores. El checker ya no las repite.
+- **`<#` sin `=>` y el alias que no es un nombre** dicen las palabras de
+  `parse_import_statement` —`expected '=>' for module alias` con su ayuda,
+  `expected alias name after '=>'`— en vez de los nombres de token de este motor.
+- **`# nombre` sin `{`** se refusa con `expected '{' after module name`. La causa
+  de que `zyjs` dijera otra cosa estaba en el lexer y es [[ZYJS-025]]: la línea
+  entera desaparecía, y lo que llegaba al parser era el `#>` de la línea
+  siguiente.
+
+`syntax-modules` pasa a 12 de 12. Sale también de rojo
+`modularity/import-executes-nothing`, la celda que sujeta la premisa **AGT-1**:
+estaba en `DIVERGE` por esta misma causa (el E013 de «executable statement» como
+error semántico, en la línea 4 y sin ayuda). La matriz baja de 270 rojas a 264.
+
+---
+
+## ZYJS-023 — El panel de problemas del playground enseña la clave en bruto de 19 de los 28 diagnósticos del checker
+
+**Estado:** **corregido el 2026-09-15** (paso 2.15d)
+**Encontrado por:** paso 2.6, 2026-09-15, al añadir el aviso `W_UNUSED_MATCH`
+**Gravedad:** media en el playground: el lector ve `chk.W_NO_EFFECT` donde debería leer una frase
+
+`src/playground/problems.js` escribe cada diagnóstico con `t(\`chk.${d.code}\`)`, y
+`t` devuelve la clave cuando el catálogo no la tiene; no hay reserva al
+`d.message` inglés. De los 28 códigos que el `Checker` de `zymbol.js` emite con
+`this.warn`/`this.error`, **19 no están** en `data/i18n/playground/english.json`:
+
+`E014`, `E015`, `E016`, `E017`, `E018`, `E019`, `E_ARRAY_MIX`, `E_HOT_AMBIG`,
+`E_HOT_OUTPUT`, `E_NAME`, `W_ARITH_TYPE`, `W_COND_TYPE`, `W_DESTRUCT_SHAPE`,
+`W_LOGIC_TYPE`, `W_MIX_UNNEEDED`, `W_NO_EFFECT`, `W_RANGE_DIR`, `W_TYPE_CHANGE`,
+`W_UNARY_TYPE`.
+
+`tests/test_i18n_playground.mjs` comprueba que los dos catálogos tienen las
+mismas claves, pero no que estén las que el motor emite. Sin celda: ZyDDT no ve
+el panel. Lo que lo sujetaría es un test en `web/tests/` que cruce los códigos
+de `zymbol.js` con el catálogo.
+
+### Corregido — 2026-09-15 (paso 2.15d)
+
+- **Reserva:** `messageOf` muestra el mensaje inglés del motor cuando el catálogo no
+  tiene la clave, como ya pasaba con `E_PARSE`, y `hintOf` muestra entonces la ayuda
+  del motor.
+- **Traducciones:** entradas en inglés y español para los 13 códigos de un solo
+  mensaje (`E014`–`E019`, `E_HOT_AMBIG`, `E_HOT_OUTPUT`, `W_ARITH_TYPE`,
+  `W_COND_TYPE`, `W_LOGIC_TYPE`, `W_RANGE_DIR`, `W_TYPE_CHANGE`).
+- **Test:** `tests/test_i18n_playground.mjs` cruza cada código que emite el checker
+  con el catálogo. Los seis que emiten varias frases con un solo código
+  (`E_ARRAY_MIX`, `E_NAME`, `W_NO_EFFECT`, `W_UNARY_TYPE`, `W_DESTRUCT_SHAPE`,
+  `W_MIX_UNNEEDED`) van en una lista con su razón, y el test falla si uno de ellos
+  gana una entrada o deja de emitirse. Comprobado quitando a propósito la clave de
+  `E016`. La prueba DOM del playground sigue en 32 de 32.
+
+---
+
+## ZYJS-024 — Los tokens de `zyjs` no llevan columna, y todo diagnóstico dice la columna 0
+
+**Estado:** **corregido el 2026-09-16** (paso 2.16)
+**Encontrado por:** `axes/syntax-modules.toml` al cerrar [[ZYJS-022]], 2026-09-15
+
+Un token de `zyjs` era `{ type, value, line }`. Sin columna, el detalle de un
+módulo que no se lee salía `fichero.zy:3:0:` donde los dos motores Rust escriben
+`fichero.zy:3:10:`, y ningún editor podía saltar al carácter. ZyDDT compara esas
+líneas al pie de la letra, y por eso las doce celdas de `syntax-modules` estaban
+en `DIVERGE` aunque el texto del error ya coincidiera.
+
+Encima, `zyjs` añadía detrás del error de carga una línea `--> main.zy:4` —la
+sentencia que importó el módulo— que los Rust no escriben: el mismo fallo se leía
+como dos errores distintos, uno en el módulo y otro en el fichero de entrada.
+
+### Corregido el 2026-09-16 (paso 2.16)
+
+- **El lexer cuenta columnas**, 1-based y en puntos de código, que es lo que
+  cuenta el span de Rust: medido con `x = "éé" ]` escrito con acento combinante,
+  los dos ponen el `]` en la columna 12, no en el décimo grafema.
+- **Una posición es el principio de la cosa que nombra.** El token guarda la
+  línea y la columna de su primer carácter, tomadas al principio de la vuelta
+  del bucle —lo de antes era la posición de después de leerlo—, y el token de fin
+  de fichero está donde el fichero acaba: `#> { f,` sin cerrar se refusa en 3:1
+  en los tres motores.
+- **`ZyError` y `ZyStaticError` reciben el token**, no un número de línea. Un
+  número suelto se sigue aceptando y entonces no hay columna que dar.
+- **El detalle de un módulo que no se lee escribe `fichero:línea:columna`**, y el
+  error de carga se marca como ya situado, así que nadie le pega detrás la línea
+  del `<#`.
+
+Siete de las doce celdas de `syntax-modules` pasan a `AGREE` (la matriz entera
+baja de 276 rojas a 270). Consensus 660/0, `reject` 42/42, el inventario de
+mensajes sin nada nuevo, las siete aplicaciones, los 216 ejemplos, `test_check`
+sin regresiones y el barrido de parseo de los 1189 `.zy` del workspace, idéntico.
+
+### Lo que queda
+
+- Un nodo del AST lleva columna sólo donde se estampa (cada sentencia, y el
+  bloque `#>`); un diagnóstico que apunta a un nodo de expresión sigue diciendo
+  0. Los tres sitios que quedan así son errores del propio fichero de entrada,
+  donde la columna no se imprime todavía.
+- `tests/run_one.mjs` sigue escribiendo la posición como `--> line N`, sin
+  columna, y ZyDDT la lee con su regla `LOC_LINE`. Escribirla como la escribe
+  Rust —`--> fichero:línea:columna`— haría comparable la columna en todas las
+  celdas con `--strict-column`; es un cambio del arnés y de cómo se ve todo
+  diagnóstico, y se pregunta antes.
+  *Decidido el 2026-09-16:* **sí, como Rust**, en un paso propio (2.19).
+
+### El arnés escribe la columna (paso 2.19, 2026-09-16)
+
+`tests/run_one.mjs` escribe `--> fichero:línea:columna`, la grafía de la CLI,
+siempre que el motor sepa la columna. Un diagnóstico que sólo tiene línea sigue
+saliendo `--> line N`: escribir `fichero:línea:0` afirmaría una columna que nadie
+ha medido, y una columna que falta tiene que verse en una celda, no quedar tapada
+por un cero.
+
+Para que haya columna que escribir:
+
+- `checkSource` pasa la columna de un error del lexer o del parser.
+- El checker (`error`, `warn`, `define`, `defineOrKeep`, `hotDefine`) recibe el
+  nodo en vez de su línea. La línea es la misma de antes, la del nodo; la columna
+  es la que el parser estampa en cada sentencia, y sólo si es de esa misma línea.
+
+Medido antes y después con `zyddt --strict-column`:
+
+| matriz | antes | después |
+|---|---|---|
+| normal (no compara columnas) | 264 | 264 — no entra ni sale ninguna: ninguna línea se movió |
+| `--strict-column` | 530 | **433** |
+
+Salen 103. Las seis que «entran» en la estricta son celdas que pasan de `DIVERGE`
+a `WORDING`: la columna ya coincide y sólo quedan las palabras. Consensus 660/0,
+`reject` 42/42, inventario sin nada nuevo, las siete aplicaciones, los 216
+ejemplos, `test_check`, `test_agents`, `test_manual` e i18n, en verde.
+
+### Lo que queda tras el 2.19: 172 celdas rojas sólo por la columna
+
+- **165, `zyjs` no da columna**: el diagnóstico apunta a un nodo de *expresión*, y
+  esos no llevan columna. Por mensaje: tipo de un operador aritmético o lógico
+  (≈ 80, eje `operator`), `chained index does not exist` (34) e `indexed
+  assignment does not exist` (6), `undefined variable` (12), el acceso desde
+  fuera de una función (4), la interpolación (`undefined variable … in string
+  interpolation`, `{}` vacío, carácter inválido: 6), aridad y marcas `<~` en una
+  llamada (5), y sueltos.
+- **7, la columna es distinta**: `expected '|' after precision` y `expected '|'
+  after format operator` (Rust apunta al token de después del prefijo, `zyjs` al
+  prefijo), un parámetro repetido o con el nombre de su función (Rust apunta al
+  parámetro, `zyjs` a la declaración), `$~` sin sitio donde escribir (4:4 contra
+  4:5) y un parámetro de lambda que no es nombre (5:10 contra 5:9).
+
+### Un resto más, cerrado el 2026-09-25 (paso P4.1)
+
+El nodo `Ident` del parser no guardaba la columna, aunque el token la tenía, así
+que un diagnóstico sobre un nombre no la llevaba. Donde más se veía era en el
+detalle de un módulo que no carga: `mira.zy:3:0` donde Rust dice `mira.zy:3:16`.
+Pasaba lo mismo con `unexpected token after module block`, que daba `7:0` en vez
+de `7:1`, porque le llegaba la sentencia y no su `zyLine`/`zyCol`.
+El `Ident` lleva ahora `col`, y el error del bloque de módulo, la posición de la
+sentencia. Barrido de parseo de los 2926 `.zy` quitando `col`: idéntico. Tres
+celdas pasan a verde: `modularity/module-does-not-see-its-importer`,
+`runtime-modules-scripts/module-with-semantic-errors` y
+`syntax-expressions/module-with-a-statement-after-its-block`.
+
+---
+
+## ZYJS-025 — El lexer de `zyjs` se come un `#` que no reconoce, y con él a veces la línea entera
+
+**Estado:** **corregido el 2026-09-16**: A en el paso 2.18, B en el 2.18b
+**Encontrado por:** el paso 2.18, 2026-09-16, buscando por qué `syntax-modules/module-without-brace` refusaba otra cosa
+
+### A. Una línea que empieza por `# texto` y no es `# nombre {`
+
+El lexer sólo emitía `#` como token cuando, mirando adelante, encontraba
+`# nombre {`. Cualquier otra línea así era una «cabecera antigua» y se saltaba
+hasta el fin de línea, sin decir nada:
+
+| programa | `zytw`, `zyvm` | `zyjs` antes |
+|---|---|---|
+| `# hola` y `>> "x" ¶` | `expected '{' after module name` | `x` |
+| `# hola mundo con texto` | `expected '{' after module name` | `x` |
+| `# ` (nada detrás) | `expected module name after '#'` | `x` |
+| `#_x [` | `expected '{' after module name` | `x` |
+| `>> "x" ¶` y luego `# hola` | `unexpected token: Hash` | `x` |
+
+Un programa que corría en el playground y que los dos motores Rust rechazan: la
+familia de [[ZYJS-020]].
+
+*Corregido el 2026-09-16 (paso 2.18).* `#` seguido de un espacio, un tabulador,
+un punto o el principio de un nombre (la regla de [[GLB-026]], así que `#🔑 {`
+declara un módulo como en Rust) es siempre el token `#`, y es el parser quien
+refusa lo que no es una declaración de módulo, con las palabras de Rust. Las cinco
+formas se refusan. En la última Rust dice `unexpected token: Hash` —el nombre de
+un token interno, [[GLB-028]]— y `zyjs` dice `expected '{' after module name`:
+los dos refusan, y el texto de Rust es el que está mal.
+
+El barrido de parseo de los 1189 `.zy` del workspace es idéntico: nada dependía
+de la cabecera antigua.
+
+### B. Un `#` suelto
+
+La última rama de la lectura de `#` todavía lo consume y sigue (`this.consume();
+continue;`), así que un `#` que no empieza nada desaparece:
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `x = 1 #` y `>> x ¶` | `unexpected token: Hash` | `1` |
+| `>> x #; ¶` | `expected expression, found Hash` | `1` |
+
+Con `#{`, `#@` y `#"a"` los tres refusan, porque lo que sigue al `#` perdido ya no
+parsea (con textos distintos, y los de los dos lados nombran tokens internos).
+
+### Qué hay que decidir
+
+¿La última rama emite el token `#` —y el parser lo refusa como en Rust—, igual
+que se hizo en A? Es un cambio de una línea.
+
+*Decidido el 2026-09-16:* **se corrige ya**, antes del paso 2.19.
+
+### Corregido el 2026-09-16 (paso 2.18b)
+
+Emitir el token no bastaba: el parser de `zyjs` leía un `#` como principio de
+módulo en **cualquier** posición, y refusaba una línea tarde (`expected module
+name after '#'`, en el token de después). La regla de Rust está en la cabecera
+de `Parser::parse`: `#` declara un módulo **sólo si es el primer token del
+fichero**; en cualquier otro sitio no empieza ninguna sentencia y cae en el brazo
+genérico, `unexpected token: Hash` con la ayuda de «expected statement».
+
+- La última rama del lexer emite `#` en vez de tirarlo.
+- `_parseStmt` abre un módulo con `#` sólo en la posición 0, y si no lo refusa
+  donde está, con las palabras de Rust. El nombre del token sale del mapa
+  `RUST_TOKEN_NAME`, el mismo que ya usa `expected expression, found X`; es un
+  nombre interno en los dos motores ([[GLB-028]]), y cuando F3 lo cambie en
+  Rust se cambia en un sitio.
+
+`x = 1 #`, `x = 1` seguido de `#{ 2 }`, y `>> "x" ¶` seguido de `# hola` se
+refusan en el `#`, con el mismo texto y la misma línea en los tres motores. La
+celda pasa a `AGREE`; la matriz se queda en 264 rojas sin que entre ninguna.
+Consensus 660/0, `reject` 42/42, inventario sin nada nuevo, las siete
+aplicaciones, los 216 ejemplos y el barrido de parseo, idéntico.
+
+### Qué lo sujeta
+
+`refusal/lone-hash-at-end-of-line`, verde.
+
+---
+
+## ZYJS-026 — `#,` y `#^` con `.` o `!` y sin cuenta se refusan con otro texto
+
+**Estado:** **corregido el 2026-09-16** (paso 3.1b)
+**Encontrado por:** el paso 3.1, 2026-09-16, midiendo `GLB-021` en todas sus formas
+
+| forma | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `#,.\|5\|`, `#,!\|5\|`, `#^.\|5\|`, `#^!\|5\|` | `expected a decimal count after '#,'` (o `'#^'`), con la ayuda que enseña `#,.2\|value\|` | `expected expression, found Hash` |
+
+Los tres refusan. `zyjs` lee la cuenta de `#,.N|` dentro del mismo token, y si
+no hay cifras ni nombre antes del `|` no forma el operador: el `#` queda solo y
+el parser lo refusa como un `#` suelto ([[ZYJS-025]] B). `#.|5|` y `#!|5|` sí
+dicen lo mismo que Rust, y desde el paso 3.1 con la misma ayuda.
+
+### Qué hay que decidir
+
+¿Se da a `#,` y `#^` el mismo rechazo que a `#.` y `#!` —`expected a decimal count
+after '#,'` con su ayuda— en el lexer de `zyjs`?
+
+*Decidido el 2026-09-16:* **se corrige ya** (paso 3.1b).
+
+### Corregido el 2026-09-16 (paso 3.1b)
+
+Medido antes, el hueco era de cinco formas y no de cuatro: cuando `#,` o `#^` no
+forman el operador, `zyjs` dejaba el `#` solo, también con la cuenta escrita y
+sin `|` detrás (`#,.2 5`, `#^!n 5`) y con `#^` seguido de otra cosa (`#^5|`).
+
+Tras intentar leer el operador, el lexer refusa ahora como `parse_format_expr`:
+un `.` o `!` sin cuenta es `expected a decimal count after '#,'` (o `'#^'`), con
+la ayuda del paso 3.1, y una cuenta sin `|` —o `#^` seguido de otra cosa— es
+`expected '|' after format operator`, con la ayuda de Rust. Cada rechazo apunta
+donde apunta Rust, a lo que ocupa el sitio de la cuenta o del `|` (un
+`posAhead` que salta el blanco como lo salta el lexer de Rust): las cinco formas
+coinciden en texto, ayuda, línea y columna.
+
+`#,5|` ya decía lo mismo que Rust y sigue apuntando al operador y no al `5`: es
+de las columnas registradas en [[ZYJS-024]].
+
+Por el camino, [[GLB-031]]: con espacios dentro del operador (`#. 2|v|`) los dos
+Rust ejecutan y `zyjs` refusa.
+
+### Qué lo sujeta
+
+`syntax-format-convert/format-expects-a-decimal-count`, verde.
+
+---
+
+## ZYJS-027 — `$!!` fuera de una función: `zyjs` escribe `Runtime error: [object Object]`
+
+**Estado:** **decidido y corregido el 2026-09-16** (paso 3.2b), en los tres motores
+**Encontrado por:** el paso 3.2, 2026-09-16, probando qué tipos de error se capturan
+
+```zymbol
+<# std/io => io
+v = io::read("/no/existe/zz.txt")
+>> "antes" ¶
+v$!!
+>> "después" ¶
+```
+
+| motor | salida | stderr | estado |
+|---|---|---|---|
+| `zytw`, `zyvm` | `antes` | nada | 1 |
+| `zyjs` | `antes` | `Runtime error: [object Object]` | 1 |
+
+Los tres terminan el programa con estado 1 en el `$!!`, que es «propagar al
+llamante», y en el nivel superior el llamante es el sistema. Igual dentro de un
+`!? { … } :! ##IO { … }`: un error blando no se lanza, así que el `:!` no lo ve y
+el programa acaba igual.
+
+`zyjs` escribe el objeto interno de su señal de propagación en vez de un
+mensaje. Los dos Rust no escriben nada: un programa termina en fallo sin decir
+por qué.
+
+### Qué hay que decidir
+
+¿Un `$!!` en el nivel superior termina el programa **en silencio** (lo que hacen
+los Rust; `zyjs` dejaría de escribir) o **diciendo el error**, p. ej.
+`Runtime error: ##IO(No such file or directory (os error 2))` (los tres
+escribirían eso)?
+
+*Decidido el 2026-09-16:* **diciendo el error.** Un programa que acaba en fallo
+dice por qué.
+
+### Corregido el 2026-09-16 (paso 3.2b)
+
+Un `$!!` que saca un error del nivel superior se convierte en un error de
+ejecución, por el mismo canal que cualquier otro:
+
+```
+Runtime error: ##IO(No such file or directory (os error 2))
+  --> main.zy:4
+```
+
+y estado 1. El texto es el del valor, el mismo que imprime `>> v`.
+
+- **TW**: el bucle de nivel superior, donde un `<~` que llega arriba fija el
+  estado de salida (GAP-ZYB-006), devuelve ahora un `RuntimeError` situado en la
+  sentencia del `$!!` cuando lo que llega es un error.
+- **VM**: el `Return` sin marco llamante devuelve un `VmError`, y `run` lo sitúa en
+  esa instrucción, compilada desde la línea del `$!!`.
+- **`zyjs`**: la señal de propagación recuerda la sentencia más interna que dejó, y
+  `run` la convierte en `ZyRuntimeError` cuando llega arriba. Dentro de una función
+  la llamada devuelve el valor antes, como siempre.
+
+Igual dentro de un `!?` de nivel superior (la línea es la del `$!!`, dentro del
+bloque): un error blando no se lanza y ningún `:!` lo ve, que es [[GLB-032]].
+Medido: los tres dan el mismo texto, la misma línea y estado 1; un `$!!` dentro de
+una función sigue devolviendo el valor al llamante. `GUIDE.md` § `$!!` lo
+documenta. `cargo test` 1039/0, consensus 660/0, `reject` 42/42, `expect`, el
+inventario de mensajes, las siete aplicaciones y los 216 ejemplos, en verde.
+
+### Qué lo sujeta
+
+`runtime-errors/propagate-at-top-level`, con `expect = "error"` desde la
+decisión, verde.
+
+---
+
+## ZYJS-028 — `$*` acepta una cuenta de repetición que los dos Rust rechazan
+
+**Estado:** **decidido y corregido el 2026-09-18** (paso 3.5d-bis)
+**Encontrado por:** el paso 3.5d, 2026-09-18, alineando los textos de `$*`
+
+| programa | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `"ab"$* 1.5` | `$* repetition count must be an integer, got Float` | `abab` (la trunca) |
+| `"ab"$* -1` | `$* repetition count must be non-negative, got -1` | `""` |
+
+No es un texto distinto: `zyjs` **ejecuta** dos programas que los otros dos
+refusan, y el gate no lo ve porque comparar una salida con un error no es una
+divergencia que `consensus` mida.
+
+### Qué hay que decidir
+
+¿`zyjs` refusa las dos formas, con los textos del TW —que desde el paso 3.5d ya
+da para el receptor—, o son formas del lenguaje y son los dos Rust los que
+sobran?
+
+*Decidido el 2026-09-18:* **`zyjs` refusa las dos**, con los textos que ya dan
+los dos Rust.
+
+### Corregido el 2026-09-18 (paso 3.5d-bis)
+
+`$*` exige una cuenta entera y no negativa: `$* repetition count must be an
+integer, got Float` y `$* repetition count must be non-negative, got -1`. Una
+cuenta de 0 sigue dando la cadena vacía, y `"ab"$* 3` sigue dando `ababab`.
+
+Al medirlo salió un error del paso 3.5b en la VM: una cuenta negativa recibía el
+mensaje de «no es entero» (`got Int`), porque los dos casos compartían rama. Ya
+son dos.
+
+Las dos celdas pasan a `AGREE`, y el eje `runtime-collection-ops` sube de 3 a 20
+celdas de acuerdo con los textos del paso 3.5c.
+
+### Qué lo sujeta
+
+`runtime-collection-ops/repeat-count-with-decimals` y
+`runtime-collection-ops/repeat-count-that-is-negative`, verdes.
+
+---
+
+## ZYJS-029 — `\` desde una función o una lambda acaba con el nombre de fuera
+
+**Estado:** **corregido el 2026-09-25** (paso P1)
+**Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
+
+```zymbol
+x = 1
+g = () -> {
+    \x
+    <~ "hecho"
+}
+>> g() ¶
+>> x ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `hecho`, `1` |
+| `zyjs` | `hecho`, y `use after destruction: variable 'x' was destroyed after its last use` |
+
+Con una función con nombre pasaba igual, y con una constante global (`\K` dentro
+de `f`). Dos causas. `collectIdentNames` no contaba el nombre de un `\` (es una
+cadena, no un nodo `Ident`), así que la lambda no se llevaba copia de `x`. Y
+`Env.destroy` subía por la cadena de entornos **sin detenerse en la frontera**,
+cuando `Env.set` sí se detiene. MEM-6: una lambda escribe sólo lo que declara.
+
+### Corregido el 2026-09-25
+
+`collectIdentNames` recoge el nombre de `LifetimeEnd`, y `Env.destroy` se detiene
+en `funcBoundary`, como `set`. El `\` de la función con nombre y el de la
+constante los refusa ahora el `Checker` antes de ejecutar ([`GLB-055`](GLOBAL.md)).
+
+### Qué lo sujeta
+
+`lifetime/a-lambda-destroys-its-own-copy`,
+`lifetime/destroy-a-file-variable-from-a-function` y
+`lifetime/destroy-a-constant-inside-a-function`, verdes.
+
+---
+
+## ZYJS-030 — Leer un parámetro destruido dice `is undefined — did you mean 'p°'`
+
+**Estado:** **corregido el 2026-09-25** (paso P4.2)
+**Encontrado por:** midiendo [`GLB-055`](GLOBAL.md), 2026-09-25
+
+```zymbol
+f(p) {
+    \p
+    <~ p
+}
+>> f(1) ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `use after destruction: variable 'p' was destroyed after its last use` |
+| `zyjs` | `'p' is undefined — did you mean 'p°' (hot definition)?` |
+
+Dentro de una lambda, leer la copia que destruyó da lo mismo. `Env.get` sólo mira
+`wasDestroyed` al llegar a la raíz; el marco de una función termina en su
+frontera y lanza antes el texto de «indefinido». Es el resto de `GLB-008` que la
+nota final de `ZYVM-005` ya anunciaba para los locales de `zyjs`.
+
+### Qué lo sujeta
+
+`lifetime/read-a-destroyed-parameter` y
+`lifetime/read-a-lambda-copy-after-destroying-it`, rojas (`WORDING`).
+
+
+### Corregido el 2026-09-25 (paso P4.2)
+
+La marca de `\` queda en el entorno donde vivía el nombre: la función, una lambda
+o un bloque. `Env.get` la busca ahora en **cada** nivel que atraviesa, y no solo
+en la raíz. Al medirlo salió una tercera forma, un local destruido dentro de un
+`?` de la función, que con arreglar solo la frontera seguía diciendo `undefined`.
+Las formas que no deben fallar siguen igual: revivir un nombre, llamar dos veces
+o destruir en una rama que no corre.
+
+Las dos celdas pasan a verde, y hay una nueva:
+`lifetime/read-a-block-local-destroyed-inside-a-function`.
+---
+
+## ZYJS-031 — El playground traduce por código, y dos códigos los comparten textos distintos
+
+**Estado:** **decidido y corregido el 2026-09-25**
+**Encontrado por:** [`GLB-055`](GLOBAL.md), 2026-09-25, al elegir el código de los diagnósticos nuevos
+
+`src/playground/problems.js` no enseña el `message` del motor: si el catálogo
+(`data/i18n/playground/*.json`) tiene una entrada para el `code`, pinta **esa**
+plantilla. Dos códigos los usan diagnósticos de fallos distintos:
+
+| código | lo que dice el motor | lo que enseña el playground |
+|---|---|---|
+| `E_SCOPE` | `'x' is read from outside this function` | `cannot access underscore variable 'x' from inner scope` |
+| `E_CONST` | `constant 'K' already declared` | `cannot reassign constant 'K'` |
+
+El programa de `E_SCOPE`, entero:
+
+```zymbol
+x = 1
+f() { <~ x }
+>> f() ¶
+```
+
+La línea de mandatos y `run_one.mjs` imprimen el `message` y están bien: sólo el
+panel de problemas del playground dice otra cosa. Ninguna prueba lo ve, porque
+`test_check.mjs` compara `message`, no lo que pinta el panel. Los diagnósticos de
+`GLB-055` tienen códigos propios (`E_DESTROY_*`) y no entran en esto.
+
+### Qué hay que decidir
+
+¿Un código por fallo (con su entrada en el catálogo inglés y español), o que el
+panel use el catálogo sólo cuando la plantilla inglesa coincide con el `message`?
+
+### Decidido y corregido el 2026-09-25
+
+**Un código por fallo, y una prueba que impide volver atrás.** Antes se midió el
+motor entero: de los 6 códigos que emiten más de una frase, solo `E_SCOPE` y
+`E_CONST` tenían entrada en el catálogo (los otros 4, sin entrada, enseñan el texto
+del motor, que es correcto). Y salió un tercero del mismo tipo: `E_HOT_OUTPUT`
+tenía en el catálogo `>> x ¶` con una `x` fija, y el motor le pasaba el nombre
+vacío. Con `>> °cuenta ¶` el motor decía `>> cuenta ¶` y el panel, `>> x ¶`.
+
+- `'x' is read from outside this function` pasa a `E_SCOPE_FN`, y `constant 'K'
+  already declared` a `E_CONST_REDECL`, los dos con su entrada y su ayuda en
+  inglés y en español.
+- `E_HOT_OUTPUT` pasa el nombre, y el catálogo dice `>> {name} ¶`.
+- `problems.js` pasa los parámetros también a la ayuda, que ahora puede nombrar lo
+  que nombra el mensaje (`pasa 'x' como parámetro`).
+- `test_i18n_playground.mjs`, sección *one code, one sentence*: un código con
+  entrada en el catálogo tiene que emitirse con una sola frase, y los tres casos
+  se pintan con el catálogo y se comparan con el mensaje del motor. Comprobado
+  que falla al deshacer el arreglo.
+
+Los ficheros que lo enseñan están en `scratchpad/decisiones/3_playground/`.
+
+---
+
+## ZYJS-032 — El error de desestructurar en una constante no lleva línea
+
+**Estado:** **corregido el 2026-09-25** (paso P4.3)
+**Encontrado por:** paso G5.3 ([`GLB-040`](GLOBAL.md)), 2026-09-25
+
+```zymbol
+PI := 3
+[PI, b] = [1, 2]
+>> b ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `cannot reassign constant 'PI'`, `--> fichero:2:1` |
+| `zyjs` | el mismo texto y la misma ayuda, **sin** línea `-->` |
+
+El `Checker` pasa el nodo de la desestructuración como posición, y ese nodo no
+lleva `line`: `posOf` devuelve `null`. El playground no puede marcar la línea.
+
+### Qué lo sujeta
+
+`isolation/const-refuses-to-be-destructured-into`, roja (`DIVERGE`).
+
+
+### Corregido el 2026-09-25 (paso P4.3)
+
+`Checker.posOf` toma `zyLine` cuando el nodo no trae `line`, que es la posición que
+`parseStmt` estampa en cada sentencia. El cambio es general y se midió así: sobre
+el corpus, `reject/` y `ZyDDT/generated`, los diagnósticos de `zyjs` con el mismo
+mensaje y la misma línea que Rust pasan de **230 a 240**, sin ninguna diferencia
+nueva. Además de este, lo arregla en los 14 `unused variable` que salían sin línea y en
+el `<~` de salida no entera (`E-EXIT-TYPE`).
+
+La celda sigue roja por otra cosa, [`GLB-061`](GLOBAL.md): Rust avisa de la constante
+sin usar y `zyjs` no.
+---
+
+## ZYJS-033 — Un `*` donde va un patrón: `zyjs` dice `expected expression`
+
+**Estado:** **corregido el 2026-09-25** (paso P4.5)
+**Encontrado por:** paso G5.5 ([`GLB-028`](GLOBAL.md)), 2026-09-25
+
+```zymbol
+?? 3 { * => 1 }
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `expected pattern, found '*'` |
+| `zyjs` | `expected expression, found '*'` |
+
+Anterior a `GLB-028`: antes los dos decían `found Star`, con la misma diferencia
+delante. `zyjs` lee el patrón de un brazo con el parser de expresiones y el
+refuso sale de allí.
+
+### Qué lo sujeta
+
+`refusal/match-arm-with-a-star`, roja (`WORDING`).
+
+
+### Corregido el 2026-09-25 (paso P4.5)
+
+Antes de pasarle un brazo al parser de expresiones, `parseMatchPatternPrimary` mira
+si el token puede empezar un patrón, con la lista de `parse_pattern_primary`. Si no
+puede, refusa con el texto de Rust: `expected pattern, found '*'`. `-` y `(` pasan
+como antes, porque los dos Rust los refusan y eso lo decide el autor
+([`GLB-062`](GLOBAL.md)). Al medir salió también [`ZYJS-038`](zyjs.md).
+---
+
+## ZYJS-034 — `zyjs` no sabe que el iterador de un rango es un Int
+
+**Estado:** **corregido el 2026-09-25** (paso P4.4)
+**Encontrado por:** preparando la decisión de GLB-043 (caso Unit), 2026-09-25
+
+```zymbol
+x = "a"
+@ i:1..2 {
+    x = i
+}
+>> x ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: type mismatch: 'x' was String but assigned Int` |
+| `zyjs` | ningún aviso |
+
+En el mismo bucle, `x = 5` y `x = n` (con `n = 3` fuera) sí avisan en `zyjs`: lo que
+no infiere es el tipo del iterador. Resto de [`GLB-043`](GLOBAL.md), que alineó
+seis formas y no esta.
+
+### Qué lo sujeta
+
+`type-change/loop-iterator`, roja (`WRONG`: `zyjs` no llega a `warn`).
+
+
+### Corregido el 2026-09-25 (paso P4.4)
+
+El `Checker` declara el iterador de un rango con `infType = 'Int'`. Medido en 511
+ficheros del corpus, de `reject/` y de ZyDDT con condiciones, rangos o `##_`: el
+número de avisos de cambio de tipo y de condición es igual en `zyjs` y en Rust en
+todos. La celda pasa a verde.
+---
+
+## ZYJS-035 — `？ x > 1 {` se refusa con otro texto
+
+**Estado:** **corregido el 2026-09-26**: la raíz era la gramática de la sentencia, no el texto
+**Encontrado por:** preparando la decisión de los caracteres confundibles, 2026-09-25
+
+```zymbol
+x = 5
+？ x > 1 {
+    >> "mayor" ¶
+}
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `unexpected token: '{'` (columna 9) |
+| `zyjs` | `expected expression, found '>'` (columna 5) |
+
+`？` (U+FF1F) es un carácter de nombre para los dos lexers, así que el refuso cae
+más tarde y en sitios distintos. Ninguno de los dos nombra el carácter; eso le
+toca a la regla de confundibles que el autor escribe en `SYMBOLS.md` §2, y
+cuando exista esta ficha probablemente se cierre con ella.
+
+### La raíz
+
+No era el texto. `zyjs` no sabía leer `x > 1` como sentencia: tras el nombre
+paraba en el postfijo, así que refusaba `x > 1` en el `>` y partía `x + 1` en `x`
+y `+1`. Los dos motores de Rust leían la expresión entera y la aceptaban callados.
+
+| sentencia | `zytw`, `zyvm` antes | `zyjs` antes |
+|---|---|---|
+| `x > 1` | corre, sin aviso | `expected expression, found '>'` |
+| `x + 1` | corre, sin aviso | `x` (avisa) y luego `+1` |
+| `-x`, `!b`, `+x` | `unexpected token` | corre |
+| `{ … }` suelto | `unexpected token: '{'` | `expected expression, found '{'` |
+
+### Decisión del autor (2026-09-26)
+
+Una expresión que empieza por un nombre es **válida y avisa**, igual que ya avisaba
+`x` suelto: `this statement does nothing: `>` computes a value and it is discarded`.
+El aviso solo salta si la expresión está hecha de nombres, literales y operadores
+aritméticos, de comparación o lógicos: una llamada dentro puede estar ahí por su
+efecto. En una comparación o una lógica, la ayuda propone `? condition { … }`.
+
+Medido antes de implementarlo: ningún `.zy` del workspace (2926) dispara el aviso,
+y el barrido del parser de `zyjs` sin posiciones solo cambia en esta celda.
+
+### Qué se cambió
+
+- `zymbol-semantic`: `pure_statement_op` y el aviso.
+- `zyjs`: la sentencia que empieza por un nombre se relee con la gramática completa
+  cuando la sigue un operador binario, también en la línea siguiente, como en Rust.
+  El Checker da el mismo aviso. `-`, `+`, `!` y `{` no empiezan una sentencia, y
+  una llamada seguida de un operador se refusa aunque este esté en otra línea.
+
+### Qué lo sujeta
+
+`refusal/fullwidth-question-mark`, en verde. También cuatro celdas de
+`syntax-expressions`: `bare-comparison-is-a-statement-that-does-nothing`,
+`bare-arithmetic-continues-across-a-line`, `statement-opening-with-a-sign` y
+`statement-opening-with-a-brace`.
+
+---
+
+## ZYJS-036 — `zyjs` no avisa de una condición que vale Unit
+
+**Estado:** **corregido el 2026-09-25** (paso P4.4)
+**Encontrado por:** midiendo las formas vecinas del caso Unit de [`GLB-043`](GLOBAL.md), 2026-09-25
+
+```zymbol
+x = 1
+x = ##_
+? x {
+    >> "si" ¶
+}
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `warning: if condition should be Bool, got Unit` |
+| `zyjs` | ningún aviso |
+
+### Qué lo sujeta
+
+`type-change/a-condition-on-an-emptied-variable`, roja.
+
+
+### Corregido el 2026-09-25 (paso P4.4)
+
+`staticTypeName` lee el tipo de la **última** asignación (`infType`), como el
+entorno de tipos de Rust, y no el registro de literales que coinciden
+(`litType`). Ese registro se borraba con `x = 1` seguido de `x = ##_`, y la condición
+callaba. Misma medida que ZYJS-034: los 511 ficheros cuentan igual. La celda pasa a
+verde.
+---
+
+## ZYJS-037 — Una salida `>>` en varias líneas perdía el resto en silencio
+
+**Estado:** **decidido y corregido el 2026-09-25** (paso P4.5)
+**Encontrado por:** el barrido de parseo del paso P4.5, al romper `GoL/εκκίνηση.zy`
+
+```zymbol
+x = 5
+>> "valor: " x
+   " unidades" ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `valor: 5 unidades` |
+| `zyjs` | `valor: 5` |
+
+`zyjs` terminaba la salida al final de la línea, y la continuación quedaba como una
+sentencia suelta que no hacía nada. `GoL` la usa en `εκκίνηση.zy` y en
+`μέτρηση/όλα.zy`, así que en el playground salía cortado. Ningún diferencial lo veía,
+porque el corpus no tenía ninguna salida en varias líneas.
+
+### Decidido por el autor
+
+**La regla de Rust** (`parse_output`): el salto de línea no termina una salida.
+Termina en `¶`, `\\`, `}`, `;`, otro `>>`, o ante lo que empieza una sentencia: una
+palabra de sentencia o un nombre al que se asigna. El autor aceptó también lo que
+esa regla trae consigo: una llamada en la línea siguiente de un `>>` sin `¶` entra en
+la salida, y se imprime su valor.
+
+### Corregido
+
+`parseOutput` corta por token y no por línea: `OUTPUT_END` más `Parser.ASSIGNING`.
+El refuso de una comparación dentro de la salida vale ahora en cualquier línea,
+también como en Rust. Barrido de parseo: cambian los dos ficheros de GoL, y ninguno
+más. Tres celdas en `syntax-io`: la continuación, la llamada absorbida y el corte
+ante una asignación.
+
+---
+
+## ZYJS-038 — Un brazo con valor y bloque (`patrón => valor { … }`) no se parsea
+
+**Estado:** **decidido y corregido el 2026-09-26** (paso P4.8)
+**Encontrado por:** el barrido de parseo del paso P4.5
+
+```zymbol
+g = ?? 92 {
+    90..100 => 'A' { >> "bien" ¶ }
+    _       => '?' { >> "otro" ¶ }
+}
+>> g ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `bien`, `A` |
+| `zyjs` | `expected pattern, found '{'` (antes `expected expression`) |
+
+La usa `interpreter/examples/phase11/05_grade_calculator.zy`. Además, la exclusión de
+`corpus/scope04_match_block.zy` para `zyjs` da otra razón (`ANSI_FORMAT`), y detrás
+de esa razón está esta divergencia: una exclusión cuya razón ya no es la verdadera.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-arm-with-a-value-and-a-block`, roja.
+
+### Decidido y corregido el 2026-09-26 (paso P4.8)
+
+**Medido:** la forma solo funcionaba entera en el TW. La VM se saltaba el bloque en silencio
+([`ZYVM-009`](zyvm.md)) y `zyjs` ni la parseaba. `GUIDE.md` no la documenta, y en todo el
+workspace la usaban dos ficheros.
+
+**Decidido por el autor:** se mantiene en los tres, porque el AST de Rust la modela a
+propósito (`MatchCase` tiene `value` y `block`) y permite algo que no tiene otra forma: dar
+un valor **y** hacer un efecto en el mismo brazo. El orden es el del TW: primero el valor,
+luego el bloque, y el brazo devuelve el valor. Documentarla en `GUIDE.md` le toca al autor.
+
+**Corregido:** el parser de `zyjs` lee el bloque de efecto después del valor, y el intérprete
+lo ejecuta en los dos caminos, como sentencia y como expresión. Al tocar el `Checker` salió
+una **zona ciega**: esperaba el cuerpo de un brazo como un array, y el parser lo guarda como
+`{type, …}`, así que **un brazo con bloque no se revisaba nunca antes de ejecutar**. Un
+`>> nada` en un brazo que no corre pasaba sin error, donde Rust lo refusa. Ahora el `Checker`
+revisa el bloque, el valor y el bloque de efecto. Barrido de parseo: cambian exactamente los
+dos ficheros que usan la forma, que ahora parsean. Al quitar el refuso de `>>|` sin terminal
+(GLB-068) caducó la exclusión de `manual/tui/06_tui_block.zy` para `zyjs`, y se retiró.
+
+---
+
+## ZYJS-039 — `zyjs` no comprueba cuántos parámetros tiene la lambda de `$>` y de `$|`
+
+**Estado:** **corregido el 2026-09-26** (paso P4.8)
+**Encontrado por:** paso P4.6, midiendo las llamadas a un valor con otro número de argumentos
+
+```zymbol
+f = (a, b) -> a + b
+r = [1, 2]$> f
+>> r ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | antes de ejecutar: `map lambda must have exactly 1 parameter, got 2` |
+| `zyjs` | en ejecución, dentro de la lambda: `+ is arithmetic only — …` |
+
+El analizador de Rust lo comprueba para `$>`, `$|` y `$<` (`type_check.rs`), y `zyjs`
+solo para `$<`, en ejecución y con otro texto.
+
+### Qué lo sujeta
+
+`runtime-functions-hof/map-with-a-two-parameter-lambda`, roja.
+
+### Corregido el 2026-09-26 (paso P4.8)
+
+`checkHofArity` en el `Checker`, con los tres textos de Rust. Se decide sobre una lambda
+escrita en el sitio o sobre una variable que guarda una: una asignación anota ahora
+`lambdaArity`. Una función con nombre no se comprueba, igual que en Rust. El código
+`E_HOF_ARITY` agrupa tres frases, así que va en la lista `ENGINE_WORDS` de
+`test_i18n_playground` (el panel muestra el texto del motor), no en el catálogo.
+
+Al medir salió la forma hermana de [`GLB-063`](GLOBAL.md): una **función con nombre** de dos
+parámetros pasada a `$>`. El TW la refusaba (`lambda expects 2 arguments, got 1`). La VM y
+`zyjs` la llamaban con un argumento de menos y fallaban después. Ahora cuentan los
+argumentos `call_callable` (la VM, en todas las llamadas de `$>`, `$|`, `$<` y `$^`) y
+`callFunc` (`zyjs`, en todas las llamadas a una función de usuario, `|>` incluido). Las
+siete aplicaciones corridas en el TW y `zyjs`, antes y después: idénticas.
+
+---
+
+## ZYJS-040 — `m.nada()` sobre un módulo: `zyjs` lee el punto como una constante
+
+**Estado:** **corregido el 2026-09-26** (paso P4.8)
+**Encontrado por:** midiendo [`GLB-066`](GLOBAL.md)
+
+```zymbol
+<# ./m/saludo => m
+>> m.nada() ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `module 'm' does not export function 'nada'` |
+| `zyjs` | `Module 'm' has no constant 'nada'. Available constants: none` |
+
+### Qué lo sujeta
+
+`runtime-modules-scripts/dot-call-of-a-function-the-module-does-not-export`, roja.
+
+### Corregido el 2026-09-26 (paso P4.8)
+
+En `CallExpr`, un `alias.f` sobre un alias de módulo se evalúa como `alias::f`, porque la
+llamada pide una función. Es lo mismo que decide el TW desde GLB-066. La lectura `m.nada`
+sigue diciendo `has no constant` en los tres. Al medirla salió que la VM la refusa antes
+de ejecutar y los otros dos en ejecución: [`ZYVM-008`](zyvm.md).
+
+---
+
+## ZYJS-041 — `zyjs` no parseaba `</ ruta />`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** registrado dos veces sin ficha propia: en las notas de la F3
+(«`zyjs` no implementa `</ ruta />`») y en GLB-052 («Lo que NO era redacción»)
+
+### Qué se observa
+
+`zyjs` no tenía token para `</`, así que el `<` caía en la expresión y todo acababa
+en `expected expression, found '<'`: el programa válido y los dos mal formados.
+
+| programa | `zytw`, `zyvm` | `zyjs` antes |
+|---|---|---|
+| `x = </ />` | `expected file path after </` | `expected expression, found '<'` |
+| `x = </ ./a.zy` | `unterminated execute expression` | lo mismo |
+| `x = </ ./a.zy />` | corre el fichero | lo mismo |
+
+El tercero hacía que el panel del playground refusara como error de sintaxis un
+programa que el CLI acepta.
+
+### Qué se cambió
+
+El lexer lee la ruta cruda hasta `/>`, como los de Rust, y el parser da los dos
+refusos con las mismas palabras y la misma ayuda. Al ejecutarse, un subscript falla:
+`cannot run '<ruta>': a subscript runs another file as a process, and the browser has
+none`. Es un mensaje que solo tiene `zyjs`, como el de `std/db`, y está en la línea
+base del inventario. La exclusión `SUBSCRIPT` sigue en pie, porque lo que excluye es
+la ejecución.
+
+Barrido del parser sin posiciones: cambian 14 ficheros. Doce pasan de `ERR` a `OK`,
+y todos son programas con un subscript válido (`vscode/syntax_test.zy`,
+`corpus/i18n/test_execute.zy`, …). Los otros dos son estas dos celdas, que pasan de
+`ERR` a `ERR` con el texto de Rust.
+
+### Qué lo sujeta
+
+`syntax-io/execute-without-a-path` y `syntax-lexer/unterminated-execute-expression`,
+en verde.
+
+---
+
+## ZYJS-042 — Una desestructuración en un bloque crea nombres nuevos en vez de escribir los de fuera
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** renombrando la variable de la nave de Klingon Galaxy (GLB-070): `zyjs`
+avisaba `unused variable` en `hov_veS.zy:169` y `zymbol check` no
+
+```zymbol
+f(a, b) { <~ (a, b) }
+x = [1]
+n = 0
+@ 2 {
+    ? #1 {
+        (x, n) = f(x, n)
+    }
+    >> x n ¶
+}
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | sin avisos |
+| `zyjs` | `unused variable 'x'` y `unused variable 'n'` |
+
+La salida es la misma en los tres: solo cambian los avisos. El Checker registra los
+nombres de la desestructuración con `define` en el marco del bloque, y así crea una
+sombra que muere sin leerse. La asignación simple (`x = …`) tenía el mismo fallo, y lo
+corrigió `defineOrKeep`.
+
+### Qué lo sujeta
+
+`syntax-variables/destructure-in-a-block-onto-outer-names-warns-nothing`, en verde.
+
+### Corregido el 2026-09-26
+
+El Checker registraba los nombres de la desestructuración con `define`; ahora usa
+`defineOrKeep`, como la asignación simple: un nombre que ya se ve se escribe, no se tapa.
+Desaparece también el aviso de Klingon Galaxy (`hov_veS.zy:169`).
+
+---
+
+## ZYJS-043 — Una función que nadie llama: `unused variable`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** al reducir ZYJS-042
+
+```zymbol
+g(a) { <~ a }
+>> 1 ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | sin avisos |
+| `zyjs` | `unused variable 'g'` |
+
+Hay dos diferencias. Rust no avisa de una función sin llamar, y aunque avisara, `g` no
+es una variable.
+
+### Qué lo sujeta
+
+`syntax-variables/a-function-never-called-is-not-an-unused-variable`, en verde.
+
+### Corregido el 2026-09-26
+
+`pop()` ya no avisa de un registro de función (`isFn`), como no avisaba de un alias ni
+de un parámetro de lambda.
+
+---
+
+## ZYJS-044 — `v = °m` sobre la variable del bucle: `unused variable 'm'`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV: `ZyBank/pruebas/verificación_almacén.zy:387`
+
+```zymbol
+xs = [1, 2]
+v = 0
+@ m:xs {
+    ? m > 1 { v = °m }
+}
+>> v ¶
+```
+
+Rust no avisa de nada; `zyjs` avisaba `unused variable 'm'`. El Checker definía `m` otra
+vez en la frontera cada vez que veía el `°` prefijo, aunque `m` ya estuviera a la vista. El
+intérprete solo lo define si no existe (`if (!exists)`), y ahora el Checker hace lo mismo.
+
+### Qué lo sujeta
+
+`syntax-variables/prefix-hot-read-of-a-loop-variable-warns-nothing`, en verde.
+
+---
+
+## ZYJS-045 — El aviso de dirección del rango, sin fichero ni columna
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV: los tres ficheros de Zofia que divergían entre
+`zytw` y `zyjs` (`matmul.zy`, `perdida_mse.zy`, `tensor_ops.zy`)
+
+`@ i:1..n` con `n` que no se lee en el fuente avisa en los tres motores. Rust dice
+`--> matmul.zy:6:9`, y `zyjs` decía `--> line 6`. Un literal no guarda su posición en
+`zyjs`, así que el parser anota ahora en el bucle dónde empieza el rango (`rangeAt`), en
+la forma con etiqueta y en la forma sin ella.
+
+### Qué lo sujeta
+
+`diagnostic/range-direction-warning-points-at-the-range`, en verde.
+
+---
+
+## ZYJS-046 — Un acumulador `°s` que nadie lee: `zyjs` no avisa
+
+**Estado:** **corregido el 2026-09-27**
+**Encontrado por:** el programa de control de ZYJS-044
+
+```zymbol
+total = 0
+@ i:1..3 {
+    s = °s i
+    total = total + i
+}
+>> total ¶
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `unused variable 's'` |
+| `zyjs` | nada |
+
+Es el caso contrario de ZYJS-044: aquí el nombre no existía, así que el `°` sí lo define,
+pero el Checker cuenta como lectura el `s` del lado derecho.
+
+### Qué lo sujeta
+
+`syntax-variables/prefix-hot-accumulator-nobody-reads-warns`, en verde.
+
+### Corregido el 2026-09-27
+
+Cuando una asignación `s = °s …` da origen al acumulador, el Checker lo define en la propia
+sentencia y, al terminarla, deja su marca de «usado» como estaba: ni el `s` del lado derecho
+ni la asignación cuentan como lectura, y una lectura posterior sí. El aviso sale donde lo pone
+Rust, en la asignación (`3:5`). Programas de control: con `>> total s ¶` después del bucle no
+avisa, y la forma `c = °c + 1` avisa igual que en Rust.
+
+---
+
+## ZYJS-047 — Un nombre `_` en la cabecera de un bucle: `cannot access underscore variable`
+
+**Estado:** **corregido el 2026-09-26**
+**Encontrado por:** la revisión de las nueve LDV. Los tres ficheros de Zofia que divergían no
+lo hacían por la columna del aviso (ZYJS-045), que era lo que se veía primero, sino por esto:
+`produc_punto` declara `_n = a$#` y recorre `@ i:1.._n`.
+
+```zymbol
+_xs = [1, 2]
+@ x:_xs { >> x ¶ }
+```
+
+| motor | |
+|---|---|
+| `zytw`, `zyvm` | `1`, `2` |
+| `zyjs` | `cannot access underscore variable '_xs' from inner scope`, antes de ejecutar |
+
+El Checker abría el marco del bucle antes de revisar su cabecera, así que el iterable, los
+límites del rango y la condición se leían «desde dentro». Ahora solo el cuerpo está dentro,
+como en los dos motores de Rust.
+
+### Qué lo sujeta
+
+`syntax-variables/underscore-name-in-a-loop-header-is-read-where-the-loop-stands`, en verde.
+
+---
+
+## ZYJS-048 — Sin inferencia de tipos de parámetro: `zyjs` ejecuta, con sus efectos, lo que los motores Rust rechazan antes de empezar
+
+**Estado:** **corregido 2026-10-05 (paso P2, ZYJS-048)** — decidido por el autor: el rechazo estático de Rust es la regla
+**Encontrado por:** el cruce del 2026-10-01 de las exclusiones `ANSI_FORMAT` de ZyQuality con
+`zyddt ask`: `corpus/memory02_function_isolation.zy` divergía (concatenaba cadenas con `+`,
+un fósil; se reescribió el 2026-10-02 y con él desapareció lo único que lo preguntaba)
+
+```zymbol
+f(v) {
+    <~ v + 1
+}
+>> "antes" ¶
+>> f("a") ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm`, `zymbol check` | estático: `argument 1 has type String, but function 'f' expects Number` — no imprime nada |
+| `zyjs` | imprime `antes` y falla **en ejecución**: `+ is arithmetic only — use juxtaposition…` |
+
+### Causa
+
+El analizador de Rust infiere el tipo de un parámetro por su uso en el cuerpo (`v + 1` ⇒
+`Number`) y comprueba cada llamada contra él. `checkSource` de `zyjs` no tiene esa
+inferencia — es la misma ausencia que ya obliga a la entrada aceptada de la aridad,
+`expected signature: g(Number, Number)` ([`GLOBAL.md`](GLOBAL.md)) —, así que la llamada
+pasa el análisis y el programa corre hasta el `+`.
+
+Es la dirección permisiva del navegador: lo escrito en el playground **hace cosas** —
+imprime, escribe — antes de fallar, y en el CLI no empieza.
+
+### Arreglo propuesto
+
+Portar a `checkSource` la inferencia de parámetros del analizador de Rust, o decidir que el
+lenguaje no la exige estáticamente y que el rechazo temprano de Rust es una cortesía. Lo
+primero es lo coherente con que `check` sea la frontera. Propuesta, no decisión.
+
+### Qué lo sujeta
+
+`refusal/argument-type-inferred-from-the-body`, que hasta la decisión llevaba
+`open_finding = "ZYJS-048"`.
+
+### Decidido el 2026-10-05
+
+Es la segunda pregunta de `C-TYP-2` (`zymbol-design/CANDIDATES.md`): ¿el comportamiento de
+Rust es **la regla**, o *rechazado* es la regla y el momento una libertad de implementación?
+Opción 1 de tres: **Rust es la regla**, y `zyjs` era un hueco. Las otras eran aceptar *refused*
+como regla (y rechazar este hallazgo) y aplazarlo hasta `C-TYP-3`. Alcance medido antes: en las
+3126 fuentes del workspace sólo dos programas llegaban al diagnóstico, la celda y la sonda
+`C-TYP-2/p1`. La frase de la premisa (`TYP-2`) es del autor y va en su propio commit; esta
+corrección no toca `zymbol-design/`.
+
+`checkSource` de `zyjs` (`Checker` en `web/src/zymbol/zymbol.js`) infiere ahora la firma de cada
+función de nivel superior, en orden de declaración, con las reglas de `infer_function_signature` y
+`collect_constraints_*` de `type_check.rs`, incluido lo que **no** mira: un grupo entre
+paréntesis no se recorre, `==` y la yuxtaposición no restringen, una comparación sólo restringe
+contra un literal, una función declarada después no aporta nada, `x += v` y `v++` son una
+asignación de `v + …`, y un `??` restringe como sentencia y no como valor. Dentro del cuerpo, un
+parámetro tiene su tipo inferido, así que pasarlo donde se espera otro también se rechaza. El
+tipo del argumento lo da una función aparte (`argType`) para no tocar `inferType`, que lee el
+aviso de cambio de tipo. Código nuevo `E_ARG_TYPE`, con su entrada en el catálogo del playground
+en inglés y en español.
+
+Medido: 44 sondas con cada clase de restricción, idénticas a `zymbol check` salvo dos programas
+que ya son erróneos por otra causa (un elemento sin definir, que Rust nombra `[?]`, y un nombre
+que es variable y función a la vez). Barrido de los 3146 `.zy` del workspace, diagnóstico por
+diagnóstico: **idéntico** en los dos motores — sale en los mismos tres ficheros (la celda, la
+sonda y `zyV.zy` de la raíz) y en ningún otro. Ningún aviso de más.
+
+Lo sujetan, en `refusal`: `argument-type-inferred-from-the-body` y seis más —
+`…-bool-from-a-logical-operator`, `…-from-an-ordering-against-a-literal`,
+`…-from-a-dictionary-key`, `…-passed-on-to-another-function`,
+`…-of-an-inferred-parameter-passed-on`— y el control `argument-type-what-does-not-constrain`,
+con las formas donde un port avisaría de más. `expect` sólo afirma la categoría; lo estático lo
+sujeta la salida, que se compara: `antes` sólo lo imprime un motor que ejecutó antes de rechazar.
+
+---
+
+## ZYJS-049 — Cuatro operandos que Rust sabe nombrar y `zyjs` no: el literal `[]`, el iterador de un `@` nuevo, un nombre que guarda una lambda y uno leído con `<<`
+
+**Estado:** **corregido 2026-10-06 (paso P3.15)** — decidido por el autor el 2026-10-06: nombrar los cuatro
+como Rust
+**Encontrado por:** al medir las vecinas de [`GLB-096`](GLOBAL.md) (paso P3.12, 2026-10-06)
+
+```zymbol
+!? {
+    >> ([] - 1) ¶
+} :! {
+    >> "refused" ¶
+}
+```
+
+`zymbol check` avisa `arithmetic operation on non-numeric type: [Any]`; `zyjs`, nada.
+
+Desde `GLB-096`, `zyjs` lee un nombre por el tipo que guarda ahora, y en las sondas de las vecinas coincide
+con Rust salvo en cuatro sitios. En los cuatro calla donde Rust avisa, porque no sabe nombrar el tipo del
+operando:
+
+| programa | `zymbol check` | `zyjs` | por qué calla |
+|---|---|---|---|
+| `[] - 1` | `[Any]` | nada | `staticKind` toma el tipo común de los elementos (`arrayElemKind`); sin elementos no hay ninguno. Guardado en un nombre sí lo nombra: `x = []` · `x - 1` avisa `[Any]` desde `GLB-096` |
+| `f() { @ c:"ab" { c - 1 } }` | `Char` | nada | un iterador cuyo nombre es nuevo se define sin tipo (`define`); sólo uno que ya existía recibe el del elemento (`assignIterator`), y ese sí avisa `Char` |
+| `x = 1` · `x = () -> 1` · `x - 1` | `() -> Int`, y el cambio de tipo | nada | `argType` no nombra el tipo de una lambda, así que tampoco avisa del cambio de tipo |
+| `<< f` · `f * 2` | `String` | nada | un nombre leído con `<<` no recibe tipo |
+
+Ninguno avisa de más: es silencio, que siempre está permitido. Lo que tiene que guardar un nombre leído
+con `<<` lo decidió [`GLB-098`](GLOBAL.md) el 2026-10-06: el tipo que lee la marca (`<<` y `##"` String,
+`###` Int, `##.` Float, `##'` Char) y «no se sabe» para `#|…|`.
+
+### Qué hay que decidir
+
+- que `zyjs` nombre los cuatro como Rust: `[]` como `[Any]`, el iterador nuevo con el tipo de su
+  elemento, la lambda por su firma, y la entrada con el tipo que fije `GLB-098` (Recomendado). La lambda
+  es la de más trabajo: hay que inferir su retorno, como ya hace `funcReturnType` para las funciones;
+- sólo los tres primeros, y la lambda queda como límite de este analizador;
+- ninguno: son los límites de lo que `zyjs` sabe nombrar.
+
+### Corrección
+
+En `web/src/zymbol/zymbol.js`:
+
+- **`[]`** escrito como literal es `[Any]` en `operandTypeName`;
+- **el iterador de un `@` nuevo** recibe el tipo de su elemento (`iteratorElemType`), como ya hacía el de
+  un rango (ZYJS-034);
+- **una lambda tiene tipo**, `(Any, …) -> R`, como la nombra `infer_expr`: cada parámetro `Any`, y `R` lo
+  que da el cuerpo — una expresión, o los `<~` de un bloque, Unit si no hay ninguno (`lambdaType`, con el
+  recorrido de `funcReturnType` sacado a `returnTypeOfBlock`). El cuerpo lee los nombres de fuera
+  (MEM-6), y un `+` con un lado `Any` da `Any`, como en Rust. Donde este análisis no sabe qué da el
+  cuerpo, calla en vez de nombrarlo distinto;
+- **un nombre leído con `<<`** guarda lo que lee su marca, con los tipos de [`GLB-098`](GLOBAL.md);
+- `Any` encaja con todo en las dos relaciones, como en Rust.
+
+### Lo que salió al medir
+
+El primer barrido, con sólo lo de arriba, ganó **12 errores que Rust no da**: `E_ARRAY_MIX` sobre arrays
+de lambdas, `[(x) -> x + 1, (x) -> x * 2]`, en seis ficheros (el curso, el tour del playground, el
+corpus). El chequeo comparaba los nombres de los tipos, y `(Any) -> Any` y `(Any) -> Int` son la misma
+función para `types_compatible_static`, que acepta `Any` a cualquier profundidad. Ahora el chequeo de
+elementos y el de argumentos usan esa relación (`typesCompatibleStatic`, parte por parte); el cambio de
+tipo sigue con la otra, `is_compatible_with`, que compara una función entera.
+
+Eso cerró además una divergencia: `[(a) -> a, () -> 1]` y `[() -> 1, () -> "s"]` los rechazan los motores
+Rust, y `zyjs`, que no nombraba ninguna lambda, los ejecutaba.
+
+Barrido de `checkSource` sobre los 3213 `.zy` del workspace, antes y después: gana **cinco**
+diagnósticos, los de las celdas de este hallazgo, iguales a los de Rust en línea y texto; no pierde
+ninguno. Las 33 sondas de [`GLB-096`](GLOBAL.md) y 17 de lambdas — anidadas, de bloque, con colecciones,
+la entrada `##'` — dan lo mismo que Rust, palabra por palabra.
+
+Una de esas 17 coincide en algo dudoso: `f = (a) -> a` · `f = (b) -> b * 2` avisa `type mismatch: 'f'
+was (Any) -> Any but assigned (Any) -> Int` en los tres motores: [`GLB-100`](GLOBAL.md).
+
+### Qué lo sujeta
+
+`runtime-operators/arithmetic-on-an-empty-array-literal`, `arithmetic-on-a-new-iterator`,
+`arithmetic-on-a-name-holding-a-lambda`, `runtime-io/text-input-in-arithmetic` y
+`typed-char-input-in-arithmetic` (`expect = "warn"`), ya sin `open_finding`; y en `collections`, de
+COL-3, `lambdas-of-one-shape-are-not-a-mix` (`expect = "ok"`), `lambdas-of-another-arity-are-checked` y
+`lambdas-returning-another-type-are-checked` (`expect = "error"`). Con el `zyjs` de antes dan WRONG
+siete; con sólo la primera mitad de la corrección, el control.
+
+---
+
+## ZYJS-050 — `zyjs` acepta como sentencia nueve expresiones que los motores Rust rechazan al parsear
+
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` las rechaza como Rust
+**Encontrado por:** al medir las vecinas de [`GLB-097`](GLOBAL.md) (paso P3.13, 2026-10-06), con un
+subíndice escrito como sentencia
+
+```zymbol
+x = 3
+>> x ¶
+##_
+>> "sigue" ¶
+```
+
+`zytw` y `zyvm` lo rechazan antes de ejecutar: `error: unexpected token: '##_'`, con la guía `expected
+statement (>>, <<, ?, ??, @, @!, @>, !?, <~, ¶, \, or identifier)`. `zyjs` lo ejecuta, imprime `3` y
+`sigue`, y descarta el valor.
+
+Una sentencia empieza por una marca o por un nombre. Estas nueve expresiones no, y sólo `zyjs` las acepta
+en ese sitio:
+
+| primera línea de la sentencia | `zytw`, `zyvm` | `zyjs` |
+|---|---|---|
+| `##_` | `unexpected token: '##_'` | la ejecuta |
+| `##Parse("x")` | `unexpected token: '#'` | la ejecuta |
+| `#\|"5"\|` | `unexpected token: '#\|'` | la ejecuta |
+| `#.2\|5\|`, `#!2\|5\|` | `unexpected token: '#.'`, `'#!'` | las ejecuta |
+| `#,\|5\|` | `unexpected token: '#,'` | la ejecuta |
+| `0x\|255\|`, `0d\|"65"\|` | `unexpected token: '0x'`, `'0d'` | las ejecuta |
+| `</ hola.zy />` | `unexpected token: '</ hola.zy />'` | la ejecuta, y falla porque el navegador no puede correr un subíndice |
+
+Las demás que empiezan por una marca las rechazan los dos (`5`, `"x"`, `(1 + 2)`, `[1, 2]`, `#1`, `'c'`,
+`##.\|5\|`, `###\|"5"\|`, `#?`) o las aceptan los dos, porque son sentencias (`<\ "echo hi" \>`,
+`>< a`, `°z = 1`).
+
+### Qué hay que decidir
+
+- que `zyjs` las rechace como Rust: el valor de una expresión que nadie usa se pierde, y la regla del
+  parser de Rust ya dice qué empieza una sentencia (Recomendado);
+- que los motores Rust las acepten, con el aviso `this statement does nothing` que ya dan para un nombre
+  suelto.
+
+### Corrección
+
+`Parser.parseStatement` (`web/src/zymbol/zymbol.js`) rechaza al empezar una sentencia los tokens `UNIT`,
+`ERRCON`, `DATA_OP` y `EXECUTE`, igual que ya rechazaba un literal, un signo o `{`, con las palabras del
+parser de Rust: `unexpected token: …` y la guía `expected statement (…)`. `Parser.tokenSpelling` escribe
+cada token como `TokenKind::quoted` en Rust: `'##_'`; `'#'` para un `##Kind(…)`; `'#|'`, `'#.'`, `'#!'`,
+`'#,'` y `'#^'` para un operador de valor; `'0x'`, `'0b'`, `'0o'` y `'0d'` para una conversión de base; y el
+subíndice entero, `'</ app.zy -L es />'`. Las 19 variantes medidas dan el mismo mensaje en los dos.
+
+Barrido de `checkSource` sobre los 3230 `.zy` del workspace, antes y después: gana **ocho** rechazos, los de
+las celdas de este hallazgo, iguales a los de Rust en línea y texto, y no pierde nada. Ningún programa del
+workspace escribía una de estas formas como sentencia.
+
+### Qué lo sujeta
+
+Las nueve celdas `refusal/*-as-a-statement`, ya sin `open_finding`: con el `zyjs` de antes, ocho dan WRONG y
+la del subíndice DIVERGE. Ésta existe desde la corrección: rechazado antes de ejecutar, ya no necesita el
+subíndice que el navegador no puede correr.
+
+---
+
+## ZYJS-051 — Un `??` escrito como sentencia en el que no encaja ningún brazo: `zyjs` sigue, y los motores Rust fallan
+
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` falla como los motores Rust,
+y la GUIDE lo dice
+**Encontrado por:** al corregir [`GLB-101`](GLOBAL.md) (paso P3.16, 2026-10-06)
+
+```zymbol
+f(v) {
+    ?? v {
+        1 => {
+            >> "uno" ¶
+        }
+    }
+    <~ 99
+}
+>> f(1) ¶
+>> f(2) ¶
+```
+
+| motor | respuesta |
+|---|---|
+| `zytw`, `zyvm` | `uno`, `99` y `Runtime error: no pattern matched in match expression` |
+| `zyjs` | `uno`, `99`, `99` |
+
+Como valor, `r = ?? 2 { 1 => "uno" }`, los tres fallan con el mismo error. Sólo la sentencia diverge:
+`zyjs` lanza `no pattern matched` al evaluar un `??` como expresión y no cuando lo ejecuta como sentencia.
+La GUIDE no dice qué pasa cuando no encaja ningún brazo, y el corpus no lo pregunta.
+
+### Qué hay que decidir
+
+- que `zyjs` falle como los motores Rust, y que la GUIDE lo diga (Recomendado);
+- que un `??` de sentencia sin brazo que encaje no haga nada, y cambien los motores Rust.
+
+### Corrección
+
+El `ExprStmt` de un `??` en `execStmt` (`web/src/zymbol/zymbol.js`) lanza `no pattern matched in match
+expression` cuando no encaja ningún brazo, igual que el camino del `??` como valor desde GLB-016. Antes
+devolvía sin más. Medido en los tres motores: con un brazo de bloque y con brazos de valor fallan los tres;
+dentro de `!?` el error llega como `##_`, también en los tres; con `_` no cambia nada.
+
+La GUIDE (§ 7, *When no arm matches*) lo dice: el error vale para un `??` que da un valor y para uno escrito
+como sentencia, nunca es un valor vacío, y el programa no sigue a la línea siguiente.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/match-statement-no-arm-matches` (`expect = "error"`): con el `zyjs` de antes da
+WRONG. Y `match-statement-no-arm-matches-met` (`expect = "ok"`), que imprime la clase que recibe el `:!`.
+
+Al quitar la deuda de `zyjs`, la celda dejó ver otra divergencia que la tapaba: la VM sitúa el error en otra
+línea. La celda llevó esa deuda, [`ZYVM-011`](zyvm.md), hasta que se corrigió el 2026-10-07.
+
+---
+
+## ZYJS-052 — Una variable asignada dos veces y nunca leída: Rust avisa, y `zyjs` calla aunque su comentario diga que avisa
+
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` avisa como Rust, con sus
+palabras
+**Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07)
+
+```zymbol
+x = 1
+x = 2
+>> "ok" ¶
+```
+
+`zymbol check` avisa `variable 'x' is assigned but never read`; `checkSource` no dice nada. Los tres
+motores imprimen `ok`.
+
+| programa | Rust | `zyjs` |
+|---|---|---|
+| `x = 1` · `x = 2` · `>> "ok" ¶` | `variable 'x' is assigned but never read` | nada |
+| `y = 0` · `x = 1` · `x = y` · `>> "ok" ¶` | `variable 'x' is assigned but never read` | nada |
+| `x = 1` · `>> "ok" ¶` (control) | `unused variable 'x'` | `unused variable 'x'` |
+
+La causa está en la rama `VarAssign` del `Checker` (`web/src/zymbol/zymbol.js`): toda asignación a un nombre
+que ya existe hace `this.lookup(stmt.name, …)` — *«Kept for what it did before: the lookup marks the name,
+as it always has for an assignment»* — y `lookup` lo marca como leído. El comentario sobre `defineOrKeep`
+dice lo contrario: *«A variable that is assigned and never read still warns, because the record from its
+FIRST definition is the one that survives and nothing ever marks it used.»* Medido, algo sí lo marca: la
+segunda asignación.
+
+En el workspace, `zymbol check` da este aviso 10 veces en 6 ficheros. En 5 de ellos, 9 avisos, `zyjs` no
+dice nada. Uno es `zyquality/corpus/analysis/write_only_variable.zy`, que existe para esta forma
+(*«Variable assigned but never read (should warn)»*), y ningún gate lo ve: su golden guarda la salida, no
+los avisos. El sexto, `web/examples/tour/errors.zy`, es otra forma — el mismo nombre en dos bloques
+hermanos — y tiene su ficha, [`GLB-105`](GLOBAL.md).
+
+### Qué hay que decidir
+
+- que `zyjs` avise como Rust, con sus palabras, y que escribir un nombre deje de contar como leerlo
+  (Recomendado): es lo que el comentario ya dice que hace, y Rust es la referencia del analizador;
+- que la distancia se quede, y el comentario diga que una segunda asignación cuenta como lectura.
+
+### Corrección
+
+Escribir un nombre deja de contar como leerlo. `lookup(…, true)` —la reasignación, que sigue rechazando un
+`_nombre` escrito desde un bloque interior— y `markWritten` —la desestructuración— marcan el registro como
+escrito; al cerrar el marco, un registro escrito y nunca leído da `W_WRITE_ONLY`, `variable '…' is assigned
+but never read`, con la ayuda de Rust, y uno que no se escribió nunca sigue dando `unused variable`. La
+sentencia que crea el registro —una definición caliente, un acumulador `s = °s …`— es su declaración, no
+una segunda escritura. `W_WRITE_ONLY` tiene su entrada en los catálogos del playground, inglés y español.
+
+Al medirlo salió [`ZYJS-054`](zyjs.md): cinco nombres de `GO/` que sólo se leen dentro de un texto
+interpolado pasado a una llamada. Antes de esta corrección, la segunda escritura los marcaba como leídos y
+lo tapaba; se corrigió primero.
+
+| programa | Rust | `zyjs`, antes | `zyjs`, ahora |
+|---|---|---|---|
+| `x = 1` · `x = 2` | assigned but never read | nada | assigned but never read |
+| `c = 0` · `@ 3 { c = 5 }` | assigned but never read | nada | assigned but never read |
+| `f() { t = 1  t = 2  <~ 0 }` | assigned but never read | nada | assigned but never read |
+| `[a, b] = [1, 2]` · `[a, b] = [3, 4]` | assigned but never read | unused variable | assigned but never read |
+| `@ 3 { s = °s "x" }` (control) | unused variable | unused variable | unused variable |
+| `x = 0` · `x += 1` (control: `+=` lee) | nada | nada | nada |
+| `f(a) { a = 5  <~ 1 }` (control: un parámetro) | nada | nada | nada |
+
+Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: cinco avisos nuevos, los
+cinco dados por Rust (los dos de `write_only_variable.zy` entre ellos), y ninguno de más. Los que Rust da en
+`klingon_galaxy/HuD.zy` y `bach.zy` siguen sin salir en `zyjs`: son ficheros de módulo, cuyos avisos `zyjs`
+descarta a propósito (DG-06, GLB-093 B).
+
+### Qué lo sujeta
+
+`unused/variable-assigned-twice-and-never-read-warns`, ya sin deuda; `variable-written-in-a-loop-and-never-read-warns`,
+`variable-written-twice-in-a-function-warns` y `destructured-twice-and-never-read-warns`, que con el `zyjs`
+de antes dan WRONG o WORDING; y el control `accumulator-never-read-is-unused`.
+
+---
+
+## ZYJS-053 — `zyjs` da a un local el tipo de su última asignación al inferir el retorno, y rechaza un programa que los motores Rust ejecutan
+
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` lee un local como Rust,
+sin tipo
+**Encontrado por:** al medir las vecinas de [`GLB-102`](GLOBAL.md) (2026-10-07)
+
+```zymbol
+f(c) {
+    r = 5
+    ? c > 0 {
+        r = "a"
+    }
+    <~ r
+}
+g(n) {
+    <~ n + 1
+}
+>> g(f(0)) ¶
+```
+
+Los dos motores Rust imprimen `6`, con el aviso `type mismatch: 'r' was Int but assigned String`. `zyjs`
+rechaza el programa antes de ejecutarlo: `argument 1 has type String, but function 'g' expects Number`.
+
+Rust define cada local de la función como `Any` antes de leer sus `<~` (`define_local_vars_from_block`, en
+`crates/zymbol-semantic/src/type_check.rs`), así que `<~ r` no le dice nada. `returnTypeOfBlock`, en
+`zyjs`, le da a `r` el tipo de la última asignación que recorre (`locals.set(st.name,
+this.inferType(st.value, locals))`) sin mirar por qué camino se llega al `<~`: aquí, la de una rama que
+`f(0)` no toma. Entró con la inferencia del cambio de tipo (`677d354`, GLB-043), que se decidió *«como
+Rust»*.
+
+| programa | al ejecutar | Rust | `zyjs` |
+|---|---|---|---|
+| el de arriba | `6` | avisa del cambio de `r` | rechaza `g(f(0))` |
+| `f(c) { r = "a"  <~ r }` · `>> "antes" ¶` · `>> g(f(1)) ¶` | `antes`, y falla en el `+` | nada | rechaza antes de imprimir `antes` |
+| `f(c) { r = 5  <~ r }` · `x = "b"` · `x = f(1)` | `5` | nada | `type mismatch: 'x' was String but assigned Int` |
+| `f(c) { <~ 5 }` · `x = "b"` · `x = f(1)` (control) | `5` | el mismo aviso | el mismo aviso |
+
+En el workspace no aparece: de los 1095 diagnósticos que `checkSource` da sobre los 3232 `.zy`, los 69 que
+Rust no da no incluyen ningún rechazo de argumento ni ningún cambio de tipo.
+
+### Qué hay que decidir
+
+- que `zyjs` lea un local como Rust, sin tipo (`Any`), y el retorno se infiera como en Rust (Recomendado):
+  es lo que decidió `677d354`, y una inferencia que no sigue los caminos sólo puede no rechazar un programa
+  correcto si no adivina;
+- que los dos analizadores sigan el tipo de los locales por caminos, como la inferencia de parámetros
+  (GLB-101), y cambie Rust.
+
+### Corrección
+
+`funcReturnType` pide a `returnTypeOfBlock` que un local de la función no tenga tipo (`localsUnknown`), como
+`define_local_vars_from_block` en Rust. Al medirlo salió el límite: en una **lambda** de bloque Rust sí
+conoce el tipo de sus locales —comprueba el cuerpo antes de leer sus `<~`—, y `zyjs` ya coincidía
+(`g = (c) -> { r = 5  <~ r }` es `(Any) -> Int` en los dos), así que la lambda se queda como estaba.
+
+| programa | antes, `zyjs` | ahora, `zyjs` y Rust |
+|---|---|---|
+| el de arriba | rechaza `g(f(0))` | imprime `6`, con el aviso del cambio de `r` |
+| `f(c) { r = "a"  <~ r }` · `>> "antes" ¶` · `>> g(f(1)) ¶` | rechaza antes de imprimir `antes` | imprime `antes` y falla en el `+` |
+| `f(c) { r = 5  <~ r }` · `x = "b"` · `x = f(1)` | avisa String → Int | nada |
+| `g = (c) -> { r = 5  <~ r }` · `g = (c) -> "s"` (control) | avisa | avisa |
+
+Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: cambia sólo la celda de esta
+ficha.
+
+### Qué lo sujeta
+
+`refusal/argument-type-not-from-a-local-assigned-in-a-branch` (`expect = "warn"`), ya sin deuda;
+`refusal/argument-type-not-from-a-local-literal` (`expect = "error"`, en ejecución: `antes` se imprime) y
+`type-change/call-returning-a-local-stays-silent` (`expect = "ok"`). Con el `zyjs` de antes, las tres dan
+rojo.
+
+---
+
+## ZYJS-054 — Un nombre leído dentro de un texto interpolado que se pasa a una llamada: `zyjs` no ve la lectura y avisa `unused variable`
+
+**Estado:** **corregido 2026-10-07** — OK del autor el 2026-10-07: no hay decisión de diseño, la lectura ya la
+cuenta Rust (GLB-018 A)
+**Encontrado por:** al corregir [`ZYJS-052`](zyjs.md) (2026-10-07): el aviso nuevo daba cinco falsos en `GO/`,
+todos sobre nombres que sólo se leen así
+
+```zymbol
+f(s) {
+    >> s ¶
+}
+t = "a"
+f("{t}")
+```
+
+Los tres motores imprimen `a`. `zymbol check` no dice nada; `checkSource` decía `unused variable 't'`.
+
+| programa | Rust | `zyjs`, antes |
+|---|---|---|
+| el de arriba | nada | `unused variable 't'` |
+| `>> f("{t}") ¶`, `x = f("{t}")`, `f("x{t}")` | nada | el mismo aviso |
+| `<# std/term => t` · `n = "abc"` · `>> t::width("{n}") ¶` | nada | `unused variable 'n'` |
+| control: `g = "{t}"` · `f(g)` | nada | nada |
+
+Los casos `Call` y `CallExpr` del `Checker` recorrían cada argumento con `checkExpr(a.value ?? a)`. El
+parser da los argumentos como nodos de expresión —la marca `<~` va aparte, en `args.outArgs`—, y un literal
+de texto tiene su propio `.value`, la lista de sus partes: `checkExpr` recibía esa lista en lugar del
+literal, y la lectura de `{t}` nunca se marcaba.
+
+En el workspace eran 28 avisos falsos, todos en `GO/棋戦.zy` —el GO del playground—, que lee así sus textos
+traducidos: `記す("═══ {題} ═══", #1, 報告<~)`.
+
+### Corrección
+
+`checkExpr(a)` en los dos sitios. Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y
+después: desaparecen esos 28 `unused variable`, ninguno dado por Rust, y no aparece nada.
+
+### Qué lo sujeta
+
+`unused/read-inside-an-interpolated-argument-is-a-read` y
+`read-inside-an-interpolated-module-argument-is-a-read` (`expect = "ok"`), una por cada caso. Con el `zyjs`
+de antes, las dos dan WRONG.
+
+---
+
+## ZYJS-055 — Un nombre usado como patrón de un `??`: `zyjs` no cuenta la lectura y avisa `unused variable`
+
+**Estado:** **corregido 2026-10-07** — decidido por el autor el 2026-10-07: `zyjs` cuenta la lectura, como Rust
+**Encontrado por:** al corregir [`GLB-105`](GLOBAL.md) (2026-10-07): nueve de los doce avisos de variable sin
+usar que `zyjs` da en el workspace y Rust no
+
+```zymbol
+umbral = 5
+v = 5
+?? v {
+    umbral => { >> "igual" ¶ }
+    _ => { >> "otro" ¶ }
+}
+```
+
+Los tres motores imprimen `igual`: un identificador en un patrón es un valor que se compara —el `??`
+compara `v` con lo que tiene `umbral`—, así que el patrón lo lee. `zymbol check` no dice nada; `checkSource`
+dice `unused variable 'umbral'`.
+
+| programa | al ejecutar | Rust | `zyjs` |
+|---|---|---|---|
+| el de arriba | `igual` | nada | `unused variable 'umbral'` |
+| `ok = [1, 2]` · `?? 2 { ok => … }` (contención) | `dentro` | nada | `unused variable 'ok'` |
+| `r = ?? v { umbral => "igual"  _ => "otro" }` · `>> r ¶` | `igual` | nada | `unused variable 'umbral'` |
+
+En el workspace son nueve avisos: `zyquality/corpus/match/13_ident_scalar.zy` (3),
+`match/14_ident_array_containment.zy` (2), `match/17_or_pattern_mixed.zy` (en un patrón `1 || expected || 9`),
+`smoke/18_match.zy` (2) y `aprende_zymbol/basico/ejemplos/04_selector_de_casos.zy`.
+
+### Qué hay que decidir
+
+- que `zyjs` cuente como lectura el nombre de un patrón, como Rust (Recomendado): es lo que el patrón hace
+  en los tres motores, y Rust es la referencia del analizador;
+- que la distancia se quede.
+
+### Corrección
+
+El parser de `zyjs` da el patrón `umbral =>` como un patrón literal cuyo valor es el nombre,
+`{ type: 'literal', value: Ident }`, y `checkMatchPattern` sólo leía un `Ident` suelto, los elementos de un
+patrón de lista y las alternativas. Ahora lee también ese literal, y con él cada alternativa de un patrón
+`||`.
+
+Barrido de `checkSource` sobre los 3261 `.zy` del workspace, antes y después: desaparecen 11 `unused
+variable`, ninguno dado por Rust —los nueve de arriba y dos más, de la misma causa, en
+`vscode/syntax_test.zy`— y no aparece nada.
+
+### Qué lo sujeta
+
+`unused/name-read-as-a-match-pattern-is-a-read`, ya sin deuda;
+`array-read-as-a-match-pattern-is-a-read` (la contención) y `name-read-in-an-or-pattern-is-a-read` (un `||`
+en un `??` usado como valor), que con el `zyjs` de antes dan WRONG.
+
+---
+
+## ZYJS-056 — `(-> 1)`: `zyjs` lo lee como una lambda sin parámetros y lo ejecuta
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: la gramática no tiene esa forma
+**Encontrado por:** una sonda mal escrita, al corregir [`ZYVM-003`](zyvm.md)
+
+```zymbol
+f = (-> 1)
+>> f() ¶
+```
+
+`zytw`, `zyvm` y `zymbol check`: `expected expression, found '->'`. **`zyjs`: `1`.**
+
+La gramática (`interpreter/IMPLEMENTATION.md`, § 8) da dos formas con paréntesis: `(x -> expr)`, con un parámetro
+dentro, y `(a, b) -> expr`, con la lista cerrada antes de la flecha; la de ningún parámetro es `() -> expr`.
+`(-> 1)` no es ninguna. Un programa escrito en el playground con esa forma fallaba fuera de él.
+
+### Causa
+
+`parseLambda`: el bucle que lee los parámetros dentro del paréntesis termina igual al llegar a `)` que a `->`, y
+la forma envuelta —`(params -> cuerpo)`— no comprobaba haber leído alguno.
+
+### Corrección
+
+La forma envuelta con cero parámetros se rechaza con las palabras de Rust, `expected expression, found '->'`.
+
+| forma | antes, `zyjs` | ahora, los tres |
+|---|---|---|
+| `(-> 1)` | la ejecuta | `expected expression, found '->'` |
+| `() -> 1` · `(x -> x + 1)` · `(a, b) -> a + b` · `() -> { <~ 7 }` | las ejecuta | las ejecuta |
+
+Ningún `.zy` del workspace usaba la forma.
+
+### Qué lo sujeta
+
+`zyquality/reject/functions/02_wrapped_lambda_without_a_parameter.zy`: 51 formas rechazadas por los tres.
+
+---
+
+## ZYJS-057 — `m[f()>2]`: `zyjs` lo lee como un camino, y es una comparación
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: lo dice la gramática
+**Encontrado por:** una sonda de [`GLB-115`](GLOBAL.md), escrita con una llamada como primer paso
+
+```zymbol
+f() { <~ 1 }
+m = [[1, 2], [3, 4]]
+>> m[f()>2] ¶
+```
+
+`zytw` y `zyvm`: `index must be an integer, got Bool`. **`zyjs`: `2`.**
+
+El paso de un camino es un átomo (`interpreter/IMPLEMENTATION.md`, § 14): un entero, `-entero`, una cadena, un
+nombre o `( expr )`. Un corchete cuyo contenido no **empieza** por un átomo seguido de `>`, `;` o `..` es un
+índice corriente, diga lo que diga después: `m[f()>2]` indexa con `f() > 2`. El camino se escribe
+`m[(f())>2]`.
+
+| | `zytw`, `zyvm` | `zyjs`, antes |
+|---|---|---|
+| `m[f()>2]` | `##Type`, el índice es un Bool | `2` — camino |
+| `a[i + 1>2]` | `##Type` | camino |
+| control: `m[1>2]` · `m[i>2]` · `m[(f())>2]` · `m[-1>1]` · `d["k">"z"]` | camino | camino |
+
+### Causa
+
+`parseNavContent` leía el primer paso con `parseAdditive` —cualquier expresión aditiva— y decidía que era un
+camino si después venía `>` o `;`. Los dos parsers de Rust lo deciden mirando los primeros tokens
+(`is_nav_index`).
+
+### Corrección
+
+La misma mirada: `navPathAhead`. Si no hay camino, el contenido del corchete es una expresión entera.
+
+### Qué lo sujeta
+
+`runtime-index-nav/a-first-step-that-is-not-an-atom-is-an-index-expression`. Con el `zyjs` de antes da DIVERGE.
+
+---
+
+## ZYJS-058 — `m[1;2]` sobre un array de filas: `zyjs` devuelve las casillas, no las filas
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión: lo dice `GUIDE.md`
+**Encontrado por:** la sonda de [`ZYJS-057`](zyjs.md)
+
+```zymbol
+m = [[1, 2], [3, 4]]
+>> m[1;2] ¶
+```
+
+`zytw` y `zyvm`: `[[1, 2], [3, 4]]`. **`zyjs`: `[1, 2, 3, 4]`.**
+
+`GUIDE.md`: `arr[p ; q ; r]` es `[v, v, v]`, un valor por camino. Un valor que es un array sigue siendo un valor.
+Sólo un paso con **rango** hace que un camino dé varios.
+
+| | `zytw`, `zyvm` | `zyjs`, antes |
+|---|---|---|
+| `m[1;2]` | `[[1, 2], [3, 4]]` | `[1, 2, 3, 4]` |
+| `m[[1, 2]]` · `m[[1];[2]]` | filas | casillas |
+| `c[1..2>1]`, un rango antes del último paso | `[[1, 2], [5, 6]]` | `[1, 2, 5, 6]` |
+| control: `m[1>1;2>2]` · `m[1>1..2;2>1]` | `[1, 4]` · `[1, 2, 3]` | igual |
+
+### Causa
+
+Las extracciones, y el paso con rango que no es el último, desplegaban **cualquier array** que recibían
+(`if (val.type === 'arr') results.push(...val.v)`): no distinguían «el camino recorrió varias posiciones» de «el
+camino encontró un array». En Rust el recorrido devuelve una lista de valores y la pregunta no existe.
+
+### Corrección
+
+Se despliega sólo si el camino —o el resto del camino— tiene un paso con rango (`navPathFans`).
+
+El eje `addressing` no podía verlo: sus hojas son escalares.
+
+### Qué lo sujeta
+
+`runtime-index-nav/extraction-of-values-that-are-arrays`, dieciséis formas, sin oráculo: lo que se pide es que
+los tres coincidan, y el que no coincidía era el port. Con el `zyjs` de antes da DIVERGE.
+
+---
+
+## ZYJS-059 — La orden con que los juegos publicados piden su semilla se rechaza en el navegador
+
+**Estado:** **corregido 2026-10-10**, el día en que se encontró — sin decisión
+**Encontrado por:** `web/tests/test_shell.mjs`, que estaba en rojo y **fuera de la puerta**: `zyq suite` no lo
+corre
+
+```zymbol
+_u = <\ "od -An -N2 -tu2 /dev/urandom | tr -d ' \n'" \>
+```
+
+Es, letra por letra, lo que escriben GO, Serpiente y Klingon Galaxy para sembrar su generador. En el navegador:
+`cannot run 'od -An -N2 -tu2 /dev/urandom | tr -d ' …'': a shell command runs as a process, and the browser has
+none`.
+
+El navegador no tiene shell; tiene una lista corta de sustitutos, y éste es uno de ellos (BUG-GOL-014).
+
+### Causa
+
+El sustituto compara la orden después de aplanarla: las comillas pasan a espacios y los espacios se juntan. Su
+patrón pedía algo después de `tr -d`. Cuando se escribió, `\n` dentro de una cadena eran dos caracteres y quedaba
+`tr -d \n`; desde que `\n` es un escape, `' \n'` es un espacio y un salto de línea, y aplanado no deja nada.
+
+Estaba roto desde antes del 2026-10-07 (la prueba ya fallaba en los commits de ese día). Nadie lo vio porque la
+prueba que lo sujeta no está en `zyquality/suites.toml`, y porque el consenso excusa a `zyjs` de todo fichero con
+`<\ … \>`.
+
+### Corrección
+
+Lo que siga a `tr -d` es opcional en el patrón.
+
+De paso, dos cosas que la misma prueba y `test_symbols.mjs` tenían en rojo por la forma vieja del bloque, que hoy
+toma una expresión y no palabras sueltas: el caso `whoami` de la prueba, y el ejemplo de la tarjeta de `<\` en la
+ayuda de símbolos del playground, que enseñaba `<\ echo hola \>` — una forma que ya no compila.
+
+### Qué lo sujeta
+
+`web/tests/test_shell.mjs` y `web/tests/test_symbols.mjs`, en verde. **Siguen fuera de la puerta**: es la razón
+de que esto durara días, y meterlos es decisión del autor.
+
+---
+
+## ZYJS-060 — **Reencaminado.** No era sólo de `zyjs`
+
+**Estado:** **reencaminado 2026-10-11** → [`GLB-120`](GLOBAL.md)
+
+`\ nombre` sobre el estado de un módulo, dentro de una de sus funciones. Se archivó aquí el 2026-10-10 porque
+`zyjs` era el motor que se apartaba de los otros dos en el programa que lo destapó; medido con más programas,
+los tres contestaban distinto y ninguno hacía lo que MEM-8 pide. La ficha, la decisión y la corrección están en
+[`GLB-120`](GLOBAL.md).
+
+---
+
+## ZYJS-061 — `nums$> (double)` corre en zyjs; en Rust el `(` abre una lambda y es un error de sintaxis
+
+**Estado:** **corregido 2026-10-11**, el día en que se encontró
+**Encontrado por:** `zyquality/docs/llm_verify.py` en su primera corrida, con la sonda de la regla 11 de
+`LLM.md` (*«`$>` with a named function takes NO parentheses»*)
+**Familia:** [`ZYJS-021`](zyjs.md), que puso la misma comprobación tras `$^` y no tras sus dos vecinos
+
+```zymbol
+double(x) { <~ x * 2 }
+nums = [1, 2, 3]
+>> (nums$> (double)) ¶
+```
+
+| | |
+|---|---|
+| `zytw`, `zyvm`, `check` | `error: expected '->' in lambda expression`, con su ayuda |
+| `zyjs` | `[2, 4, 6]` |
+
+Lo mismo tras `$|`. zyjs leía `(double)` como una expresión agrupada.
+
+### Qué cambió
+
+El bloque que `$^` tenía en línea pasa a `requireLambdaInParens()` y lo llaman también `$>` y `$|` cuando lo que
+sigue es un `(`. Mismo texto y misma ayuda que Rust.
+
+### Qué lo sujeta
+
+`syntax-functions-lambdas/map-with-a-parenthesised-name`, `…/filter-with-a-parenthesised-name` y el control
+`…/map-and-filter-with-a-bare-name`; la sonda `11b` de `llm_verify`.
+
+### Visto al medirlo, sin corregir
+
+`nums$> (1 -> 2)`: los dos dicen `expected parameter name in lambda`, Rust en la columna 13 y zyjs en la 12.
+La matriz no compara columnas salvo con `--strict-column`.
+
+---
+
+## ZYJS-062 — Un nombre caliente como patrón de `??`: zyjs lo acepta e inventa la variable
+
+**Estado:** **corregido 2026-10-11**, el día en que se encontró
+**Encontrado por:** las sondas vecinas de [`GLB-124`](GLOBAL.md)
+
+```zymbol
+r = ?? 5 {
+    acc° => "hot"
+    _ => "otro"
+}
+>> r ¶
+```
+
+| | |
+|---|---|
+| `zytw`, `zyvm`, `check` | `error: expected pattern, found 'acc°'` |
+| `zyjs` | `otro`, con el aviso `unused variable 'acc'` |
+
+Un patrón de identificador compara con lo que el nombre guarda; un nombre caliente se crea al usarlo, así que el
+patrón crearía aquello con lo que compara. zyjs lo leía como una expresión.
+
+### Qué cambió
+
+`parseMatchPatternPrimary` rechaza un `IDENT` caliente con las palabras de Rust.
+
+### Qué lo sujeta
+
+`refusal/hot-name-as-a-match-pattern`.
+
