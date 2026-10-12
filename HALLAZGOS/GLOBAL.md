@@ -9077,3 +9077,36 @@ una causa que no es ésta.
   ninguna vez.
 - `engine.ml` conserva el campo `build` y la sustitución `{exe}`, que sólo usaba el oráculo `ml`. Se dejan: un
   motor que necesite compilarse sigue siendo una entrada legítima, y quitarlos es otra decisión.
+
+## GLB-127 — `>> +a`: el `+` unario al principio de un elemento de `>>` lo rechazan `zytw` y `zyvm`, y `zyjs` lo acepta
+
+**Estado:** **abierto** — hallado y sin corregir. Sujeto por la celda `runtime-operators/unary-plus-starts-an-output-item`
+(`open_finding`). No hay nada que decidir: la forma ya está decidida (GLB-019, 2026-09-15: *el `+` unario es forma del
+lenguaje*) y `GUIDE.md` la documenta. Falta que el parser de `>>` la acepte
+**Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 3.5: al ejecutar todos los bloques de `GUIDE.md`, no sólo
+los anotados, `>> +a ¶ // 10` no pasaba `zymbol check`
+**Familia:** [`GLB-019`](GLOBAL.md) — la celda que lo decidió usa `(+v)` y `x = (+v)`, que sí pasan, y no cubría esta posición
+
+```zymbol
+a = 10
+>> +a ¶
+```
+
+| | `b = +a` | `>> +a ¶` | `>> 0 + +a ¶` |
+|---|---|---|---|
+| `zytw` | `10` | `expected expression, found '+'` | `expected expression, found '+'` |
+| `zyvm` | `10` | `expected expression, found '+'` | `expected expression, found '+'` |
+| `zyjs` | `10` | `10` | `10` |
+
+### Por qué
+
+`parse_output_item_term` (`zymbol-parser/src/expressions.rs`) trata como unario inicial sólo `Not` y `Minus`
+(`>> -a` y `>> !f` funcionan); el resto cae en `parse_primary_expr`, que no acepta `+`. El comentario de DI-03, que
+puso ahí el `-`, lista exactamente esas dos. El `+` unario llegó a `parse_unary` el 2026-09-15 y no a este camino.
+
+### Qué lo sujeta
+
+La celda de arriba, con `open_finding = { zytw = "GLB-127", zyvm = "GLB-127" }`: el día que pasen, queda en rojo hasta
+cerrar esta ficha. El arreglo es de una línea en el parser (añadir `Plus` junto a `Not | Minus`), y **no se ha hecho**:
+es lo que el plan pide que no se haga fuera de su paso. `+"a"` dará entonces el error de tipo documentado en vez de uno
+de sintaxis.
