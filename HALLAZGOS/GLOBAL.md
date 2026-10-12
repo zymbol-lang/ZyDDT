@@ -9114,16 +9114,18 @@ de sintaxis.
 ## GLB-128 — El Gate de GitHub da dos «sin veredicto» que son del entorno: un repositorio privado y un runner más rápido que la máquina donde se calibró
 
 **Estado:** **abierto** — dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
-(`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Sin decidir**: lo que falta
-es del autor, y el 2026-10-12 decidió publicar con esto documentado y arreglarlo en la v0.0.11
+(`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
+el autor** (ver la tabla): `pins` da por «saltado» un `DM-` cuyo repo no está clonado, y en `cost` el contado exacto basta
+cuando el cronometrado no llega al suelo. Arreglo escrito en las ramas `v0.0.11` de `zyquality` y `ZyDDT` y probado en
+local con el suelo forzado; **sigue abierto hasta que un Gate de GitHub lo dé verde**, que es donde falló
 **Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 2.4, al ver el Gate de GitHub por primera vez corriendo la
 capa de calidad entera (GLB-126 la había desbloqueado)
 **Familia:** [`GLB-126`](GLOBAL.md) — el Gate que no corría — y [`ZYVM-022`](zyvm.md) en lo que toca a `cost`
 
-| | qué dice CI | por qué | qué hay que decidir |
+| | qué dice CI | por qué | qué se decidió (2026-10-12) |
 |---|---|---|---|
-| `zyddt` · `pins` | `UNVERIFIED DM-02_array_equality.zy — DM-02 is a Divergente_ES id, and that repository is not cloned beside this one` → exit 2 | `Divergente_ES` es `zymbol-lang/divergente`, **privado**: un workflow público no lo clona sin un secreto | hacerlo público, darle a CI un token de sólo lectura, o que `pins` trate un repo no clonado como «saltado» y no como «sin veredicto» |
-| `cost` · 6 casos cronometrados | `NO VERDICT zyvm base run 39ms < 40ms floor — this ratio would measure process startup` → exit 2 | el runner es 2,1–2,4× más rápido que la máquina donde se calibró: bases de 29–41 ms allí, de 54–120 aquí | subir los tamaños (`n`), bajar el suelo `min_base_ms` (es «bajar la pregunta», movimiento 6 de `HOW_TO_CHANGE_ZYMBOL.md`), o que el contado exacto baste cuando el cronometrado no llega al suelo |
+| `zyddt` · `pins` | `UNVERIFIED DM-02_array_equality.zy — DM-02 is a Divergente_ES id, and that repository is not cloned beside this one` → exit 2 | `Divergente_ES` es `zymbol-lang/divergente`, **privado**: un workflow público no lo clona sin un secreto | **«saltado»**: `pins` nombra el pin como `SKIPPED` con su razón, lo cuenta en el resumen y no empeora la salida; se verifica de verdad en la corrida local, donde `Divergente_ES` está clonado. Descartados: hacerlo público, darle a CI un token de sólo lectura |
+| `cost` · 6 casos cronometrados | `NO VERDICT zyvm base run 39ms < 40ms floor — this ratio would measure process startup` → exit 2 | el runner es 2,1–2,4× más rápido que la máquina donde se calibró: bases de 29–41 ms allí, de 54–120 aquí | **el contado exacto basta** donde el motor cuenta (`zytw`, `zyvm`): la fila cronometrada bajo el suelo sale `SKIPPED`, con su razón, y el veredicto es el de las razones contadas (que, si fallan, ponen la puerta en rojo). `zyjs`, `count_off` y `time-ratio` siguen en «sin veredicto». Descartados: subir `n` (queda calibrado a un runner), bajar `min_base_ms` (movimiento 6 de `HOW_TO_CHANGE_ZYMBOL.md`) |
 
 Los seis casos: `growth/append-local` y `growth/append-several-local` (`zyvm`), `growth/module-call-that-reads-one-cell`
 (`zytw`, `zyvm`), `growth/sort-with-comparator` (`zytw`, `zyvm`). Las aserciones **contadas** de esos mismos casos pasan en
@@ -9140,3 +9142,34 @@ precondición *CI green* de `agents/release_merge.md`, que no se cumple en `v0.0
 
 `consensus` 677 de acuerdo, 0 divergen; `expect` 647 + 30; `reject` 55; `guide` 130; `llm` 88; `lsp` 14, 0 fuera de la
 línea base; `project` las 9 aplicaciones; `fmtcheck` 9 cuerpos; `bench` 16; `web` 15 suites; 29 premisas.
+
+### Qué se hizo, y lo que CI deja de mirar
+
+- `zyquality/cost/run.py`: una fila cronometrada que el suelo rechaza, en un caso de crecimiento donde el motor también se
+  cuenta, se difiere a las razones contadas. Sale `SKIPPED` con su razón y con la frase de si esas razones la responden o
+  fallan; el `GREEN` final dice cuántas lecturas se apartaron. Sin contador (`zyjs`), con `count_off` o en un `time-ratio`
+  nada cambia. Probado aparte con el suelo a 100 s: contado que pasa → verde con la nota; contado que falla → rojo, y la
+  línea dice que ellas son el veredicto; contado que no se puede tomar → «sin veredicto» por duplicado. Con el
+  `cost.toml` real, en la máquina donde se calibró, no aparece ningún `SKIPPED`: nada cambia donde el reloj llega.
+- `ZyDDT/bin/zyddt`: `cmd_pins` imprime `SKIPPED` en vez de `UNVERIFIED` y no empeora la salida. Un pin sin fichar que no
+  es `DM-`, o un `DM-` sin fichar con `Divergente_ES` presente, sigue en rojo (`UNFILED`).
+
+**Lo que CI deja de mirar, dicho aquí y no en un resumen:** (1) que el id `DM-02` exista en `Divergente_ES` — sólo lo
+verifica la corrida local antes de un merge, donde ese repo está clonado; (2) la lectura del reloj de esas seis filas en
+`zytw`/`zyvm` — en CI manda el contado, que es exacto pero no ve lo que sólo el reloj vería (un coste por paso que no
+cambie el recuento). `zyjs` sigue en el reloj y pasa.
+
+### Y el Gate de `main` de la v0.0.10: otra causa, y no es de esta ficha
+
+El Gate que corrió sobre `main` (`5a3d5b1`, 11:51Z) dio además `expect` y `consensus` en rojo. No son estas dos: clonó los
+hermanos de `main`, que seguían en v0.0.9 — se fusionaron entre las 14:30 y las 14:37Z —, y vio 666 `.zy`, 41 rechazos y
+selftest de 51 donde la rama veía 683, 55 y 56. El árbol del intérprete en `main` es idéntico al de la rama, cuyo Gate
+(hermanos en `v0.0.10`) pasó todo salvo estas dos preguntas. El Gate clona los hermanos **al correr**, así que evalúa
+`main` contra el `main` de cada uno en ese instante: fusionar los hermanos primero y el intérprete el último evita ese
+rojo; si no, hay que relanzar el Gate de `main` al terminar.
+
+**Medido al relanzarlo** (16:07Z, `5a3d5b1`, hermanos ya fusionados): 56 / 683 / 55 como en la rama; `selftest`, `audit`,
+`reject`, `expect` y `consensus` pasan y sólo `suites` falla — por `pins`. El «sin veredicto» de `cost` **no apareció**: ese
+runner dio bases de 59–225 ms en las mismas seis filas donde el de las 11:51Z dio 28–40 ms. El suelo de `cost` no depende
+sólo de la máquina de calibración: **varía entre ejecuciones del mismo workflow** en el mismo tipo de runner, así que subir
+`n` habría seguido a merced de cuál tocara.

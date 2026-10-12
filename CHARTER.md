@@ -173,7 +173,10 @@ The rule makes size a **consequence** rather than a decision:
   What is mechanically checked, by `zyddt pins` since 2026-10-02, is that a
   pin's name and first line carry the same id and that the id is a filed
   finding; until then nothing checked it, and two pins of an undeclared `ZYQ-`
-  series had got in. Two pins may share an id when one finding has two faces
+  series had got in. A `DM-` id is filed in `Divergente_ES`, which is private:
+  where that repository is not cloned beside this one — a public CI — the pin is
+  reported `SKIPPED`, with its reason, and the local run before a merge is where
+  it is verified. Two pins may share an id when one finding has two faces
   that cannot share a file — a refusal stops the run before the other face is
   asked (`ZYVM-001`) — and the report lists them.
 - Therefore *"hundreds of thousands of repetitive tests"* is not a risk that has

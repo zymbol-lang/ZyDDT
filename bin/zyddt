@@ -975,7 +975,7 @@ def cmd_pins(args, cfg) -> int:
     """Every pin names a filed finding, in its name and in its first line."""
     root = Path(__file__).resolve().parents[1]
     filed, have_div = _filed_findings(root)
-    rc, seen = GREEN, {}
+    rc, seen, skipped = GREEN, {}, []
     for pin in sorted((root / "cases" / "pin").glob("*.zy")):
         name = PIN_NAME.match(pin.name)
         if not name:
@@ -994,9 +994,14 @@ def cmd_pins(args, cfg) -> int:
         if pid in filed:
             continue
         if pid.startswith("DM-") and not have_div:
-            print(R.yellow(f"  UNVERIFIED  {pin.name} — {pid} is a Divergente_ES id, and "
+            # Not cloned is not the same as not filed. Divergente_ES is private,
+            # so a public CI cannot have it and no run there can say whether the
+            # id exists; the local run before a merge, where it is cloned, can.
+            # Said with its reason on its own line and counted in the summary —
+            # not a silence, and not a pass (GLB-128, decided 2026-10-12).
+            print(R.yellow(f"  SKIPPED     {pin.name} — {pid} is a Divergente_ES id, and "
                            f"that repository is not cloned beside this one"))
-            rc = worse(rc, NOVERDICT)
+            skipped.append(pin.name)
             continue
         print(R.red(f"  UNFILED     {pin.name} — no finding called {pid} in HALLAZGOS/"
                     + ("" if not pid.startswith("DM-") else " or Divergente_ES/")))
@@ -1005,8 +1010,14 @@ def cmd_pins(args, cfg) -> int:
     for pid, names in sorted(shared.items()):
         print(R.dim(f"  shared      {pid}: {', '.join(names)}"))
     n = sum(len(v) for v in seen.values())
-    print(f"  {n} pin(s), {len(seen)} finding(s)" +
-          ("" if rc != GREEN else R.dim(" — every one named and filed")))
+    if skipped:
+        tail = R.yellow(f" — {len(skipped)} skipped: a `DM-` id is checked only where "
+                        f"Divergente_ES is cloned")
+    elif rc == GREEN:
+        tail = R.dim(" — every one named and filed")
+    else:
+        tail = ""
+    print(f"  {n} pin(s), {len(seen)} finding(s)" + tail)
     return rc
 
 
