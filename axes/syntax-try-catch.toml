@@ -1,0 +1,72 @@
+# The syntax-try-catch axis — Phase B, family B7 of the diagnostics plan.
+#
+# A catch filter written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line.
+#
+# Seven lines of this family have no cell (reasons in the queue): each parser of
+# `!?`, `:!`, `:>` and `##Type` checks that its first token is the one it was
+# called for, and every caller has already checked the same token.
+
+id      = "syntax-try-catch"
+what    = "the parser diagnostics of try, catch and finally: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "error-type-with-one-hash"
+what = "expected '##' for error type (missing second #) — with its help"
+src  = """
+!? {
+    >> 1 / 0 ¶
+} :! #Div {
+    >> "c" ¶
+}
+"""
+
+[[cell]]
+id   = "error-type-without-a-name"
+what = "expected error type name after '##' — with its help"
+src  = """
+!? {
+    >> 1 / 0 ¶
+} :! ## {
+    >> "c" ¶
+}
+"""
+
+# ── The error kind, written as one word (added 2026-10-02) ──────────────────
+#
+# The `##Kind("…")` constructor and the `##Kind(m)` pattern arrived with GoL's
+# decisions (2026-09-29) with five diagnostics and nothing to provoke them —
+# `zyquality/messages/reach.py` listed them the day after, and it was not in the
+# gate to say so. One cell per diagnostic family, each with its help.
+
+[[cell]]
+id   = "error-kind-written-apart"
+what = "a pattern whose `##` and kind are separated by a space — the kind is written together"
+src  = """
+r = ##Parse("x")
+?? r {
+    ## Parse => >> "p" ¶
+    _ => >> "o" ¶
+}
+"""
+
+[[cell]]
+id   = "error-pattern-left-open"
+what = "an error pattern whose parenthesis is never closed — and its help, ##Kind(message)"
+src  = """
+r = ##Parse("x")
+?? r {
+    ##Parse(m => >> m ¶
+    _ => >> "o" ¶
+}
+"""
+
+[[cell]]
+id   = "error-value-left-open"
+what = "an error value whose message is never closed — and its help, ##Kind(\"message\")"
+src  = """
+e = ##Parse("x"
+>> e ¶
+"""

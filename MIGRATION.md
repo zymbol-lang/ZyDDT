@@ -7,6 +7,15 @@
 > **What it is not.** Not the result. No file has been triaged yet. This defines
 > *how*, so the work is mechanical when it starts and so nobody has to decide the
 > same question twice.
+>
+> **2026-10-02.** Still true of the triage proper: steps 1–5 below have not
+> started, and the corpus grew from 661 to 681 files in the meantime. What
+> exists is the record the triage was to produce, `zyquality/dropped.tsv`,
+> opened by a hygiene pass rather than by the triage: six files written in a
+> form the language does not have (CELL — their question is a cell now), four
+> goldens nothing compared, eight seeds of an oracle phase that moved here (two
+> of which still diverged, GLB-078 and GLB-079), and the artifacts of manual
+> runs. The verdicts below were used as written.
 
 ---
 
@@ -107,7 +116,7 @@ Copying is last, not first.
    behaviour is now covered by a cell is a CELL verdict, decided by
    measurement rather than by opinion. This is the step that makes the triage
    mechanical instead of 661 judgement calls.
-3. **Read the eight gap logs** (`interpreter/LDV.md` § 5.1) against what remains.
+3. **Read the eight gap logs** (`zymbol-design/LDV.md` § 5.1) against what remains.
    Every finding gets a pin; every remaining corpus file that matches a finding
    is that pin's starting point.
 4. **Choose the seed set** from what is still standing.

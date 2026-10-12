@@ -1,0 +1,997 @@
+# The runtime-functions-hof axis — Phase C, family C7 of the diagnostics plan.
+#
+# Calls, lambdas, the pipe and the higher-order operators given something that
+# is not what they need: the runtime diagnostics no program provoked on
+# 2026-09-14. `<id>` raises it, `<id>-met` catches it and prints the family.
+# The value that is wrong — a number where a function goes, a lambda of the
+# wrong arity — arrives through a parameter, so the analyzer lets it run.
+#
+# Three of this family have no cell (reasons in the queue): the compiler's two
+# arity backstops, which the analyzer's own arity check always reaches first
+# from the command line, and the sort comparator check, which the parser makes
+# unreachable by requiring a lambda literal after `$^`.
+
+id      = "runtime-functions-hof"
+what    = "the runtime diagnostics of calls, lambdas, the pipe and the higher-order operators: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "expression-is-not-callable"
+expect = "error"
+what   = "expression is not callable"
+src    = """
+t(v) {
+    <~ v[1](2)
+}
+>> t([5]) ¶
+"""
+
+[[cell]]
+id     = "expression-is-not-callable-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1](2)
+}
+!? {
+    >> t([5]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "filter-requires-array-got"
+expect = "error"
+what   = "filter requires array, got {:?}"
+src    = """
+t(v) {
+    <~ v$| (x -> x > 0)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "filter-requires-array-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$| (x -> x > 0)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "filter-requires-lambda-function"
+expect = "error"
+what   = "filter requires lambda function"
+src    = """
+t(v) {
+    <~ [1, 2]$| v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "filter-requires-lambda-function-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$| v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "lambda-expects-arguments-got"
+expect = "error"
+what   = "lambda expects {} arguments, got {}"
+src    = """
+t(v) {
+    <~ v(1)
+}
+>> t((a, b) -> a + b) ¶
+"""
+
+[[cell]]
+id     = "lambda-expects-arguments-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v(1)
+}
+!? {
+    >> t((a, b) -> a + b) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "map-requires-array-got"
+expect = "error"
+what   = "map requires array, got {:?}"
+src    = """
+t(v) {
+    <~ v$> (x -> x)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "map-requires-array-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$> (x -> x)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "map-over-a-tuple-keeps-the-tuple"
+expect = "ok"
+what   = "a HOF walks what `@` walks: a tuple in, a tuple out"
+# Until step G4 the two Rust engines took an array and nothing else, while
+# `zyjs` took everything and said so in generic words. Decided 2026-09-22: a
+# higher-order operator walks whatever `@ e:v` hands over, which is one rule
+# instead of a list of accepted types.
+src    = """
+t(v) {
+    <~ v$> (x -> x)
+}
+>> t((1, 2)) ¶
+"""
+
+[[cell]]
+id     = "map-over-a-string-keeps-the-string"
+expect = "ok"
+what   = "a HOF walks what `@` walks: a string in, characters through, a string out"
+src    = """
+t(v) {
+    <~ v$> (c -> c)
+}
+>> t("ab") ¶
+"""
+
+[[cell]]
+id     = "map-over-a-dictionary-yields-its-keys"
+expect = "ok"
+what   = "a dictionary hands over its KEYS, exactly as `@ k:d` does (decision 8)"
+# `zyjs` used to hand over the VALUES here, which contradicted its own loop.
+# The keys are a list once they are out, so the answer is an array.
+src    = """
+t(v) {
+    <~ v$> (k -> k)
+}
+>> t(#(x: 1, y: 2)) ¶
+"""
+
+[[cell]]
+id     = "map-requires-lambda-function"
+expect = "error"
+what   = "map requires lambda function"
+src    = """
+t(v) {
+    <~ [1, 2]$> v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "map-requires-lambda-function-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$> v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "member-function-calls-not-supported"
+expect = "error"
+what   = "member function calls not supported"
+src    = """
+t(v) {
+    <~ v[1].f(2)
+}
+>> t([5]) ¶
+"""
+
+[[cell]]
+id     = "member-function-calls-not-supported-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1].f(2)
+}
+!? {
+    >> t([5]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "pipe-operator-requires-a-callable-function-or"
+expect = "error"
+what   = "pipe operator requires a callable function or lambda"
+src    = """
+t(v) {
+    <~ 5 |> v
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "pipe-operator-requires-a-callable-function-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 5 |> v
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "reduce-lambda-requires-2-parameters-accumulator-element"
+expect = "error"
+what   = "reduce lambda requires 2 parameters (accumulator, element), got {}"
+src    = """
+t(v) {
+    <~ [1, 2]$< (0, v)
+}
+>> t(x -> x) ¶
+"""
+
+[[cell]]
+id     = "reduce-lambda-requires-2-parameters-accumulator-element-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$< (0, v)
+}
+!? {
+    >> t(x -> x) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "reduce-requires-array-got"
+expect = "error"
+what   = "reduce requires array, got {:?}"
+src    = """
+t(v) {
+    <~ v$< (0, (a, x) -> a + x)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "reduce-requires-array-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$< (0, (a, x) -> a + x)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "reduce-requires-lambda-function"
+expect = "error"
+what   = "reduce requires lambda function"
+src    = """
+t(v) {
+    <~ [1, 2]$< (0, v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "reduce-requires-lambda-function-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$< (0, v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "sort-requires-an-array-got"
+expect = "error"
+what   = "sort requires an array, got {:?}"
+src    = """
+t(v) {
+    <~ v$^ (a, b -> a < b)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "sort-requires-an-array-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$^ (a, b -> a < b)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "sort-comparator-that-is-not-a-bool"
+expect = "error"
+what   = "a `$^` comparator that answers something other than a Bool is an error — decided 2026-09-15 (GLB-024), a ##Type: there is no truthiness. Before, no engine refused it — the tree-walker read an Int, 0 and a String all as false, the VM and zyjs as truthy; the comparators use their parameters, or zyjs warns them unused and hides the question (found in step 1.10, 2026-09-15; GLB-024)"
+src    = """
+v = [3, 1, 2]
+>> (v$^ (a, b -> a - b)) ¶
+>> (v$^ (a, b -> a * 0 + b * 0)) ¶
+>> (v$^ (a, b -> "{a}{b}")) ¶
+"""
+
+[[cell]]
+id     = "lambda-captures-a-name-read-in-a-string"
+expect = "ok"
+what   = "a lambda captures a name it reads only inside an interpolation — the tree-walker's capture walk skipped string parts, so `{log}` stayed as text there while the VM and zyjs read it (found in step 2.15, 2026-09-15; ZYTW-005)"
+src    = """
+log = ""
+tag = (s -> { log = "{log}{s}"  <~ log })
+>> tag("A") " " tag("B") ¶
+"""
+
+[[cell]]
+id     = "local-destroyed-in-a-branch-not-taken"
+expect = "ok"
+what   = "a function-local destroyed only in a branch that does not run is still readable afterwards, as at file level — the VM refuses the read (found in step 2.15, 2026-09-15; ZYVM-005)"
+# 2026-09-27: `? #0` became `? y == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
+src    = """
+f() {
+    y = 2
+    ? y == 0 { \\ y }
+    <~ y
+}
+>> f() ¶
+"""
+
+[[cell]]
+id     = "a-name-that-holds-something-else-is-called"
+expect = "error"
+what   = "calling a NAME that holds something other than a function: the tree-walker says `undefined function: 'v'` — and `v` is defined — the VM `this needs Function and got Int`, zyjs `'v' is not a function` (found in step 3.5b, 2026-09-16; GLB-034)"
+src    = """
+t(v) {
+    <~ v(2)
+}
+>> t(5) ¶
+"""
+
+# ── A callable value called with the wrong number of arguments (step P4.6) ──
+#
+# The tree-walker refused it; the VM and zyjs ran it — a missing argument came
+# in as Unit and failed later, somewhere else, and an extra one was dropped (in
+# the VM, copied over the callee's captured registers).
+
+[[cell]]
+id     = "lambda-called-with-an-extra-argument"
+expect = "error"
+what   = "`(a) -> a` called with two arguments"
+src    = """
+f = (a) -> a
+>> f(1, 2) ¶
+"""
+
+[[cell]]
+id     = "lambda-without-parameters-called-with-one"
+expect = "error"
+what   = "`() -> 1` called with one argument"
+src    = """
+f = () -> 1
+>> f(5) ¶
+"""
+
+[[cell]]
+id     = "named-function-called-through-a-variable-with-too-few"
+expect = "error"
+what   = "a named function held in a variable, called with one argument of two"
+src    = """
+g(a, b) { <~ a + b }
+h = g
+>> h(1) ¶
+"""
+
+[[cell]]
+id     = "map-with-a-two-parameter-lambda"
+expect = "error"
+what   = "map lambda must have exactly 1 parameter, got {}"
+# ZYJS-039, open: both Rust engines refuse it before running; zyjs has no such
+# check and fails later, inside the lambda, with another error.
+src    = """
+f = (a, b) -> a + b
+r = [1, 2]$> f
+>> r ¶
+"""
+
+[[cell]]
+id     = "call-a-lambda-held-in-a-dictionary-key"
+expect = "ok"
+what   = "`d.f(1)` calls the lambda under key `f` — the tree-walker took every `x.f(…)` for a module call"
+src    = """
+d = #(f: x -> x + 1)
+>> d.f(1) ¶
+"""
+
+[[cell]]
+id     = "filter-with-a-two-parameter-lambda"
+expect = "error"
+what   = "filter lambda must have exactly 1 parameter, got {} — zyjs had no such check (ZYJS-039)"
+src    = """
+r = [1, 2]$| (a, b) -> a > b
+>> r ¶
+"""
+
+[[cell]]
+id     = "reduce-with-a-one-parameter-lambda"
+expect = "error"
+what   = "reduce lambda must have exactly 2 parameters (acc, elem), got {}"
+src    = """
+r = [1, 2]$< (0, a -> a)
+>> r ¶
+"""
+
+[[cell]]
+id     = "map-with-a-two-parameter-named-function"
+expect = "error"
+what   = "a named function of two parameters handed to `$>`: refused at the call, as a lambda value is (GLB-063)"
+src    = """
+g(a, b) { <~ a + b }
+r = [1, 2]$> g
+>> r ¶
+"""
+
+# ── The kind of that refusal (added 2026-10-02) ─────────────────────────────
+#
+# `sort-comparator-that-is-not-a-bool` holds the refusal and is green. What was
+# decided with it — the refusal is a `##Type` (GLB-024, 2026-09-15) — it does
+# not ask, and all three engines still raise `##_`. A `!?` with ONLY a
+# `:! ##Type` asks it with `expect` alone: the program ends well exactly when
+# the kind is the decided one, and the error escapes when it is not.
+
+[[cell]]
+id     = "sort-comparator-not-a-bool-is-a-type-error"
+what   = "a comparator that answers a number is refused as a ##Type, as decided: a `:! ##Type` catches it"
+expect = "ok"
+src    = """
+!? {
+    >> ([3, 1, 2]$^ (a, b -> a - b)) ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+# ── The neighbour of the sort comparator (added 2026-10-03) ─────────────────
+#
+# Measured while closing GLB-024: a `$|` predicate that answers an Int was a
+# `##Type` in the tree-walker and plain truthiness in the VM and zyjs. Decided
+# 2026-10-03 (GLB-080): a ##Type in all three.
+
+[[cell]]
+id     = "filter-predicate-not-a-bool-is-a-type-error"
+what   = "a `$|` predicate that answers a number is refused as a ##Type, as a sort comparator is (GLB-080, decided 2026-10-03); before, the VM and zyjs filtered by truthiness"
+expect = "ok"
+src    = """
+!? {
+    _q = [3, 1, 2]$| (x -> x + 1)
+    // reached only when the filter did not refuse: an ##Index no `:! ##Type`
+    // catches, so a silent filter ends the program in an error
+    >> [1][5] ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+[[cell]]
+id     = "filter-after-split-predicate-not-a-bool-is-a-type-error"
+what   = "the same refusal on the path where the VM fuses the split and the filter: `s$/ \",\"$| f`"
+expect = "ok"
+src    = """
+!? {
+    _q = "a,b,c"$/ ","$| (x -> 1)
+    >> [1][5] ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+# ── An output parameter is the caller's variable (GLB-117, 2026-10-10) ──────
+#
+# `<~` used to be copied in and written back, so one write through it cost the
+# size of the collection, every call. The author asked that it work on the
+# original: the caller's variable is LENT to the parameter for as long as the
+# call lasts. Three answers depended on the copy, and each was decided:
+#
+#   S1  what the function wrote before failing stays written;
+#   S2  the same variable cannot be two output arguments of one call;
+#   S3  module state passed to a function of its own module is still copied,
+#       and the copy is dropped if the call fails (runtime-modules-scripts).
+
+[[cell]]
+id     = "output-parameter-after-a-failed-call"
+premise = "MEM-5"
+what   = "the callee writes its `<~` parameter and then fails, caught by the caller: what it wrote is written — at one level, through two, with a scalar, and after a `$!!` (GLB-117, S1)"
+expect = "ok"
+oracle_literal_ok = "`falla` is the observable of a path; the collections are computed on both sides"
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def f(a):
+    a.append(99)
+    x = [1]
+    a.append(x[5 - 1])
+def interno(a):
+    a.append(5)
+    z = [1]
+    a.append(z[9 - 1])
+def externo(a):
+    a.append(4)
+    interno(a)
+    a.append(6)
+d = [1, 2, 3]
+try: f(d)
+except IndexError: print("falla")
+print(show(d))
+d = [1]
+try: externo(d)
+except IndexError: print("falla")
+print(show(d))
+n = [5]
+def escalar(n):
+    n[0] = n[0] + 1
+    k = [1]
+    n[0] = n[0] + k[3 - 1]
+try: escalar(n)
+except IndexError: print("falla")
+print(n[0])
+d = [1]
+d.append(7)
+print(show(d))
+"""
+src    = """
+interno(a<~) {
+    a$+ 5
+    z = [1]
+    w = z[9]
+    a$+ w
+}
+externo(a<~) {
+    a$+ 4
+    interno(a<~)
+    a$+ 6
+}
+escalar(n<~) {
+    n = n + 1
+    k = [1]
+    j = k[3]
+    n = n + j
+}
+propaga(a<~) {
+    a$+ 7
+    e = ##Mio("x")
+    e$!!
+    a$+ 8
+}
+f(a<~) {
+    a$+ 99
+    x = [1]
+    y = x[5]
+    a$+ y
+}
+d = [1, 2, 3]
+!? {
+    f(d<~)
+} :! {
+    >> "falla" ¶
+}
+>> d ¶
+d = [1]
+!? { externo(d<~) } :! { >> "falla" ¶ }
+>> d ¶
+n = 5
+!? { escalar(n<~) } :! { >> "falla" ¶ }
+>> n ¶
+d = [1]
+_r = propaga(d<~)
+>> d ¶
+"""
+
+[[cell]]
+id     = "output-parameter-same-variable-twice"
+premise = "MEM-5"
+what   = "`h(e<~, e<~)`: one variable cannot be two output parameters of one call. It was copied into both and the second write-back discarded the first, `[0, 2]`; it is refused (GLB-117, S2)"
+expect = "error"
+src    = """
+h(a<~, b<~) {
+    a$+ 1
+    b$+ 2
+}
+e = [0]
+h(e<~, e<~)
+>> e ¶
+"""
+
+[[cell]]
+id     = "output-parameter-also-passed-by-value"
+premise = "MEM-5"
+what   = "the control of S2: once as output and once by value is a call like any other, and the by-value argument holds what the variable held before the call"
+expect = "ok"
+src    = """
+g(a<~, b) {
+    a$+ 7
+    <~ b$#
+}
+k = 3
+d = [1, 2, k]
+n = g(d<~, d)
+>> n " " d ¶
+"""
+oracle.py = """
+def g(a, b):
+    a.append(7)
+    return len(b)
+k = 3
+d = [1, 2, k]
+n = g(d, list(d))
+print(n, "[" + ", ".join(str(x) for x in d) + "]")
+"""
+
+[[cell]]
+id     = "output-parameter-handed-on"
+what   = "the control: an output parameter passed on as output, and a scalar one — `[1, 5, 6] 11`, whatever the mechanism"
+expect = "ok"
+src    = """
+sumar(n<~) { n = n + 1 }
+interno(a<~) { a$+ 5 }
+externo(a<~) {
+    interno(a<~)
+    a$+ 6
+}
+d = [1]
+externo(d<~)
+k = 10
+sumar(k<~)
+>> d " " k ¶
+"""
+
+# ── A variable read, then written by a later operand through `<~` ───────────
+#
+# Operands are evaluated left to right (the `evaluation-order` axis), so in
+# `x + inc(x<~)` the `x` is 5 when it is read, whatever `inc` writes to it
+# afterwards. The tree-walker and zyjs answered 6; the VM read the register when
+# the operator ran, after the write-back, and answered 16 (ZYVM-015, corrected
+# 2026-10-10: a variable the statement also passes as `<~` is read into a
+# temporary of its own).
+
+[[cell]]
+id     = "variable-read-before-a-later-operand-writes-it"
+what   = "`x + inc(x<~)`, `(x, inc(x<~), x)` and `e = d$+ meter(d<~)`: the earlier read is the value before the call (ZYVM-015)"
+expect = "ok"
+oracle.py = """
+def inc(box):
+    box[0] += 10
+    return 1
+def meter(d):
+    d.append(99)
+    return 1
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+x = [5]
+left = x[0]
+y = left + inc(x)
+print(y, x[0])
+x = [5]
+a = x[0]
+b = inc(x)
+c = x[0]
+print(f"({a}, {b}, {c})")
+d = [1, 2, 3]
+read = list(d)
+e = read + [meter(d)]
+print(show(e), show(d))
+"""
+src    = """
+inc(a<~) {
+    a = a + 10
+    <~ 1
+}
+meter(a<~) {
+    a$+ 99
+    <~ 1
+}
+x = 5
+y = x + inc(x<~)
+>> y " " x ¶
+x = 5
+t = (x, inc(x<~), x)
+>> t ¶
+d = [1, 2, 3]
+e = d$+ meter(d<~)
+>> e " " d ¶
+"""
+
+# ── A self-assignment whose operand writes its receiver (added 2026-10-10) ──
+#
+# The statement forms of the cell above: `d$+ meter(d<~)` is `d = d$+
+# meter(d<~)`, and left to right the `d` on the left is read before the call
+# writes it — so the call's write is overwritten by the assignment (GLB-115,
+# decided 2026-10-10). The tree-walker edited `d` as the call had left it, on
+# the operators that had a shortcut and only on those.
+
+[[cell]]
+id     = "self-assignment-whose-operand-writes-the-receiver"
+what   = "`d$+ meter(d<~)`, `d[1]$~ meter(d<~)`, `d$-[meter(d<~)]`, `x = x + inc(x<~)` and `v = d[cambia(d<~)]`: the receiver is the value from before the call (GLB-115, ZYTW-014)"
+expect = "ok"
+src    = """
+inc(a<~) {
+    a = a + 10
+    <~ 1
+}
+meter(a<~) {
+    a$+ 99
+    <~ 1
+}
+cambia(a<~) {
+    a = [7, 8, 9, 6]
+    <~ 1
+}
+d = [4, 2, 3]
+d$+ meter(d<~)
+>> d ¶
+d = [4, 2, 3]
+d[1]$~ meter(d<~)
+>> d ¶
+d = [4, 2, 3]
+d$-[meter(d<~)]
+>> d ¶
+x = 5
+x = x + inc(x<~)
+>> x ¶
+d = [10, 20, 30]
+v = d[cambia(d<~)]
+>> v " " d ¶
+"""
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def meter(d):
+    d.append(99)
+    return 1
+d = [4, 2, 3]
+read = list(d); d = read + [meter(d)]
+print(show(d))
+d = [4, 2, 3]
+read = list(d); read[0] = meter(d); d = read
+print(show(d))
+d = [4, 2, 3]
+read = list(d); del read[meter(d) - 1]; d = read
+print(show(d))
+x = 5
+left = x; x = x + 10; x = left + 1
+print(x)
+d = [10, 20, 30]
+read = d; d = [7, 8, 9, 6]; v = read[1 - 1]
+print(v, show(d))
+"""
+
+# ── An operand runs once (added 2026-10-10) ─────────────────────────────────
+#
+# `x = x OP y`, `x = arr[i]` and the edits work on the variable where it lives.
+# In the tree-walker each of those shortcuts evaluated its operand first and,
+# when the shortcut did not apply — a division, a comparison, a juxtaposition,
+# an index past the end — handed the whole expression back to be evaluated
+# again: `n = n / f()` and `s = s f()` called `f` twice, and `v = v && f()`
+# called it with `v` false (ZYTW-011, corrected the day it was found). The
+# values came out right, so nothing with a golden could see it; only an operand
+# with an effect tells one evaluation from two.
+
+[[cell]]
+id     = "operand-of-a-self-assignment-runs-once"
+oracle_literal_ok = "the lines are the observable of a path — how many calls ran, and in what order — not a typed answer"
+what   = "`n = n / f()`, `%`, `^`, a float, `s = s f()`, `s$+ f()`, `b = b == f()`, `v = v && f()` with `v` false, and three indices past the end: `f` runs once each, and not at all behind a false `&&` (ZYTW-011)"
+expect = "ok"
+src    = """
+dos() {
+    >> "call" ¶
+    <~ 2
+}
+letra() {
+    >> "call" ¶
+    <~ "z"
+}
+si() {
+    >> "call" ¶
+    <~ #1
+}
+n = 10
+n = n / dos()
+n = n % dos()
+n = n ^ dos()
+f = 1.5
+f = f / dos()
+s = "ab"
+s = s letra()
+s$+ letra()
+b = #1
+b = b == si()
+v = #0
+v = v && si()
+t = [1, 2, 3]
+!? { t$-[dos() + 7] } :! { >> "refused" ¶ }
+!? { t[dos() + 7]$~ 0 } :! { >> "refused" ¶ }
+!? {
+    x = t[dos() + 7]
+    >> x ¶
+} :! { >> "refused" ¶ }
+>> n " " f " " s " " b " " v " " t ¶
+"""
+oracle.py = """
+def dos():
+    print("call")
+    return 2
+def letra():
+    print("call")
+    return "z"
+def si():
+    print("call")
+    return True
+def flag(x): return "#1" if x else "#0"
+n = 10
+n = n // dos()
+n = n % dos()
+n = n ** dos()
+f = 1.5
+f = f / dos()
+s = "ab"
+s = s + letra()
+s = s + letra()
+b = True
+b = b == si()
+v = False
+v = v and si()
+t = [1, 2, 3]
+for _ in range(3):
+    i = dos() + 7
+    if not 1 <= i <= len(t):
+        print("refused")
+print(n, f, s, flag(b), flag(v), "[" + ", ".join(str(x) for x in t) + "]")
+"""
+
+# ── A tuple is refused before its operand runs (added 2026-10-10) ───────────
+#
+# `t[1]$~ f()` on a positional tuple: the receiver is what is wrong, and it is
+# read first, so `f` never runs. The tree-walker and zyjs refused first; the VM
+# left the check to the instruction that writes, which runs after the operand,
+# and called `f` before refusing (ZYVM-019, corrected the day it was found).
+
+[[cell]]
+id     = "tuple-edit-is-refused-before-its-operand-runs"
+oracle_literal_ok = "the lines are the observable of a path — how many calls ran, and in what order — not a typed answer"
+what   = "`t[1]$~ f()` and `t$+ f()` on a positional tuple: refused without calling `f` (ZYVM-019)"
+expect = "ok"
+src    = """
+f() {
+    >> "call" ¶
+    <~ 9
+}
+t = (1, 2)
+!? { t[1]$~ f() } :! { >> "refused" ¶ }
+!? { t$+ f() } :! { >> "refused" ¶ }
+u = t[1]$~ f()
+>> t " " u ¶
+"""
+oracle.py = """
+def f():
+    print("call")
+    return 9
+t = (1, 2)
+print("refused")
+print("refused")
+u = (f(),) + t[1:]
+print(f"({t[0]}, {t[1]}) ({u[0]}, {u[1]})")
+"""
+
+# ── A block lambda that ends without `<~` — ZYTW-015, decided 2026-10-11 ─────
+#
+# It gives `##_`, as a named function that ends without `<~` always has. The
+# tree-walker alone refused it (`block lambda must use <~ to return value`),
+# on the natural shape of a callback, and for a month the only record of it was
+# a paragraph in a release plan: no file in the corpus wrote the form, so the
+# consensus had nothing to disagree about. These four are that file.
+
+[[cell]]
+id     = "block-lambda-called-for-its-effect"
+expect = "ok"
+what   = "a block lambda with no `<~`, called as a statement: the effect happens and the program goes on (ZYTW-015)"
+src    = """
+lam = () -> { >> "efecto" ¶ }
+lam()
+>> "sigo" ¶
+"""
+
+[[cell]]
+id     = "block-lambda-without-return-is-unit"
+expect = "ok"
+what   = "its value is `##_`, as a named function's is"
+src    = """
+lam = () -> { >> "efecto" ¶ }
+f() { >> "efecto" ¶ }
+v = lam()
+w = f()
+>> (v == ##_) " " (w == ##_) ¶
+"""
+
+[[cell]]
+id     = "block-lambda-returns-on-one-path"
+expect = "ok"
+what   = "a `<~` on one path only: the other path gives `##_`"
+src    = """
+lam = x -> { ? x > 0 { <~ "pos" } }
+>> lam(1) ¶
+v = lam(-1)
+>> (v == ##_) ¶
+"""
+
+[[cell]]
+id     = "block-lambda-as-a-callback"
+expect = "ok"
+what   = "`$>` with a block lambda called for its effect walks the whole collection"
+src    = """
+xs = [1, 2]
+ys = xs$> (x -> { >> x ¶ })
+>> ys$# ¶
+"""

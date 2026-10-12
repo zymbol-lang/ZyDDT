@@ -1,0 +1,794 @@
+# The runtime-index-nav axis — Phase C, family C4 of the diagnostics plan.
+#
+# Indexing, navigation (`>`), dictionary addressing and the destructuring
+# pattern: the runtime diagnostics no program provoked on 2026-09-14. Same shape
+# as runtime-collection-ops: `<id>` raises it, `<id>-met` catches it and prints
+# the family. The wrong value arrives through a parameter so the analyzer lets
+# the program run; a navigation step with a float is passed as a VARIABLE,
+# because `v[1>1.5]` is refused by the parser and `v[1.5>1]` reads as `1.5 > 1`.
+#
+# Four diagnostics of this family have no cell because nothing reaches them;
+# the reasons are in zyquality/messages/queue/runtime.tsv.
+
+id      = "runtime-index-nav"
+what    = "the runtime diagnostics of indexing, navigation and dictionary addressing: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "a-string-navigation-step-addresses-a-dictionary"
+expect = "error"
+what   = "a String addresses a dictionary key, and this is [Int] — the same words through `v[\"k\"]` and through `v[1>\"k\"]` (step 3.5b, decided 2026-09-16)"
+src    = """
+t(v) {
+    <~ v[1>"a"]
+}
+>> t([[1, 2]]) ¶
+"""
+
+[[cell]]
+id     = "a-string-navigation-step-addresses-a-dictionary-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>"a"]
+}
+!? {
+    >> t([[1, 2]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not"
+expect = "error"
+what   = "a dictionary is addressed by key, not by position: `{}` has no meaning here"
+src    = """
+t(v) {
+    <~ v$-[1]
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$-[1]
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not-2"
+expect = "error"
+what   = "a dictionary is addressed by key, not by position"
+src    = """
+t(v) {
+    <~ v[1]
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "a-dictionary-is-addressed-by-key-not-2-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1]
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-dictionary-is-asked-about-a-key"
+expect = "error"
+what   = "a dictionary is asked about a key, so `$?` needs a String, got {:?}"
+src    = """
+t(v) {
+    <~ v$? 5
+}
+>> t(#(a: 1)) ¶
+"""
+
+[[cell]]
+id     = "a-dictionary-is-asked-about-a-key-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v$? 5
+}
+!? {
+    >> t(#(a: 1)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-navigation-step-is-a-position-int"
+expect = "error"
+what   = "a navigation step is a position (Int) or a dictionary key (String), got {:?}"
+src    = """
+t(v, s) {
+    <~ v[(s)>1]$~ 9
+}
+>> t([[1, 2]], 1.5) ¶
+"""
+
+[[cell]]
+id     = "a-navigation-step-is-a-position-int-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v, s) {
+    <~ v[(s)>1]$~ 9
+}
+!? {
+    >> t([[1, 2]], 1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "a-positional-tuple-is-addressed-by-position"
+expect = "error"
+what   = "a positional tuple is addressed by position, not by name: '{}'"
+src    = """
+t(v) {
+    <~ v.a
+}
+>> t((1, 2)) ¶
+"""
+
+[[cell]]
+id     = "a-positional-tuple-is-addressed-by-position-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v.a
+}
+!? {
+    >> t((1, 2)) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-index-into-expected-array-tuple-or"
+expect = "error"
+what   = "cannot index into Int — expected array, tuple, or string, whether the index came through `v[1]` or through `v[1>1]` (step 3.5b, decided 2026-09-16)"
+src    = """
+t(v) {
+    <~ v[1>1]
+}
+>> t([5]) ¶
+"""
+
+[[cell]]
+id     = "cannot-index-into-expected-array-tuple-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>1]
+}
+!? {
+    >> t([5]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-index-only-arrays-tuples-and-strings"
+expect = "error"
+what   = "the plain index says what the navigation form says: cannot index into Int — expected array, tuple, or string (step 3.5b, decided 2026-09-16)"
+src    = """
+t(v) {
+    <~ v[1]
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "cannot-index-only-arrays-tuples-and-strings-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1]
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-0-is-invalid-zymbol-uses-1"
+expect = "error"
+what   = "index 0 is invalid — Zymbol uses 1-based indexing"
+src    = """
+t(v) {
+    <~ v[1>0]$~ 9
+}
+>> t([[1, 2]]) ¶
+"""
+
+[[cell]]
+id     = "index-0-is-invalid-zymbol-uses-1-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>0]$~ 9
+}
+!? {
+    >> t([[1, 2]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-must-be-an-integer-got"
+expect = "error"
+what   = "index must be an integer, got {:?}"
+src    = """
+t(v) {
+    <~ [1, 2][v]
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "index-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2][v]
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-array"
+expect = "error"
+what   = "index out of bounds: index {} for array of length {}"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-array-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [1, 2]$-[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-string"
+expect = "error"
+what   = "index out of bounds: index {} for string of length {}"
+src    = """
+t(v) {
+    <~ "ab"$-[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-string-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"$-[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-tuple"
+expect = "error"
+what   = "index out of bounds: index {} for tuple of length {}"
+src    = """
+t(v) {
+    <~ (1, 2)$-[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-index-for-tuple-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ (1, 2)$-[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-for-collection-of"
+expect = "error"
+what   = "index out of bounds: {} for collection of length {}"
+src    = """
+t(v) {
+    <~ [[1, 2]][1>v]$~ 9
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "index-out-of-bounds-for-collection-of-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ [[1, 2]][1>v]$~ 9
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "nav-range-written-downwards-selects-descending"
+expect = "ok"
+what   = "D3: `v[1>3..1]` BUILDS by reversing, the same way `a$[3..1]` reads"
+# Was `invalid-nav-range-indices-are-1-based`, asking for `error` with the text
+# "indices are 1-based and start must be ≤ end". D3 (GLB-012, decided
+# 2026-09-15) retired that premise: a range written downwards selects
+# descending, and step 4.4 built it for the slice. The navigation half landed
+# in step G2 (2026-09-22) — until then the tree-walker refused it and the other
+# two answered `[]`, so no engine did what D3 says.
+src    = """
+t(v) {
+    <~ v[1>3..1]
+}
+>> t([[10, 20, 30, 40]]) ¶
+"""
+
+[[cell]]
+id     = "nav-range-indices-are-1-based"
+expect = "error"
+what   = "invalid nav range {}..{} — indices are 1-based"
+# What is left of the old refusal once D3 took the direction out of it: a bound
+# of 0 is still no position. The message lost its "and start must be ≤ end"
+# half in step G2, because that half stopped being true.
+src    = """
+t(v) {
+    <~ v[1>0..2]
+}
+>> t([[10, 20, 30, 40]]) ¶
+"""
+
+[[cell]]
+id     = "nav-range-written-downwards-selects-descending-met"
+expect = "ok"
+what   = "and it is a value, not an error: `!?` has nothing to meet"
+src    = """
+t(v) {
+    <~ v[1>3..1]
+}
+!? {
+    >> t([[10, 20, 30, 40]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "nav-range-indices-are-1-based-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>0..2]
+}
+!? {
+    >> t([[10, 20, 30, 40]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "navigation-index-must-be-an-integer-got"
+expect = "error"
+what   = "index must be an integer, got Float — the same words as a plain index (step 3.5b, decided 2026-09-16)"
+src    = """
+t(v, s) {
+    <~ v[1>s..2]
+}
+>> t([[1, 2, 3]], 1.5) ¶
+"""
+
+[[cell]]
+id     = "navigation-index-must-be-an-integer-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v, s) {
+    <~ v[1>s..2]
+}
+!? {
+    >> t([[1, 2, 3]], 1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "no-key-in-dictionary-it-is-empty"
+expect = "error"
+what   = "no key '{}' in dictionary — it is empty"
+src    = """
+t(v) {
+    <~ v["x"]
+}
+>> t(#()) ¶
+"""
+
+[[cell]]
+id     = "no-key-in-dictionary-it-is-empty-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v["x"]
+}
+!? {
+    >> t(#()) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "range-indices-in-nav-path-must-be"
+expect = "error"
+what   = "range indices in nav path must be positive integers"
+src    = """
+t(v) {
+    <~ v[1>-1..2]
+}
+>> t([[1, 2, 3]]) ¶
+"""
+
+[[cell]]
+id     = "range-indices-in-nav-path-must-be-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v[1>-1..2]
+}
+!? {
+    >> t([[1, 2, 3]]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "string-index-out-of-bounds-index-for"
+expect = "error"
+what   = "string index out of bounds: index {} for string of length {}"
+src    = """
+t(v) {
+    <~ "ab"[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "string-index-out-of-bounds-index-for-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ "ab"[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "the-dot-reaches-a-dictionary-key-and"
+expect = "error"
+what   = "the dot reaches a dictionary key, and this is {}"
+src    = """
+t(v) {
+    <~ v.a
+}
+>> t([1, 2]) ¶
+"""
+
+[[cell]]
+id     = "the-dot-reaches-a-dictionary-key-and-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v.a
+}
+!? {
+    >> t([1, 2]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "the-pattern-dict-requires-a-dictionary-got"
+expect = "error"
+what   = "the pattern #(…) requires a dictionary, got {}"
+src    = """
+t(v) {
+    #(a: x) = v
+    <~ x
+}
+>> t([1, 2]) ¶
+"""
+
+[[cell]]
+id     = "the-pattern-dict-requires-a-dictionary-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    #(a: x) = v
+    <~ x
+}
+!? {
+    >> t([1, 2]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "tuple-index-out-of-bounds-index-for"
+expect = "error"
+what   = "tuple index out of bounds: index {} for tuple of length {}"
+src    = """
+t(v) {
+    <~ (1, 2)[v]
+}
+>> t(9) ¶
+"""
+
+[[cell]]
+id     = "tuple-index-out-of-bounds-index-for-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ (1, 2)[v]
+}
+!? {
+    >> t(9) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+# ── A navigation into a dictionary by position (step P4-3, 2026-09-26) ──────
+#
+# A dictionary is addressed by key (decision 11). The flat forms were aligned;
+# the nested ones were not: the tree-walker READ `v[1>k]` of `[#(a: 1)]` by
+# position, and the VM, compiling a navigation to plain `ArrayGet`s, gave the
+# plain index's words. zyjs already said what all three say now.
+
+[[cell]]
+id     = "nav-read-into-a-dictionary-by-position"
+expect = "error"
+what   = "`v[1>k]` with a dictionary at step 2 and `k` an Int — the tree-walker returned the first value"
+src    = """
+t(v, k) {
+    <~ v[1>k]
+}
+>> t([#(a: 1)], 1) ¶
+"""
+
+[[cell]]
+id     = "nav-read-with-a-decimal-step"
+expect = "error"
+what   = "a navigation step that is a Float: the navigation's words, not the plain index's"
+src    = """
+t(v, k) {
+    <~ v[1>k]
+}
+>> t([#(a: 1)], 1.5) ¶
+"""
+
+[[cell]]
+id     = "nav-edit-into-a-dictionary-by-position"
+expect = "error"
+what   = "`v[1>k]$~ 2` with a dictionary at step 2: `d[n>…]$~ value` in all three"
+src    = """
+t(v, k) {
+    <~ v[1>k]$~ 2
+}
+>> t([#(a: 1)], 1) ¶
+"""
+
+[[cell]]
+id     = "nav-edit-with-a-decimal-step"
+expect = "error"
+what   = "an edit through a navigation step that is a Float"
+src    = """
+t(v, k) {
+    <~ v[1>k]$~ 2
+}
+>> t([#(a: 1)], 1.5) ¶
+"""
+
+# ── A bracket after a parenthesized index (added 2026-10-03) ───────────────
+#
+# Measured while proving the CHAINED_BRACKETS help unreachable (GLB-077):
+# `(m[1])[2]` was read by the Rust engines (2) and refused by zyjs. Decided
+# 2026-10-03 (GLB-087): it is the chain with parentheses around its first half,
+# and refused like it. The result of an operation or a call in parentheses is
+# still indexed.
+
+[[cell]]
+id     = "index-after-a-parenthesized-index"
+what   = "`(m[1])[2]`: the navigator written twice, with parentheses — refused as the chain is (GLB-087)"
+expect = "error"
+src    = """
+m = [[1, 2], [3, 4]]
+>> (m[1])[2] ¶
+"""
+
+[[cell]]
+id     = "index-after-a-parenthesized-call-index"
+what   = "`(f()[1])[2]`: the same through a call; `f()[1>2]` is the form"
+expect = "error"
+src    = """
+f() { <~ [[7, 8]] }
+>> (f()[1])[2] ¶
+"""
+
+[[cell]]
+id     = "index-after-a-parenthesized-result"
+what   = "the control: the result of an operation, a call or a slice in parentheses is still indexed"
+expect = "ok"
+src    = """
+m = [[1, 2], [3, 4]]
+a = [3, 1]
+f() { <~ [[7, 8]] }
+>> (a$^+)[1] ¶
+>> (f())[1] ¶
+>> (m[1..2])[1] ¶
+>> f()[1>2] ¶
+"""
+
+# ── What makes a bracket a navigation path (added 2026-10-10) ───────────────
+#
+# The grammar's step is an atom: an integer, `-integer`, a string, a name, or
+# `( expr )`. A bracket whose content does not START with an atom followed by
+# `>`, `;` or `..` is an ordinary index expression, whatever comes later in it —
+# so `m[f()>2]` indexes with the comparison `f() > 2`, a Bool. Both Rust parsers
+# read it that way (`is_nav_index`). The browser engine took any additive
+# expression as a first step and walked the path (ZYJS-057, corrected the day
+# it was found). The marker is printed after the read: an engine that walks
+# says so.
+
+[[cell]]
+id     = "a-first-step-that-is-not-an-atom-is-an-index-expression"
+what   = "`m[f()>2]` and `a[i + 1>2]`: the index is the comparison, a Bool, and is refused; `m[(f())>2]` is the path (ZYJS-057)"
+expect = "ok"
+oracle_literal_ok = "the lines are the observable of a path — refused or walked — not a typed answer"
+src    = """
+f() { <~ 1 }
+m = [[1, 2], [3, 4]]
+a = [10, 20, 30]
+i = 1
+!? {
+    x = m[f()>2]
+    >> "walked " x ¶
+} :! ##Type { >> "refused" ¶ }
+!? {
+    y = a[i + 1>2]
+    >> "walked " y ¶
+} :! ##Type { >> "refused" ¶ }
+>> m[(f())>2] + a[i + 1] ¶
+"""
+oracle.py = """
+def f(): return 1
+m = [[1, 2], [3, 4]]
+a = [10, 20, 30]
+i = 1
+print("refused")
+print("refused")
+print(m[f() - 1][2 - 1] + a[i + 1 - 1])
+"""
+
+# ── A path yields one value unless one of its steps is a range (2026-10-10) ─
+#
+# `arr[p ; q]` is `[v, v]`, one value per path (GUIDE.md). A value that is
+# itself an array is still one value: `m[1;2]` on an array of rows is two rows.
+# Only a RANGE step makes a path yield several. The browser engine spread any
+# array an extraction was handed, so `m[1;2]` answered the four cells of both
+# rows, and `c[1..2>1]` — a range before the last step — likewise (ZYJS-058,
+# corrected the day it was found). The addressing axis could not see it: its
+# leaves are scalars. No oracle here; what is asked is that the three agree,
+# and the one that did not was the port.
+
+[[cell]]
+id     = "extraction-of-values-that-are-arrays"
+what   = "`m[1;2]`, `m[[1, 2]]`, `m[[1];[2]]`, `c[1..2>1]`, `c[1..2>1..2]` and a dictionary under a range: an array found at the end of a path is one value, not a list of them (ZYJS-058)"
+expect = "ok"
+src    = """
+m = [[1, 2], [3, 4]]
+c = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+d = [#(a: [1, 2]), #(a: [3, 4])]
+>> m[1;2] ¶
+>> m[1>1;2>2] ¶
+>> m[1>1..2;2>1] ¶
+>> m[[1]] " " m[[1>2]] ¶
+>> m[[1, 2]] ¶
+>> m[[1];[2]] ¶
+>> m[[1>1..2];[2>1..2]] ¶
+>> c[1>1;2>2] ¶
+>> c[1..2>1] ¶
+>> c[[1>1];[2>1..2]] ¶
+>> c[1>1..2>1] ¶
+>> c[1..2>1..2] ¶
+>> c[1..2>1..2>1] ¶
+>> c[2..1>2] ¶
+>> d[1..2>"a"] ¶
+>> d[1>"a";2>"a"] ¶
+"""
+

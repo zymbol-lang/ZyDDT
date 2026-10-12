@@ -25,8 +25,12 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import fnmatch
+import os
+import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
@@ -34,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 from zyddt import axes as A            # noqa: E402
 from zyddt import compare as C         # noqa: E402
 from zyddt import engines as E          # noqa: E402
+from zyddt import findings as F         # noqa: E402
 from zyddt import exclude as X         # noqa: E402
 from zyddt import observe as O          # noqa: E402
 from zyddt import report as R           # noqa: E402
@@ -48,10 +53,11 @@ def _observe_all(cfg, engs, file: Path, phase: str, timeout: float,
     """Run every engine, except the ones a rule excuses from this case.
 
     An excluded engine is never invoked.  That is the point the exclusion table
-    exists to make: `<\\ shell \\>` in zyjs does not fail, it ANSWERS — with
-    `Date.now() * 1e6 + random()` from the stub in zymbol.js — so running it and
-    discarding the result is not the same as not asking.  A discarded answer is
-    one refactor away from being read.
+    exists to make: `<\\ shell \\>` in zyjs used to ANSWER rather than fail — a
+    random number from the stub in zymbol.js, until BUG-GOL-014 (2026-09-29) —
+    so running it and discarding the result was not the same as not asking.  It
+    refuses now, and the rule stands for every engine that might answer: a
+    discarded answer is one refactor away from being read.
     """
     out = []
     for e in engs:
@@ -80,6 +86,15 @@ def _case_id(file: Path) -> str:
         if f.is_relative_to(base):
             return str(f.relative_to(base).with_suffix(""))
     return str(f.with_suffix("").name)
+
+
+def _shown(file: Path) -> str:
+    """How a file is named in a report: relative to this repository when it is
+    inside it, wherever the caller stands. `zyq suite` runs this layer from
+    zyquality/, and every pin used to be printed by its absolute path."""
+    f = Path(file).resolve()
+    root = Path(__file__).resolve().parents[1]
+    return str(f.relative_to(root)) if f.is_relative_to(root) else str(file)
 
 
 def _indent(text: str, pad: str = "      ") -> str:
@@ -115,6 +130,18 @@ def cmd_surfaces(args, cfg) -> int:
     as an absent engine. A driver that crashes on one file is reported and the
     sweep continues, because "this file breaks the driver" is itself a finding
     and stopping would hide the rest.
+
+    One thing is excused, and it is MEASURED rather than declared: a token on
+    the line a static refusal points at. A cell like `x = #,. 2|v|` exists to be
+    refused; there is no operator there for a surface to mark, and a surface
+    that marked it `invalid` would be blind for good — every unknown token would
+    become "invalid" and none would ever be reported again. So the tree-walker's
+    analyser is asked (`zymbol check`), and only the lines its errors name are
+    excused. The rest of a refused program is still graded, and so is every
+    line of a program that runs — including one that fails at run time, which
+    is a valid program (`#.v|x|` with a bad `v`). Decided by the author on
+    2026-09-29; before it, 45 such tokens kept `surfaces` RED with every
+    valid-program cell clean.
     """
     if not cfg.surfaces:
         print(R.dim("    none declared"))
@@ -123,9 +150,14 @@ def cmd_surfaces(args, cfg) -> int:
     root = Path(__file__).resolve().parents[1]
     files = sorted(set(root.glob("generated/**/*.zy")) | set(root.glob("cases/**/*.zy")))
     rc = GREEN
+    refused = _static_refusal_lines(cfg, files, args.timeout)
+    if refused is None:
+        print(R.dim("    no engine answers the static phase; nothing is excused"))
+        refused = {}
 
     for surf in cfg.surfaces:
         findings: list[tuple[str, str, str, str]] = []
+        on_refusal = 0
         try:
             proc = subprocess.run(surf.argv(files), capture_output=True, text=True,
                                   timeout=max(args.timeout, 120))
@@ -146,6 +178,9 @@ def cmd_surfaces(args, cfg) -> int:
             path, ln, col, text = parts
             if surf.excused(text):
                 continue
+            if ln.isdigit() and int(ln) in refused.get(Path(path).resolve(), ()):
+                on_refusal += 1
+                continue
             rel = Path(path)
             findings.append((str(rel.relative_to(root) if rel.is_relative_to(root) else rel),
                              ln, col, text))
@@ -155,6 +190,8 @@ def cmd_surfaces(args, cfg) -> int:
         print(f"  {R.bold(surf.id):<12} {head:<28} {R.dim(surf.desc)}")
         if surf.tolerate:
             print(f"  {'':<12} {R.dim('tolerates ' + surf.tolerate + ' — ' + surf.reason)}")
+        if on_refusal:
+            print(f"  {'':<12} {R.dim(f'{on_refusal} more on a line a static refusal points at — excused')}")
         for rel, ln, col, text in findings[: args.detail or 8]:
             print(f"      {R.dim(rel)}:{ln}:{col}  {R.bold(repr(text))}")
         if n > (args.detail or 8):
@@ -162,6 +199,29 @@ def cmd_surfaces(args, cfg) -> int:
         if n:
             rc = worse(rc, RED)
     return rc
+
+
+def _static_refusal_lines(cfg, files, timeout) -> dict[Path, set[int]] | None:
+    """For each file the analyser refuses, the lines its errors point at.
+
+    One engine is enough: the static phase is shared — `zytw` and `zyvm` run the
+    same analyser, and `zyjs` has none of its own to ask. None when no engine
+    answers `check`, so the caller can say so instead of excusing nothing
+    silently or everything by accident.
+    """
+    engs = [e for e in cfg.engines if e.argv("static", Path("x.zy")) is not None]
+    if not engs:
+        return None
+    eng = engs[0]
+    out: dict[Path, set[int]] = {}
+    for f in files:
+        obs = O.classify(E.run(eng, f, "static", timeout), cfg.normalise)
+        if obs.status != "error" or obs.kind != "static":
+            continue
+        lines = {d.line for d in obs.diags if d.severity == "error" and d.line is not None}
+        if lines:
+            out[Path(f).resolve()] = lines
+    return out
 
 
 # ── observe ──────────────────────────────────────────────────────────────────
@@ -220,12 +280,12 @@ def cmd_ask(args, cfg) -> int:
         con = C.consensus(obs, cfg.normalise.compare_column)
         if con.outcome == C.AGREE:
             cov = "" if con.full else R.dim(f"  [{con.coverage}]")
-            print(f"{R.green('AGREE')}       {file}  {R.verdict(con.verdict)}{cov}")
+            print(f"{R.green('AGREE')}       {_shown(file)}  {R.verdict(con.verdict)}{cov}")
             for o in con.excluded:
                 print(f"    {o.engine:<8} {R.dim('excluded')}  "
                       f"{R.dim(o.excluded.tag + ': ' + o.excluded.reason)}")
             continue
-        _print_consensus(str(file), con)
+        _print_consensus(_shown(file), con)
         worst = worse(worst, RED if con.outcome == C.DIVERGE else NOVERDICT)
     return worst
 
@@ -312,9 +372,33 @@ def cmd_axis(args, cfg) -> int:
     worst = GREEN
     rows = []
 
+    # A declared debt has to name a finding that is filed, and engines that
+    # exist. One that does not is an exclusion with no reason — it would turn a
+    # red into KNOWN on the word of nobody — so it is red itself and covers
+    # nothing.
+    filed, _ = _filed_findings(Path(__file__).resolve().parents[1])
+    engine_ids = {e.id for e in cfg.engines}
+    void_debt: set[str] = set()
+    for ax in axes:
+        for cell in ax.cells:
+            d = cell.open_finding
+            if d is None:
+                continue
+            ids = [d] if isinstance(d, str) else list(d.values())
+            unknown = [e for e in ([] if isinstance(d, str) else d) if e not in engine_ids]
+            unfiled = [i for i in ids if i not in filed]
+            if unknown or unfiled:
+                void_debt.add(f"{ax.id}/{cell.id}")
+                worst = worse(worst, RED)
+                why = (f"unknown engine(s) {unknown}" if unknown else "") + \
+                      ("; " if unknown and unfiled else "") + \
+                      (f"{', '.join(unfiled)} is not filed in HALLAZGOS/" if unfiled else "")
+                print(f"{R.red('VOID DEBT')}   {ax.id}/{cell.id}  {R.dim(why)}")
+
     for ax in axes:
         engs = cfg.by_id(ax.engines or None)
         agreed = diverged = worded = wrong = noverdict = narrowed = oracled = 0
+        known = 0
 
         # ── How much of a red gets printed ──────────────────────────────────
         # A matrix changes what a report has to survive.  One defect in `zyjs`
@@ -341,6 +425,27 @@ def cmd_axis(args, cfg) -> int:
 
         for cell in ax.cells:
             label = f"{ax.id}/{cell.id}"
+            debt = None if label in void_debt else cell.open_finding
+
+            def owe(verdict_d, paid) -> bool:
+                """Print what the declared debt made of a red. → True when the red
+                is the debt (KNOWN), so the caller does not count it red."""
+                nonlocal known, worst
+                if verdict_d == C.KNOWN:
+                    known += 1
+                    print(f"{R.yellow('KNOWN')}       {label}  "
+                          f"{R.dim(_debt_text(debt) + (' — ' + cell.what if cell.what else ''))}")
+                    print(R.dim(f"    declared debt: {_debt_where(debt, filed)} — "
+                                f"reported every run, not counted against the gate"))
+                    return True
+                if verdict_d == C.PAID:
+                    worst = worse(worst, RED)
+                    who = f" for {', '.join(paid)}" if paid else ""
+                    print(f"{R.red('DEBT PAID')}   {label}  {R.dim(_debt_text(debt))}")
+                    print(R.dim(f"    passes{who}: the finding looks fixed — close it in "
+                                f"{_debt_where(debt, filed)} and drop `open_finding`"))
+                return False
+
             if cell.skip:
                 # A skipped cell names the axis value it skips and why, so a
                 # hole in a matrix is visible AS a hole (CHARTER § 5).
@@ -368,6 +473,8 @@ def cmd_axis(args, cfg) -> int:
             required = cell.expect or ax.expect
             bad = C.offenders(obs, required) if required else []
             if bad:
+                if owe(*C.debt(debt, True, frozenset(o.engine for o in bad))):
+                    continue
                 wrong += 1
                 worst = worse(worst, RED)
                 print(f"{R.red('WRONG')}       {label}  {R.dim(cell.what)}")
@@ -390,6 +497,8 @@ def cmd_axis(args, cfg) -> int:
                 continue
 
             if con.outcome == C.DIVERGE:
+                if owe(*C.debt(debt, True, frozenset())):
+                    continue
                 diverged += 1
                 worst = worse(worst, RED)
                 if not detailed():
@@ -447,6 +556,8 @@ def cmd_axis(args, cfg) -> int:
                                 ' silence with oracle_literal_ok = "reason"'))
                     continue
                 if raw.stdout != v.out:
+                    if owe(*C.debt(debt, True, frozenset())):
+                        continue
                     wrong += 1
                     worst = worse(worst, RED)
                     print(f"{R.red('WRONG ANSWER')} {label}  "
@@ -461,16 +572,21 @@ def cmd_axis(args, cfg) -> int:
                 narrowed += 1
 
             if con.outcome == C.WORDING:
-                worded += 1
                 wording_now.add(label)
                 if label not in baseline:
+                    if owe(*C.debt(debt, True, frozenset())):
+                        continue                   # counted once, as known
+                    worded += 1
                     worst = worse(worst, RED)      # a NEW wording split is a red
                     print(f"{R.red('NEW WORDING')} {label}  "
                           f"{R.dim('not in wording.baseline')}")
                     if detailed():
                         _print_consensus(label, con)
-                elif args.verbose:
-                    _print_consensus(label, con)
+                else:
+                    worded += 1
+                    owe(*C.debt(debt, False, frozenset()))   # baselined: green
+                    if args.verbose:
+                        _print_consensus(label, con)
                 continue
 
             if con.outcome == C.PARTIAL:
@@ -480,6 +596,7 @@ def cmd_axis(args, cfg) -> int:
                 continue
 
             agreed += 1
+            owe(*C.debt(debt, False, frozenset()))           # green: a debt is paid
             if args.verbose or not con.full:
                 cov = "" if con.full else R.dim(f"  [{con.coverage}]")
                 print(f"{R.green('AGREE')}       {label}  {R.verdict(v.verdict)}{cov}")
@@ -493,41 +610,44 @@ def cmd_axis(args, cfg) -> int:
                         f"none, `zyddt -v axis` for all, `zyddt observe FILE` "
                         f"for one"))
         rows.append((ax.id, len(ax.cells), agreed, worded, diverged, wrong,
-                     noverdict, narrowed, oracled))
-
-    if args.regen_baseline:
-        if args.axes:
-            print(R.red("zyddt: --regen-baseline needs a full run — a partial one "
-                        "would erase entries it never asked about"), file=sys.stderr)
-            return NOVERDICT
-        _save_baseline(wording_now)
-        print(R.yellow(f"\n  wording.baseline rewritten: {len(wording_now)} entries"))
-        return GREEN
+                     noverdict, narrowed, oracled, known))
 
     # Only over the axes that actually ran.  `zyddt axis environment` compared
     # the whole baseline against one axis's results and announced that three
     # splits had closed; they had simply not been asked.  A partial run may not
     # report a global improvement.
+    #
+    # A stale entry is RED (GLB-040, decided 2026-09-25).  While it stays in the
+    # list, the cell it names may split again and the gate will accept it in
+    # silence — an open door, which is what `--audit-exclusions` refuses in
+    # zyquality.  It is removed by hand, in the step that healed it.  There is
+    # no command that rewrites the file: `--regen-baseline` absorbed splits
+    # nobody had decided and twice ate the comments that explained the ones
+    # somebody had (HOW_TO_CHANGE_ZYMBOL.md § 2, move 5).
     ran = {ax.id for ax in axes}
     healed = {e for e in baseline - wording_now if e.split("/", 1)[0] in ran}
     if healed:
-        print(R.green(f"\n  {len(healed)} wording split(s) closed since the baseline: "
-                      + ", ".join(sorted(healed))))
-        print(R.dim("  rerun with --regen-baseline to lock the improvement in"))
+        worst = worse(worst, RED)
+        print()
+        for e in sorted(healed):
+            print(f"{R.red('STALE WORDING')} {e}  "
+                  f"{R.dim('agrees now, or no longer exists — remove it from wording.baseline by hand')}")
 
     print()
     print(f"  {'axis':<22}{'cells':>6}{'agree':>7}{'oracled':>9}{'narrowed':>10}"
-          f"{'wording':>9}{'diverge':>9}{'wrong':>7}{'no verdict':>12}")
-    for name, cells, ag, wd, dv, wr, nv, nr, orc in rows:
+          f"{'wording':>9}{'diverge':>9}{'wrong':>7}{'known':>7}{'no verdict':>12}")
+    for name, cells, ag, wd, dv, wr, nv, nr, orc, kn in rows:
         print(f"  {name:<22}{cells:>6}{ag:>7}"
               f"{(R.green(str(orc)) if orc else R.dim('0')):>9}"
               f"{(R.dim(str(nr)) if nr else '0'):>10}"
               f"{(R.yellow(str(wd)) if wd else '0'):>9}"
               f"{(R.red(str(dv)) if dv else '0'):>9}"
               f"{(R.red(str(wr)) if wr else '0'):>7}"
+              f"{(R.yellow(str(kn)) if kn else '0'):>7}"
               f"{(R.yellow(str(nv)) if nv else '0'):>12}")
     print(R.dim("  oracled  = agreed AND checked against an implementation that is not ours"))
     print(R.dim("  narrowed = agreed, but a rule excused an engine: fewer surfaces asked"))
+    print(R.dim("  known    = red, and the declared debt of a filed finding (open_finding)"))
     print(R.dim("  an axis that is not declared has no row, and that is the honest gap"))
 
     dead = table.dead_rules()
@@ -546,6 +666,17 @@ def cmd_axis(args, cfg) -> int:
     return worst
 
 
+def _debt_text(debt) -> str:
+    if isinstance(debt, str):
+        return debt
+    return ", ".join(f"{e} {i}" for e, i in sorted(debt.items()))
+
+
+def _debt_where(debt, filed: dict[str, str]) -> str:
+    ids = [debt] if isinstance(debt, str) else sorted(set(debt.values()))
+    return ", ".join(f"{filed.get(i, 'HALLAZGOS/')} {i}" for i in ids)
+
+
 BASELINE = Path(__file__).resolve().parents[1] / "wording.baseline"
 
 
@@ -561,18 +692,6 @@ def _load_baseline() -> set[str]:
         return set()
     return {l.split("#", 1)[0].strip() for l in BASELINE.read_text().splitlines()
             if l.split("#", 1)[0].strip()}
-
-
-def _save_baseline(entries: set[str]) -> None:
-    header = (
-        "# Cells where every engine does the same thing and says it differently.\n"
-        "# Recorded by `zyddt axis --regen-baseline`, which is deliberate and\n"
-        "# separate: this file may shrink on its own, and may never grow on its\n"
-        "# own. A line appearing here that was not written on purpose is a new\n"
-        "# one-sided message, which is the thing zyquality/messages/ counts\n"
-        "# statically and this counts as it is actually emitted.\n"
-    )
-    BASELINE.write_text(header + "".join(f"{e}\n" for e in sorted(entries)))
 
 
 # ── selftest — grading the grader ────────────────────────────────────────────
@@ -620,6 +739,367 @@ def cmd_selftest(args, cfg) -> int:
 
 
 # ── suite — one command, one verdict ─────────────────────────────────────────
+
+# ── The premises ─────────────────────────────────────────────────────────────
+#
+# Every other command here compares an implementation against another
+# implementation. None of them can see a rule that all three engines break
+# together, and none could see MEM-2 being retired on 2026-08-24 — the engine,
+# the guide and the one-page brief moved in one commit and stayed consistent
+# with each other.
+#
+# This one crosses the axes against `zymbol-design/PREMISES.md`, which is a
+# SOURCE: it is not derived from any engine, and it lives in its own repository
+# so that it is not even in the working tree while somebody is fixing one.
+#
+# The crossing is deliberately BIDIRECTIONAL. One direction alone is the failure
+# it exists to prevent:
+#
+#   · premise → cell only, and a cell may claim a premise nobody declared;
+#   · cell → premise only, and a premise may quietly lose the cell that held it
+#     while its `Held by` still names it.
+
+DESIGN_DIR = "ZYMBOL_DESIGN"          # env override, like every path in engines.toml
+# `##` or `###`: the ids sit under a domain heading, and the depth of that
+# heading is the document's business rather than this parser's.
+PREMISE_HEAD = re.compile(r"^#{2,4}\s+([A-Z]{2,6}-\d+)\s+—\s+(.+?)\s*$", re.M)
+CELL_REF = re.compile(r"`([a-z0-9_-]+/[a-z0-9_*-]+)`")
+
+
+def _design_dir() -> Path:
+    env = os.environ.get(DESIGN_DIR)
+    if env:
+        return Path(env).expanduser()
+    return Path(__file__).resolve().parents[2] / "zymbol-design"
+
+
+def _premises_of(text: str) -> dict[str, dict]:
+    """→ {id: {what, held: [glob], stated_empty: bool}} from PREMISES.md.
+
+    The section of an id runs to the next `## ` heading, so a `Held by` is read
+    from its own premise and never from the next one.
+    """
+    out, heads = {}, list(PREMISE_HEAD.finditer(text))
+    stops = [m.start() for m in re.finditer(r"^#{1,4}\s", text, re.M)]
+    for m in heads:
+        nxt = next((s_ for s_ in stops if s_ > m.end()), len(text))
+        body = text[m.end():nxt]
+        held_line = ""
+        for line in body.splitlines():
+            if line.startswith("**Held by**"):
+                held_line = line
+            elif held_line and line.startswith(("`", "(", "not ", "**red**")):
+                held_line += " " + line      # a `Held by` wrapped for width
+            elif held_line:
+                break
+        out[m.group(1)] = {
+            "what": m.group(2),
+            "held": CELL_REF.findall(held_line),
+            "stated_empty": "nothing yet" in held_line,
+            # A third state, and it is not a weaker version of the other two.
+            # MEM and COL constrain what a PROGRAM may do, so a program can be
+            # written that breaks them. Most of SYM constrains what a PROPOSAL
+            # may be — "derive, do not invent" is checked by a reader against an
+            # inventory, and no execution can ask it. Reporting those as holes
+            # would file a property of the domain as debt.
+            "by_review": held_line.strip().startswith("**Held by** — review"),
+            # A fourth state. Some claims are not about what a program prints:
+            # a ratio of peak memory, or the shape of an archive. Those are held
+            # by a suite outside this layer, and reporting them as missing cells
+            # would file a working guarantee as debt. Marked by starting the
+            # line with "elsewhere:" so it cannot be confused with prose.
+            "elsewhere": held_line.strip().startswith("**Held by** — elsewhere:"),
+        }
+    return out
+
+
+def _declared_premises() -> dict[str, set[str]]:
+    """→ {cell_id_with_axis: {premise_id}} read from the axis TOMLs themselves.
+
+    A set, not one id: a cell measures a situation, and one situation can be
+    evidence for more than one rule. `block-var-direct` shows both that a block
+    does not leak into its container (MEM-6) and that a function does not reach
+    a block (MEM-2), and making it choose would mean writing the same program
+    twice under two names — the redundancy the admission rule forbids.
+
+    Read raw rather than through `axes.load_all`, because `premise` is a
+    property of the DECLARATION: a matrix declares it once for every point it
+    generates, and a `[[cell]]` declares its own.
+    """
+    out = {}
+    for path in sorted(A.AXES_DIR.glob("*.toml")):
+        d = tomllib.loads(path.read_text(encoding="utf-8"))
+        named = {c["id"]: c.get("premise") for c in d.get("cell", [])}
+        # An axis may declare one for all of its cells, the way it declares
+        # `expect`: a matrix's points and the loose `[[cell]]`s beside it are
+        # asking about the same rule, and annotating each by hand is how one
+        # gets forgotten.
+        axis_premise = d.get("premise")
+        matrix_premise = d.get("matrix", {}).get("premise", axis_premise)
+        for cell in A.load_all_from(A.AXES_DIR, [path.stem])[0].cells:
+            if cell.id in named:               # a loose [[cell]]
+                p = named[cell.id] or axis_premise
+            else:                              # generated by the matrix
+                p = matrix_premise or axis_premise
+            if p:
+                out[f"{path.stem}/{cell.id}"] = {p} if isinstance(p, str) else set(p)
+    return out
+
+
+def cmd_premises(args, cfg) -> int:
+    """Cross the declared premises against the cells that claim to hold them."""
+    design = _design_dir()
+    doc = design / "PREMISES.md"
+    if not doc.is_file():
+        print(R.yellow(f"  SKIPPED — {doc} not found"))
+        print(R.dim(f"    clone zymbol-design beside this repository, or set "
+                    f"{DESIGN_DIR}=<path>"))
+        print(R.dim("    exit 2: the check did not run, which is not the same "
+                    "as nothing being wrong"))
+        return NOVERDICT
+
+    premises = _premises_of(doc.read_text(encoding="utf-8"))
+    declared = _declared_premises()
+    known = {f"{ax.id}/{c.id}" for ax in A.load_all() for c in ax.cells}
+    rc, holes, reviewed, elsewhere = GREEN, 0, 0, 0
+
+    # cell → premise: a cell may not claim an id the source does not declare.
+    for cell, pids in sorted(declared.items()):
+        for pid in sorted(pids):
+            if pid not in premises:
+                print(R.red(f"  UNDECLARED  {cell} claims {pid}, "
+                            f"which {doc.name} does not declare"))
+                rc = RED
+
+    for pid in sorted(premises):
+        p = premises[pid]
+        if p["by_review"]:
+            print(f"  {R.dim(pid)}  {R.dim('by review')}  " + R.dim(p["what"]))
+            reviewed += 1
+            continue
+        if p["elsewhere"]:
+            print(f"  {R.dim(pid)}  {R.dim('held elsewhere')}  " + R.dim(p["what"]))
+            elsewhere += 1
+            continue
+        if p["stated_empty"]:
+            print(R.yellow(f"  {pid}  no cell — ") + R.dim(p["what"]))
+            holes += 1
+            continue
+        if not p["held"]:
+            print(R.red(f"  {pid}  states no `Held by` at all — a premise whose "
+                        f"cells nobody wrote down is a premise nobody is keeping"))
+            rc = RED
+            continue
+        broken = False                     # this premise's own crossing
+        for glob in p["held"]:
+            hit = fnmatch.filter(known, glob)
+            if not hit:
+                # The dead reference: the premise still names a cell that is gone,
+                # which reads as covered and is not.
+                print(R.red(f"  DEAD REF    {pid} names `{glob}`, "
+                            f"which matches no cell"))
+                broken = True
+                continue
+            # premise → cell: every cell it names must name it back.
+            for cell in hit:
+                if pid not in declared.get(cell, set()):
+                    got = ", ".join(sorted(declared.get(cell, set()))) or "nothing"
+                    print(R.red(f"  ONE-SIDED   {pid} names `{cell}`, "
+                                f"which declares {got}"))
+                    broken = True
+        # Its line is green only when its own crossing held. It used to be
+        # printed green unconditionally (`if rc == GREEN or True`), so a premise
+        # was listed as kept on the line right under the error that said it was
+        # not.
+        n = sum(len(fnmatch.filter(known, g)) for g in p["held"])
+        if broken:
+            rc = RED
+            print(f"  {R.red(pid)}  {n} cell(s)  " + R.dim(p["what"]))
+        else:
+            print(f"  {R.green(pid)}  {n} cell(s)  " + R.dim(p["what"]))
+
+    print()
+    print(f"  {len(premises)} premise(s) declared in {doc.name}, "
+          f"{holes} with no cell yet"
+          + (f", {reviewed} checked by review rather than by execution"
+             if reviewed else "")
+          + (f", {elsewhere} held by a suite outside this layer"
+             if elsewhere else ""))
+    if holes:
+        print(R.dim("    a premise with no cell is a hole that names itself; "
+                    "it is not a pass and not a failure"))
+    return rc
+
+
+# ── pins — every pin names a finding that is filed ───────────────────────────
+#
+# CHARTER § 3: a pin is "one minimal reproduction of a named finding, carrying
+# the ID it came from", and "a pin with no ID is a file nobody can explain".
+# Nothing checked it. Two pins carried an id of a series nobody had declared
+# (`ZYQ-`): one of them said GLB-005 in its own first line and ZYQ-001 in its
+# name, and the other named a finding that had never been filed anywhere.
+#
+# Three rules, each one a way a pin stops explaining itself:
+#   · its name starts with the id                      → UNNAMED
+#   · its first line is `// PIN <that id>`             → MISNAMED
+#   · the id is a heading in HALLAZGOS/, or in
+#     Divergente_ES/ for the DM series                 → UNFILED
+#
+# Two pins may share an id: ZYVM-001 has two faces that cannot share a file,
+# because a refusal stops the run before the second is asked. That is reported,
+# not refused — the header of each says why it is separate.
+
+PIN_NAME = re.compile(r"^([A-Z]{2,6}-\d+)_")
+PIN_HEAD = re.compile(r"^//\s*PIN\s+([A-Z]{2,6}-\d+)\b")
+FINDING_HEAD = re.compile(r"^#{1,4}\s+(?:~~)?([A-Z]{2,6}-\d+)(?:~~)?\b", re.M)
+
+
+def _filed_findings(root: Path) -> tuple[dict[str, str], bool]:
+    """→ ({id: where it is filed}, whether Divergente_ES could be read)."""
+    out: dict[str, str] = {}
+    for f in sorted((root / "HALLAZGOS").glob("*.md")):
+        if f.name == "INDICE.md":
+            continue
+        for m in FINDING_HEAD.finditer(f.read_text(encoding="utf-8")):
+            out.setdefault(m.group(1), f"HALLAZGOS/{f.name}")
+    div = Path(os.environ.get("ZYDDT_DIVERGENTE", root.parent / "Divergente_ES"))
+    if not div.is_dir():
+        return out, False
+    for f in sorted(div.glob("*.md")):
+        for m in FINDING_HEAD.finditer(f.read_text(encoding="utf-8")):
+            out.setdefault(m.group(1), f"Divergente_ES/{f.name}")
+    return out, True
+
+
+def cmd_pins(args, cfg) -> int:
+    """Every pin names a filed finding, in its name and in its first line."""
+    root = Path(__file__).resolve().parents[1]
+    filed, have_div = _filed_findings(root)
+    rc, seen = GREEN, {}
+    for pin in sorted((root / "cases" / "pin").glob("*.zy")):
+        name = PIN_NAME.match(pin.name)
+        if not name:
+            print(R.red(f"  UNNAMED     {pin.name} — a pin's name starts with the id it pins"))
+            rc = worse(rc, RED)
+            continue
+        pid = name.group(1)
+        seen.setdefault(pid, []).append(pin.name)
+        first = pin.read_text(encoding="utf-8").splitlines()[:1]
+        head = PIN_HEAD.match(first[0]) if first else None
+        if not head or head.group(1) != pid:
+            said = head.group(1) if head else "no `// PIN <id>` line"
+            print(R.red(f"  MISNAMED    {pin.name} — named {pid}, its first line says {said}"))
+            rc = worse(rc, RED)
+            continue
+        if pid in filed:
+            continue
+        if pid.startswith("DM-") and not have_div:
+            print(R.yellow(f"  UNVERIFIED  {pin.name} — {pid} is a Divergente_ES id, and "
+                           f"that repository is not cloned beside this one"))
+            rc = worse(rc, NOVERDICT)
+            continue
+        print(R.red(f"  UNFILED     {pin.name} — no finding called {pid} in HALLAZGOS/"
+                    + ("" if not pid.startswith("DM-") else " or Divergente_ES/")))
+        rc = worse(rc, RED)
+    shared = {k: v for k, v in seen.items() if len(v) > 1}
+    for pid, names in sorted(shared.items()):
+        print(R.dim(f"  shared      {pid}: {', '.join(names)}"))
+    n = sum(len(v) for v in seen.values())
+    print(f"  {n} pin(s), {len(seen)} finding(s)" +
+          ("" if rc != GREEN else R.dim(" — every one named and filed")))
+    return rc
+
+
+# ── findings — the index of HALLAZGOS/, read from the fichas themselves ──────
+#
+# HALLAZGOS/ had two hand-kept indexes, and both rotted: the table atop GLOBAL.md
+# stopped at GLB-007 with 77 fichas filed, and INDICE.md § 0 counted the state
+# of 2026-08-30. Five fichas kept saying «abierto» weeks after their last part
+# was fixed. The state of a finding is its own **Estado** line, so the index is
+# computed from that, and what holds an open one is computed from the
+# declarations that name it.
+
+ESTADO, _state_of = F.ESTADO, F.state_of
+
+
+def _fichas(root: Path) -> list[tuple[str, str, str, str]]:
+    """→ [(file, id, title, state)] for every `## ID — title` with an Estado."""
+    out = []
+    for f in sorted((root / "HALLAZGOS").glob("*.md")):
+        if f.name == "INDICE.md":
+            continue
+        text = f.read_text(encoding="utf-8")
+        heads = list(re.finditer(r"^##\s+([A-Z]{2,6}-\d+)\s+—\s+(.*)$", text, re.M))
+        for i, m in enumerate(heads):
+            body = text[m.end(): heads[i + 1].start() if i + 1 < len(heads) else len(text)]
+            e = ESTADO.search(body)
+            out.append((f.name, m.group(1), m.group(2).strip(),
+                        _state_of(e.group(1)) if e else "other"))
+    return out
+
+
+def _held(root: Path) -> dict[str, list[str]]:
+    """→ {finding id: [what declares it as debt]} — ZyDDT cells, and
+    zyquality/cost/ cases when that repository is cloned beside this one."""
+    held: dict[str, list[str]] = {}
+    for ax in A.load_all():
+        for c in ax.cells:
+            d = c.open_finding
+            for fid in sorted({d} if isinstance(d, str) else set((d or {}).values())):
+                held.setdefault(fid, []).append(f"{ax.id}/{c.id}")
+    cost = root.parent / "zyquality" / "cost" / "cost.toml"
+    if cost.is_file():
+        for case in tomllib.loads(cost.read_text(encoding="utf-8")).get("case", []):
+            for fid in (case.get("open_finding") or {}).values():
+                held.setdefault(fid, []).append(f"zyquality/cost {case.get('id', '?')}")
+    return held
+
+
+def cmd_findings(args, cfg) -> int:
+    """Open and closed fichas, what holds each open one, and the contradictions."""
+    root = Path(__file__).resolve().parents[1]
+    fichas, held = _fichas(root), _held(root)
+    rc = GREEN
+    by_file: dict[str, dict[str, int]] = {}
+    for fname, fid, title, state in fichas:
+        by_file.setdefault(fname, {}).setdefault(state, 0)
+        by_file[fname][state] += 1
+        if state == "open":
+            if fid in held:
+                print(f"  {R.yellow('open')}      {fid:<9} {R.dim(title[:70])}")
+                print(R.dim(f"            held by {', '.join(held[fid])}"))
+            else:
+                print(f"  {R.yellow('open')}      {fid:<9} {R.dim(title[:70])}")
+                print(f"            {R.yellow('watched by nothing')}")
+        elif state in ("closed", "dismissed") and fid in held:
+            # The ficha says it is over and a declaration still owes it: one of
+            # the two is wrong, and the gate cannot tell which.
+            print(R.red(f"  CONTRADICTION  {fid} is {state} in HALLAZGOS/{fname} and "
+                        f"still declared as debt by {', '.join(held[fid])}"))
+            rc = worse(rc, RED)
+        elif state == "other":
+            print(R.dim(f"  ?         {fid:<9} no Estado this index can read, in {fname}"))
+    # The table and the «N abiertos» sentence atop each file are kept by hand:
+    # incomplete is allowed, contradicting the ficha below is not.
+    states = {fid: state for _, fid, _, state in fichas}
+    for f in sorted((root / "HALLAZGOS").glob("*.md")):
+        for n, fid, said, real in F.stale_summary(f.read_text(encoding="utf-8"), states):
+            print(R.red(f"  STALE SUMMARY  HALLAZGOS/{f.name}:{n} says {fid} is {said}; "
+                        f"its Estado line says {real}"))
+            rc = worse(rc, RED)
+    filed = {fid for _, fid, _, _ in fichas}
+    for fid in sorted(set(held) - filed):
+        print(R.red(f"  UNFILED   {fid} is declared as debt by {', '.join(held[fid])} "
+                    f"and has no ficha"))
+        rc = worse(rc, RED)
+    print()
+    print(f"  {'file':<16}{'open':>6}{'closed':>8}{'other':>7}")
+    for fname, n in sorted(by_file.items()):
+        other = sum(v for k, v in n.items() if k not in ("open", "closed"))
+        print(f"  {fname:<16}{n.get('open', 0):>6}{n.get('closed', 0):>8}{other:>7}")
+    return rc
+
+
 def cmd_suite(args, cfg) -> int:
     """What every other repository's wrapper delegates to.
 
@@ -637,11 +1117,25 @@ def cmd_suite(args, cfg) -> int:
         print(R.red("\n  the runner does not grade correctly; nothing below is evidence"))
         return NOVERDICT
 
+    # The declaration, before anything is run. It needs no engine, and it is the
+    # only check here that compares the implementations against something that
+    # is not another implementation. NO VERDICT when zymbol-design is absent is
+    # deliberate: a layer that cannot see the premises cannot report that they
+    # hold.
+    print(R.bold("\n  premises") + R.dim("   (zymbol-design/PREMISES.md, the source)"))
+    rc = cmd_premises(args, cfg)
+    if rc == NOVERDICT:
+        print(R.yellow("\n  the premises could not be read; what follows grades "
+                       "the engines against each other only"))
+    elif rc == RED:
+        print(R.red("\n  a premise and its cells disagree about what holds it"))
+
     print(R.bold("\n  engines"))
-    rc = cmd_engines(args, cfg)
-    if rc != GREEN:
+    rc_engines = cmd_engines(args, cfg)
+    if rc_engines != GREEN:
         print(R.red("\n  an engine did not answer; nothing below may be called a pass"))
         return NOVERDICT
+    rc = worse(rc, rc_engines)
 
     print(R.bold("\n  axes") + R.dim("   (cells, generated from axes/*.toml)"))
     rc = worse(rc, cmd_axis(args, cfg))
@@ -654,17 +1148,23 @@ def cmd_suite(args, cfg) -> int:
     pins = sorted((Path(__file__).resolve().parents[1] / "cases" / "pin").glob("*.zy"))
     print(R.bold("\n  pins") + R.dim(f"   ({len(pins)} named finding{'' if len(pins) == 1 else 's'})"))
     if pins:
-        args.files = [q.relative_to(Path.cwd()) if q.is_relative_to(Path.cwd())
-                      else q for q in pins]
+        rc = worse(rc, cmd_pins(args, cfg))
+        args.files = pins
         rc = worse(rc, cmd_ask(args, cfg))
     else:
         print(R.dim("    none recorded yet"))
 
+    print(R.bold("\n  findings") + R.dim("   (HALLAZGOS/, read from each ficha's Estado)"))
+    rc = worse(rc, cmd_findings(args, cfg))
+
     print()
     if rc == GREEN:
+        # It used to end "see the undeclared axes above", and nothing above
+        # listed any: an undeclared axis has no row, which is the only honest
+        # way this report can show it (CHARTER § 6).
         print("  " + R.green(R.bold("GREEN")) + R.dim(
             " — nothing regressed in what has been declared."
-            "  It does not mean correct: see the undeclared axes above."))
+            "  It does not mean correct: an axis nobody declared has no row above."))
     elif rc == RED:
         print("  " + R.red(R.bold("RED")) + " — a regression, not noise.")
     else:
@@ -695,14 +1195,17 @@ def main() -> int:
     sub.add_parser("engines", help="what can run, and what cannot")
     sub.add_parser("selftest", help="grade the runner itself — needs no engine")
     sub.add_parser("surfaces", help="the two lexers: what did they leave unmarked")
+    sub.add_parser("premises", help="the declared premises, against the cells "
+                                    "that hold them")
+    sub.add_parser("pins", help="every pin names a filed finding, in its name "
+                                "and in its first line")
+    sub.add_parser("findings", help="the fichas of HALLAZGOS/: open, closed, and "
+                                    "what holds each open one")
     sub.add_parser("suite", help="the whole layer, one verdict")
     for name, help_ in (("gen", "write every cell from axes/*.toml"),
                         ("axis", "generate, run, and publish the denominator")):
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("axes", nargs="*", help="axis file stems (default: all)")
-        if name == "axis":
-            sp.add_argument("--regen-baseline", action="store_true",
-                            help="record today's wording splits as the baseline")
     for name, help_ in (("observe", "what each engine said"),
                         ("ask", "CELL: all engines must answer alike"),
                         ("check", "PIN: compare against the recorded .observed")):
@@ -714,8 +1217,7 @@ def main() -> int:
 
     args = p.parse_args()
     # `suite` reuses the other handlers, so give it the fields they read.
-    for attr, default in (("axes", []), ("files", []), ("regen", False),
-                          ("regen_baseline", False)):
+    for attr, default in (("axes", []), ("files", []), ("regen", False)):
         if not hasattr(args, attr):
             setattr(args, attr, default)
     cfg = E.load()
@@ -725,7 +1227,8 @@ def main() -> int:
     return {"engines": cmd_engines, "observe": cmd_observe, "ask": cmd_ask,
             "check": cmd_check, "gen": cmd_gen, "axis": cmd_axis,
             "suite": cmd_suite, "selftest": cmd_selftest,
-            "surfaces": cmd_surfaces}[args.cmd](args, cfg)
+            "surfaces": cmd_surfaces, "premises": cmd_premises,
+            "pins": cmd_pins, "findings": cmd_findings}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

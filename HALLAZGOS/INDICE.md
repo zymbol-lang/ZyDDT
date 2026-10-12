@@ -14,6 +14,17 @@
 
 ---
 
+> **El estado vivo no está en este documento.** Lo calcula `./bin/zyddt findings`
+> —también dentro de `suite`— a partir de la línea **Estado** de cada ficha: qué
+> está abierto, qué celda o qué caso de `zyquality/cost/` lo sujeta, qué no vigila
+> nada, y en rojo la ficha cerrada que todavía se declara como deuda — y, desde
+> el 2026-10-10, la fila o la frase «N abiertos» de la cabecera de un fichero que
+> contradiga a su ficha (`STALE SUMMARY`): siete lo hacían ese día. Las
+> secciones «Estado — fecha» de abajo son la historia de cada día, con sus cifras.
+> Las tablas que se llevaban a mano se pudrieron: la de `GLOBAL.md` se paró en
+> `GLB-007`, y seis fichas siguieron diciendo «abierto» con todas sus partes
+> corregidas (revisado el 2026-10-02).
+
 ## 0. Estado — 2026-08-30
 
 **Los nueve hallazgos abiertos están corregidos.** Los ejes declarados van
@@ -27,10 +38,10 @@ delante — la más cara, `GLB-005`, resultó valer **un fichero de 84**.
 
 | fichero | abiertos | corregidos |
 |---|---:|---:|
-| [`zytw.md`](zytw.md) | 0 | 0 |
-| [`zyvm.md`](zyvm.md) | 0 | 2 |
-| [`zyjs.md`](zyjs.md) | 0 | 12 |
-| [`GLOBAL.md`](GLOBAL.md) | **1** | 7 |
+| [`zytw.md`](zytw.md) | 0 | **1** |
+| [`zyvm.md`](zyvm.md) | **1** | 2 |
+| [`zyjs.md`](zyjs.md) | **1** | **13** |
+| [`GLOBAL.md`](GLOBAL.md) | **2** | **9** |
 | [`highlight.md`](highlight.md) | 0 | 1 |
 | [`tmgrammar.md`](tmgrammar.md) | 0 | 1 |
 
@@ -235,6 +246,54 @@ significaba que nadie había mirado.
 
 Las cinco superficies del CHARTER están graduadas. Hay una **sexta sin
 declarar** — el resaltador propio del curso — y es [`GLB-006`](GLOBAL.md).
+
+---
+
+## Estado — 2026-09-12: el primer eje que pregunta por el alcance
+
+`axes/isolation.toml` nace de las **cinco premisas del modelo de memoria** que el
+autor enunció ese día, y que son el primer texto normativo que existe sobre él:
+`LLM.md` describe lo que hacen los motores y `MEMORY_MODEL.md` audita diseño
+contra implementación, pero ninguno dice que una regla **deba** cumplirse.
+
+El eje afirma en vez de preguntar (`expect = "error"`), y tiene que hacerlo: los
+tres motores están **de acuerdo** en el comportamiento que la premisa 2 rechaza,
+así que un diferencial sale verde sobre el hueco entero. Es el caso que
+`VERDICTS.md` § 6 nombra — *«tres motores que aciertan a coincidir mal coinciden
+perfectamente»*.
+
+18 celdas: **12 verdes, 6 rojas**.
+
+| rojas | qué son |
+|---:|---|
+| 4 | la fila `file-var`: una función lee los nombres de nivel de fichero. **No es una regresión**: el aislamiento se retiró a propósito el 2026-08-24 (`fbccc8e`, ZyBank `ERROR-ZYB-002`) y `GUIDE.md` § 10b, que lo documentaba como deliberado, se retiró con él. Son la **decisión pendiente sobre la premisa 2**, no un defecto que arreglar sin validar |
+| ~~2~~ | [`ZYTW-001`](zytw.md) — **corregida el 2026-09-12**. El hueco era mayor que la ficha: el analizador no entraba en el cuerpo de una lambda de bloque, así que allí dentro un nombre inexistente, una aridad mal y una marca `<~` ausente eran todos silencio |
+
+Las 12 verdes no son decoración: **cuatro de las cinco premisas se cumplen hoy y
+no las sujetaba nada**. Que la constante de fichero llegue a una función, que el
+parámetro sea la puerta, que `<~` se exija en los dos extremos y que `~` no salga
+al llamante pasaron a tener una celda cada una el mismo día que se midieron.
+
+**El eje no está registrado en `zyquality/suites.toml`.** Mientras la fila
+`file-var` esté en rojo, meterlo en el gate compartido convertiría la línea base
+verde en una línea base con seis rojos permanentes, y un rojo que siempre está
+deja de significar «regresión». Registrarlo va con la decisión sobre la premisa 2
+y es del autor.
+
+> **Corregido el 2026-10-02:** el párrafo de arriba nunca fue cierto. `zyddt suite`
+> corre **todos** los ejes de `axes/`, y está en `zyquality/suites.toml` desde el
+> 2026-09-09 (zyquality `a322389`): `isolation`, escrito el 2026-09-12, estuvo en
+> el gate desde el día en que se escribió. Hoy tiene 47 celdas, todas en verde.
+
+Lo que el eje **no** cubre, y hay que decirlo aquí: las premisas 3 y 4 —un módulo
+es dueño de su entorno, y su estado sólo se alcanza por sus propias funciones
+(`E005`)— necesitan un segundo fichero, porque un módulo **es** un fichero, y una
+celda generada es un fichero. Hasta que el runner sepa emitir un hermano, o van
+como chinchetas o no están probadas. Hoy no están probadas.
+
+> **Corregido el 2026-10-02:** el runner sabe emitir hermanos —`[cell.files]`, que
+> usan `modularity`, `syntax-modules` y `runtime-modules-scripts`— y MEM-3 y MEM-4
+> tienen dos celdas cada una (`zyddt premises`: ninguna premisa sin celda).
 
 ---
 

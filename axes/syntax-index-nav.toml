@@ -1,0 +1,193 @@
+# The syntax-index-nav axis — Phase B, family B11 of the diagnostics plan.
+#
+# Navigation (`m[i>j]`), computed steps, and flat and structured extraction left
+# open or written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line.
+#
+# The computed step is asked in two positions. As the SECOND step, `m[1>(a 1]`,
+# the parser reaches the navigator's own `(` branch. As the FIRST, `m[(a 1)>1]`,
+# the browser engine reads `(a 1)` as a juxtaposition (`11`) and fails at run
+# time instead.
+
+id      = "syntax-index-nav"
+what    = "the parser diagnostics of navigation and extraction: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "computed-step-left-open"
+what = "expected ')' after computed index — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>(a 1] ¶
+"""
+
+[[cell]]
+id   = "computed-step-not-closed-in-first-position"
+what = "expected ')' after computed index — in the first step"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[(a 1)>1] ¶
+"""
+
+[[cell]]
+id   = "flat-extraction-left-open"
+what = "expected ']' after flat extraction"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>1 ; 2>2 ¶
+"""
+
+[[cell]]
+id   = "extraction-group-left-open"
+what = "expected ']' to close extraction group — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[[1>1 ; [2>2]] ¶
+"""
+
+[[cell]]
+id   = "structured-extraction-left-open"
+what = "expected ']' to close structured extraction — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[[1>1] ; [2>2] ¶
+"""
+
+[[cell]]
+id   = "negative-step-without-an-integer"
+what = "expected integer after '-' in nav index — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>-a] ¶
+"""
+
+[[cell]]
+id   = "step-is-a-float-literal"
+what = "expected navigation step — with its help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>1.5] ¶
+"""
+
+[[cell]]
+id   = "navigation-left-open"
+what = "expected ']' after index — with the navigator help"
+src  = """
+m = [[1, 2], [3, 4]]
+a = 1
+>> m[1>1 ¶
+"""
+
+# GLB-036 (corrected 2026-10-05): which help an unclosed bracket gets is decided
+# the way `is_nav_index` decides it, by looking at what follows the `[` BEFORE it
+# is read — a navigation gets the navigator's help, a plain index the plain one,
+# and only a `;` makes it a flat extraction. zyjs used to give the navigator's
+# help to every unclosed index in an expression, and the flat-extraction text to
+# a range.
+
+[[cell]]
+id   = "index-left-open-without-a-path"
+what = "an unclosed index with no `>` in an expression: the plain help, not the navigator's (GLB-036)"
+src  = """
+x = [1, 2]
+>> x[1 = 2 ¶
+"""
+
+[[cell]]
+id   = "index-left-open-in-an-assignment"
+what = "the same on the right of an assignment"
+src  = """
+x = [1, 2]
+y = x[1 = 2
+"""
+
+[[cell]]
+id   = "range-left-open"
+what = "an unclosed range: a navigation, so the navigator's help — not the flat-extraction text, which needs a `;` (GLB-036)"
+src  = """
+x = [1, 2]
+>> x[1..2 ¶
+"""
+
+[[cell]]
+id   = "flat-extraction-of-atoms-left-open"
+what = "an unclosed `;` list that opens with a plain atom (`x[1;2`): the flat-extraction text, with no help"
+src  = """
+x = [1, 2]
+>> x[1;2 ¶
+"""
+
+[[cell]]
+id   = "index-left-open-after-an-expression-and-a-semicolon"
+what = "`x[a + 1 ; 2`: what follows the `[` is not a path atom, so it is a plain index whatever comes after"
+src  = """
+x = [1, 2]
+a = 1
+>> x[a + 1 ; 2 ¶
+"""
+
+# ── An edit on a ranged path (2026-10-02) ───────────────────────────────────
+#
+# Reading `m[1..2>1]` is a form of the language and agrees in all three. As the
+# receiver of an edit it is refused by all three, for two different reasons
+# (GLB-077) — and the parser's own help for it, RANGE_IN_PATH, is never shown.
+
+# Decided 2026-10-03 (GLB-077): a receiver whose bracket has a range — simple or
+# in a path — selects several places and a write reaches one, so the refusal
+# names the range (RANGE_IN_PATH), in the three engines and for `$~` too. zyjs
+# could not parse these at statement level until then.
+
+[[cell]]
+id   = "edit-on-a-ranged-path"
+what = "`m[1..2>1]$+ 5`: an edit cannot write into a range, and the help says so (GLB-077)"
+src  = """
+m = [[1, 2], [3, 4]]
+m[1..2>1]$+ 5
+>> m ¶
+"""
+
+[[cell]]
+id   = "update-on-a-ranged-path"
+what = "`m[1..2>1]$~ 9`: `$~` keeps its own headline, with the range as the reason"
+src  = """
+m = [[1, 2], [3, 4]]
+m[1..2>1]$~ 9
+>> m ¶
+"""
+
+[[cell]]
+id   = "edit-on-a-range"
+what = "`a[1..2]$+ 5`: a simple range is the same refusal as one in a path"
+src  = """
+a = [1, 2, 3]
+a[1..2]$+ 5
+>> a ¶
+"""
+
+[[cell]]
+id   = "update-on-a-range"
+what = "`a[1..2]$~ 9`: and with `$~`"
+src  = """
+a = [1, 2, 3]
+a[1..2]$~ 9
+>> a ¶
+"""
+
+[[cell]]
+id     = "edit-on-one-place-of-a-path"
+what   = "the control: without a range the same path is one place, and it is written"
+expect = "ok"
+src    = """
+m = [[1, 2], [3, 4]]
+m[1>1]$~ 9
+m[2]$+ 5
+>> m ¶
+"""

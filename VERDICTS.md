@@ -135,12 +135,18 @@ that refuse and accept the same program "a wording difference".
 
 Wording splits are held in `wording.baseline`, as a **list and not a count** — a
 count that stays at 3 while one split closes and another opens is a green gate
-over a regression. It may fall on its own and may never rise on its own:
+over a regression. It is **edited by hand**, and nothing else writes it:
 
 ```bash
-zyddt axis                     # a new split is RED
-zyddt axis --regen-baseline    # deliberate, separate, and a reviewable diff
+zyddt axis     # a split not in the list is RED (NEW WORDING)
+               # an entry whose cell agrees now is RED too (STALE WORDING)
 ```
+
+A stale entry is an open door: while it is listed, its cell may split again
+and be accepted in silence. It is removed in the step that healed it. An entry
+is added only with a comment saying who accepted the difference, and why.
+`--regen-baseline` existed until 2026-09-25 (GLB-040): it absorbed splits nobody
+had decided, and twice ate the comments explaining the ones somebody had.
 
 This is `zyquality/messages/` applied to what is actually emitted at runtime,
 where that suite counts what is *defined* in the source. The two are
@@ -151,13 +157,15 @@ complementary: a message no test reaches is invisible here and visible there.
 ## 5. The outcomes of asking
 
 `zyddt ask` and `zyddt axis` both end in exactly one of these. Only the first two
-are a pass.
+are a pass. `KNOWN` exits 0 and is not one either: it is a red somebody filed and
+declared, reported on every run until the finding is closed.
 
 | outcome | meaning | exit |
 |---|---|---|
 | `AGREE` | same shape, same words | 0 |
 | `WORDING` | same shape, different words, already in the baseline | 0 |
 | `NEW WORDING` | same shape, different words, **not** in the baseline | 1 |
+| `STALE WORDING` | a baseline entry whose cell agrees now, or no longer exists | 1 |
 | `DIVERGE` | different shape — the engines did different things | 1 |
 | `WRONG` | they agreed, and the axis says the category is wrong | 1 |
 | `WRONG` | at least one engine did not reach the category the cell requires — and it is **named** (§ 11) | 1 |
@@ -165,6 +173,9 @@ are a pass.
 | `PARTIAL` | the answering engines agreed; not all of them answered | 2 |
 | `NO VERDICT` | fewer than two engines answered. An agreement of one is not an agreement | 2 |
 | `DEAD RULE` | an exclusion matched no case, so the list has stopped describing anything | 2 |
+| `KNOWN` | red, and the cell declares the filed, open finding it is red for (§ 12) | 0 |
+| `DEBT PAID` | the cell declares a debt and passes: close the finding, drop the declaration (§ 12) | 1 |
+| `VOID DEBT` | the declared debt names no filed finding, or an engine that does not exist (§ 12) | 1 |
 
 Exit codes are the contract every other repository's wrapper already honours:
 **0** green, **1** red, **2** no verdict.
@@ -435,9 +446,9 @@ consensus numbers — a reversed argv and a missing module resolver — both
 broken runner does not announce itself. It announces the engines.
 
 ```console
-$ zyddt selftest
-  cold  29/29 ok   classifier, parser, comparator, globs, config
-  cmd    6/6  ok   every subcommand survives being called
+$ zyddt selftest                        # as on 2026-10-02
+  cold  51/51 ok   classifier, parser, comparator, globs, config
+  cmd   10/10 ok   every subcommand survives being called
   live   3/3  ok   every engine runs the seed and answers it right
 ```
 
@@ -544,3 +555,51 @@ Every engine reaching the required category and still disagreeing about *how* �
 three different error messages, say — is still a `DIVERGE`, and it routes to
 `HALLAZGOS/GLOBAL.md` rather than to any one engine's file. The report says so
 on the line.
+
+---
+
+## 12. Declared debt — `open_finding`
+
+Decided by the author on 2026-10-02. A finding that is filed and open has two
+bad options without this: a cell that is red until the engine is fixed, which
+makes a permanently red gate (and a red that is always there stops meaning
+regression), or no cell at all, which leaves the finding watched by nobody —
+six open findings were in that state when this was written.
+
+A cell may declare the finding it is red for:
+
+```toml
+[[cell]]
+id = "lambda-parameter-shadowing-is-not-unused"
+expect = "ok"
+src = '''
+base = 100
+f = (base, x) -> base + x
+>> f(base, 2) ¶
+'''
+open_finding = { zytw = "GLB-074", zyvm = "GLB-074" }
+```
+
+| declared | covers | when the cell passes |
+|---|---|---|
+| `"ID"` | any red of the cell | `DEBT PAID`, red |
+| `{ engine = "ID" }` | a `WRONG` whose offenders are **all** in the table — needs an `expect`, since only an `expect` names an engine | `DEBT PAID` for each engine that now complies, red |
+
+What it covers is printed as `KNOWN` on every run, with the file the finding is
+filed in, and counted in the `known` column — it does not turn the gate red.
+Everything else stays red: one more engine failing a per-engine debt is a
+regression, not the old debt.
+
+**The direction that matters is the second one.** A passing cell that still
+declares a debt is red, because a marker that outlives its fix covers the next
+failure of the same cell in silence. That is the rule `@reject-pending`
+(`PROMOTE`), `wording.baseline` (`STALE WORDING`, GLB-040) and
+`--audit-exclusions` already follow; `zyquality/cost/`, where `open_finding` was
+born, reported the paid debt in green until the same day, and now follows it
+too.
+
+A debt must name a finding that is a heading in `HALLAZGOS/`, and engines that
+`engines.toml` declares. One that does not is `VOID DEBT` — red, and it covers
+nothing — because a debt nobody filed is an exclusion with no reason. And it is
+declared on a `[[cell]]`, never on a `[matrix]`: it is a claim about one
+program, and it has to be readable beside that program.

@@ -130,6 +130,25 @@ class Observation:
         return tuple((d.head, d.body, d.help) for d in self.diags)
 
 
+# A path anywhere inside a message, reduced to its file name. `keep_location`
+# already drops the machine-dependent path from the `-->` line for exactly this
+# reason — engines.toml says it "leaked a scratchpad path in the very first
+# probe" — and a path embedded in the message text is the same fact in a place
+# that rule did not reach: `failed to parse module: … in '/home/…/m/efecto.zy'`
+# against `… in 'generated/…/m/efecto.zy'` is one engine printing an absolute
+# path and another a relative one, which says nothing about the language.
+# Two shapes, and deliberately only two: a path ending in `.zy`, and an ABSOLUTE
+# path. A module name like `std/math` contains a slash and is not a path on this
+# machine — reducing it would delete information the message is carrying.
+PATHISH = re.compile(r"/(?:[\w.~-]+/)*([\w.-]+)|(?:[\w.~-]*/)+([\w.-]+\.zy)")
+
+
+def _normalise_paths(text: str, norm) -> str:
+    if not getattr(norm, "normalise_paths", True):
+        return text
+    return PATHISH.sub(lambda m: m.group(1) or m.group(2), text)
+
+
 def _strip(text: str, norm: Normalise) -> str:
     return ANSI.sub("", text) if norm.strip_ansi else text
 
@@ -164,12 +183,12 @@ def parse_stderr(text: str, norm: Normalise) -> tuple[list[Diag], list[str], str
 
         if m := RUNTIME.match(raw):
             flush()
-            fault = m.group(1).strip()
+            fault = _normalise_paths(m.group(1).strip(), norm)
             continue
 
         if m := HEAD.match(raw):
             flush()
-            sev, head = m.group(1), m.group(2).strip()
+            sev, head = m.group(1), _normalise_paths(m.group(2).strip(), norm)
             continue
 
         if m := LOC_FULL.match(raw):
@@ -187,7 +206,7 @@ def parse_stderr(text: str, norm: Normalise) -> tuple[list[Diag], list[str], str
             if sev is not None:
                 helptext = m.group(1).strip()
             else:
-                unclaimed.append(raw.strip())
+                unclaimed.append(_normalise_paths(raw.strip(), norm))
             continue
 
         if norm.drop_source_excerpt and EXCERPT.match(raw):
@@ -201,7 +220,7 @@ def parse_stderr(text: str, norm: Normalise) -> tuple[list[Diag], list[str], str
         if sev is not None:
             body.append(raw.strip())          # a continuation of the message
         else:
-            unclaimed.append(raw.strip())
+            unclaimed.append(_normalise_paths(raw.strip(), norm))
 
     flush()
     return diags, unclaimed, fault

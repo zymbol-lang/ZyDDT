@@ -1,0 +1,1583 @@
+# The runtime-modules-scripts axis — Phase C, family C9 of the diagnostics plan.
+#
+# Loading a module that does not compile, a sub-script that fails, a shell
+# command given a function, an unexported function reached as a value: the
+# runtime diagnostics no program provoked on 2026-09-14. `<id>` raises it,
+# `<id>-met` catches it and prints the family.
+#
+# The three module-load failures have NO `-met` cell, and cannot: an import must
+# come before any statement (E013), so there is no `!?` to put it in.
+#
+# `</ file />` and `<\ shell \>` are excluded for zyjs in exclusions.toml with
+# the tags that already existed, SUBSCRIPT and BASH_EXEC.
+#
+# Five of this family have no cell (reasons in the queue): `Module '{}' not
+# loaded` (an alias is only registered after its module loads), both texts of
+# `ConstantNotExported` and `circular dependency detected` (variants declared
+# and never constructed), and `failed to run` (a shell that was found and then
+# could not start). A sixth, `lexer errors: {0}`, belongs to `zymbol fmt`.
+
+id      = "runtime-modules-scripts"
+what    = "the runtime diagnostics of modules, sub-scripts and shell commands: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "bash-function-interpolation"
+expect = "error"
+what   = "cannot use function in bash command interpolation"
+src    = """
+g = x -> x
+>> <\\ "echo " g \\> ¶
+"""
+
+[[cell]]
+id     = "bash-function-interpolation-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+g = x -> x
+!? {
+    >> <\\ "echo " g \\> ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "bash-collection-interpolation"
+expect = "ok"
+what   = "a collection joined into a shell command becomes the same text in every engine — the tree-walker joins elements with spaces, the VM wrote `[1, 2]` and `(3, x)`, and `#(…)`, which the shell reads as a comment (found in step 1.5, 2026-09-15; no document says which is right)"
+src    = """
+a = [1, 2]
+t = (3, "x")
+d = #(k: 1, j: "z")
+>> <\\ "echo A " a \\> ¶
+>> <\\ "echo T " t \\> ¶
+>> <\\ "echo D " d \\> ¶
+"""
+
+[[cell]]
+id     = "subscript-runtime-error"
+expect = "error"
+what   = "a subscript that fails is reported as the CLI reports it — `Runtime error: division by zero` and its `-->` line, nested; the tree-walker printed Rust's `Located { … }` (GLB-017 B, corrected 2026-09-16)"
+src    = """
+x = </ ./sub/falla.zy />
+>> x ¶
+"""
+[cell.files]
+"sub/falla.zy" = """
+>> 1 / 0 ¶
+"""
+
+[[cell]]
+id     = "subscript-runtime-error-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    x = </ ./sub/falla.zy />
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+[cell.files]
+"sub/falla.zy" = """
+>> 1 / 0 ¶
+"""
+
+[[cell]]
+id     = "subscript-lexer-errors"
+expect = "error"
+what   = "{} lexer errors in {}"
+src    = """
+x = </ ./sub/lexico.zy />
+>> x ¶
+"""
+[cell.files]
+"sub/lexico.zy" = """
+>> "abc ¶
+"""
+
+[[cell]]
+id     = "subscript-lexer-errors-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    x = </ ./sub/lexico.zy />
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+[cell.files]
+"sub/lexico.zy" = """
+>> "abc ¶
+"""
+
+[[cell]]
+id     = "subscript-parser-errors"
+expect = "error"
+what   = "{} parser errors in {}"
+src    = """
+x = </ ./sub/sintaxis.zy />
+>> x ¶
+"""
+[cell.files]
+"sub/sintaxis.zy" = """
+>> ( ¶
+"""
+
+[[cell]]
+id     = "subscript-parser-errors-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+!? {
+    x = </ ./sub/sintaxis.zy />
+    >> x ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+[cell.files]
+"sub/sintaxis.zy" = """
+>> ( ¶
+"""
+
+[[cell]]
+id     = "unexported-function-as-an-error-value"
+expect = "error"
+what   = "a call to a function the module does not export cannot be caught: it is refused before the program runs"
+# ZYVM-008, decided 2026-09-26. This cell used to ask for the text `_err`
+# carried when `!?` caught the call; a refusal made before running reaches no
+# `!?`, in any engine.
+src    = """
+<# ./m/ok => o
+!? {
+    >> o::priv() ¶
+} :! {
+    >> _err ¶
+}
+"""
+[cell.files]
+"m/ok.zy" = """
+# ok {
+    #> { f }
+    f() {
+        <~ 1
+    }
+    priv() {
+        <~ 2
+    }
+}
+"""
+
+[[cell]]
+id     = "undefined-module-alias"
+expect = "error"
+what   = "undefined module alias: '{}'"
+src    = """
+t(v) {
+    <~ v.f(1)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "undefined-module-alias-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ v.f(1)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "module-with-lexer-errors"
+expect = "error"
+what   = "{} lexer error(s) in '{}'"
+src    = """
+<# ./m/lexico => b
+>> b::f() ¶
+"""
+[cell.files]
+"m/lexico.zy" = """
+# lexico {
+    #> { f }
+    f() {
+        <~ "abc
+    }
+}
+"""
+
+[[cell]]
+id     = "module-with-parse-errors"
+expect = "error"
+what   = "{} parse error(s) in '{}'"
+src    = """
+<# ./m/sintaxis => b
+>> b::f() ¶
+"""
+[cell.files]
+"m/sintaxis.zy" = """
+# sintaxis {
+    #> { f }
+    f() {
+        <~ (
+    }
+}
+"""
+
+[[cell]]
+id     = "module-with-semantic-errors"
+expect = "error"
+what   = "{} semantic error(s) in '{}'"
+src    = """
+<# ./m/semantica => b
+>> b::f() ¶
+"""
+[cell.files]
+"m/semantica.zy" = """
+# semantica {
+    #> { f }
+    f() {
+        <~ nada_definido
+    }
+}
+"""
+
+[[cell]]
+id     = "subscript-with-warnings-that-fails"
+what   = "a subscript that has warnings and then fails: the VM runs it as a process and passes its whole stderr on, warnings included, into the error and into `_err`; the tree-walker runs it in-process and reports the failure alone. Asks only that the engines agree (found in step 3.3, 2026-09-16; GLB-017 I)"
+src    = """
+r = "?"
+!? {
+    r = </ ./sub/avisa.zy />
+} :! {
+    >> "[" _err "]" ¶
+}
+"""
+[cell.files]
+"sub/avisa.zy" = """
+aviso = 5
+x = 1 / 0
+"""
+
+[[cell]]
+id     = "dot-call-of-a-function-the-module-does-not-export"
+expect = "error"
+what   = "`m.nada()` on a module that does not export `nada`"
+# ZYJS-040, open: both Rust engines say `module 'm' does not export function
+# 'nada'`; zyjs reads the dot as a constant: `Module 'm' has no constant …`.
+src    = """
+<# ./m/saludo => m
+>> m.nada() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "dot-read-of-a-constant-the-module-does-not-have"
+expect = "error"
+what   = "`m.nada` read: `Module 'm' has no constant 'nada'` in all three"
+# ZYVM-008, decided 2026-09-26: refused before running in all three, with the
+# line and column. The VM refused it before running with no location; the
+# tree-walker and zyjs refused it only when the line ran.
+src    = """
+<# ./m/saludo => m
+>> m.nada ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+# ZYVM-008, decided 2026-09-26: a member the module does not export is refused
+# before the program runs, even in a branch that never runs, as an undefined
+# local name already was.
+
+[[cell]]
+id     = "missing-constant-in-a-branch-that-never-runs"
+expect = "error"
+what   = "`m.nada` inside `? #0 { … }` is refused before anything prints"
+src    = """
+<# ./m/saludo => m
+>> "antes" ¶
+? #0 {
+    >> m.nada ¶
+}
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "missing-function-in-a-branch-that-never-runs"
+expect = "error"
+what   = "`m::nada()` inside `? #0 { … }` is refused before anything prints"
+src    = """
+<# ./m/saludo => m
+>> "antes" ¶
+? #0 {
+    >> m::nada() ¶
+}
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "missing-std-function-in-a-branch-that-never-runs"
+expect = "error"
+what   = "`mt::nada(1)` on `std/math` is refused by `run` as `check` refuses it"
+src    = """
+<# std/math => mt
+>> "antes" ¶
+? #0 {
+    >> mt::nada(1) ¶
+}
+"""
+
+[[cell]]
+id     = "variable-that-shares-an-alias-name-is-not-a-module"
+expect = "ok"
+what   = "a local `m` hides the alias `m`, so `m.x` reads the dictionary"
+src    = """
+<# ./m/saludo => m
+f() {
+    m = #(x: 7)
+    <~ m.x
+}
+>> f() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+# GLB-017 C and I, decided 2026-09-26: a subscript runs in this process, down
+# the road `zymbol run` takes in the caller's engine; no shell, no PATH; its
+# path is resolved from the file the `</` is written in.
+
+[[cell]]
+id     = "subscript-inside-a-module-resolves-from-the-module"
+expect = "ok"
+what   = "`</ ./s.zy />` in a function of `lib/l.zy` runs `lib/s.zy`, not `./s.zy`"
+src    = """
+<# ./lib/l => l
+>> l::corre()
+"""
+[cell.files]
+"lib/l.zy" = """
+# l {
+    #> { corre }
+    corre() { <~ </ ./s.zy /> }
+}
+"""
+"lib/s.zy" = """
+>> "soy lib/s" ¶
+"""
+
+[[cell]]
+id     = "subscript-path-with-a-quote-is-only-a-path"
+expect = "error"
+what   = "a `\"` and a `;` in the path are part of the file name: nothing reaches a shell"
+src    = """
+x = </ ./a";echo INYECTADO;"b.zy />
+>> x ¶
+"""
+
+# GLB-070, decided 2026-09-26: behind a `.`, a local variable that shares an
+# alias's name hides the alias; `::` names the module whatever the scope holds.
+
+[[cell]]
+id     = "variable-that-shares-an-alias-name-calls-its-own-lambda"
+expect = "ok"
+what   = "a local `m` holding a lambda at `g`: `m.g(1)` calls the lambda, not the module"
+src    = """
+<# ./m/saludo => m
+f() {
+    m = #(g: (n) -> n + 100)
+    <~ m.g(1)
+}
+>> f() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "scope-operator-reaches-the-module-through-a-shadowing-variable"
+expect = "ok"
+what   = "with a local `m`, `m::saluda()` still calls the module"
+src    = """
+<# ./m/saludo => m
+f() {
+    m = #(x: 7)
+    <~ m::saluda() m.x
+}
+>> f() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "file-variable-cannot-take-an-alias-name"
+expect = "error"
+what   = "at file level `m = #(K: 5)` after `<# … => m` is refused: one name, one thing (MEM-7)"
+# GLB-070, decided 2026-09-26 (option C). It used to run, and `m.K` read the
+# module — 1 — right after the line that wrote `K: 5`.
+src    = """
+<# ./m/k => m
+m = #(K: 5)
+>> m.K ¶
+"""
+[cell.files]
+"m/k.zy" = """
+# k {
+    #> { K }
+    K := 1
+}
+"""
+
+[[cell]]
+id     = "function-variable-hides-a-constant-the-module-does-have"
+expect = "ok"
+what   = "in a function, a local `m` with key `K` hides the alias `m` that exports `K`: `m.K` is the local 5"
+# GLB-070. The earlier cells read a key the module does not have, so a
+# fall-back to the variable passed them; zyjs still preferred the module when
+# it had the name.
+src    = """
+<# ./m/k => m
+f() {
+    m = #(K: 5)
+    <~ m.K
+}
+>> f() ¶
+"""
+[cell.files]
+"m/k.zy" = """
+# k {
+    #> { K }
+    K := 1
+}
+"""
+
+[[cell]]
+id     = "lambda-parameter-hides-an-alias-of-its-name"
+expect = "ok"
+what   = "a lambda of the file whose parameter is `m`: `m.K` reads the argument, not the module"
+# GLB-070. The tree-walker read the module here: its rule asked for a
+# function's call depth, and a lambda does not raise it.
+src    = """
+<# ./m/k => m
+f = (m) -> m.K
+>> f(#(K: 9)) ¶
+"""
+[cell.files]
+"m/k.zy" = """
+# k {
+    #> { K }
+    K := 1
+}
+"""
+
+# ── An import nobody uses (HLZ-015, decided and built 2026-09-27) ───────────
+#
+# In 囲碁 the frozen v2 engine was imported, offered on the menu and never
+# called: choosing v2 played v3 and no engine said a word (GO/Depurando_GO.md
+# DG-02). The warning is the pair below; the second cell is its control — the
+# three ways an alias is used without an ordinary call, which must stay quiet.
+
+[[cell]]
+id     = "unused-import-warns"
+expect = "warn"
+what   = "an alias the file never names again warns `import 'b' is never used`, and the program still runs"
+src    = """
+<# ./m/uno => a
+<# ./m/uno => b
+>> a::f() ¶
+"""
+[cell.files]
+"m/uno.zy" = """
+# uno {
+    #> { f, K }
+    K := 2
+    f() { <~ 1 }
+}
+"""
+
+[[cell]]
+id     = "import-used-without-a-call-is-used"
+expect = "ok"
+what   = "a constant read as `a.K`, a `std/` constant, and an alias used only by a re-export are all uses: no warning"
+src    = """
+<# ./m/uno => a
+<# ./m/capa => c
+<# std/math => mat
+>> a.K " " c::g() " " (mat.PI > 3) ¶
+"""
+[cell.files]
+"m/uno.zy" = """
+# uno {
+    #> { f, K }
+    K := 2
+    f() { <~ 1 }
+}
+"""
+"m/capa.zy" = """
+# capa {
+    <# ./uno => u
+    #> { u::f => g }
+}
+"""
+
+# ── GLB-017 F, which nothing held (added 2026-10-02) ─────────────────────────
+#
+# `v.f(1)` on a number: the tree-walker used to say `undefined module alias` and
+# the other two `the dot reaches a dictionary key`. All three say the second
+# now, and no cell asked — so the ficha kept calling it open.
+
+[[cell]]
+id     = "dot-call-on-a-number"
+expect = "error"
+what   = "`v.f(1)` with `v` a number: the dot reaches a dictionary key, and this is an Int"
+src    = """
+v = 5
+>> v.f(1) ¶
+"""
+
+# ── An edit whose operand writes the same module state (added 2026-10-10) ───
+#
+# `datos$+ meter()` where `meter` appends to `datos` too. Decided by the author
+# on 2026-10-10 (GLB-115): left to right, in an edit as everywhere else. The
+# receiver is read first, so `d$+ f()` is `d = d$+ f()` and what the operand
+# wrote is overwritten. The VM and zyjs already answered that; the tree-walker
+# evaluated the operand first and edited the state as it then stood — on the
+# three operators that had a shortcut, and only on those.
+
+[[cell]]
+id     = "edit-whose-operand-writes-the-same-state"
+what   = "`datos$+ meter()`, `datos[1]$~ meter()` and `datos$-[meter()]` where `meter` appends to `datos`: the receiver is read before the operand runs, and the operand's write is overwritten (GLB-115)"
+expect = "ok"
+oracle.py = """
+def show(v): print("[" + ", ".join(str(x) for x in v) + "]")
+datos = [1, 2, 3]
+def meter():
+    global datos
+    datos = datos + [99]
+    return 1
+read = list(datos); datos = read + [meter()]
+show(datos)
+datos = [1, 2, 3]
+read = list(datos); v = meter(); read[0] = v; datos = read
+show(datos)
+datos = [1, 2, 3]
+read = list(datos); i = meter(); del read[i - 1]; datos = read
+show(datos)
+"""
+src    = """
+<# ./mod/orden => O
+O::anexar()
+>> O::ver() ¶
+O::reiniciar()
+O::tocar()
+>> O::ver() ¶
+O::reiniciar()
+O::quitar()
+>> O::ver() ¶
+"""
+[cell.files]
+"mod/orden.zy" = """
+# orden {
+    #> { anexar, tocar, quitar, ver, reiniciar }
+    datos = [1, 2, 3]
+
+    meter() {
+        datos$+ 99
+        <~ 1
+    }
+    anexar() { datos$+ meter() }
+    tocar()  { datos[1]$~ meter() }
+    quitar() { datos$-[meter()] }
+    ver() { <~ datos }
+    reiniciar() { datos = [1, 2, 3] }
+}
+"""
+
+# What ZYVM-003's fix could not break: an edit of module state that FAILS,
+# caught, leaves the state as it was. The VM's edit instructions used to take the
+# value out of the register before they validated, which was harmless only while
+# the module's slot kept its own copy. Since 2026-10-10 the edit is the only
+# owner of the value: every instruction validates before it writes, and a failed
+# edit hands the value back to the slot.
+
+[[cell]]
+id     = "module-state-after-a-failed-edit"
+what   = "an update, a removal, an insertion and a path into a scalar that fail on module state, each caught: the state is unchanged"
+expect = "ok"
+src    = """
+<# ./mod/atom => A
+!? { A::tocar_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+!? { A::quitar_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+!? { A::insertar_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+!? { A::camino_mal() } :! { >> "falla" ¶ }
+>> A::ver() ¶
+"""
+[cell.files]
+"mod/atom.zy" = """
+# atom {
+    #> { tocar_mal, quitar_mal, insertar_mal, camino_mal, ver }
+    tabla = [10, 20, 30]
+
+    tocar_mal()    { tabla[99]$~ 7 }
+    quitar_mal()   { tabla$-[99] }
+    insertar_mal() { tabla$+[99] 7 }
+    camino_mal()   { tabla[1>2]$~ 7 }
+    ver() { <~ tabla }
+}
+"""
+
+# ── Module state as an output argument (added 2026-10-10) ───────────────────
+#
+# `tocar(datos<~)` inside the module that owns `datos`. MEM-5 says an output
+# parameter comes back modified. The tree-walker and zyjs wrote the result back
+# to the module's state; the VM wrote it to the temporary it had loaded the
+# state into and lost it, silently (ZYVM-014, corrected 2026-10-10).
+
+[[cell]]
+id     = "output-argument-that-is-module-state"
+what   = "a function writes its `<~` parameter and the argument is the module's own state: the write reaches the state (ZYVM-014)"
+expect = "ok"
+src    = """
+<# ./mod/pres => P
+P::correr()
+>> P::ver() ¶
+P::correr()
+>> P::ver() ¶
+"""
+oracle.py = """
+datos = [1, 2, 3]
+def tocar(a): a.append(9)
+for _ in range(2):
+    tocar(datos)
+    print("[" + ", ".join(str(x) for x in datos) + "]")
+"""
+[cell.files]
+"mod/pres.zy" = """
+# pres {
+    #> { correr, ver }
+    datos = [1, 2, 3]
+
+    tocar(a<~) { a$+ 9 }
+    correr() { tocar(datos<~) }
+    ver() { <~ datos }
+}
+"""
+
+# Module state passed as output and read directly at the same time: two copies,
+# 3 and 4 elements. Everything else passed as `<~` is LENT to its parameter
+# since 2026-10-10 (GLB-117); this is the one case that is not, decided as S3 —
+# every function of the module can see the original while the call lasts, so
+# the parameter works on a copy, written back when the call returns.
+
+[[cell]]
+id     = "module-state-read-while-passed-as-output"
+premise = "MEM-5"
+what   = "inside the callee, the module's state read directly and the `<~` parameter bound to it are two copies: `3 4` (GLB-117, S3)"
+expect = "ok"
+src    = """
+<# ./mod/pres2 => P
+P::correr()
+"""
+[cell.files]
+"mod/pres2.zy" = """
+# pres2 {
+    #> { correr }
+    datos = [1, 2, 3]
+
+    tocar(a<~) {
+        a$+ 9
+        >> datos$# " " a$# ¶
+    }
+    correr() { tocar(datos<~) }
+}
+"""
+
+# ── A tuple held as module state does not change either (added 2026-10-10) ──
+#
+# A positional tuple is not edited in place: `t$+ 4` as a statement is refused,
+# and `u = t$+ 4` builds. The VM made that check on the receiver's REGISTER, and
+# module state has none — so inside a module every editing operator but `$~`
+# went through and the tuple grew (ZYVM-016, corrected the day it was found).
+# The oracle says what each line must print; three engines that all let the
+# edit through would agree with each other.
+
+[[cell]]
+id     = "tuple-held-as-module-state-is-not-edited"
+what   = "`t$+ v`, `t$-[i]`, `t$- v`, `t$-- v`, `t$+[i] v`, `t$++ a b`, `t[i]$~ v` and `t$-[a..b]` on a tuple that is module state: each refused, the tuple unchanged; `u = t$+ 4` builds (ZYVM-016)"
+expect = "ok"
+src    = """
+<# ./mod/fija => F
+F::probar()
+"""
+oracle.py = """
+for _ in range(8):
+    print("refused")
+print("(1, 2, 3)")
+print("(1, 2, 3, 4) (1, 2, 3)")
+"""
+[cell.files]
+"mod/fija.zy" = """
+# fija {
+    #> { probar }
+    t = (1, 2, 3)
+
+    probar() {
+        !? {
+            t$+ 4
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$-[1]
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$- 1
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$-- 1
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$+[1] 0
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$++ 7 8
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t[1]$~ 9
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        !? {
+            t$-[1..2]
+            >> "edited" ¶
+        } :! { >> "refused" ¶ }
+        >> t ¶
+        u = t$+ 4
+        >> u " " t ¶
+    }
+}
+"""
+
+# ── A local name that is also the module's (added 2026-10-10) ───────────────
+#
+# Inside a module function, a PARAMETER named like the module's state is the
+# function's own variable. The VM read it from its register and wrote it to the
+# module's slot: `asignar(datos) { datos = [0]  <~ datos }` returned the argument
+# untouched and replaced the module's `datos` (ZYVM-018, corrected the day it
+# was found). The oracle is Python, where a parameter shadows a global the same
+# way.
+
+[[cell]]
+id     = "parameter-named-like-module-state-is-the-function-s-own"
+what   = "a parameter named like the module's state, assigned, added to, edited in place and taken by a block lambda: the function sees its own value and the module's state is untouched (ZYVM-018)"
+expect = "ok"
+src    = """
+<# ./mod/sombra => S
+>> S::asignar([10, 20]) " " S::ver() ¶
+>> S::sumar(1) " " S::ver() ¶
+>> S::editar([10, 20, 30], 9) " " S::ver() ¶
+>> S::en_lambda() " " S::ver() ¶
+"""
+oracle.py = """
+datos = [1, 2, 3]
+n = 100
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def asignar(datos):
+    datos = [0]
+    return datos
+def sumar(n):
+    n = n + 1
+    n += 1
+    return n
+def editar(datos, n):
+    datos = list(datos)
+    datos[0] = n
+    del datos[1]
+    datos.append(n)
+    return datos
+def en_lambda():
+    g = lambda n: n + 1
+    return g(5)
+def ver(): return f"({show(datos)}, {n})"
+print(show(asignar([10, 20])), ver())
+print(sumar(1), ver())
+print(show(editar([10, 20, 30], 9)), ver())
+print(en_lambda(), ver())
+"""
+[cell.files]
+"mod/sombra.zy" = """
+# sombra {
+    #> { asignar, sumar, editar, en_lambda, ver }
+    datos = [1, 2, 3]
+    n = 100
+
+    asignar(datos) {
+        datos = [0]
+        <~ datos
+    }
+    sumar(n) {
+        n = n + 1
+        n += 1
+        <~ n
+    }
+    editar(datos, n) {
+        datos[1]$~ n
+        datos$-[2]
+        datos$+ n
+        <~ datos
+    }
+    en_lambda() {
+        g = (n) -> {
+            n = n + 1
+            <~ n
+        }
+        <~ g(5)
+    }
+    ver() { <~ (datos, n) }
+}
+"""
+
+# A loop variable or a destructured name that coincides with the module's state
+# is NOT a parameter: it is the module's state, however it gets its value.
+# Decided by the author on 2026-10-10 (GLB-119) — one rule, "giving a value to a
+# name of the module writes its state", the one an assignment already followed.
+# The tree-walker did that. The VM gave the name a register of its own in nine
+# of these forms, then read from the register and assigned to the slot; zyjs
+# kept a loop variable in the turn's scope and published it when the loop
+# ended, so a function of the module called from the body read the old value.
+
+[[cell]]
+id     = "loop-variable-or-destructured-name-that-is-module-state"
+what   = "`@ n:1..3`, `@ n:[…]`, `@ (k, n):d`, `[n, m] = …`, `(n, m) = …`, `#(n: n, m: m) = …`, `[n, *m] = …` and two nested loops, inside a module whose state has `n`, `m` and `k`: each writes the state, and a function called from the loop's body reads it (GLB-119)"
+expect = "ok"
+src    = """
+<# ./mod/vuelta => V
+>> V::rango() " " V::ver() ¶
+V::reiniciar()
+>> V::rango_lee() " " V::ver() ¶
+V::reiniciar()
+>> V::coleccion() " " V::ver() ¶
+V::reiniciar()
+>> V::pares() " " V::ver() ¶
+V::reiniciar()
+>> V::destr_arr() " " V::ver() ¶
+V::reiniciar()
+>> V::destr_tupla() " " V::ver() ¶
+V::reiniciar()
+>> V::destr_dic() " " V::ver() ¶
+V::reiniciar()
+>> V::resto() " " V::ver() ¶
+V::reiniciar()
+>> V::anidado() " " V::ver() ¶
+V::reiniciar()
+>> V::bucle_escribe() " " V::ver() ¶
+"""
+oracle.py = """
+n, m, k = 100, 200, "k0"
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    return str(v)
+def ver(): return f"({show(n)}, {show(m)}, {k})"
+def reiniciar():
+    global n, m, k
+    n, m, k = 100, 200, "k0"
+def lee(): return n
+def rango():
+    global n
+    s = 0
+    for n in range(1, 4): s = s + n
+    return s
+def rango_lee():
+    global n
+    s = 0
+    for n in range(1, 4): s = s + lee()
+    return s
+def coleccion():
+    global n
+    s = 0
+    for n in [10, 20]: s = s + n
+    return s
+def pares():
+    global n, k
+    s = ""
+    for k, n in {"a": 1, "b": 2}.items(): s = s + k + str(n)
+    return s
+def destr_arr():
+    global n, m
+    n, m = [7, 8]
+    n = n + 1
+    return n + m
+def destr_tupla():
+    global n, m
+    n, m = (5, 6)
+    return n * m
+def destr_dic():
+    global n, m
+    d = {"n": 3, "m": 4}
+    n, m = d["n"], d["m"]
+    return n + m
+def resto():
+    global n, m
+    n, *m = [1, 2, 3]
+    return n + len(m)
+def anidado():
+    global n, m
+    s = 0
+    for n in range(1, 3):
+        for m in range(1, 3): s = s + n * m
+    return s
+def bucle_escribe():
+    global n
+    for n in range(1, 4): n = n * 10
+    return 0
+for f in (rango, rango_lee, coleccion, pares, destr_arr, destr_tupla, destr_dic, resto, anidado, bucle_escribe):
+    print(f(), ver())
+    reiniciar()
+"""
+[cell.files]
+"mod/vuelta.zy" = """
+# vuelta {
+    #> { rango, rango_lee, coleccion, pares, destr_arr, destr_tupla, destr_dic, resto, anidado, bucle_escribe, ver, reiniciar }
+    n = 100
+    m = 200
+    k = "k0"
+
+    lee() { <~ n }
+    rango() {
+        s = 0
+        @ n:1..3 { s = s + n }
+        <~ s
+    }
+    rango_lee() {
+        s = 0
+        @ n:1..3 { s = s + lee() }
+        <~ s
+    }
+    coleccion() {
+        s = 0
+        @ n:[10, 20] { s = s + n }
+        <~ s
+    }
+    pares() {
+        d = #(a: 1, b: 2)
+        s = ""
+        @ (k, n):d { s = s k n }
+        <~ s
+    }
+    destr_arr() {
+        [n, m] = [7, 8]
+        n = n + 1
+        <~ n + m
+    }
+    destr_tupla() {
+        (n, m) = (5, 6)
+        <~ n * m
+    }
+    destr_dic() {
+        #(n: n, m: m) = #(n: 3, m: 4)
+        <~ n + m
+    }
+    resto() {
+        [n, *m] = [1, 2, 3]
+        <~ n + m$#
+    }
+    anidado() {
+        s = 0
+        @ n:1..2 {
+            @ m:1..2 { s = s + n * m }
+        }
+        <~ s
+    }
+    bucle_escribe() {
+        @ n:1..3 { n = n * 10 }
+        <~ 0
+    }
+    ver() { <~ (n, m, k) }
+    reiniciar() {
+        n = 100
+        m = 200
+        k = "k0"
+    }
+}
+"""
+
+# And the tree-walker's own: a function whose parameter is named like the
+# module's state CALLED another function of the module, and the module's state
+# became the parameter's value — with no `<~` anywhere. The parameter's name had
+# been injected into the frame as the module's variable, and the flush on the
+# way into the next call published it (ZYTW-008, corrected 2026-10-10).
+
+[[cell]]
+id     = "call-from-a-function-whose-parameter-is-named-like-module-state"
+what   = "`d(datos) { <~ lee(datos) }` in a module whose state is `datos`: the call leaves the module's state alone (ZYTW-008)"
+expect = "ok"
+src    = """
+<# ./mod/pasa => P
+>> P::d([1]) " " P::ver() ¶
+>> P::e([1, 2]) " " P::ver() ¶
+"""
+oracle.py = """
+datos = [1, 2, 3]
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+def lee(v): return len(v)
+def otro(x): x.append(5)
+def d(datos): return lee(datos)
+def e(datos):
+    datos = list(datos)
+    otro(datos)
+    return datos
+print(d([1]), show(datos))
+print(show(e([1, 2])), show(datos))
+"""
+[cell.files]
+"mod/pasa.zy" = """
+# pasa {
+    #> { d, e, ver }
+    datos = [1, 2, 3]
+
+    lee(v) { <~ v$# }
+    otro(x<~) { x$+ 5 }
+    d(datos) { <~ lee(datos) }
+    e(datos) {
+        otro(datos<~)
+        <~ datos
+    }
+    ver() { <~ datos }
+}
+"""
+
+# ── Module state read, then written by a later operand (added 2026-10-10) ───
+#
+# The same rule as the edits above, on every other shape a receiver has: the
+# left side of an arithmetic self-assignment, the collection of an indexed
+# read, the root of a deep update. The tree-walker read each of them AFTER the
+# operand — its shortcuts evaluate the operand and then work on the variable
+# where it lives — and so did the VM for the root of `m[i>j]$~ v`. Left to
+# right in the three since 2026-10-10 (GLB-115, ZYTW-014).
+
+[[cell]]
+id     = "module-state-read-before-a-later-operand-writes-it"
+what   = "`n = n + tocar()`, `n = n * tocar()`, `datos[meter()]` and `m[(cambia())>1]$~ 5` where the call writes what is on its left: the value read is the one from before the call (GLB-115, ZYTW-014)"
+expect = "ok"
+src    = """
+<# ./mod/antes => A
+A::sumar()
+>> A::n_es() ¶
+A::reiniciar()
+A::multiplicar()
+>> A::n_es() ¶
+A::reiniciar()
+>> A::indice() ¶
+A::reiniciar()
+>> A::hondo() ¶
+"""
+oracle.py = """
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    return str(v)
+n = 5
+def tocar():
+    global n
+    n = n + 10
+    return 1
+left = n; n = left + tocar(); print(n)
+n = 5
+left = n; n = left * tocar(); print(n)
+datos = [10, 20, 30]
+def meter():
+    global datos
+    datos = [7, 8, 9, 6]
+    return 1
+read = datos; i = meter(); print(read[i - 1])
+m = [[1, 2], [3, 4]]
+def cambia():
+    global m
+    m = [[70, 80], [90, 60]]
+    return 1
+read = [list(r) for r in m]; i = cambia(); read[i - 1][0] = 5; m = read
+print(show(m))
+"""
+[cell.files]
+"mod/antes.zy" = """
+# antes {
+    #> { sumar, multiplicar, indice, hondo, n_es, reiniciar }
+    n = 5
+    datos = [10, 20, 30]
+    m = [[1, 2], [3, 4]]
+
+    tocar() {
+        n = n + 10
+        <~ 1
+    }
+    meter() {
+        datos = [7, 8, 9, 6]
+        <~ 1
+    }
+    cambia() {
+        m = [[70, 80], [90, 60]]
+        <~ 1
+    }
+    sumar()       { n = n + tocar() }
+    multiplicar() { n = n * tocar() }
+    indice()      { <~ datos[meter()] }
+    hondo() {
+        m[(cambia())>1]$~ 5
+        <~ m
+    }
+    n_es() { <~ n }
+    reiniciar() {
+        n = 5
+        datos = [10, 20, 30]
+        m = [[1, 2], [3, 4]]
+    }
+}
+"""
+
+# ── Save, call, restore (added 2026-10-10) ──────────────────────────────────
+#
+# A function calls another that changes the module's state and then writes the
+# state back to what it was when the function started — how a search undoes a
+# move. The tree-walker lost that write: it decides what a frame changed by
+# comparing each variable with the copy the frame was given on entry, and a
+# value written back to equal that copy looked untouched, so the module kept
+# what the nested call had stored (ZYTW-013, corrected the day it was found).
+
+[[cell]]
+id     = "module-state-written-back-to-its-starting-value-after-a-nested-call"
+what   = "`deshacer() { mover()  n = 5  t = [1, 2] }` with `n` 5 and `t` `[1, 2]` on entry and `mover` changing both: the state is what `deshacer` wrote last (ZYTW-013)"
+expect = "ok"
+src    = """
+<# ./mod/deshace => D
+D::deshacer()
+>> D::ver() ¶
+D::otro()
+>> D::ver() ¶
+"""
+oracle.py = """
+n = 5
+t = [1, 2]
+def show(): print(f"({n}, [" + ", ".join(str(x) for x in t) + "])")
+def mover():
+    global n, t
+    n = 99
+    t = [9]
+def deshacer():
+    global n, t
+    mover()
+    n = 5
+    t = [1, 2]
+def otro():
+    global n, t
+    mover()
+    n = 6
+    t = [3]
+deshacer(); show()
+otro(); show()
+"""
+[cell.files]
+"mod/deshace.zy" = """
+# deshace {
+    #> { deshacer, otro, ver }
+    n = 5
+    t = [1, 2]
+
+    mover() {
+        n = 99
+        t = [9]
+    }
+    deshacer() {
+        mover()
+        n = 5
+        t = [1, 2]
+    }
+    otro() {
+        mover()
+        n = 6
+        t = [3]
+    }
+    ver() { <~ (n, t) }
+}
+"""
+
+# The other side of S3: a copy that is not written back is dropped. A function
+# that writes its `<~` parameter and then fails leaves the module's state as it
+# was — where a variable of the caller's own keeps what was written (S1), since
+# that one was lent. A local of a module function is lent like any other.
+
+[[cell]]
+id     = "module-state-passed-as-output-to-a-call-that-fails"
+premise = "MEM-5"
+what   = "`tocar(datos<~)` writes and then fails, with `datos` the module's state: the state is unchanged; a local passed the same way keeps the writes, through two levels (GLB-117, S1 and S3)"
+expect = "ok"
+oracle_literal_ok = "the labels are the observable of a path; the collections are computed on both sides"
+src    = """
+<# ./mod/presta => P
+P::correr()
+>> P::ver() ¶
+>> P::anidado() ¶
+"""
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+datos = [1, 2, 3]
+def tocar(a):
+    a.append(9)
+    x = [1]
+    a.append(x[5 - 1])
+def interno(a):
+    a.append(5)
+    z = [1]
+    a.append(z[9 - 1])
+def externo(a):
+    a.append(4)
+    interno(a)
+    a.append(6)
+try: tocar(list(datos))
+except IndexError: print("falla en el modulo")
+print(show(datos))
+local = [0]
+try: externo(local)
+except IndexError: print("falla anidada")
+print(show(local))
+"""
+[cell.files]
+"mod/presta.zy" = """
+# presta {
+    #> { correr, ver, anidado }
+    datos = [1, 2, 3]
+
+    tocar(a<~) {
+        a$+ 9
+        x = [1]
+        y = x[5]
+        a$+ y
+    }
+    correr() {
+        !? { tocar(datos<~) } :! { >> "falla en el modulo" ¶ }
+    }
+    interno(a<~) {
+        a$+ 5
+        z = [1]
+        w = z[9]
+        a$+ w
+    }
+    externo(a<~) {
+        a$+ 4
+        interno(a<~)
+        a$+ 6
+    }
+    anidado() {
+        local = [0]
+        !? { externo(local<~) } :! { >> "falla anidada" ¶ }
+        <~ local
+    }
+    ver() { <~ datos }
+}
+"""
+
+# The same for module state: what a module hands out is a value. An edit the
+# module makes afterwards does not reach it, and an edit of what was handed out
+# does not reach the module (ZYJS-014; the two Rust engines share and copy on
+# write).
+
+[[cell]]
+id     = "module-state-handed-out-is-a-value"
+what   = "`z = S::dame()`, then the module edits its state in place, then the caller edits what it was given: three separate arrays"
+expect = "ok"
+src    = """
+<# ./mod/st => S
+S::mete(1)
+S::mete(2)
+z = S::dame()
+S::mete(3)
+S::toca(1, 9)
+w = S::dame()
+w$+ 100
+>> z " " w " " S::dame() " " S::largo() ¶
+"""
+oracle.py = """
+def show(v): return "[" + ", ".join(str(x) for x in v) + "]"
+datos = []
+datos.append(1); datos.append(2)
+z = list(datos)
+datos.append(3); datos[0] = 9
+w = list(datos); w.append(100)
+print(show(z), show(w), show(datos), len(datos))
+"""
+[cell.files]
+"mod/st.zy" = """
+# st {
+    #> { mete, dame, toca, largo }
+    datos = []
+
+    mete(v) { datos$+ v }
+    dame() { <~ datos }
+    toca(i, v) { datos[i]$~ v }
+    largo() { <~ datos$# }
+}
+"""
+
+
+# A module's state lives in one place. The tree-walker used to hand every frame
+# a copy of the variables its body names and write back, on the way out, the
+# ones that had changed (ZYTW-010): a frame that FAILED dropped its copy, and
+# with it everything it had written before failing. The VM and zyjs kept it.
+
+[[cell]]
+id     = "module-state-written-before-a-failure-stays-written"
+what   = "a function of a module edits a cell, adds to a counter, and then fails: caught outside, both writes are there (ZYTW-010)"
+expect = "ok"
+src    = """
+<# ./mod/antes => A
+!? { A::falla(2) } :! { >> A::total() ¶ }
+>> A::leer(2) " " A::total() ¶
+!? { A::falla_dentro(3) } :! { >> A::total() ¶ }
+>> A::leer(3) " " A::total() ¶
+"""
+oracle.py = """
+t, n = [0, 0, 0, 0], 0
+def falla(i):
+    global n
+    t[i - 1] = 99
+    n += 100
+    raise IndexError
+def falla_dentro(i):
+    global n
+    n += 1
+    falla(i)
+for f, i in ((falla, 2), (falla_dentro, 3)):
+    try: f(i)
+    except IndexError: print(n)
+    print(t[i - 1], n)
+"""
+[cell.files]
+"mod/antes.zy" = """
+# antes {
+    #> { falla, falla_dentro, leer, total }
+    t = [0, 0, 0, 0]
+    n = 0
+
+    falla(i) {
+        t[i]$~ 99
+        n += 100
+        x = t[1000]
+        <~ x
+    }
+    falla_dentro(i) {
+        n += 1
+        <~ falla(i)
+    }
+    leer(i) { <~ t[i] }
+    total() { <~ n }
+}
+"""
+
+# The hot mark on a name that is module state. GLB-119 decided that giving a
+# value to a name of the module writes its state, however the value gets there;
+# `n° = …` is one more way, and the VM gave it a register of its own (ZYVM-020).
+
+[[cell]]
+id     = "hot-assignment-to-a-name-that-is-module-state"
+what   = "`n° = n + i` and `°n = n + i` in a loop, inside a module whose state has `n`: each writes the state (ZYVM-020)"
+expect = "ok"
+src    = """
+<# ./mod/calor => C
+>> C::despues() " " C::ver() ¶
+>> C::antes() " " C::ver() ¶
+"""
+oracle.py = """
+n = 10
+for i in (1, 2, 3): n = n + i
+print(n, n)
+for i in (1, 2, 3): n = n + i
+print(n, n)
+"""
+[cell.files]
+"mod/calor.zy" = """
+# calor {
+    #> { despues, antes, ver }
+    n = 10
+
+    despues() {
+        @ i:1..3 { n° = n + i }
+        <~ n
+    }
+    antes() {
+        @ i:1..3 { °n = n + i }
+        <~ n
+    }
+    ver() { <~ n }
+}
+"""
+
+# A lambda written in a function of a module captures the module's state as it
+# captures anything else: by value, when it is written. Decided by the author on
+# 2026-10-10 (ZYVM-021). The tree-walker and zyjs did that; in the VM a name that
+# is module state has no register, so the body loaded it from the module's slot
+# when it ran and saw whatever was there by then.
+
+[[cell]]
+id     = "lambda-in-a-module-function-captures-module-state"
+what   = "a lambda in a function of a module names the module's state: it reads what the state held when the lambda was written, its own writes stay inside it, and one stored in the module keeps what it captured (ZYVM-021)"
+expect = "ok"
+src    = """
+<# ./mod/captura => K
+>> K::lee() " " K::ver() ¶
+>> K::escribe() " " K::ver() ¶
+>> K::anidada() " " K::ver() ¶
+>> K::param() ¶
+>> K::hof() ¶
+>> K::guardada() ¶
+>> K::usar() " " K::usar() ¶
+>> K::bloque() " " K::ver() ¶
+"""
+oracle.py = """
+t, n, g = [5, 6], 10, None
+def show(v):
+    if isinstance(v, list): return "[" + ", ".join(show(x) for x in v) + "]"
+    if isinstance(v, tuple): return "(" + ", ".join(show(x) for x in v) + ")"
+    return str(v)
+def ver(): return (t, n)
+def lee():
+    global n
+    f = (lambda t0, n0: lambda k: t0[k - 1] + n0)(list(t), n)
+    t[0] = 500
+    n = 1000
+    return f(1)
+def escribe():
+    def f(k, n0=n): return n0 + k
+    return (f(7), n)
+def anidada():
+    global n
+    h = (lambda n0: lambda b: n0 + 1 + b)(n)
+    n = 0
+    return h(2)
+def param(): return 4 * 2
+def hof(): return [x + n for x in [1, 2, 3]]
+def guardada():
+    global g
+    g = (lambda n0: lambda k: n0 + k)(n)
+    return 0
+def usar():
+    global n
+    n = n + 1
+    return g(1)
+def bloque(): return (99 + 1, n)
+print(show(lee()), show(ver()))
+print(show(escribe()), show(ver()))
+print(show(anidada()), show(ver()))
+print(param())
+print(show(hof()))
+print(guardada())
+a = usar(); b = usar()
+print(a, b)
+print(show(bloque()), show(ver()))
+"""
+[cell.files]
+"mod/captura.zy" = """
+# captura {
+    #> { lee, escribe, anidada, param, hof, guardada, usar, bloque, ver }
+    t = [5, 6]
+    n = 10
+    g = 0
+
+    ver() { <~ (t, n) }
+    lee() {
+        f = k -> t[k] + n
+        t[1]$~ 500
+        n = 1000
+        <~ f(1)
+    }
+    escribe() {
+        f = (k) -> {
+            n = n + k
+            <~ n
+        }
+        r = f(7)
+        <~ (r, n)
+    }
+    anidada() {
+        f = a -> (b -> n + a + b)
+        h = f(1)
+        n = 0
+        <~ h(2)
+    }
+    param() {
+        f = (n) -> n * 2
+        <~ f(4)
+    }
+    hof() {
+        r = [1, 2, 3]$> (x -> x + n)
+        <~ r
+    }
+    guardada() {
+        g = k -> n + k
+        <~ 0
+    }
+    usar() {
+        n = n + 1
+        <~ g(1)
+    }
+    bloque() {
+        f = (k) -> {
+            n = 99
+            <~ n + k
+        }
+        r = f(1)
+        <~ (r, n)
+    }
+}
+"""

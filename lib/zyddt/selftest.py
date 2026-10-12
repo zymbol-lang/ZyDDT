@@ -397,6 +397,101 @@ def _():
     assert C.worse(C.GREEN, C.GREEN) == C.GREEN
 
 
+# ── Declared debt ────────────────────────────────────────────────────────────
+#
+# `open_finding` decides whether a red is a regression, so a mistake here does
+# not fail loudly: it turns a regression KNOWN, or keeps a paid debt quiet.
+# Each branch is asked once, cold.
+
+@case("debt/a-finding-id-covers-any-red-of-its-cell",
+      "a cell declared as GLB-073 that turns red is KNOWN, not a regression")
+def _():
+    assert C.debt("GLB-073", True, frozenset()) == (C.KNOWN, [])
+    assert C.debt("GLB-073", True, frozenset({"zyjs"})) == (C.KNOWN, [])
+
+
+@case("debt/a-passing-cell-pays-its-debt",
+      "a declared cell that passes is red: the finding looks fixed, the marker goes")
+def _():
+    assert C.debt("GLB-073", False, frozenset()) == (C.PAID, [])
+    assert C.debt({"zytw": "GLB-074", "zyvm": "GLB-074"}, False, frozenset()) \
+        == (C.PAID, ["zytw", "zyvm"])
+
+
+@case("debt/per-engine-covers-only-the-engines-it-names",
+      "one more engine failing the same cell is a regression, not the old debt")
+def _():
+    d = {"zytw": "GLB-074", "zyvm": "GLB-074"}
+    assert C.debt(d, True, frozenset({"zytw", "zyvm"})) == (C.KNOWN, [])
+    assert C.debt(d, True, frozenset({"zytw", "zyvm", "zyjs"})) == (None, [])
+    assert C.debt({"zyvm": "X-1"}, True, frozenset({"zytw", "zyvm"})) == (None, [])
+
+
+@case("debt/one-engine-fixed-is-paid-for-that-engine",
+      "half a fix pays half the debt, and the table has to say so")
+def _():
+    d = {"zytw": "GLB-074", "zyvm": "GLB-074"}
+    assert C.debt(d, True, frozenset({"zyvm"})) == (C.PAID, ["zytw"])
+
+
+@case("findings/estado-forms-the-fichas-use",
+      "«decidido y corregido» is closed; a status nobody can read is `other`, not open")
+def _():
+    from zyddt import findings as Fi
+    assert Fi.state_of("abierto — pendiente de decisión") == "open"
+    assert Fi.state_of("**corregido el 2026-09-26**") == "closed"
+    assert Fi.state_of("**decidido y corregido el 2026-09-25** (paso P1)") == "closed"
+    assert Fi.state_of("**cerrado** — verificado") == "closed"
+    assert Fi.state_of("desestimado") == "dismissed"
+    assert Fi.state_of("**la cascada corregida…") == "other"
+
+
+@case("findings/a-summary-may-be-incomplete-and-may-not-contradict",
+      "a row or an «abiertos:» sentence that names a closed ficha open is stale; a missing row is not")
+def _():
+    from zyddt import findings as Fi
+    text = ("| [`XX-1`](#xx-1) | **abierto** | a |\n"
+            "| [`XX-2`](#xx-2) | **corregido 2026-01-01** | b |\n"
+            "| ~~`XX-3`~~ | **reencaminado** | c |\n"
+            "\n**Dos abiertos: `XX-1` y `XX-4`.** `XX-2` se corrigió.\n"
+            "\n## XX-1 — t\n\n| [`XX-2`](#xx-2) | **abierto** | below the first ficha: not the summary |\n")
+    states = {"XX-1": "closed", "XX-2": "closed", "XX-3": "rerouted", "XX-4": "open", "XX-5": "open"}
+    assert Fi.stale_summary(text, states) == [(1, "XX-1", "open", "closed"),
+                                              (5, "XX-1", "open", "closed")]
+    assert Fi.stale_summary(text, dict(states, **{"XX-1": "open"})) == []
+
+
+@case("debt/no-declaration-changes-nothing", "a cell with no open_finding is judged as before")
+def _():
+    assert C.debt(None, True, frozenset({"zyjs"})) == (None, [])
+    assert C.debt(None, False, frozenset()) == (None, [])
+
+
+@case("debt/per-engine-needs-an-expect-and-a-matrix-cannot-owe",
+      "only an expect names an engine; a debt is about one program, not a matrix")
+def _():
+    import tempfile
+    d = Path(tempfile.mkdtemp())
+    (d / "noexpect.toml").write_text(
+        'id = "n"\n[[cell]]\nid = "c"\nsrc = ">> 1 ¶"\n'
+        'open_finding = { zyjs = "ZYJS-001" }\n', encoding="utf-8")
+    try:
+        A.load_all_from(d)
+        raise AssertionError("a per-engine debt with no expect was accepted")
+    except SystemExit as e:
+        assert "needs an `expect`" in str(e), e
+    (d / "noexpect.toml").unlink()
+    (d / "m.toml").write_text(
+        'id = "m"\n[[dimension]]\nname = "a"\nvalues = ["p"]\n'
+        '[matrix]\nid = "«a»"\nsrc = ">> 1 ¶"\nopen_finding = "GLB-001"\n',
+        encoding="utf-8")
+    try:
+        A.load_all_from(d)
+        raise AssertionError("a matrix-wide debt was accepted")
+    except SystemExit as e:
+        assert "[[cell]]" in str(e), e
+
+
 # ── The matrix ───────────────────────────────────────────────────────────────
 #
 # The generator is the one part of this layer that can manufacture coverage that
@@ -553,6 +648,12 @@ SMOKE: list[tuple[str, list[str]]] = [
     ("ask", ["generated/verdict/ok.zy"]),
     ("check", ["--regen", "cases/seed/hello.zy"]),
     ("surfaces", []),
+    # Added 2026-10-02: the command existed since 2026-09-12 and runs inside
+    # every `suite`, and this list — the one that catches a command body that no
+    # longer runs — did not name it.
+    ("premises", []),
+    ("pins", []),
+    ("findings", []),
 ]
 
 

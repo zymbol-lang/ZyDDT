@@ -1,0 +1,578 @@
+# The runtime-format-convert axis — Phase C, family C5 of the diagnostics plan.
+#
+# Casts (`###`, `##!`), base conversion (`0x|x|`) and the format expressions
+# (`#.n|x|`, `#!n|x|`, `#,|x|`): the runtime diagnostics no program provoked on
+# 2026-09-14. `<id>` raises it, `<id>-met` catches it and prints the family. The
+# wrong value arrives through a parameter so the analyzer lets the program run.
+#
+# `0x|"zz"|` is one program with two diagnostics, one per Rust engine:
+# `failed to parse 'zz' as hexadecimal number` in the tree-walker and
+# `failed to parse 'zz' as base-16 number` in the VM. One cell holds both.
+
+id      = "runtime-format-convert"
+what    = "the runtime diagnostics of casts, base conversion and format expressions: that each happens, and how it is met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "failed-to-parse-as-binary-number"
+expect = "error"
+what   = "failed to parse '{}' as binary number — the base is NAMED"
+# Only the hexadecimal one had a cell, and the VM was saying `base-2`,
+# `base-8`, `base-10` and `base-16` in all four — the radix it holds rather
+# than what the reader wrote (step G4.6, 2026-09-23).
+src    = """
+t(v) {
+    <~ 0b|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-octal-number"
+expect = "error"
+what   = "failed to parse '{}' as octal number"
+src    = """
+t(v) {
+    <~ 0o|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-decimal-number"
+expect = "error"
+what   = "failed to parse '{}' as decimal number"
+src    = """
+t(v) {
+    <~ 0d|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "float-cast-requires-a-numeric-value"
+expect = "error"
+what   = "##. requires a numeric value, got {} — and the family is ##Type"
+# The tree-walker answered `##_` here, because the site carried no kind and
+# the word-based classifier found no "type" in the sentence. `###` next to it
+# answered `##Type`, so `!?` sorted two casts two ways (step G4.6).
+src    = """
+t(v) {
+    <~ ##.v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "float-cast-requires-a-numeric-value-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ##.v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "trunc-cast-requires-a-numeric-value-or"
+expect = "error"
+what   = "##! requires a numeric value or Char, got {}"
+src    = """
+t(v) {
+    <~ ##!v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "trunc-cast-requires-a-numeric-value-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ##!v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "int-cast-requires-a-numeric-value-got"
+expect = "error"
+what   = "### requires a numeric value, got {}"
+src    = """
+t(v) {
+    <~ ###v
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "int-cast-requires-a-numeric-value-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ###v
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "base-conversion-expressions-work-with-char-int"
+expect = "error"
+what   = "base conversion expressions work with char, int, or string, got {:?}"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "base-conversion-expressions-work-with-char-int-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-rounding"
+expect = "error"
+what   = "cannot convert string '{}' to number for rounding"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+>> t("abc") ¶
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-rounding-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+!? {
+    >> t("abc") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-truncation"
+expect = "error"
+what   = "cannot convert string '{}' to number for truncation"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+>> t("abc") ¶
+"""
+
+[[cell]]
+id     = "cannot-convert-string-to-number-for-truncation-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+!? {
+    >> t("abc") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "decimal-count-must-be-a-whole-number"
+expect = "error"
+what   = "decimal count must be a whole number, got {}"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+>> t(1.5) ¶
+"""
+
+[[cell]]
+id     = "decimal-count-must-be-a-whole-number-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+!? {
+    >> t(1.5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "decimal-count-must-not-be-negative-got"
+expect = "error"
+what   = "decimal count must not be negative, got {}"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+>> t(-1) ¶
+"""
+
+[[cell]]
+id     = "decimal-count-must-not-be-negative-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.v|1.23|
+}
+!? {
+    >> t(-1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-number"
+expect = "error"
+what   = "failed to parse '{}' as {} number"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t("zz") ¶
+"""
+
+[[cell]]
+id     = "failed-to-parse-as-number-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t("zz") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "format-expressions-only-work-with-numbers-got"
+expect = "error"
+what   = "format expressions only work with numbers, got {:?}"
+src    = """
+t(v) {
+    <~ #,|v|
+}
+>> t("x") ¶
+"""
+
+[[cell]]
+id     = "format-expressions-only-work-with-numbers-got-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #,|v|
+}
+!? {
+    >> t("x") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "integer-overflow-cannot-represent-this-float"
+expect = "error"
+what   = "integer overflow: {} cannot represent this float"
+src    = """
+t(v) {
+    <~ ###v
+}
+>> t(1.0e300) ¶
+"""
+
+[[cell]]
+id     = "integer-overflow-cannot-represent-this-float-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ ###v
+}
+!? {
+    >> t(1.0e300) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "invalid-unicode-character-code"
+expect = "error"
+what   = "a surrogate read by `0x|…|`: `character out of range: 0x|…| cannot represent this code` — it was `invalid Unicode character code: {}`, a `##_` that quoted the value (GLB-113)"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+>> t("D800") ¶
+"""
+
+[[cell]]
+id     = "invalid-unicode-character-code-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ 0x|v|
+}
+!? {
+    >> t("D800") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "round-expressions-only-work-with-numbers-or"
+expect = "error"
+what   = "round expressions only work with numbers or numeric strings, got {:?}"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+>> t(#1) ¶
+"""
+
+[[cell]]
+id     = "round-expressions-only-work-with-numbers-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #.2|v|
+}
+!? {
+    >> t(#1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "truncate-expressions-only-work-with-numbers-or"
+expect = "error"
+what   = "truncate expressions only work with numbers or numeric strings, got {:?}"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+>> t(#1) ¶
+"""
+
+[[cell]]
+id     = "truncate-expressions-only-work-with-numbers-or-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+t(v) {
+    <~ #!2|v|
+}
+!? {
+    >> t(#1) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "format-a-numeric-string"
+expect = "ok"
+what   = "`#,|v|` with v a string that reads as a number gives the same answer in every engine — the tree-walker refuses it, the VM and zyjs format it, and `#.2|v|` takes it in all three (found in step 2.8, 2026-09-15; GLB-029)"
+src    = """
+t(v) {
+    <~ #,|v|
+}
+>> t("1234.5") ¶
+"""
+
+# GLB-071, fixed 2026-09-26: `#|text|` is an Int or a Float depending on the
+# text, known only when it runs. The Rust analyser typed it Float and refused
+# it as an index; it also never looked at the operand.
+
+[[cell]]
+id     = "numeric-eval-of-text-is-a-valid-index"
+expect = "ok"
+what   = "`a[#|\"2\"|]` reads the second element: the value is an Int when it runs"
+src    = """
+a = [10, 20, 30]
+s = "2"
+>> a[#|s|] ¶
+"""
+
+[[cell]]
+id   = "numeric-eval-of-an-undefined-name"
+what = "`#|nada|` on a name that does not exist is refused before running"
+src  = """
+>> #|nada| ¶
+"""
+
+
+# ── A literal with a base prefix is a Char (added 2026-10-09) ───────────────
+#
+# `0x`, `0b`, `0o` and `0d` write character codes (zymbol-design/SYMBOLS.md):
+# `0xFF` is `ÿ` and `0d65` is `A`, outside ASCII too, in the three engines.
+# Three texts said Int (GLB-110, corrected 2026-10-09): this cell holds the
+# engines, which were right, against a drift towards what those texts said.
+
+[[cell]]
+id     = "base-literal-is-a-char"
+expect = "ok"
+what   = "`0xFF`, `0x3042` and `0d65` are Chars — `ÿ`, `あ`, `A` — and `##!` gives their codes (GLB-110)"
+src    = """
+a = 0xFF
+b = 0x3042
+c = 0d65
+>> a " " b " " c ¶
+>> (a#?)[1] " " (b#?)[1] " " (c#?)[1] ¶
+>> (##!a + 1) ¶
+"""
+
+# ── `##'expr`: an Int code point to its Char (added 2026-10-09) ─────────────
+#
+# Decided by the author on 2026-10-09 (GLB-109, D1): `##'` is the pair of `##!`
+# on a Char, and fails the way its siblings `###`, `##.` and `##!` do — at run
+# time, with the kind declared: a wrong type is `##Type`, a code with no
+# character (past 0x10FFFF, a surrogate, below 0) is `##Range`. Only an Int is a
+# code; a Float is not, even a whole one. A Char stays itself.
+
+[[cell]]
+id     = "char-cast-from-an-int"
+what   = "`##'n` is the Char with code point n — computed, past ASCII and at Unicode's last code — and `##!` reads it back (GLB-109)"
+expect = "ok"
+src    = """
+n = 65
+>> ##'n ¶
+>> ##'(n + 12289) ¶
+>> ##'0x41 ¶
+c = ##'n
+>> (c#?)[1] ¶
+@ code:[0, 55295, 57344, 1114111] {
+    >> (##!##'code + 7) ¶
+}
+"""
+oracle.py = """
+print(chr(65))
+print(chr(65 + 12289))
+print("A")
+print("##'")
+for code in [0, 55295, 57344, 1114111]:
+    print(ord(chr(code)) + 7)
+"""
+
+[[cell]]
+id     = "char-cast-code-with-no-character-is-range"
+what   = "`##'` on an Int that is no character — past 0x10FFFF, a surrogate, below 0 — is caught by `:! ##Range` (GLB-109)"
+expect = "ok"
+src    = """
+@ code:[1114112, 55296, 57343, -1] {
+    !? {
+        >> ##'code ¶
+    } :! ##Range {
+        >> "range" ¶
+    }
+}
+"""
+
+[[cell]]
+id     = "char-cast-of-a-non-int-is-type"
+what   = "`##'` on a Float, even a whole one, a String or a Bool is caught by `:! ##Type`: only an Int is a code (GLB-109)"
+expect = "ok"
+src    = """
+l = #[65.0, "A", #1]
+@ v:l {
+    !? {
+        >> ##'v ¶
+    } :! ##Type {
+        >> "type" ¶
+    }
+}
+"""
+
+# GLB-113 (decided 2026-10-09): a base literal also reads a TEXT of digits —
+# `0d|"65"|` is 'A' — so a code reached through text with no character is the
+# same failure as `##'` on that Int: `##Range`, without the value.
+[[cell]]
+id     = "code-with-no-character-through-text-is-range"
+what   = "`0d|\"{n}\"|` with a code past 0x10FFFF or a surrogate, in each base, is caught by `:! ##Range` (GLB-113)"
+expect = "ok"
+src    = """
+n = 1114112
+s = 55296
+for_text = ["{n}", "{s}"]
+@ t:for_text {
+    !? {
+        >> 0d|t| ¶
+    } :! ##Range {
+        >> "range" ¶
+    }
+}
+!? {
+    >> 0x|"DFFF"| ¶
+} :! ##Range {
+    >> "range" ¶
+}
+"""
+
+[[cell]]
+id     = "char-cast-requires-an-int-or-char"
+expect = "error"
+what   = "##' requires an Int or Char, got {} — uncaught, as its siblings' cells above (GLB-109)"
+src    = """
+t(v) {
+    <~ ##'v
+}
+>> t(65.0) ¶
+"""
+
+[[cell]]
+id     = "char-cast-character-out-of-range"
+expect = "error"
+what   = "character out of range: ##' cannot represent this Int — uncaught (GLB-109)"
+src    = """
+t(v) {
+    <~ ##'v
+}
+>> t(1114112) ¶
+"""

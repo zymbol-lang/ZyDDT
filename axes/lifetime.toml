@@ -1,0 +1,623 @@
+# The lifetime axis — MEM-8, the two ways a value stops existing.
+#
+# ── Why it needed an axis of its own ────────────────────────────────────────
+#
+# Automatic release is required to be INVISIBLE, so no cell can observe it: a
+# correct program prints the same thing either way, which is exactly what makes
+# a differential blind to it. That half is measured by `zyquality/cost/`, as a
+# ratio of peak memory against a control — a claim about cost, which is not
+# something a cell can make.
+#
+# What a cell CAN ask is the other half. `\ x` is the exception the premise
+# declares: it is observable on purpose, and using the name afterwards is an
+# error. That is a category, and a category is what `expect` asserts.
+#
+# ── What was found the moment it was asked ──────────────────────────────────
+#
+# The corpus has two files that use `\`, and both destroy a name and never touch
+# it again. Nobody had written the case the premise is about, so no consensus
+# run had ever compared it — and the three engines do not agree:
+#
+#   zytw, zyvm   runtime, after half the output is written, saying
+#                `use after destruction: variable 'x' was destroyed …`
+#   zyjs         before running, saying `undefined variable 'x'` — which does
+#                not say a destruction happened at all
+#
+# Each engine has a different half right: the browser one refuses at the better
+# moment, the Rust ones say the better thing. Recorded as GLB-008.
+
+id      = "lifetime"
+what    = "how a value stops existing, and what may be said about it afterwards"
+engines = ["zytw", "zyvm", "zyjs"]
+premise = "MEM-8"
+
+[[cell]]
+id   = "use-after-destruction"
+what = "a name used after `\\` destroys it"
+# expect = error only: WHICH error, and when, is exactly what diverges, and
+# asserting either would be picking a winner before the author has.
+src  = """
+x = "dato"
+>> x ¶
+\\ x
+>> x ¶
+"""
+
+[[cell]]
+id     = "destroy-then-reassign"
+expect = "ok"
+what   = "a destroyed name comes back when it is assigned again"
+# `\` ends a life, it does not burn the name. Without this cell the rule above
+# could be met by refusing the name forever, which would be a different language.
+src    = """
+x = 1
+\\ x
+x = 2
+>> x ¶
+"""
+
+[[cell]]
+id     = "destroy-what-is-finished-with"
+expect = "ok"
+what   = "destroying a name that is never touched again is the ordinary case"
+src    = """
+x = 1
+>> x ¶
+\\ x
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "destroy-inside-a-function"
+expect = "ok"
+what   = "a function may destroy its own local"
+src    = """
+f() { x = 1
+\\ x
+<~ "hecho" }
+>> f() ¶
+"""
+
+[[cell]]
+id     = "destroy-in-a-branch-not-taken"
+expect = "ok"
+what   = "a `\\` that never runs destroys nothing"
+# The cell that decides HOW the rule may be enforced, and it was written after
+# GLB-008's proposed fix turned out to be backwards. Moving the check into the
+# analyser sounded like the obvious repair — one engine already did it — until
+# this case was asked: `zytw` prints 1 because the branch never ran, and `zyjs`
+# refuses the program. A static check with no flow analysis cannot tell a
+# destruction that happened from one that was merely written down, so the
+# run-time answer is not the late one, it is the only correct one.
+# 2026-09-27: `? #0` became `? x == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
+src    = """
+x = 1
+? x == 0 { \\ x }
+>> x ¶
+"""
+
+[[cell]]
+id     = "destroy-a-name-that-does-not-exist"
+expect = "error"
+what   = "`\\ nada` destroys a name that was never defined"
+# GLB-055, decided 2026-09-25: a static error, the one a read gives. MEM-8 made
+# use-after-destruction a RUN-TIME error because only running tells a `\` that
+# ran from one that was written down; whether a name is VISIBLE is not that
+# question, and `? #0 { >> nada ¶ }` was already refused before anything runs.
+# Both Rust engines accepted this in silence.
+src    = """
+\\nada
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-missing-name-in-a-branch-not-taken"
+expect = "error"
+what   = "`\\ nada` inside `? #0 { }` is refused before running, as `>> nada` is there"
+# The control that decided GLB-055: the same branch with a read is a static
+# error in all three engines.
+src    = """
+? #0 { \\nada }
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-block-local-after-its-block"
+expect = "error"
+what   = "a name born in a block is gone after it, for `\\` as for a read (MEM-6)"
+src    = """
+? #1 { y = 1 }
+\\y
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-hot-counter-after-its-loop"
+expect = "error"
+what   = "`i°` dies with its loop; destroying it afterwards names nothing — the case GLB-055 was found with"
+src    = """
+n = 0
+@ n < 3 {
+    i° += 1
+    n += 1
+}
+\\i
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-twice"
+expect = "error"
+what   = "a second `\\` that runs is a use after the first, at run time (GLB-055)"
+src    = """
+x = 1
+\\x
+\\x
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-twice-in-a-loop"
+expect = "error"
+what   = "the second pass of a loop destroys what the first already destroyed"
+src    = """
+x = 1
+@ 2 { \\x }
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-after-a-destruction-that-did-not-run"
+expect = "ok"
+what   = "why the double `\\` is a run-time error: a `\\` in a branch not taken destroyed nothing"
+# 2026-09-27: `? #0` became `? x == 0`. Since HLZ-016 a literal-only
+# condition warns `this branch never runs`, and `expect = "ok"` asserts no
+# warning at all, which is part of what this cell guards. The branch is still
+# not taken at run time; the analyser just cannot fold it.
+src    = """
+x = 1
+? x == 0 { \\x }
+\\x
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-constant"
+expect = "error"
+what   = "a constant lives as long as the program (MEM-1): `\\ K` is refused before running"
+# Destroyed, the name could be neither reassigned nor declared again.
+src    = """
+K := 1
+\\K
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "destroy-a-constant-inside-a-function"
+expect = "error"
+what   = "a function cannot end a global constant"
+# Was a `\` that did nothing in both Rust engines, and ended the global in zyjs.
+src    = """
+K := 1
+f() {
+    \\K
+    <~ "hecho"
+}
+>> f() ¶
+>> K ¶
+"""
+
+[[cell]]
+id     = "destroy-a-function"
+expect = "error"
+what   = "only a variable can be destroyed: `\\ f` on a named function is refused"
+# Both Rust engines ran it and `f()` still answered; zyjs destroyed it.
+src    = """
+f() { <~ 1 }
+\\f
+>> f() ¶
+"""
+
+[[cell]]
+id     = "destroy-a-module-alias"
+expect = "error"
+what   = "only a variable can be destroyed: `\\ m` on a module alias is refused"
+# All three ran it, and `m::saluda()` still answered: a `\` that did nothing.
+src    = """
+<# ./m/saludo => m
+\\m
+>> m::saluda() ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+[[cell]]
+id     = "destroy-a-file-variable-from-a-function"
+expect = "error"
+what   = "a function cannot end a name it cannot see (MEM-2)"
+# Was a no-op in both Rust engines and ended the file's `x` in zyjs.
+src    = """
+x = 1
+f() {
+    \\x
+    <~ "hecho"
+}
+>> f() ¶
+>> x ¶
+"""
+
+[[cell]]
+id     = "a-lambda-destroys-its-own-copy"
+expect = "ok"
+what   = "a lambda's `\\ x` ends its copy, never the file's `x` (MEM-6: it writes only what it declares)"
+# zyjs ended the file's `x`, and so did the VM, invisibly: its `DestroyGlobal`
+# ran from any body, where a write to a file variable runs only from `<main>`.
+src    = """
+x = 1
+g = () -> {
+    \\x
+    <~ "hecho"
+}
+>> g() ¶
+>> g() ¶
+>> x ¶
+"""
+
+[[cell]]
+id     = "a-function-that-destroys-its-parameter-called-twice"
+expect = "ok"
+what   = "each call has its own parameter: the mark of one call is not the next one's"
+# zyvm failed the SECOND call: its destroyed-slot marks are absolute and were
+# never cleared when a frame ended, so `>> p` read the previous call's mark.
+src    = """
+f(p) {
+    >> p ¶
+    \\p
+    <~ "hecho"
+}
+>> f(1) ¶
+>> f(2) ¶
+"""
+
+[[cell]]
+id     = "a-lambda-that-reads-then-destroys-called-twice"
+expect = "ok"
+what   = "a lambda's captured copy is fresh at every call"
+src    = """
+x = 1
+g = () -> {
+    >> x ¶
+    \\x
+    <~ "hecho"
+}
+>> g() ¶
+>> g() ¶
+"""
+
+[[cell]]
+id     = "read-a-destroyed-parameter"
+expect = "error"
+what   = "reading a parameter after `\\ p` is a use after destruction"
+# ZYJS-030, open: zyjs says `'p' is undefined — did you mean 'p°' (hot
+# definition)?`. Its `Env.get` checks for a destruction only at the root, and a
+# function's frame ends at its boundary before reaching it.
+src    = """
+f(p) {
+    \\p
+    <~ p
+}
+>> f(1) ¶
+"""
+
+[[cell]]
+id     = "read-a-lambda-copy-after-destroying-it"
+expect = "error"
+what   = "inside a lambda, reading the copy it destroyed is a use after destruction"
+# ZYJS-030, open: the same path as a parameter.
+src    = """
+x = 1
+g = () -> {
+    \\x
+    <~ x
+}
+>> g() ¶
+"""
+
+[[cell]]
+id     = "call-a-destroyed-lambda"
+expect = "error"
+what   = "calling a lambda variable after `\\ g` is a use after destruction"
+# ZYTW-007, open: the tree-walker says `undefined function: 'g'`, while zyvm and
+# zyjs say `use after destruction`.
+src    = """
+g = () -> 1
+\\g
+>> g() ¶
+"""
+
+[[cell]]
+id     = "read-a-block-local-destroyed-inside-a-function"
+expect = "error"
+what   = "a name ended in a function's `?` block and read in that block"
+# ZYJS-030: the mark lives in the block's frame; zyjs looked for it only at the
+# function boundary and said "'y' is undefined — did you mean 'y°'".
+src    = """
+f() {
+    ? #1 {
+        y = 1
+        \\y
+        >> y ¶
+    }
+    <~ 0
+}
+>> f() ¶
+"""
+
+# ── A module's state ────────────────────────────────────────────────────────
+#
+# Everything above ends a name of the file, of a function or of a lambda. A
+# variable of a module is none of those: it is shared by the module's functions
+# and outlives every call. Asked on 2026-10-10, the three engines gave three
+# answers — the tree-walker ended it for the one frame that ran the `\\`, the
+# VM did nothing at all, and zyjs ended it for the module and never gave it
+# back. Decided by the author on 2026-10-11 (GLB-120): it is this premise,
+# applied where no engine applied it whole. The state is the module's, so its
+# end is too; reading it is the run-time error a `!?` catches; assigning it
+# gives it back to the module.
+
+[[cell]]
+id     = "destroy-module-state"
+expect = "ok"
+what   = "`\\ c` in a function of a module ends `c` for the module: every function finds it destroyed however it reads it, an assignment from any of them gives it back, a second `\\` is a use after the first — and a branch not taken, a parameter and a lambda's copy end nothing of the module's (GLB-120)"
+oracle_literal_ok = "the steps print the labels the functions return; what the oracle computes is which steps fail and what the state holds after each"
+src    = """
+<# ./mod/fin => F
+t(etq, f) {
+    !? {
+        r = f()
+        >> etq " " r ¶
+    } :! { >> etq " ERROR" ¶ }
+}
+t("01", () -> F::mostrar())
+t("02", () -> F::destruye())
+t("03", () -> F::mostrar())
+t("04", () -> F::lee())
+t("05", () -> F::interp())
+t("06", () -> F::arg())
+t("07", () -> F::escribe("nueva"))
+t("08", () -> F::lee())
+t("09", () -> F::destruye())
+t("10", () -> F::comparten())
+t("11", () -> F::lee())
+t("12", () -> F::destruye_y_lee())
+t("13", () -> F::mostrar())
+t("13b", () -> F::escribe("viva"))
+t("14", () -> F::destruye_y_escribe())
+t("15", () -> F::lee())
+t("16", () -> F::destruye())
+t("17", () -> F::destruye())
+t("18", () -> F::escribe("otra"))
+t("19", () -> F::rama(0))
+t("20", () -> F::lee())
+t("21", () -> F::param("x"))
+t("22", () -> F::lee())
+t("23", () -> F::lam())
+t("24", () -> F::lee())
+t("25", () -> F::rama(1))
+t("26", () -> F::lee())
+t("27", () -> F::lista())
+t("28", () -> F::largo())
+t("29", () -> F::indice())
+t("30", () -> F::suma())
+t("31", () -> F::edita())
+t("32", () -> F::edita2())
+t("33", () -> F::recorre())
+t("34", () -> F::presta())
+t("35", () -> F::renace())
+t("36", () -> F::largo())
+t("37", () -> F::bucle())
+t("38", () -> F::largo())
+"""
+oracle.py = """
+class Dead(Exception): pass
+S = {"c": "inicio", "v": [1, 2, 3], "n": 5}
+dead = set()
+def get(k):
+    if k in dead: raise Dead
+    return S[k]
+def put(k, x):
+    dead.discard(k)
+    S[k] = x
+def end(k):
+    if k in dead: raise Dead
+    dead.add(k)
+def destruye(): end("c"); return "destruida"
+def lee(): return get("c")
+def escribe(x): put("c", x); return get("c")
+def comparten(): put("c", "propia"); put("c", "de la hermana"); return get("c")
+def destruye_y_lee(): end("c"); return get("c")
+def destruye_y_escribe(): end("c"); put("c", "renacida"); return get("c")
+def mostrar():
+    try: return get("c")
+    except Dead: return "no hay c"
+def rama(k):
+    if k > 0: end("c")
+    return "rama"
+def param(c): return "param"
+def lam():
+    get("c")            # the lambda captures the value where it is written
+    return "lam"
+def interp(): return "<" + get("c") + ">"
+def arg(): return get("c")
+def lista(): end("v"); return "sin v"
+def largo(): return len(get("v"))
+def indice(): return get("v")[0]
+def suma(): end("n"); put("n", get("n") + 1); return get("n")
+def edita(): get("v").append(4); return len(get("v"))
+def edita2(): get("v")[0] = 9; return get("v")[0]
+def recorre(): return sum(get("v"))
+def presta(): get("v").append(1); return len(get("v"))
+def renace(): put("v", [7]); put("n", 1); return len(get("v")) + get("n")
+def bucle():
+    end("n")
+    for i in (1, 2, 3):
+        put("n", i)
+        get("v").append(i)
+    return get("n")
+steps = [("01", mostrar), ("02", destruye), ("03", mostrar), ("04", lee), ("05", interp), ("06", arg),
+    ("07", lambda: escribe("nueva")), ("08", lee), ("09", destruye), ("10", comparten), ("11", lee),
+    ("12", destruye_y_lee), ("13", mostrar), ("13b", lambda: escribe("viva")), ("14", destruye_y_escribe),
+    ("15", lee), ("16", destruye), ("17", destruye), ("18", lambda: escribe("otra")), ("19", lambda: rama(0)),
+    ("20", lee), ("21", lambda: param("x")), ("22", lee), ("23", lam), ("24", lee), ("25", lambda: rama(1)),
+    ("26", lee), ("27", lista), ("28", largo), ("29", indice), ("30", suma), ("31", edita), ("32", edita2),
+    ("33", recorre), ("34", presta), ("35", renace), ("36", largo), ("37", bucle), ("38", largo)]
+for tag, f in steps:
+    try: print(tag, f())
+    except Dead: print(tag, "ERROR")
+"""
+[cell.files]
+"mod/fin.zy" = """
+# fin {
+    #> { destruye, lee, escribe, comparten, destruye_y_lee, destruye_y_escribe, mostrar, rama, param, lam, interp, largo, indice, arg, suma, lista, edita, edita2, recorre, presta, renace, bucle }
+    c = "inicio"
+    v = [1, 2, 3]
+    n = 5
+
+    destruye() {
+        \\ c
+        <~ "destruida"
+    }
+    lee() { <~ c }
+    escribe(x) {
+        c = x
+        <~ c
+    }
+    _pone() { c = "de la hermana" }
+    comparten() {
+        c = "propia"
+        _pone()
+        <~ c
+    }
+    destruye_y_lee() {
+        \\ c
+        <~ c
+    }
+    destruye_y_escribe() {
+        \\ c
+        c = "renacida"
+        <~ c
+    }
+    mostrar() {
+        !? { <~ c } :! { <~ "no hay c" }
+    }
+    rama(k) {
+        ? k > 0 { \\ c }
+        <~ "rama"
+    }
+    param(c) {
+        \\ c
+        <~ "param"
+    }
+    lam() {
+        g = () -> {
+            \\ c
+            <~ "lam"
+        }
+        <~ g()
+    }
+    interp() { <~ "<{c}>" }
+    _id(x) { <~ x }
+    arg() { <~ _id(c) }
+    lista() {
+        \\ v
+        <~ "sin v"
+    }
+    largo() { <~ v$# }
+    indice() { <~ v[1] }
+    suma() {
+        \\ n
+        n += 1
+        <~ n
+    }
+    edita() {
+        v$+ 4
+        <~ v$#
+    }
+    edita2() {
+        v[1]$~ 9
+        <~ v[1]
+    }
+    recorre() {
+        s = 0
+        @ x:v { s += x }
+        <~ s
+    }
+    _mas(a<~) { a$+ 1 }
+    presta() {
+        _mas(v<~)
+        <~ v$#
+    }
+    renace() {
+        (v, n) = ([7], 1)
+        <~ v$# + n
+    }
+    bucle() {
+        \\ n
+        @ n:1..3 { v$+ n }
+        <~ n
+    }
+}
+"""
+
+[[cell]]
+id     = "read-module-state-another-function-destroyed"
+expect = "error"
+what   = "with no `!?` around it, reading what a sibling destroyed stops the program"
+src    = """
+<# ./mod/corta => F
+>> F::destruye() ¶
+>> F::lee() ¶
+"""
+[cell.files]
+"mod/corta.zy" = """
+# corta {
+    #> { destruye, lee }
+    c = "inicio"
+
+    destruye() {
+        \\ c
+        <~ "destruida"
+    }
+    lee() { <~ c }
+}
+"""
+
+[[cell]]
+id     = "destroy-module-state-twice-across-calls"
+expect = "error"
+what   = "the second call destroys what the first already destroyed: a use after it"
+src    = """
+<# ./mod/corta => F
+>> F::destruye() ¶
+>> F::destruye() ¶
+"""
+[cell.files]
+"mod/corta.zy" = """
+# corta {
+    #> { destruye }
+    c = "inicio"
+
+    destruye() {
+        \\ c
+        <~ "destruida"
+    }
+}
+"""

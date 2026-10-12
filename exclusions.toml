@@ -71,3 +71,47 @@ reason  = "`<\\ shell \\>` has no browser equivalent"
 # (`--without STD_DB`): they have std/db only when built with the feature and an
 # ODBC driver present, and a release package has neither.  That is what
 # ZyQuality's VM_COMPARE_EXCLUDE existed for.
+
+# ── `</ sub.zy />` ───────────────────────────────────────────────────────────
+# Same shape as BASH_EXEC: a sub-script runs another FILE as a process, and the
+# browser engine has no file system and no process to run it in. It does not
+# merely fail — it does not parse the form at all (`expected expression, found
+# Lt`), which is the honest answer for a construct it cannot have.
+#
+# The cell stays where it is and is still graded on the two engines that can run
+# it, which is the whole reason this table exists rather than a folder.
+
+[[rule]]
+match   = "modularity/subscript-path-is-taken-literally"
+engines = ["zyjs"]
+tag     = "SUBSCRIPT"
+reason  = "`</ file />` runs another file as a process; a browser has neither"
+
+# ── `std/db` ─────────────────────────────────────────────────────────────────
+# ODBC is a native driver stack. The browser engine has no connection to fail to
+# open, so the case says nothing there — while the two Rust engines answer the
+# question it is asking.
+
+[[rule]]
+match   = "runtime-errors/db-*"
+engines = ["zyjs"]
+tag     = "STD_DB"
+reason  = "ODBC is a native driver stack; a browser has no connection to open"
+
+[[rule]]
+match   = "runtime-modules-scripts/bash-*"
+engines = ["zyjs"]
+tag     = "BASH_EXEC"
+reason  = "`<\\ shell \\>` has no browser equivalent"
+
+[[rule]]
+match   = "runtime-modules-scripts/subscript-*"
+engines = ["zyjs"]
+tag     = "SUBSCRIPT"
+reason  = "`</ file />` runs another file as a process; a browser has neither"
+
+[[rule]]
+match   = "runtime-std-db/*"
+engines = ["zyjs"]
+tag     = "STD_DB"
+reason  = "ODBC is a native driver stack; a browser has no connection to open"

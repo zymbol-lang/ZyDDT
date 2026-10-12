@@ -1,0 +1,668 @@
+# The isolation axis — which names a body may reach across a boundary.
+#
+# ── Why this axis exists ────────────────────────────────────────────────────
+#
+# The author stated the memory model's five premises on 2026-09-12, and they are
+# the first NORMATIVE text about it: `LLM.md` describes what the engines do and
+# `MEMORY_MODEL.md` audits design against implementation, but neither says a
+# rule *must* hold. Premise 2 is the one this axis is built for:
+#
+#   > A variable is only visible and modifiable inside its scope; the ones in
+#   > the main scope, only in the main scope.
+#
+# Four of the five premises hold today and **nothing tests them**. That is the
+# first reason for the axis and it is independent of premise 2: the fences that
+# do work — a block's name unreachable from a function, a caller's local
+# unreachable from a callee — are held down by nobody, and this file is written
+# so that breaking one of them turns a cell red the same day.
+#
+# ── Why `expect` and not `ask` ───────────────────────────────────────────────
+#
+# `zyddt ask` requires the engines to answer alike, and all three agree on the
+# behaviour premise 2 rejects. A differential is green over the whole gap, by
+# construction — the case `VERDICTS.md` § 6 names: *"three engines that agree
+# wrongly agree perfectly"*. So this axis asserts, with the weakest claim that
+# still bites: whatever the message, **this must not run**.
+#
+# An oracle cannot help either. There is no independent implementation that
+# decides whether a Zymbol function may see its file's scope — the question is
+# about Zymbol's rule, not about a computation. `VERDICTS.md` § 8 names that
+# case too, and `expect` is what is left.
+#
+# ── What the matrix crosses ─────────────────────────────────────────────────
+#
+# Two things that are genuinely orthogonal: WHERE a name is born, and HOW the
+# body that reads it is reached. The second dimension exists because of
+# ERROR-ZYB-002 (ZyBank): before 2026-08-24 the same body meant two different
+# things depending on how it was reached — a direct call ran isolated, the same
+# function taken as a value captured — and nothing in the source said which one
+# you were looking at. That incoherence is the reason the isolation was retired
+# rather than enforced. Whatever is decided now, the four readers must answer
+# ALIKE, and a matrix is the only form that keeps asking.
+#
+# ── The state of the `file-var` row, 2026-09-13 ─────────────────────────────
+#
+# Three of the four are GREEN: MEM-2 was implemented on 2026-09-13 and a named
+# function reading a file variable is a static error in all three engines. It
+# cost nothing to restore — four corpus files, all of them tests of this rule,
+# and none of the nine applications.
+#
+# `file-var-lambda` stays RED on purpose. A lambda reaching out is a WARNING
+# while that half is decided, and this cell asserts `error`. It is declared debt
+# and not a defect: PREMISES.md § 2 (MEM-6) states the open question and the
+# argument on both sides. The day the lambda is decided this cell either goes
+# green or its `expect` changes — and if neither happens, the red is the
+# reminder that a question was left open.
+#
+# ── The state as it was on 2026-09-12, kept ────────────────────────────────
+#
+# Those four cells fail today, in all three engines, and the failure is the
+# open question rather than a regression: the isolation was removed deliberately
+# (`fbccc8e`, 2026-08-24) and `GUIDE.md` § 10b, which documented it as
+# deliberate, was retired with it. They are declared WITHOUT a skip on purpose —
+# a skip would make the hole invisible in exactly the place the author asked for
+# a watch. The axis is not registered in `zyquality/suites.toml` while they are
+# red, so the shared gate keeps its green baseline; registering it is the
+# author's call and belongs with the decision on premise 2.
+#   [Corrected 2026-10-02: it never was outside the gate. `zyddt suite` runs every
+#   axis, and has been in zyquality/suites.toml since 2026-09-09.]
+#
+# ── What is NOT here ────────────────────────────────────────────────────────
+#
+# Premises 3 and 4 (a module owns its environment; its state is reachable only
+# through its own functions, `E005`) need a second file — a module is a file —
+# and a generated cell is one file. They belong in this axis and cannot be
+# expressed by it yet; until the runner can emit a sibling, they are pins under
+# `cases/pin/` or they are untested. Today they are untested, and saying so here
+# is the point: an axis that quietly covers less than its name claims is the
+# failure this layer exists to prevent.
+#   [Corrected 2026-10-02: the runner emits siblings (`[cell.files]`), and MEM-3
+#   and MEM-4 have two cells each; `zyddt premises` reports no premise without
+#   one.]
+
+id      = "isolation"
+what    = "which names a body may reach across a boundary, and which it may not"
+# Every cell of this axis asserts a premise of `zymbol-design/PREMISES.md`, by
+# id. `zyddt premises` crosses the two lists in both directions: a premise with
+# no cell, a cell claiming a premise that does not exist, and a `Held by` naming
+# a cell that is gone are all reported. The declaration is what makes the
+# crossing possible — an axis that measures a rule without saying which rule is
+# a test nobody can trace back to a decision.
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"        # any error; static or runtime is not asserted here
+
+# ── The crossing that must be refused ───────────────────────────────────────
+
+[[dimension]]
+name = "origin"
+# Where the name is born. Every one of these is OUTSIDE the body that reads it,
+# which is the whole content of premise 2.
+#
+# Each `open` READS its own name before the boundary is crossed. Without that
+# the Rust engines add `warning: unused variable` and zyjs does not, and all
+# eight cells reported that difference instead of the crossing — one cell, one
+# question, the same reason `operator.toml` parenthesises its comparisons.
+values = [
+  { id = "file-var",     name = "principal",   decl = "principal = 10", open = "", close = "" },
+  { id = "block-var",    name = "de_bloque",   decl = "", open = "? #1 {\n    de_bloque = 10\n    >> de_bloque ¶", close = "}" },
+  { id = "caller-local", name = "de_llamante", decl = "", open = "llamante() {\n    de_llamante = 10\n    >> de_llamante ¶", close = "}\nllamante()" },
+]
+
+[[dimension]]
+name = "reader"
+# How the body that reads the name is reached. `head`/`tail` wrap the name so
+# the SAME body is expressed four ways; `invoke` reaches it.
+values = [
+  { id = "direct",   head = "lee() { >> ",         tail = " ¶ }",                          invoke = "lee()" },
+  { id = "as-value", head = "lee() { >> ",         tail = " ¶ }",                          invoke = "f = lee\n    f()" },
+  { id = "nested",   head = "lee() { >> ",         tail = " ¶ }\nmedio() { lee() }",       invoke = "medio()" },
+  # The lambda left this dimension on 2026-09-13. It is a LIGHT environment
+  # (MEM-6), so at file level it reads the file because it IS that scope — the
+  # same answer a `?` block gets — and the matrix's `expect = "error"` is wrong
+  # for it. What the rule does forbid is a lambda INSIDE a function reaching the
+  # file, and that is its own cell below: the boundary it crosses there belongs
+  # to the function, not to the lambda.
+]
+
+[matrix]
+# Two premises, one situation: these cells show both that a function does not
+# reach outside itself (MEM-2) and that a block does not leak into its container
+# (MEM-6). Writing them twice under two names would be the same test twice.
+premise = ["MEM-2", "MEM-6"]
+id   = "«origin.id»-«reader.id»"
+what = "a «reader.id» read of a «origin.id» from outside its scope"
+src  = """
+«origin.decl»
+«reader.head»«origin.name»«reader.tail»
+«origin.open»
+    «reader.invoke»
+«origin.close»
+"""
+
+# ── The fences that must hold open ──────────────────────────────────────────
+#
+# `expect = "ok"` per cell, overriding the axis. These are premises 1 and 4b:
+# the crossings the language grants on purpose. They pass today and nothing
+# else asserts them, which is why they are here — a granted crossing that
+# quietly stops working is as much a defect as a refused one that starts.
+
+[[cell]]
+id     = "const-is-global"
+premise = "MEM-1"
+what   = "premise 1: a file constant is readable inside a function"
+expect = "ok"
+src    = """
+LIMITE := 99
+lee() { >> LIMITE ¶ }
+lee()
+"""
+
+[[cell]]
+id     = "parameter-is-the-door"
+premise = "MEM-2"
+what   = "premise 2, satisfied: the value crosses as a parameter"
+expect = "ok"
+src    = """
+principal = 10
+lee(v) { >> v ¶ }
+lee(principal)
+"""
+
+[[cell]]
+id     = "output-parameter-marked-both-ends"
+premise = "MEM-5"
+what   = "premise 4b: `<~` at the signature and at the call site"
+expect = "ok"
+src    = """
+sube(b<~) { b = b + 100 }
+y = 1
+sube(y<~)
+>> y ¶
+"""
+
+[[cell]]
+id     = "working-copy-stays-inside"
+premise = "MEM-5"
+what   = "premise 4b's other half: `~` is a working copy the caller never sees"
+expect = "ok"
+src    = """
+trabaja(p~) { p = p * 2   >> p ¶ }
+y = 1
+trabaja(y)
+>> y ¶
+"""
+
+# ── The marks that must be required ─────────────────────────────────────────
+#
+# Premise 4b is only a safeguard if BOTH halves are enforced. These inherit the
+# axis's `expect = "error"`.
+
+[[cell]]
+id   = "output-parameter-unmarked-at-call"
+premise = "MEM-5"
+what = "premise 4b: the signature declares an output, the call site does not say so"
+src  = """
+sube(b<~) { b = b + 100 }
+y = 1
+sube(y)
+>> y ¶
+"""
+
+[[cell]]
+id   = "output-mark-without-an-output-parameter"
+premise = "MEM-5"
+what = "premise 4b: the call site claims an output the signature does not declare"
+src  = """
+sube(b) { b = b + 100 }
+y = 1
+sube(y<~)
+>> y ¶
+"""
+
+[[cell]]
+id   = "output-argument-must-be-a-variable"
+premise = "MEM-5"
+expect = "error"
+what = "an output argument writes back into the caller, so it cannot be an expression"
+src  = """
+sube(b<~) { b = b + 100 }
+sube(1 + 2<~)
+>> "fin" ¶
+"""
+
+# ── MEM-6: the two levels ───────────────────────────────────────────────────
+#
+# The light environment already behaves as MEM-6 requires, in all three engines,
+# and nothing held it. These four cells are that floor. They are cheap and they
+# are the ones that would go unnoticed if a future change to scope handling
+# broke them — a block that started leaking into its container would break no
+# corpus file, because no corpus file asks.
+
+[[cell]]
+id      = "light-block-does-not-leak"
+premise = "MEM-6"
+what    = "a name born in a block does not exist in its strong environment"
+src     = """
+? #1 { x = 1 }
+>> x ¶
+"""
+
+[[cell]]
+id      = "light-block-modifies-its-strong"
+premise = "MEM-6"
+expect  = "ok"
+what    = "a block modifies its container's name — one name, not a shadowing copy"
+src     = """
+x = 1
+? #1 { x = 2 }
+>> x ¶
+"""
+
+[[cell]]
+id      = "light-siblings-are-independent"
+premise = "MEM-6"
+expect  = "ok"
+what    = "two sibling blocks may each hold the same name without meeting"
+src     = """
+? #1 { y = 1   >> y ¶ }
+? #1 { y = 2   >> y ¶ }
+"""
+
+[[cell]]
+id      = "hot-definition-anchors-above"
+premise = "MEM-6"
+expect  = "ok"
+what    = "`°` is how a value survives the block it was written in"
+src     = """
+@ _i:1..3 { °t += _i }
+>> t ¶
+"""
+
+# ── MEM-7: one name, one thing ──────────────────────────────────────────────
+#
+# All four are accepted today, in silence. `two-parameters-alike` is not merely
+# accepted: the three engines answer 2, 1 and 2 — the VM keeps the first
+# parameter and the other two keep the last — so the program's value is decided
+# by the engine that runs it. That is what a name collision inside one container
+# costs when nobody refuses it, and no corpus file writes `f(a, a)`.
+#
+# Red as of 2026-09-12, and red is the honest state: the author decided on
+# 2026-09-12 that these are static errors, and the cells are what will say when
+# they stop being red.
+
+[[cell]]
+id      = "two-parameters-alike"
+premise = "MEM-7"
+what    = "two parameters of one function sharing a name"
+src     = """
+f(a, a) { <~ a }
+>> f(1, 2) ¶
+"""
+
+[[cell]]
+id      = "parameter-named-as-its-function"
+premise = "MEM-7"
+what    = "a parameter carrying the name of the function it belongs to"
+src     = """
+f(f) { <~ f }
+>> f(1) ¶
+"""
+
+[[cell]]
+id      = "variable-and-function-alike"
+premise = "MEM-7"
+what    = "a variable and a function sharing a name in one file"
+src     = """
+dato = 5
+dato() { <~ 9 }
+>> dato " " dato() ¶
+"""
+
+[[cell]]
+id      = "function-defined-twice"
+premise = "MEM-7"
+what    = "one function defined twice in one file"
+src     = """
+f() { <~ 1 }
+f() { <~ 2 }
+>> f() ¶
+"""
+
+# ── MEM-7 and the loop iterator (ERROR-GOL-017, 2026-10-01) ─────────────────
+#
+# A block has no namespace of its own, so `@ m:…` over a visible `m` writes that
+# `m`: every engine leaves the last element in it. The analyser declared a
+# second `m` for the loop, and the outer one was reported `unused variable`
+# while the program read it — by zytw and zyvm when the read came after the
+# loop, by all three when it was inside the body. The first cell says nothing
+# may be said about that program; the second, that the change of type the same
+# loop can make is said, as `m = 5` after `m = "fuera"` says it.
+
+[[cell]]
+id      = "loop-iterator-assigns-a-visible-name"
+premise = "MEM-7"
+expect  = "ok"
+what    = "`@ m:…` over a visible `m` writes it, and nothing calls `m` unused"
+src     = """
+m = 0
+@ m:1..3 { >> m ¶ }
+>> m ¶
+n = 0
+@ n:[5, 6] { >> n ¶ }
+"""
+
+[[cell]]
+id      = "loop-iterator-changes-the-type"
+premise = "MEM-7"
+expect  = "warn"
+what    = "`@ m:[1, 2]` after `m = \"fuera\"` changes `m` from String to Int, and says so"
+src     = """
+m = "fuera"
+@ m:[1, 2] { >> m ¶ }
+>> m ¶
+"""
+
+
+# ── The lambda, after MEM-6 was settled on 2026-09-13 ───────────────────────
+#
+# A lambda is light: it opens no boundary of its own, so the isolation it has is
+# the one it INHERITS from whatever strong environment it is written in. That is
+# what makes the rule need no exception — and it is also why these two cells sit
+# beside each other rather than in the matrix, which can only assert one
+# category per row.
+
+[[cell]]
+id      = "lambda-at-file-level-reads-the-file"
+premise = "MEM-6"
+expect  = "ok"
+what    = "a lambda written at file level reads the file — it is that scope"
+src     = """
+factor = 3
+n = [1, 2]
+>> (n$> (x -> x * factor)) ¶
+"""
+
+[[cell]]
+id      = "lambda-sees-its-enclosing-function"
+premise = "MEM-6"
+expect  = "ok"
+what    = "a lambda reads the function it is written in — this is what a factory is"
+src     = """
+fabrica(f) { <~ x -> x * f }
+dob = fabrica(2)
+>> dob(5) ¶
+"""
+
+[[cell]]
+id      = "lambda-write-stays-inside"
+premise = "MEM-6"
+expect  = "ok"
+what    = "the write direction of MEM-6's table: a lambda writes only the names it declares, so `c = c + x` inside `$>` leaves the file's `c` at 0, while a `?` block and a `@` write through to it (7)"
+# MEM-6 said on 2026-09-13 that "the write direction has no cell yet": an
+# engine in which a lambda wrote through to its container passed every cell
+# the premise named. Found again on 2026-10-06, reading the premises against
+# the cells; the three engines agree.
+# The program checks itself: a lambda that wrote through, or a block that did
+# not, ends in a `##Div`, so three engines failing alike are still WRONG.
+src     = """
+id(v) { <~ v }
+c = 0
+r = [1, 2, 3]$> (x -> {
+    c = c + x
+    <~ x
+})
+? c <> 0 {
+    >> (1 / id(0)) ¶
+}
+? r$# == 3 {
+    c = c + 5
+}
+@ _i:1..2 {
+    c = c + 1
+}
+? c <> 7 {
+    >> (1 / id(0)) ¶
+}
+>> r " " c ¶
+"""
+
+[[cell]]
+id      = "lambda-inside-a-function-cannot-reach-the-file"
+premise = "MEM-2"
+what    = "a lambda inherits its function's isolation: the file is out of reach"
+src     = """
+base = 10
+f(n) { <~ (n$> (x -> x + base)) }
+>> f([1, 2]) ¶
+"""
+
+# ── The halves that nothing was asking, 2026-09-13 ──────────────────────────
+#
+# Found by reading the premises against the cells rather than by a failure. Each
+# one is the OTHER half of a rule that was already covered on one side:
+# MEM-1 had a cell for reading a constant and none for the part that makes it a
+# constant; MEM-2 had eleven cells and all eleven were reads, while the premise
+# says «vistas o modificadas»; MEM-6 names `_name` as the strictest scope in the
+# language and no cell asked about it.
+
+[[cell]]
+id      = "const-cannot-be-reassigned"
+premise = "MEM-1"
+what    = "a constant refuses a second value — the half that makes it one"
+src     = """
+PI := 3.14
+PI = 3
+>> PI ¶
+"""
+
+# The other ways of writing into a constant (D5), each with the same text and
+# the same help in all three engines — zyjs gave the text without the help
+# until GLB-040 (step G5.3), and nothing measured these five.
+[[cell]]
+id      = "const-refuses-a-compound-assignment"
+premise = "MEM-1"
+expect  = "error"
+what    = "`PI += 1` is a second value too"
+src     = """
+PI := 3
+PI += 1
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-an-increment"
+premise = "MEM-1"
+expect  = "error"
+what    = "`PI++` is a second value too"
+src     = """
+PI := 3
+PI++
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-to-be-read-into"
+premise = "MEM-1"
+expect  = "error"
+what    = "`<< PI` would write what was read into the constant"
+src     = """
+PI := 3
+<< PI
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-to-be-an-iterator"
+premise = "MEM-1"
+expect  = "error"
+what    = "a loop iterator is written every turn, so a constant cannot be one"
+# Red: both Rust engines also warn `unused variable 'PI'`, about a constant the
+# last line reads, and zyjs does not — GLB-056. A warning is part of the shape.
+src     = """
+PI := 3
+@ PI:1..2 { >> "x" ¶ }
+>> PI ¶
+"""
+
+[[cell]]
+id      = "const-refuses-to-be-destructured-into"
+premise = "MEM-1"
+expect  = "error"
+what    = "a destructuring pattern writes its names, so a constant cannot be one of them"
+# ZYJS-032 (no line in zyjs) fixed in step P4.3; the unused-constant warning
+# the Rust engines added here is the same in all three since GLB-061.
+src     = """
+PI := 3
+[PI, b] = [1, 2]
+>> b ¶
+"""
+
+[[cell]]
+id      = "const-reaches-a-lambda"
+premise = "MEM-1"
+expect  = "ok"
+what    = "a constant is global, so a lambda reads it like anything else does"
+src     = """
+LIM := 9
+f = () -> { <~ LIM }
+>> f() ¶
+"""
+
+[[cell]]
+id      = "write-inside-a-function-does-not-escape"
+premise = "MEM-2"
+expect  = "ok"
+what    = "MEM-2's other half: a write inside a function stays inside it"
+# The premise says a variable is visible OR MODIFIABLE only in its own scope,
+# and its eleven other cells all ask about reading. This is what the write side
+# looks like when the value crossed as a parameter, which is the only way it
+# crosses at all.
+src     = """
+base = 10
+f(b) { b = 999
+<~ b }
+>> f(base) " " base ¶
+"""
+
+[[cell]]
+id      = "underscore-is-invisible-outside"
+premise = "MEM-6"
+what    = "`_name` cannot be read from the scope that contains its block"
+src     = """
+? #1 { _t = 1 }
+>> _t ¶
+"""
+
+[[cell]]
+id      = "a-block-name-is-gone-with-or-without-underscore"
+premise = "MEM-6"
+what    = "what is born in a light block dies with it — the same failure with no `_`, so the `_` is not its cause"
+# The control for the cell above: this program fails exactly as `_t` does, which
+# is why reading `_t` from outside now says only `undefined variable` instead of
+# also blaming the underscore (GLB-039, decided 2026-09-24).
+src     = """
+? #1 { t = 1 }
+>> t ¶
+"""
+
+[[cell]]
+id      = "underscore-name-is-free-again-outside"
+premise = "MEM-6"
+expect  = "ok"
+what    = "`_` means PRIVATE: once its block closes the name is free, and assigning it outside declares a new one"
+# It used to be refused as "cannot access underscore variable from outer scope",
+# twice. MEM-6 says what is born in the block dies with it, so outside there is
+# nothing left to reach — exactly as without the `_`.
+src     = """
+? #1 { _value = 10 }
+_value = 20
+>> _value ¶
+"""
+
+[[cell]]
+id      = "prefix-anchor-and-underscore-is-refused"
+premise = "MEM-6"
+what    = "`°_k`: the prefix anchors the value ABOVE the loop, where `_` makes it unreadable — refused before running"
+# A value that outlives its loop but that nothing outside the loop may read. The
+# suffix is the form that means something; see the next cell.
+src     = """
+@ i:1..2 {
+    °_k += i
+}
+"""
+
+[[cell]]
+id      = "suffix-anchor-and-underscore-is-a-private-accumulator"
+premise = "MEM-6"
+expect  = "ok"
+what    = "`_k°`: lives through every iteration, dies with the loop, and only the loop's own block sees it"
+# The author's case (2026-09-25): an accumulator that cannot be initialised
+# outside the loop — the loop body would not see it — nor inside — it would
+# reset every turn. `°` decides how long it lives and `_` who sees it; with the
+# SUFFIX the two agree. On 2026-09-24 both spellings had been refused on the
+# grounds that the markers contradict each other; only the prefix does.
+src     = """
+@ {
+    _k° += 1
+    >> _k ¶
+    ? _k == 5 { @! }
+}
+"""
+
+[[cell]]
+id      = "suffix-anchored-underscore-is-not-seen-by-inner-blocks"
+premise = "MEM-6"
+what    = "the `_` still applies: a block nested in the loop cannot read `_k°`"
+src     = """
+@ {
+    _k° += 1
+    ? _k == 5 { @! }
+    ? #1 { >> _k ¶ }
+}
+"""
+
+[[cell]]
+id      = "suffix-anchored-underscore-is-gone-after-the-loop"
+premise = "MEM-6"
+what    = "a suffix anchor dies with its loop: after it, `_k` is simply undefined"
+src     = """
+@ {
+    _k° += 1
+    ? _k == 5 { @! }
+}
+>> _k ¶
+"""
+
+[[cell]]
+id      = "underscore-is-invisible-inside"
+premise = "MEM-6"
+what    = "`_name` cannot be read from a block nested inside its own"
+# The direction that makes `_` stricter than everything else here: a light
+# environment normally lets an inner block read what the outer one holds, and
+# this is the one name that does not.
+src     = """
+? #1 { _t = 1
+    ? #1 { >> _t ¶ } }
+"""
+
+[[cell]]
+id      = "underscore-siblings-are-independent"
+premise = "MEM-6"
+expect  = "ok"
+what    = "two sibling blocks may each hold the same `_name`"
+src     = """
+? #1 { _t = 1   >> _t ¶ }
+? #1 { _t = 2   >> _t ¶ }
+"""
+
+[[cell]]
+id      = "an-unused-constant"
+premise = "MEM-1"
+expect  = "warn"
+what    = "a constant declared and never read warns, and is called a constant"
+# GLB-061, decided 2026-09-26: `unused constant 'K'` in all three. Both Rust
+# engines said `unused variable 'K'`; zyjs said nothing.
+src     = """
+K := 1
+>> "x" ¶
+"""

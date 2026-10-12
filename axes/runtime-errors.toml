@@ -1,0 +1,539 @@
+# The runtime-errors axis — every kind of failure, and how it is met.
+#
+# ── Two shapes, and using the wrong one tests nothing ───────────────────────
+#
+# Zymbol's failures are not one family. `LLM.md` § 9 states the rule and the
+# measurement on 2026-09-14 confirms it:
+#
+#   RAISED    ##Type, ##Div, ##Index, ##Range, ##Key — a mistake in the program.
+#             Met with `!? { … } :! ##Kind { … }`.
+#   SOFT      ##Parse, ##DB, ##Time, ##IO, ##Network — the world did not
+#             cooperate. They come back AS A VALUE: `$!` answers `#1` and `#?`
+#             names the kind. A `:!` never sees them, because nothing was thrown.
+#
+# Of the soft kinds, `##Parse` is also RAISED, by an operator that cannot read a
+# text as a number — `0d|"abc"|`, and `"a" < 10` since GLB-094 (2026-10-06) —
+# and that one a `:!` does meet. The rule above is about what the standard
+# modules return, which is where those five kinds come from.
+#
+# So a cell that wraps `t::of(2026, 13, 45)` in a try/catch proves nothing at
+# all: it passes whether or not the error exists, because the catch is never
+# entered either way. That is why each kind below is asked in its own shape.
+#
+# ── Why these four first ────────────────────────────────────────────────────
+#
+# Of the ten kinds, six had at least one test of being met (##Div 7 files,
+# ##Index 4, ##Range 2, ##IO 2, ##Network 1, ##Key 1) and FOUR had none:
+# ##Type, ##Parse, ##DB, ##Time. A kind nothing meets is one where a regression
+# passes whole and silent.
+
+id      = "runtime-errors"
+what    = "each kind of failure: that it happens, and that it can be met"
+engines = ["zytw", "zyvm", "zyjs"]
+
+# ── ##Type — raised ─────────────────────────────────────────────────────────
+
+[[cell]]
+id   = "type-is-raised"
+what = "a native called with the wrong type raises, rather than answering something"
+src  = """
+<# std/math => m
+>> m::sqrt("a") ¶
+"""
+
+[[cell]]
+id     = "type-is-catchable"
+expect = "ok"
+what   = "and `:! ##Type` meets it — the half that makes the kind usable"
+src    = """
+<# std/math => m
+!? {
+    >> m::sqrt("a") ¶
+} :! ##Type {
+    >> "type capturado" ¶
+}
+"""
+
+# ── ##Parse — soft ──────────────────────────────────────────────────────────
+
+[[cell]]
+id     = "parse-comes-back-as-a-value"
+expect = "ok"
+what   = "malformed JSON is a VALUE, testable with `$!`, not something thrown"
+# `\{` escapes the brace: an unescaped `{` opens string interpolation, and the
+# first draft of this cell measured that instead of the decoder.
+src    = """
+<# std/json => j
+r = j::decode("\\{roto")
+>> (r$!) " " (r#?)[1] ¶
+"""
+
+# ── ##Time — soft ───────────────────────────────────────────────────────────
+
+[[cell]]
+id     = "time-comes-back-as-a-value"
+expect = "ok"
+what   = "a date that does not exist is a soft ##Time, not a crash"
+src    = """
+<# std/time => t
+d = t::of(2026, 13, 45)
+>> (d$!) " " (d#?)[1] ¶
+"""
+
+# ── ##DB — soft, and not everywhere ─────────────────────────────────────────
+
+[[cell]]
+id     = "db-comes-back-as-a-value"
+expect = "ok"
+what   = "a connection that cannot be made is a value, so a program can carry on"
+# Excluded for zyjs in exclusions.toml: a browser has no ODBC. Same shape as
+# BASH_EXEC and SUBSCRIPT — the case stays here and is graded where it can run.
+src    = """
+<# std/db => d
+c = d::connect("odbc", "DSN=no-existe-este")
+>> (c$!) " " (c#?)[1] ¶
+"""
+
+# ── A catch that does not match must not swallow ────────────────────────────
+#
+# GLB-010, found by the cell above on 2026-09-14. `:! ##Kind` filters, and an
+# error that does not match the filter has not been handled — it has to carry on
+# out of the `!?` exactly as if no catch had been written. Under `zyvm` it
+# disappears instead, and the program continues with whatever state the failure
+# left behind. That is the most expensive shape a defect can take: no output, no
+# exit code, no trace.
+#
+# Two kinds, crossed the other way round, because one of them alone could be met
+# by an engine that simply never matches anything.
+
+[[cell]]
+id   = "unmatched-catch-propagates-div"
+what = "a `##Div` meeting a `:! ##Index` is not handled, and must reach the top"
+src  = """
+!? {
+    >> (1 / 0) ¶
+} :! ##Index {
+    >> "index" ¶
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "unmatched-catch-propagates-index"
+what = "and the reverse pairing, so this cannot pass by never matching at all"
+src  = """
+!? {
+    a = [1, 2]
+    >> a[99] ¶
+} :! ##Div {
+    >> "div" ¶
+}
+>> "sigue" ¶
+"""
+
+[[cell]]
+id     = "a-native-type-error-knows-its-kind"
+expect = "ok"
+what   = "`_err#?` names ##Type for a native called with the wrong type"
+# The second half of GLB-010: zyvm answers ##_ here, which is why `:! ##Type`
+# never matched in the first place. A kind that is not carried is a kind nobody
+# can filter on.
+src    = """
+<# std/math => m
+!? {
+    >> m::sqrt("a") ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "propagate-at-top-level"
+expect = "error"
+what   = "`v$!!` on a soft error outside any function ends the program saying which error ended it — `Runtime error: ##IO(…)` and its line, status 1. The two Rust engines used to say nothing and zyjs wrote `[object Object]` (decided 2026-09-16; ZYJS-027)"
+src    = """
+<# std/io => io
+v = io::read("/no/existe/zz.txt")
+>> "antes" ¶
+v$!!
+>> "después" ¶
+"""
+
+# ── The kind of an error that carries a value (added 2026-10-06) ─────────────
+#
+# An error that does not declare its kind gets it from the words of its message
+# (`zymbol_common::errkind`; `errorKindOfMessage` in zyjs). When the message
+# carried a value of the program — a text, a key, the keys there are — the
+# value's words counted as much as the engine's: `u["overflow"]` was a `##Range`
+# in the Rust engines, and `#.2|"index"|` an `##Index` in all three. GLB-097,
+# corrected 2026-10-06: those sites declare their kind where they raise — an
+# absent key is a `##Key`, and a text read as a number that it is not is a
+# `##Parse`, by base conversion, rounding or truncation. One cell per way an
+# absent key is reached: each is its own raise site in each engine.
+
+[[cell]]
+id     = "missing-key-is-a-key-whatever-its-name"
+expect = "ok"
+what   = "a key that is not there is a `##Key` even when it is called `overflow` — the Rust engines read `##Range` from the words (GLB-097)"
+src    = """
+id(v) { <~ v }
+u = #(nombre: "x", edad: 3)
+!? {
+    >> u[id("overflow")] ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-through-the-dot-is-a-key"
+expect = "ok"
+what   = "`u.overflow`, through the dot: a `##Key` (GLB-097)"
+src    = """
+u = #(nombre: "x", edad: 3)
+!? {
+    >> u.overflow ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-removed-is-a-key"
+expect = "ok"
+what   = "`u$-[\"overflow\"]`, removing a key that is not there: a `##Key` (GLB-097)"
+src    = """
+id(v) { <~ v }
+u = #(nombre: "x", edad: 3)
+!? {
+    e = u$-[id("overflow")]
+    >> e ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-in-a-navigation-is-a-key"
+expect = "ok"
+what   = "`m[\"a\">\"overflow\"]`, a key missing one step down: a `##Key` (GLB-097)"
+src    = """
+m = #(a: #(b: 1))
+!? {
+    >> m["a">"overflow"] ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-in-a-pattern-is-a-key"
+expect = "ok"
+what   = "`#(overflow: n) = u`, a pattern naming a key that is not there: a `##Key` (GLB-097)"
+src    = """
+u = #(nombre: "x", edad: 3)
+!? {
+    #(overflow: n) = u
+    >> n ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "missing-key-is-a-key-whatever-the-other-keys-are"
+expect = "ok"
+what   = "the message lists the keys that ARE there, and their words count too: `#(overflow: 1)[\"zz\"]` is a `##Range` in Rust (GLB-097)"
+src    = """
+id(v) { <~ v }
+w = #(overflow: 1)
+!? {
+    >> w[id("zz")] ¶
+} :! ##Key {
+    >> "Key" ¶
+}
+"""
+
+[[cell]]
+id     = "base-conversion-failure-is-a-parse-whatever-the-text"
+expect = "ok"
+what   = "`0d|\"type\"|` fails to read the text as a number: a `##Parse`, as `0d|\"abc\"|` is — not the `##Type` its words give (GLB-097)"
+src    = """
+id(v) { <~ v }
+!? {
+    >> 0d|id("type")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "rounding-a-text-is-a-parse-error"
+expect = "ok"
+what   = "`#.2|\"abc\"|` reads a text as a number and it is not one: a `##Parse` (GLB-097, decided 2026-10-06; it was a `##_`)"
+src    = """
+id(v) { <~ v }
+!? {
+    >> #.2|id("abc")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "rounding-a-word-is-a-parse-error"
+expect = "ok"
+what   = "`#.2|\"index\"|` is a `##Parse` too — not the `##Index` the words of the text gave (GLB-097)"
+src    = """
+id(v) { <~ v }
+!? {
+    >> #.2|id("index")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+[[cell]]
+id     = "truncating-a-word-is-a-parse-error"
+expect = "ok"
+what   = "`#!2|\"overflow\"|` is a `##Parse` — not the `##Range` the words of the text gave (GLB-097)"
+src    = """
+id(v) { <~ v }
+!? {
+    >> #!2|id("overflow")| ¶
+} :! ##Parse {
+    >> "Parse" ¶
+}
+"""
+
+# ── The kind of an error that carries a NAME (added 2026-10-06) ─────────────
+#
+# The same rule as GLB-097, with a name of the program in the message instead of
+# a value. Four of them reach run time in a program `check` accepts, and all
+# four took the family of the name's words: `t.index` on a positional tuple was
+# an `##Index`, `t.zz` a `##_`. GLB-099, decided and corrected 2026-10-07: each
+# declares its kind where it is raised — the tuple read by name and the dot on
+# what is not a dictionary are a `##Type` (D1), a name used after `\` is a
+# `##_`, a subscript that is not there is an `##IO`. Every cell names its value
+# with a word, so a kind read from the words again would show.
+
+[[cell]]
+id     = "positional-tuple-read-by-a-name-is-a-type-error"
+expect = "ok"
+what   = "`t.index` on a positional tuple is a `##Type`: the receiver has no names (GLB-099)"
+src    = """
+id(v) { <~ v }
+t = id((1, 2))
+!? {
+    >> t.index ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+[[cell]]
+id     = "dot-on-a-non-dictionary-is-a-type-error"
+expect = "ok"
+what   = "`x.index` with `x` an Int is a `##Type` — the word `index` is in the guidance, `use d.index` (GLB-099)"
+src    = """
+id(v) { <~ v }
+x = id(5)
+!? {
+    >> x.index ¶
+} :! ##Type {
+    >> "Type" ¶
+}
+"""
+
+[[cell]]
+id     = "use-after-destruction-is-a-plain-error"
+expect = "ok"
+what   = "a name called `index` read after `\\ index` is a `##_`, declared — the cell checks the family itself, since `:! ##_` would meet any (GLB-099)"
+src    = """
+id(v) { <~ v }
+index = 5
+>> index ¶
+\\ index
+!? {
+    >> index ¶
+} :! {
+    ? (_err#?)[1] <> "##_" {
+        >> (1 / id(0)) ¶
+    }
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "missing-subscript-is-an-io-error"
+expect = "ok"
+what   = "`</ index_type.zy />`, a subscript that is not there, is an `##IO` — the word is in the path (GLB-099); in the browser too, where no subscript runs"
+src    = """
+!? {
+    r = </ index_type.zy />
+    >> r ¶
+} :! ##IO {
+    >> "IO" ¶
+}
+"""
+
+# ── The line of an error raised after a nested block (added 2026-10-07) ─────
+#
+# Measured beside ZYVM-011. The line of a runtime error is the line of the
+# statement. When the statement ran a nested block before failing — the block of
+# a `??` arm, the body of a function it called — the tree-walker gives the line
+# of the last statement in that block, and so did the VM for the arm. zyjs gave
+# the statement's line in both (GLB-106, corrected 2026-10-07: a statement that
+# finishes gives the line back to the one holding it, and so does a call that
+# returns; the VM restamps what follows a `??`). The controls after the next
+# cells: an error raised INSIDE the block or the function keeps its own line.
+
+[[cell]]
+id     = "error-after-a-block-arm-is-at-the-statement"
+expect = "error"
+what   = "`x = 1 + (?? v { 1 => \"uno\" { >> \"a\" ¶ } })` fails at the `+`: TW and VM say line 4, the `>>` (GLB-106)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => "uno" {
+        >> "a" ¶
+    }
+})
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-after-a-call-is-at-the-statement"
+expect = "error"
+what   = "`x = 1 + g()` fails at the `+` after `g` ran: the TW says line 3, the `<~` inside `g` (GLB-106)"
+src    = """
+g() {
+    >> "a" ¶
+    <~ "b"
+}
+x = 1 + g()
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-after-a-lambda-call-is-at-the-statement"
+expect = "error"
+what   = "`x = 1 + g()` with `g` a block lambda: the `+` fails at the line of the statement — the TW said the `<~` inside `g` (GLB-106)"
+src    = """
+g = () -> {
+    >> "a" ¶
+    <~ "b"
+}
+x = 1 + g()
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-after-a-block-arm-with-a-wildcard-is-at-the-statement"
+expect = "error"
+what   = "the same with a `_ =>` arm: the `+` fails at the line of the statement (GLB-106)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => "uno" {
+        >> "a" ¶
+    }
+    _ => "otro"
+})
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-after-a-loop-in-a-block-arm-is-at-the-statement"
+expect = "error"
+what   = "the arm's block holds a loop: the `+` after it still fails at the line of the statement (GLB-106)"
+src    = """
+v = 1
+x = 1 + (?? v {
+    1 => "a" {
+        @ i:1..2 {
+            >> i ¶
+        }
+    }
+})
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-inside-a-block-is-at-its-own-line"
+expect = "error"
+what   = "the control: an error raised inside a `?` block is at the line inside it"
+src    = """
+c = 1
+? c > 0 {
+    x = 1 + "a"
+    >> x ¶
+}
+"""
+
+[[cell]]
+id     = "error-inside-a-function-is-at-its-own-line"
+expect = "error"
+what   = "the control: an error raised inside the function called is at the line inside it"
+src    = """
+g() {
+    >> "a" ¶
+    x = 1 + "b"
+    <~ x
+}
+y = g()
+>> y ¶
+"""
+
+# ── An error inside a lambda whose body is an expression (added 2026-10-07) ─
+#
+# Measured beside GLB-106: the tree-walker and zyjs give the line of the
+# statement running — the one that called the lambda — and the VM gives no
+# `-->` line at all, called directly or by `$>` (ZYVM-012, corrected
+# 2026-10-07: an instruction with no line takes the call that reached it). A
+# block lambda was placed in all three.
+
+[[cell]]
+id     = "error-inside-an-expression-lambda-has-a-line"
+expect = "error"
+what   = "`h = (s) -> s + 1` called with a String: the error says where — the VM says nothing (ZYVM-012)"
+src    = """
+h = (s) -> s + 1
+x = h("b")
+>> x ¶
+"""
+
+[[cell]]
+id     = "error-inside-an-expression-lambda-given-to-map-has-a-line"
+expect = "error"
+what   = "`[\"a\", \"b\"]$> (x -> x + 1)`: the error is at the line of the `$>` (ZYVM-012)"
+src    = """
+xs = ["a", "b"]
+ys = xs$> (x -> x + 1)
+>> ys ¶
+"""
+
+[[cell]]
+id     = "error-inside-an-expression-lambda-called-in-a-function-has-a-line"
+expect = "error"
+what   = "`<~ h(v)` inside `f`, with `h = (s) -> s + 1`: the error is at the `<~`, after `en f` printed (ZYVM-012)"
+src    = """
+h = (s) -> s + 1
+f(v) {
+    >> "en f" ¶
+    <~ h(v)
+}
+x = "b"
+>> f(x) ¶
+"""
+
+[[cell]]
+id     = "error-inside-a-filter-lambda-in-a-block-lambda-has-a-line"
+expect = "error"
+what   = "`xs$| (x -> x > 1)` inside a block lambda: the error is at the line of the `$|` (ZYVM-012)"
+src    = """
+g = (xs) -> {
+    <~ xs$| (x -> x > 1)
+}
+>> g(["a", "b"]) ¶
+"""

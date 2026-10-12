@@ -61,6 +61,11 @@ src  = """
 
 [[cell]]
 id   = "not-equal-is-not-a-symbol"
+# SYM-4 of zymbol-design/PREMISES.md — no natural-language words in the grammar,
+# and `!=` is the one a reader brings from every other language. The only cell in
+# this repository that holds a premise of the sign system: its six siblings
+# constrain a proposal rather than a program, and nothing executable can ask them.
+premise = "SYM-4"
 what = "`!=` is not a Zymbol operator; the language spells it `<>`"
 # Arrived here from the operator axis, which had declared `!=` as one of its
 # operators.  It is the mistake a reader brings from every other language, so it
@@ -88,6 +93,47 @@ id   = "expression-is-a-comma"
 what = "a stray comma where an expression belongs"
 src  = """
 x = ,
+"""
+
+# The refusal quotes the token as the program writes it — `found ','`,
+# `found '='` — and not as the lexer names it inside (GLB-028, decided
+# 2026-09-25: it said `found Comma`). These two hold the spellings a table
+# could get wrong: an alternative newline, and the two-character `<>`.
+[[cell]]
+id   = "expression-is-a-newline-mark"
+what = "`¶` where an expression belongs is quoted as `'¶'`"
+src  = """
+x = ¶
+"""
+
+[[cell]]
+id   = "expression-is-a-not-equal"
+what = "`<>` where an expression belongs is quoted as `'<>'`"
+src  = """
+x = <>
+"""
+
+[[cell]]
+id   = "match-arm-with-a-star"
+what = "a `*` where a match pattern belongs"
+# ZYJS-033, open: both Rust engines say `expected pattern, found '*'`, zyjs
+# `expected expression, found '*'`.
+src  = """
+?? 3 { * => 1 }
+"""
+
+[[cell]]
+id   = "fullwidth-question-mark"
+what = "`？` (U+FF1F) where `?` belongs: a name to the lexer, so the refusal falls later"
+# ZYJS-035, fixed 2026-09-26: both Rust engines said `unexpected token: '{'`,
+# zyjs `expected expression, found '>'` — it could not read `x > 1` as a
+# statement. Neither names the character: the editor does, as a warning
+# (`confusable-character`, decided 2026-09-25), and the engines never will.
+src  = """
+x = 5
+？ x > 1 {
+    >> "mayor" ¶
+}
 """
 
 [[cell]]
@@ -171,3 +217,1121 @@ g(a, b) { <~ [a, b] }
 s = g(1, 2, 3)$#
 >> s ¶
 """
+
+# ── The operand of a numeric cast (added 2026-10-09) ─────────────────────────
+#
+# The sixth appearance of the same hole: `infer_expr` answered `Expr::NumericCast`
+# with the cast's result type and never inferred the operand, so nothing written
+# inside `###`, `##.` or `##!` was checked. The tree-walker ran the program and
+# failed half way, the VM's compiler refused an undefined name before running
+# but not a wrong arity, and zyjs refused both before running. Corrected
+# 2026-10-09 with `##'` (GLB-112, GLB-109): the three refuse before running, so
+# `antes` is never printed. The `>> "antes"` line is what tells the two apart.
+
+[[cell]]
+id   = "arity-inside-a-numeric-cast"
+what = "a call with the wrong argument count, as the operand of `###`: refused before running — the Rust engines printed `antes` first (GLB-112)"
+src  = """
+g(a) {
+    <~ a
+}
+>> "antes" ¶
+x = ###g(1, 2)
+>> x ¶
+"""
+
+[[cell]]
+id   = "undefined-inside-a-numeric-cast"
+what = "a name that does not exist, inside `##.`: refused before running — the tree-walker printed `antes` first (GLB-112)"
+src  = """
+>> "antes" ¶
+x = ##.(noexiste + 1)
+>> x ¶
+"""
+
+[[cell]]
+id   = "arity-inside-a-char-cast"
+what = "a call with the wrong argument count, inside `##'`: refused before running, as in the other three casts (GLB-112)"
+src  = """
+g(a) {
+    <~ a
+}
+>> "antes" ¶
+x = ##'g(1, 2)
+>> x ¶
+"""
+
+[[cell]]
+id   = "output-mark-inside-a-numeric-cast"
+what = "an output parameter passed without `<~`, inside `###`: refused before running (GLB-112)"
+src  = """
+f(a, b<~) {
+    b = a
+    <~ 1
+}
+y = 0
+x = ###f(2, y)
+>> x " " y ¶
+"""
+
+# The help of an arity refusal writes the signature as the CALLER writes it —
+# the names, and `<~` where the call must spell it (GLB-040, decided
+# 2026-09-25). It used to print inferred types, `g(Number, Number)`, which zyjs
+# could not give; these hold the new wording in its edge cases.
+[[cell]]
+id   = "arity-signature-shows-the-output-mark"
+what = "the signature in the help carries `<~` and leaves out `~`, which never reaches the caller"
+src  = """
+f(a~, b<~, c) { b = a + c }
+y = 0
+f(1, y<~)
+>> y ¶
+"""
+
+[[cell]]
+id   = "arity-of-a-function-without-parameters"
+what = "a function that takes nothing, called with something: `expected signature: g()`"
+src  = """
+g() { <~ 1 }
+>> g(5) ¶
+"""
+
+[[cell]]
+id   = "arity-of-a-module-function"
+what = "a module function called with the wrong count; no signature is offered, in either engine"
+src  = """
+<# ./m/saludo => m
+>> m::saluda(1) ¶
+"""
+[cell.files]
+"m/saludo.zy" = """
+# saludo {
+    #> { saluda }
+    saluda() { <~ "hola" }
+}
+"""
+
+# ── Dentro del cuerpo de una lambda de bloque (ZYTW-001) ────────────────────
+#
+# Hasta el 2026-09-12 el analizador no entraba en un `-> { … }`: el cuerpo de
+# expresión iba a `infer_expr`, que es lo que comprueba, y el de bloque a
+# `infer_return_type_from_block`, que sólo recolecta tipos de retorno. Todo lo
+# escrito ahí dentro pasaba sin mirar.
+#
+# La celda que lo encontró preguntaba por un nombre fuera de alcance, que es una
+# de las tres mitades. Estas son las otras dos, más la forma mínima de la
+# primera: un hueco de una zona ciega no se cierra con el caso que lo destapó,
+# porque la siguiente regresión entrará por cualquiera de las otras puertas.
+#
+# `m[i][j]` no está aquí a propósito: lo rechaza el PARSER, así que seguía
+# fallando dentro de la lambda incluso cuando el analizador no miraba — y es lo
+# que hacía que la zona ciega no lo pareciera.
+
+[[cell]]
+id   = "undefined-inside-a-lambda-block"
+what = "a name that exists nowhere, inside a lambda's block body"
+src  = """
+f = () -> { >> jamas_definida ¶ }
+f()
+"""
+
+[[cell]]
+id   = "arity-inside-a-lambda-block"
+what = "a call with the wrong argument count, inside a lambda's block body"
+# The body uses BOTH parameters on purpose. With `{ <~ a }` the cell also asked
+# about `unused variable 'b'`, which zyjs reports and the Rust engines do not —
+# one cell, one question.
+src  = """
+g(a, b) { <~ a + b }
+f = () -> { >> g(1) ¶ }
+f()
+"""
+
+[[cell]]
+id   = "output-mark-missing-inside-a-lambda-block"
+what = "a call missing its `<~` mark, inside a lambda's block body"
+src  = """
+sube(b<~) { b = b + 1 }
+y = 1
+f = () -> { sube(y) }
+f()
+"""
+
+# ── SYM-8: la modalidad va al final ────────────────────────────────────────
+
+[[cell]]
+id      = "modality-before-its-label"
+premise = "SYM-8"
+what    = "`@!outer` — a modal `!` with an argument after it"
+# SYM-8 of zymbol-design/PREMISES.md: a modal `?` or `!` is the rightmost mark
+# of an operator, which is why labelled break is `@:outer!`. The form is refused,
+# though not by a message that says so: the parser reads `@!` as a bare break and
+# `outer` as an expression, so what comes out is `undefined variable 'outer'`.
+# Recorded here because the cell asserts the refusal and not the wording — the
+# same asymmetry SYM-4 shows, where `!=` explains itself and a keyword does not.
+src     = """
+@:outer _i:1..3 { @!outer }
+"""
+
+[[cell]]
+id   = "undefined-name-in-string-interpolation"
+what = "`{name}` of a name that is nothing — not a variable, a function or a module alias — at file level and inside a function"
+# Decided 2026-09-15 (GLB-018 A): a static error. Until then all three engines
+# printed `{nadie}` as text, silently, and `zymbol check` said nothing; only the
+# tree-walker's `<<` prompt failed, at run time. The corpus file
+# modules_scope/interp_global_const.zy asserted the literal form, and lost those
+# two lines the same day.
+src  = """
+>> "a {nadie} b" ¶
+f(v) { <~ "{v} {tampoco}" }
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "lone-tilde"
+what = "a `~` with nothing to mark — `1 ~ 2`: both Rust engines refuse the token, and zyjs dropped it and printed `12` (found in step 2.1, 2026-09-15; ZYJS-020)"
+src  = """
+x = 1 ~ 2
+>> x ¶
+"""
+
+[[cell]]
+id   = "stray-literal-statement"
+what = "a literal on its own after an index — `x[1] 5`: both Rust engines refuse the `5` as a statement, zyjs ran it and said nothing (found in step 2.3, 2026-09-15; ZYJS-021)"
+src  = """
+x = [1, 2]
+x[1] 5
+>> x ¶
+"""
+
+[[cell]]
+id     = "undefined-name-inside-a-tui-block"
+expect = "error"
+what   = "a name that does not exist, read in a string inside a TUI block: the Rust type checker never enters `>>| { … }`, so it gets as far as opening the alternate screen (found in step 2.17, 2026-09-15; GLB-030)"
+src    = """
+>>| {
+    >> "{nada}" ¶
+}
+"""
+
+[[cell]]
+id     = "lone-hash-at-end-of-line"
+expect = "error"
+what   = "a `#` that begins nothing is refused — both Rust engines say so, and zyjs dropped it without a sound and printed 1 (found in step 2.18, 2026-09-16; ZYJS-025 B)"
+src    = """
+x = 1 #
+>> x ¶
+"""
+
+[[cell]]
+id   = "match-arm-with-an-at-sign"
+what = "`@` where a match pattern belongs — refused with the pattern's words in both"
+src  = """
+?? 3 { @ => 1 }
+"""
+
+# ── A parameter's type, inferred from the body (2026-10-02) ────────────────
+#
+# The Rust analyser refused the call before anything ran; zyjs had no parameter
+# inference, printed `antes` and failed at the `+` (ZYJS-048). Every engine
+# refused, so `expect` held in all three — what diverged was WHEN.
+
+# Decided 2026-10-05 (ZYJS-048, the argument-type half of C-TYP-2): the Rust
+# behaviour is the rule — what inference reaches is refused BEFORE the program
+# runs, in all three engines. `expect` only names the category; the static half
+# is held by the output, which is compared: `antes` is printed only by an engine
+# that ran the program before refusing it, and that engine diverges.
+
+[[cell]]
+id   = "argument-type-inferred-from-the-body"
+premise = "TYP-2"
+what = "a String passed where the body made the parameter a Number — refused before `antes` is printed (ZYJS-048)"
+src  = """
+f(v) {
+    <~ v + 1
+}
+>> "antes" ¶
+>> f("a") ¶
+"""
+
+[[cell]]
+id   = "argument-type-bool-from-a-logical-operator"
+premise = "TYP-2"
+what = "a parameter read by `&&` is a Bool: an Int passed to it is refused"
+src  = """
+f(v) { <~ v && #1 }
+>> "antes" ¶
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "argument-type-from-an-ordering-against-a-literal"
+premise = "TYP-2"
+what = "a parameter compared with `<` against an Int literal is an Int: a String is refused"
+src  = """
+f(v) { <~ v < 5 }
+>> "antes" ¶
+>> f("a") ¶
+"""
+
+[[cell]]
+id   = "argument-type-from-a-dictionary-key"
+premise = "TYP-2"
+what = "a parameter used as the key of a dictionary built in the body is a String: an Int is refused"
+src  = """
+f(k) {
+    d = #(a: 1)
+    <~ d[k]
+}
+>> "antes" ¶
+>> f(1) ¶
+"""
+
+[[cell]]
+id   = "argument-type-passed-on-to-another-function"
+premise = "TYP-2"
+what = "a parameter handed to a function declared before is that function's parameter type, and inside the body it is passed on with its own"
+src  = """
+g(n) { <~ n * 2 }
+f(v) { <~ g(v) }
+>> "antes" ¶
+>> f("a") ¶
+"""
+
+[[cell]]
+id   = "argument-type-of-an-inferred-parameter-passed-on"
+premise = "TYP-2"
+what = "inside `g`, `w` is a Number — passing it where a Bool is expected is refused, though nobody calls `g` with a wrong value"
+src  = """
+f(v) { <~ v && #1 }
+g(w) {
+    x = w + 1
+    <~ f(w)
+}
+>> "antes" ¶
+>> g(1) ¶
+"""
+
+[[cell]]
+id     = "argument-type-what-does-not-constrain"
+premise = "TYP-2"
+what   = "the controls: `==`, juxtaposition, a parenthesized use and a function declared later constrain nothing, so these calls run — the forms where a port would over-refuse"
+expect = "ok"
+src    = """
+igual(v) { <~ v == 5 }
+texto(v) { <~ "[" v "]" }
+grupo(v) { <~ (v + 1) }
+antes(v) { <~ despues(v) }
+despues(n) { <~ n }
+>> igual("a") ¶
+>> texto(1) ¶
+>> antes("a") ¶
+"""
+
+# ── A use in one branch, or in a loop, does not reach the parameter (added 2026-10-06)
+#
+# The language is variant: a function may treat each type its own way, and its
+# returns already unify to `Any`. The inference collected the constraints of
+# every branch as if all of them ran, so a function that dispatches on the type
+# of its parameter refused the call it was written for — `f("a")` below runs and
+# answers `a1` (GLB-101, raised by the author 2026-10-06). The same dispatch
+# written with `??` was accepted. Decided the same day (option A): a use
+# requires something only when every path through the body goes through it.
+# The cells below hold each way a path can avoid a use, and the two refusals
+# that every path still reaches.
+
+[[cell]]
+id      = "argument-type-not-from-one-branch"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a function that treats each type in its own branch accepts both: `f(1)` is 2 and `f(\"a\")` is a1 (GLB-101)"
+src     = '''
+f(v) {
+    t = v#?
+    ? t[1] == "###" {
+        <~ v + 1
+    } _? t[1] == "##\"" {
+        <~ v "1"
+    }
+}
+>> f(1) ¶
+>> f("a") ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-a-loop-body"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a use inside a `@` that may not run does not reach the parameter: `f(\"a\", #0)` answers a (GLB-101)"
+src     = '''
+f(v, c) {
+    @ c {
+        <~ v + 1
+    }
+    <~ v
+}
+>> f(1, #1) ¶
+>> f("a", #0) ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-past-an-early-return"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a guard that returns early: the use after it is not on the path the guard takes, so `f(\"a\")` answers a1 (GLB-101)"
+src     = '''
+f(v) {
+    t = v#?
+    ? t[1] == "##\"" {
+        <~ v "1"
+    }
+    <~ v + 1
+}
+>> f(1) ¶
+>> f("a") ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-a-later-condition"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a `_?` condition is read only on the paths that reach it: with `c` true, `v > 0` is never asked, and `f(\"a\", #1)` answers 0 (GLB-101)"
+src     = '''
+f(v, c) {
+    ? c {
+        <~ 0
+    } _? v > 0 {
+        <~ 1
+    }
+    <~ 2
+}
+>> f("a", #1) ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-one-arm"
+premise = "TYP-2"
+expect  = "warn"
+what    = "a `??` arm is one path: `1 => v + 1` beside `_ => (v \"1\")` requires nothing, and `f(\"a\")` answers a — the warning is the statement discarding the arms' values (GLB-101)"
+# A value no arm matches fails (`no pattern matched`) in the Rust engines, so a
+# `??` with no `_` arm leaves no path past it: that one is not a cell, because
+# what it requires is what the arms that match require.
+src     = '''
+f(v) {
+    ?? v {
+        1 => v + 1
+        _ => (v "1")
+    }
+    <~ v
+}
+>> f(1) ¶
+>> f("a") ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-past-a-return-under-try"
+premise = "TYP-2"
+expect  = "ok"
+what    = "a `<~` under `!?` closes its path, so the use after the `!?` is not asked of it: `f(\"a\")` answers ax (GLB-101)"
+src     = '''
+f(v) {
+    !? {
+        <~ v "x"
+    } :! {
+        >> "fallo" ¶
+    }
+    <~ v + 1
+}
+>> f("a") ¶
+'''
+
+# The right side of `&&` and `||` is evaluated only when the left does not
+# decide (the three engines short-circuit), so it is not on every path either.
+# TYP-2 says so since 2026-10-06, and the analysers follow it since the same
+# day (GLB-103). The left side still requires a Bool:
+# `argument-type-bool-from-a-logical-operator` holds that.
+
+[[cell]]
+id      = "argument-type-not-from-the-right-of-and"
+premise = "TYP-2"
+expect  = "ok"
+what    = "the right side of `&&` runs only when the left is #1, so it is not on every path: `f(#0, 5)` answers #0 (GLB-103)"
+src     = '''
+f(a, b) {
+    <~ a && b
+}
+>> f(#0, 5) ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-the-right-of-or"
+premise = "TYP-2"
+expect  = "ok"
+what    = "the right side of `||` runs only when the left is #0: `f(#1, 5)` answers #1 (GLB-103)"
+src     = '''
+f(a, b) {
+    <~ a || b
+}
+>> f(#1, 5) ¶
+'''
+
+[[cell]]
+id      = "argument-type-not-from-inside-the-right-of-and"
+premise = "TYP-2"
+expect  = "ok"
+what    = "nor does anything inside the right side: `a && b > 0` asks nothing of `b`, and `f(#0, \"x\")` answers #0 (GLB-103)"
+src     = '''
+f(a, b) {
+    <~ a && b > 0
+}
+>> f(#0, "x") ¶
+'''
+
+[[cell]]
+id      = "argument-type-from-both-branches"
+premise = "TYP-2"
+what    = "`? c { <~ v + 1 } _ { <~ v * 2 }`: every path uses `v` as a number, so `f(\"a\", #1)` is refused before it runs (GLB-101)"
+src     = '''
+f(v, c) {
+    ? c {
+        <~ v + 1
+    } _ {
+        <~ v * 2
+    }
+}
+>> "antes" ¶
+>> f("a", #1) ¶
+'''
+
+[[cell]]
+id      = "argument-type-from-every-arm"
+premise = "TYP-2"
+what    = "a `??` whose every arm, `_` included, uses `v` as a number: refused before it runs (GLB-101)"
+src     = '''
+f(v) {
+    ?? v {
+        1 => v + 1
+        _ => v * 2
+    }
+}
+>> "antes" ¶
+>> f("a") ¶
+'''
+
+# ── An expression that is not a statement (added 2026-10-06) ────────────────
+#
+# A statement begins with a mark (`>>`, `<<`, `?`, `??`, `@`, `!?`, `<~`, `¶`,
+# `\`) or with a name, and the Rust parser refuses anything else at the start of
+# a line: `unexpected token`. zyjs parsed these as statements, ran the program
+# and discarded the value (ZYJS-050, measured beside GLB-097). Corrected
+# 2026-10-07: zyjs refuses all nine with the Rust parser's words, the token
+# spelled as `TokenKind::quoted` spells it. The ninth form, `</ file.zy />`, has
+# its cell since then: refused before anything runs, it no longer needs the
+# subscript the browser cannot run.
+
+[[cell]]
+id   = "unit-as-a-statement"
+what = "`##_` alone on a line"
+src  = """
+x = 3
+>> x ¶
+##_
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "error-value-as-a-statement"
+what = "`##Parse(\"x\")`, an error value nobody keeps"
+src  = """
+x = 3
+>> x ¶
+##Parse("x")
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "numeric-eval-as-a-statement"
+what = "`#|\"5\"|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#|"5"|
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "rounding-as-a-statement"
+what = "`#.2|5|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#.2|5|
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "truncation-as-a-statement"
+what = "`#!2|5|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#!2|5|
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "format-as-a-statement"
+what = "`#,|5|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+#,|5|
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "base-conversion-as-a-statement"
+what = "`0x|255|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+0x|255|
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "text-base-conversion-as-a-statement"
+what = "`0d|\"65\"|` alone on a line"
+src  = """
+x = 3
+>> x ¶
+0d|"65"|
+>> "sigue" ¶
+"""
+
+[[cell]]
+id   = "subscript-as-a-statement"
+what = "`</ hola.zy />` alone on a line: refused before it runs, in the browser too"
+src  = """
+x = 3
+>> x ¶
+</ hola.zy />
+>> "sigue" ¶
+"""
+
+
+# ── The type a function returns, past a `??` written as a statement (added 2026-10-07)
+#
+# A `??` alone on a line discards the values of its arms — the three engines run
+# it so, and the check warns that it does — but both analysers read the return
+# type as if each value were a `<~`. The first `f` below was a function of Int
+# and String, so `Any`, and the call that passes its String where a Number is
+# required was accepted (GLB-102). Decided 2026-10-07: an arm's value is not a
+# return; a `<~` inside an arm's block is.
+#
+# Every `??` here but the control's gives values, so every engine warns either
+# way, and what a cell can tell apart is a refusal. The call sits in a branch
+# that does not run, so the category is decided by the inferred type alone: an
+# analyser that read the values as returns again answers `warn`.
+
+[[cell]]
+id      = "argument-type-from-a-return-past-a-match-statement"
+premise = "TYP-2"
+what    = "`?? v { 1 => 10  _ => 20 }`, then `<~ \"texto\"`: `f` returns a String, and `g(f(1))` is refused where a Number is required (GLB-102)"
+src     = """
+f(v) {
+    ?? v {
+        1 => 10
+        _ => 20
+    }
+    <~ "texto"
+}
+g(n) {
+    <~ n + 1
+}
+c = 1
+? c > 5 {
+    >> g(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id      = "argument-type-from-the-block-of-a-value-arm"
+premise = "TYP-2"
+what    = "`1 => 10 { <~ \"diez\" }`: the block returns and the value does not, so `f` returns a String (GLB-102)"
+src     = """
+f(v) {
+    ?? v {
+        1 => 10 { <~ "diez" }
+        _ => 20 { <~ "veinte" }
+    }
+}
+g(n) {
+    <~ n + 1
+}
+c = 1
+? c > 5 {
+    >> g(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id      = "argument-type-of-a-match-statement-is-unit"
+premise = "TYP-2"
+what    = "a `??` whose arms only give values returns nothing: `f` is Unit, and `h(f(1))` is refused where a String is required (GLB-102)"
+src     = """
+f(v) {
+    ?? v {
+        1 => "a"
+        _ => "b"
+    }
+}
+h(s) {
+    <~ s > "m"
+}
+c = 1
+? c > 5 {
+    >> h(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id      = "argument-type-from-the-blocks-of-a-match-statement"
+premise = "TYP-2"
+expect  = "ok"
+what    = "the control: `1 => { <~ \"a\" }` returns, so `f` is a String and `h(f(1))` is accepted where a String is required"
+src     = """
+f(v) {
+    ?? v {
+        1 => { <~ "a" }
+        _ => { <~ "b" }
+    }
+}
+h(s) {
+    <~ s > "m"
+}
+c = 1
+? c > 5 {
+    >> h(f(1)) ¶
+}
+>> "fin" ¶
+"""
+
+# ── A local's type, read for the return (added 2026-10-07) ──────────────────
+#
+# Rust defines every local of a function as `Any` before it reads the `<~`
+# (`define_local_vars_from_block`). zyjs gives a local the type of the last
+# assignment it walks, whatever the path, so `f` below returns a String for it
+# alone, and `g(f(0))` — 6 in the Rust engines, since `f(0)` takes no branch —
+# was refused in the browser before it ran (ZYJS-053, measured beside GLB-102;
+# corrected 2026-10-07: a named function's locals have no type for its return
+# in zyjs either). What inference does not reach is not refused (TYP-2). Every
+# engine warns that `r` changes type, so the category asked is `warn`. The
+# second cell is the same local with one assignment: the program runs, prints
+# `antes` and fails at the `+` — it is not refused before it starts.
+
+[[cell]]
+id      = "argument-type-not-from-a-local-assigned-in-a-branch"
+premise = "TYP-2"
+expect  = "warn"
+what    = "`r = 5`, then `r = \"a\"` in a branch `f(0)` does not take: `g(f(0))` runs and prints 6 (ZYJS-053)"
+src     = """
+f(c) {
+    r = 5
+    ? c > 0 {
+        r = "a"
+    }
+    <~ r
+}
+g(n) {
+    <~ n + 1
+}
+>> g(f(0)) ¶
+"""
+
+[[cell]]
+id      = "argument-type-not-from-a-local-literal"
+premise = "TYP-2"
+expect  = "error"
+what    = "`f(c) { r = \"a\"  <~ r }`: `g(f(1))` is not refused, so `antes` prints and the `+` fails (ZYJS-053)"
+src     = """
+f(c) {
+    r = "a"
+    <~ r
+}
+g(n) {
+    <~ n + 1
+}
+>> "antes" ¶
+>> g(f(1)) ¶
+"""
+
+
+# ── A top-level `<~` of a String inside a `??` (added 2026-10-07) ───────────
+#
+# A top-level `<~` ends the program and its value is the exit status, a whole
+# number — refused before running when it is not. The walk of the top level
+# read statements, so inside a `??` whose value is used neither analyser saw
+# it, and zyjs did not see it in a `??` written as a statement either: its
+# `case 'Match'` read a shape the parser never builds (GLB-107). `antes` is
+# printed only by an engine that ran the program before refusing it.
+
+[[cell]]
+id   = "top-level-exit-of-a-string-in-a-match-statement"
+what = "`?? v { 1 => { <~ \"b\" } … }` at the top level: refused before `antes` prints — zyjs ran it (GLB-107)"
+src  = """
+>> "antes" ¶
+v = 1
+?? v {
+    1 => {
+        <~ "b"
+    }
+    _ => {
+        <~ 0
+    }
+}
+"""
+
+[[cell]]
+id   = "top-level-exit-of-a-string-in-a-match-value"
+what = "`x = ?? v { 1 => { <~ \"b\" } … }` at the top level: refused before `antes` prints, in the three engines (GLB-107)"
+src  = """
+>> "antes" ¶
+v = 1
+x = ?? v {
+    1 => {
+        <~ "b"
+    }
+    _ => 0
+}
+>> x ¶
+"""
+
+
+# ── `#|…|` gives a number or the text (added 2026-10-07) ────────────────────
+#
+# `#|s|` is an Int or a Float when the text is a number and the text itself when
+# it is not, which only running can tell — Any, as the input `<< #|v|` has been
+# since GLB-098. Typed Number, Rust refused this program, which runs in all
+# three engines and prints `#1` (decided 2026-10-07, GLB-098's open half).
+
+[[cell]]
+id      = "argument-type-not-from-a-numeric-eval"
+premise = "TYP-2"
+expect  = "ok"
+what    = "`h(#|x|)` with `h` wanting a String and `x = \"zeta\"`: `#|x|` is the text, and the call runs — `#1` (GLB-098)"
+src     = """
+h(s) {
+    <~ s > "m"
+}
+x = "zeta"
+>> h(#|x|) ¶
+"""
+
+
+# ── A second statement on the line of an assignment (added 2026-10-09) ──────
+#
+# The right-hand side of `=` takes juxtaposition, so in `s = s + 1  i = i + 1`
+# the `i` is read as one more operand and the error lands on the second `=`. The
+# Rust engines said `unexpected token: '='` with a list of the statements
+# expected — which offers an identifier, and `i` is one — and zyjs `expected
+# expression, found '='`. Corrected 2026-10-09 (GLB-111): the three say
+# `unexpected '=': 'i' was read as part of the expression before it`, with the
+# help `a new statement starts on a new line, or after ';'`, for `=`, the
+# compound assignments and `++`/`--` alike.
+
+[[cell]]
+id   = "second-statement-after-an-assignment-on-one-line"
+what = "`s = s + 1  i = i + 1` on one line: refused, and the message does not say the `i` joined the expression before it (GLB-111)"
+src  = """
+s = 0
+i = 1
+@ i <= 2 {
+    s = s + 1  i = i + 1
+}
+>> s " " i ¶
+"""
+
+[[cell]]
+id   = "second-statement-after-an-assignment-on-one-line-compound"
+what = "`s = s + 1  i += 1`: the same sentence, for `+=` (GLB-111)"
+src  = """
+s = 0
+i = 1
+s = s + 1  i += 1
+>> s " " i ¶
+"""
+
+[[cell]]
+id   = "second-statement-after-an-assignment-on-one-line-increment"
+what = "`s = s + 1  i++`: the same sentence, for `++` (GLB-111)"
+src  = """
+s = 0
+i = 1
+s = s + 1  i++
+>> s " " i ¶
+"""
+
+# ── The dictionary pattern is written `#(…)` — GLB-122, decided 2026-10-11 ───
+#
+# The literal `(a: 1)` has been refused since v0.0.9 (`reject/collections/06`).
+# The PATTERN on the other side of `=` was not migrated and kept running in all
+# three engines, which is the second spelling the mark was introduced to end.
+# Nothing in the corpus, the applications, the examples or the documents wrote
+# it, so nothing could disagree.
+
+[[cell]]
+id     = "dictionary-pattern-without-the-mark"
+what   = "`(name: n, age: y) = person` — a dictionary pattern is written `#(…)` (GLB-122)"
+src    = '''
+person = #(name: "A", age: 3)
+(name: n, age: y) = person
+>> n y ¶
+'''
+
+[[cell]]
+id     = "dictionary-pattern-without-the-mark-in-a-loop-head"
+what   = "the same pattern in a loop head, `@ (k: a, v: b):ps`"
+src    = '''
+ps = [#(k: 1, v: 2)]
+@ (k: a, v: b):ps { >> a b ¶ }
+'''
+
+[[cell]]
+id     = "dictionary-pattern-with-the-mark"
+expect = "ok"
+what   = "the control: `#(name: n, age: y) = person` takes a dictionary apart, and `(a, b)` a tuple"
+src    = '''
+person = #(name: "A", age: 3)
+#(name: n, age: y) = person
+(a, b) = (1, 2)
+>> n y a b ¶
+'''
+
+[[cell]]
+id     = "dictionary-pattern-with-the-mark-in-a-loop-head"
+expect = "ok"
+what   = "and in a loop head: `@ #(k: a, v: b):ps` — the form the refusal points at has to exist"
+# It did not, in any engine. The Rust parser took the BARE pattern here and
+# zyjs took neither, so refusing the bare one would have left no spelling at
+# all. The grammar already listed `dictionary_destructure` under `loop_pattern`.
+src    = '''
+ps = [#(k: 1, v: 2), #(k: 3, v: 4)]
+@ #(k: a, v: b):ps { >> a b " " }
+>> ¶
+@ (x, y):[(1, 2)] { >> x y ¶ }
+@ (3) { >> "." }
+>> ¶
+'''
+
+# ── An identifier in a `??` pattern is a read — GLB-124, found 2026-10-11 ────
+#
+# `?? s { tope => … }` compares the scrutinee with what `tope` holds, so the
+# pattern reads the name. The type checker never looked at it: a name that did
+# not exist, or a file variable named from inside a function, passed `check`
+# and then met three answers — the tree-walker failed half way through the
+# output, the VM refused to compile, and zyjs read the variable MEM-2 says it
+# cannot see. Found by a probe of `LLM.md` § 5 that was itself written wrong.
+
+[[cell]]
+id      = "match-identifier-pattern-reads-the-file-from-a-function"
+premise = "MEM-2"
+what    = "an identifier pattern naming a file variable, inside a named function: refused before running (GLB-124)"
+src     = '''
+dias = [1, 2, 3]
+nota(s) {
+    <~ ?? s {
+        dias => "wk"
+        _ => "F"
+    }
+}
+>> "antes" ¶
+>> nota(2) ¶
+'''
+
+[[cell]]
+id      = "match-list-pattern-reads-the-file-from-a-function"
+premise = "MEM-2"
+what    = "the same name inside a list pattern"
+src     = '''
+uno = 1
+f(v) {
+    <~ ?? v { [uno] => "lista" _ => "F" }
+}
+>> f([1]) ¶
+'''
+
+[[cell]]
+id   = "match-identifier-pattern-that-is-nothing"
+what = "an identifier pattern naming nothing at all is `undefined variable`, statically"
+src  = '''
+r = ?? 5 {
+    nadie => "x"
+    _ => "F"
+}
+>> r ¶
+'''
+
+[[cell]]
+id      = "match-identifier-pattern-through-a-parameter"
+premise = "MEM-2"
+expect  = "ok"
+what    = "the control: the name arrives as a parameter, and at file level it is in view"
+src     = '''
+dias = [1, 2]
+r = ?? 2 {
+    dias => "wk"
+    _ => "F"
+}
+>> r ¶
+nota(s, ds) {
+    <~ ?? s { ds => "wk" _ => "F" }
+}
+>> nota(1, dias) ¶
+'''
+
+# ── `#(a, b) = t` — GLB-123, decided 2026-10-11 ─────────────────────────────
+#
+# The other half of GLB-122. `#(` says "dictionary", so what is inside is
+# `key: name` pairs; a positional pattern under that mark took a tuple apart in
+# the two Rust engines and was refused by zyjs with the words of a missing `:`.
+
+[[cell]]
+id   = "positional-pattern-under-the-dictionary-mark"
+what = "`#(a, b) = (1, 2)`: a dictionary pattern takes `key: name` pairs (GLB-123)"
+src  = '''
+#(a, b) = (1, 2)
+>> a b ¶
+'''
+
+[[cell]]
+id   = "positional-pattern-under-the-dictionary-mark-in-a-loop-head"
+what = "the same in a loop head, `@ #(a, b):ps`"
+src  = '''
+ps = [(1, 2)]
+@ #(a, b):ps { >> a b ¶ }
+'''
+
+[[cell]]
+id   = "empty-dictionary-pattern"
+what = "`#() = d` names nothing to take out"
+src  = '''
+#() = #()
+>> "fin" ¶
+'''
+
+# ── A hot name is not a pattern — ZYJS-062, found 2026-10-11 ────────────────
+
+[[cell]]
+id   = "hot-name-as-a-match-pattern"
+what = "`?? v { acc° => … }`: a hot name would create what the pattern compares with (ZYJS-062)"
+src  = '''
+r = ?? 5 {
+    acc° => "hot"
+    _ => "otro"
+}
+>> r ¶
+'''
+
+# ── A function is a value and a module is not — GLB-125, decided 2026-10-11 ──
+#
+# `f =>` with `f` a function passed `check` and then met three answers: the
+# tree-walker failed when the `??` ran, the VM refused to compile, zyjs compared.
+# Two cases, and they were decided apart.
+#
+# A FUNCTION is a value everywhere else — `h = f`, `h == f`, `xs$> f` — and
+# `?? h { g => … }` with `g` a VARIABLE holding one already matched by identity
+# in all three. Writing the declared name instead only failed because the two
+# Rust engines looked the name up among the variables. It is a comparison.
+#
+# A MODULE is not a value (GUIDE § 2, non-value types), and measuring the
+# pattern showed the hole was wider than the pattern: `x = M` and `M == M`
+# passed `check` the same way. A bare alias is refused wherever it stands as a
+# value; `M.NAME` and `M::f()` reach into the module and are untouched.
+
+[[cell]]
+id     = "match-identifier-pattern-names-a-function"
+expect = "ok"
+what   = "`?? h { f => … }` with `f` a function: a comparison by identity, as `==` is (GLB-125)"
+src    = '''
+f(x) { <~ x }
+g(x) { <~ x }
+h = f
+>> (?? h { f => "es f" _ => "otro" }) ¶
+>> (?? h { g => "es g" _ => "otro" }) ¶
+>> (?? 5 { f => "fn" _ => "otro" }) ¶
+r = ?? [f] {
+    [g] => "g"
+    [f] => "lista f"
+    _ => "otro"
+}
+>> r ¶
+dentro(v) { <~ ?? v { g => "g" f => "f" _ => "otro" } }
+>> dentro(f) " " dentro(g) " " dentro(1) ¶
+'''
+
+[[cell]]
+id     = "match-identifier-pattern-holds-a-function"
+expect = "ok"
+what   = "the control that already held: the same comparison through a variable and through a parameter"
+src    = '''
+f(x) { <~ x }
+g(x) { <~ x }
+lam = x -> x
+k = lam
+>> (?? k { lam => "es lam" _ => "otro" }) ¶
+es(v, w) { <~ ?? v { w => "igual" _ => "distinta" } }
+>> es(f, f) " " es(f, g) ¶
+'''
+
+[[cell]]
+id   = "match-identifier-pattern-names-a-module"
+what = "`?? 5 { M => … }` with `M` a module alias: a module is not a value (GLB-125)"
+src  = '''
+<# std/math => M
+r = ?? 5 {
+    M => "mod"
+    _ => "otro"
+}
+>> r ¶
+'''
+
+[[cell]]
+id   = "module-alias-assigned"
+what = "`x = M`: the same refusal — the hole was wider than the pattern"
+src  = '''
+<# std/math => M
+x = M
+>> "fin" ¶
+'''
+
+[[cell]]
+id   = "module-alias-compared"
+what = "`M == M`"
+src  = '''
+<# std/math => M
+>> (M == M) ¶
+'''
+
+[[cell]]
+id   = "module-alias-as-an-argument"
+what = "`f(M)`"
+src  = '''
+<# std/math => M
+f(v) { <~ 1 }
+>> f(M) ¶
+'''
+
+[[cell]]
+id     = "module-alias-reached-through-its-members"
+expect = "ok"
+what   = "the control: `M.NAME` and `M::f()` reach into a module, and a dictionary key may be spelled like the alias"
+src    = '''
+<# std/math => M
+>> (M.PI > 3.0) " " M::abs(-2) ¶
+d = #(M: 1)
+>> d.M ¶
+'''

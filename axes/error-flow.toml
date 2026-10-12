@@ -1,0 +1,776 @@
+# The error-flow axis — how a raised error travels through `!?`, `:!` and `:>`.
+#
+# `runtime-errors` asks whether each KIND of failure happens and can be met. This
+# asks the other question: once raised, where does the error GO. The two are
+# independent, and the second one had no cell at all until 2026-09-14, when the
+# first cell of the first did — GLB-010, a `:!` that did not match and swallowed
+# the error under `zyvm`. Following it showed that was one symptom of one cause:
+# the register VM kept a single handler per frame and had no notion of an error
+# still pending, so it could not nest a `!?`, could not rethrow through a filter,
+# and could not finish a `:>` with the error alive.
+#
+# ── The rule every cell here holds ──────────────────────────────────────────
+#
+#   · a `:!` whose filter does not match has not handled anything: the error
+#     leaves the `!?` as if no catch had been written;
+#   · `:>` always runs — after the body, after a catch, after a catch that
+#     itself failed, and on the way out through `@!`, `@>` and `<~`;
+#   · an error raised inside `:!` or `:>` belongs to the `!?` OUTSIDE, never to
+#     the one it was raised in;
+#   · leaving a `!?` by a jump disarms it: its `:!` does not catch what happens
+#     after the loop.
+#
+# `REFERENCE.md` states the second one in so many words — "`:> { }` — finally
+# block (always executes, regardless of error)" — and the rest follow from a
+# filter being a filter.
+#
+# ── Where Python is an oracle, and where it is not ──────────────────────────
+#
+# CPython's try/except/finally means the same thing as the rule above in every
+# case but two, and those two are where Zymbol decided otherwise on purpose:
+#
+#   · a `<~` inside `:>` does not return (BUG-ZYB-011: cleanup does not decide
+#     the value) — Python's `return` in `finally` does, and swallows the error;
+#   · an `@!` inside `:>` does not swallow a pending error — Python's `break`
+#     in `finally` does.
+#
+# So those cells carry no oracle, and say why. Every other cell does, written as
+# the same control flow and not as the answer.
+#
+# And every oracle here prints words that are also in the Zymbol source, which is
+# what `suggestive` exists to catch: an answer typed into the program it is meant
+# to check. It is not that here. The answer to a question about control flow is
+# WHICH of the labels written in the program get printed, and in what order — a
+# cell has two or more labels and a wrong engine prints a different subset of
+# them. Both sides compute the path; the labels are only how a path is seen. So
+# each oracle cell says `oracle_literal_ok`, pointing here.
+
+id      = "error-flow"
+what    = "where a raised error goes: nested `!?`, filters that do not match, `:>` and the jumps that cross it"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "ok"
+
+# ── Nesting: each `!?` owns its own handler ─────────────────────────────────
+
+[[cell]]
+id   = "inner-done-then-outer-error"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "an inner `!?` that finished cleanly does not catch what fails after it"
+src  = """
+!? {
+    !? { >> "dentro" ¶ } :! { >> "catch interior" ¶ }
+    >> 10 / 0 ¶
+} :! ##Div {
+    >> "catch exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print("dentro")
+    except Exception:
+        print("catch interior")
+    print(10 // 0)
+except ZeroDivisionError:
+    print("catch exterior")
+"""
+
+[[cell]]
+id   = "inner-caught-then-outer-error"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "an inner `!?` that caught its error is spent: the next one goes outside"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Div { >> "interior" ¶ }
+    a = [1]
+    >> a[9] ¶
+} :! ##Index {
+    >> "exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    except ZeroDivisionError:
+        print("interior")
+    a = [1]
+    print(a[8])
+except IndexError:
+    print("exterior")
+"""
+
+[[cell]]
+id   = "error-in-catch-reaches-outer"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "an error raised inside `:!` belongs to the `!?` outside"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Div {
+        a = [1]
+        >> a[9] ¶
+    }
+} :! ##Index {
+    >> "exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    except ZeroDivisionError:
+        a = [1]
+        print(a[8])
+except IndexError:
+    print("exterior")
+"""
+
+[[cell]]
+id   = "unmatched-inner-reaches-outer"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a filter that does not match hands the error to the `!?` around it"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Index { >> "interior" ¶ }
+    >> "no llega" ¶
+} :! ##Div {
+    >> "exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    except IndexError:
+        print("interior")
+    print("no llega")
+except ZeroDivisionError:
+    print("exterior")
+"""
+
+[[cell]]
+id   = "unmatched-in-function-reaches-caller"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "and across a call: the caller's `:!` meets what the callee's filter let through"
+src  = """
+h(x) {
+    !? { <~ 10 / x } :! ##Index { <~ -1 }
+    <~ 99
+}
+!? { >> h(0) ¶ } :! ##Div { >> "en el llamador" ¶ }
+"""
+oracle.py = """
+def h(x):
+    try:
+        return 10 // x
+    except IndexError:
+        return -1
+    return 99
+try:
+    print(h(0))
+except ZeroDivisionError:
+    print("en el llamador")
+"""
+
+[[cell]]
+id   = "rethrown-error-is-the-same-error"
+what = "what reaches the outer `:!` through a filter is the original, kind and message"
+# No oracle: `_err`'s printed form is Zymbol's own.
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Index { >> "no" ¶ }
+} :! {
+    >> _err ¶
+}
+"""
+
+# ── `:>` always runs, and does not decide whether the error survives ────────
+
+[[cell]]
+id   = "finally-without-catch-propagates"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `!?` with only `:>` runs the cleanup and lets the error through"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :> { >> "limpieza" ¶ }
+    >> "no llega" ¶
+} :! ##Div {
+    >> "exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    finally:
+        print("limpieza")
+    print("no llega")
+except ZeroDivisionError:
+    print("exterior")
+"""
+
+[[cell]]
+id   = "unmatched-catch-runs-finally-then-propagates"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a filter that does not match: the cleanup runs, then the error leaves"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Index { >> "no" ¶ } :> { >> "limpieza" ¶ }
+    >> "no llega" ¶
+} :! ##Div {
+    >> "exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    except IndexError:
+        print("no")
+    finally:
+        print("limpieza")
+    print("no llega")
+except ZeroDivisionError:
+    print("exterior")
+"""
+
+[[cell]]
+id   = "error-in-catch-still-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `:!` that fails itself still owes its `:>` — REFERENCE: always executes"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :! ##Div {
+        a = [1]
+        >> a[9] ¶
+    } :> {
+        >> "limpieza" ¶
+    }
+} :! ##Index {
+    >> "exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    except ZeroDivisionError:
+        a = [1]
+        print(a[8])
+    finally:
+        print("limpieza")
+except IndexError:
+    print("exterior")
+"""
+
+[[cell]]
+id   = "error-in-finally-replaces-the-pending-one"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `:>` that fails while an error is pending: the new error is the one that leaves"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :> {
+        a = [1]
+        >> a[9] ¶
+    }
+} :! ##Div {
+    >> "div" ¶
+} :! ##Index {
+    >> "index" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    finally:
+        a = [1]
+        print(a[8])
+except ZeroDivisionError:
+    print("div")
+except IndexError:
+    print("index")
+"""
+
+[[cell]]
+id   = "caught-inside-finally-keeps-the-pending-one"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `!?` that catches INSIDE a `:>` does not consume the error the `:>` is carrying"
+src  = """
+!? {
+    !? { >> 10 / 0 ¶ } :> {
+        !? {
+            a = [1]
+            >> a[9] ¶
+        } :! ##Index {
+            >> "index dentro" ¶
+        }
+        >> "fin" ¶
+    }
+} :! ##Div {
+    >> "div exterior" ¶
+}
+"""
+oracle.py = """
+try:
+    try:
+        print(10 // 0)
+    finally:
+        try:
+            a = [1]
+            print(a[8])
+        except IndexError:
+            print("index dentro")
+        print("fin")
+except ZeroDivisionError:
+    print("div exterior")
+"""
+
+# ── Leaving by a jump: the cleanup runs, and the `!?` is disarmed ───────────
+
+[[cell]]
+id   = "break-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "`@!` out of a `!?` body runs its `:>`"
+src  = """
+@ {
+    !? { @! } :> { >> "limpieza" ¶ }
+}
+>> "después" ¶
+"""
+oracle.py = """
+while True:
+    try:
+        break
+    finally:
+        print("limpieza")
+print("después")
+"""
+
+[[cell]]
+id   = "continue-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "`@>` out of a `!?` body runs its `:>`, once per turn"
+src  = """
+n = 0
+@ n < 2 {
+    n += 1
+    !? { @> } :> { >> "limpieza " n ¶ }
+}
+"""
+oracle.py = """
+n = 0
+while n < 2:
+    n += 1
+    try:
+        continue
+    finally:
+        print("limpieza", n)
+"""
+
+[[cell]]
+id   = "break-in-catch-runs-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "`@!` out of a `:!` runs the `:>` too"
+src  = """
+@ {
+    !? { >> 10 / 0 ¶ } :! { >> "catch" ¶ @! } :> { >> "limpieza" ¶ }
+}
+>> "después" ¶
+"""
+oracle.py = """
+while True:
+    try:
+        print(10 // 0)
+    except Exception:
+        print("catch")
+        break
+    finally:
+        print("limpieza")
+print("después")
+"""
+
+[[cell]]
+id   = "break-disarms-the-catch"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `!?` left by `@!` does not catch what fails after the loop"
+# A counted loop and a caller on purpose: with a handler left armed, an infinite
+# loop would re-enter itself forever, and an uncaught error would give the cell
+# nothing to compare but a crash.
+src  = """
+f() {
+    @ 1 {
+        !? { @! } :! { >> "catch del bucle" ¶ }
+    }
+    a = [1]
+    <~ a[9]
+}
+!? { >> f() ¶ } :! ##Index { >> "en el llamador" ¶ }
+"""
+oracle.py = """
+def f():
+    for _ in range(1):
+        try:
+            break
+        except Exception:
+            print("catch del bucle")
+    a = [1]
+    return a[8]
+try:
+    print(f())
+except IndexError:
+    print("en el llamador")
+"""
+
+[[cell]]
+id   = "continue-disarms-the-catch"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "and the same for `@>`"
+src  = """
+f() {
+    @ 1 {
+        !? { @> } :! { >> "catch del bucle" ¶ }
+    }
+    a = [1]
+    <~ a[9]
+}
+!? { >> f() ¶ } :! ##Index { >> "en el llamador" ¶ }
+"""
+oracle.py = """
+def f():
+    for _ in range(1):
+        try:
+            continue
+        except Exception:
+            print("catch del bucle")
+    a = [1]
+    return a[8]
+try:
+    print(f())
+except IndexError:
+    print("en el llamador")
+"""
+
+[[cell]]
+id   = "break-in-finally-keeps-the-error"
+what = "an `@!` inside a `:>` that is carrying an error leaves the loop and the error with it"
+# No oracle: Python's `break` in `finally` discards the exception. Zymbol does
+# not — tree-walker and browser engine agree — and neither does its `<~` below.
+src  = """
+!? {
+    @ {
+        !? { >> 10 / 0 ¶ } :> { @! }
+    }
+    >> "después del bucle" ¶
+} :! ##Div {
+    >> "exterior" ¶
+}
+"""
+
+[[cell]]
+id   = "return-runs-finally-outside-its-own-catch"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `:>` reached through `<~` is not inside its own `:!`"
+src  = """
+f() {
+    !? { <~ 1 } :! { >> "catch propio" ¶ } :> { >> 10 / 0 ¶ }
+    <~ 2
+}
+!? { >> f() ¶ } :! ##Div { >> "en el llamador" ¶ }
+"""
+oracle.py = """
+def f():
+    try:
+        return 1
+    except Exception:
+        print("catch propio")
+    finally:
+        print(10 // 0)
+    return 2
+try:
+    print(f())
+except ZeroDivisionError:
+    print("en el llamador")
+"""
+
+[[cell]]
+id   = "return-in-finally-does-not-swallow"
+what = "a `<~` inside `:>` is not a return (BUG-ZYB-011), so the pending error still leaves"
+# No oracle: Python's `return` in `finally` swallows the exception.
+src  = """
+f() {
+    !? { >> 10 / 0 ¶ } :> { <~ 5 }
+    <~ 2
+}
+!? { >> f() ¶ } :! ##Div { >> "en el llamador" ¶ }
+"""
+
+# ── A function boundary is a boundary for the handler too ───────────────────
+
+[[cell]]
+id   = "lambda-inside-try-does-not-run-finally"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `<~` inside a lambda written in a `!?` returns from the lambda, not through the `:>`"
+src  = """
+!? {
+    g = x -> { <~ x * 2 }
+    >> g(2) ¶
+} :> {
+    >> "limpieza" ¶
+}
+"""
+oracle.py = """
+try:
+    def g(x):
+        return x * 2
+    print(g(2))
+finally:
+    print("limpieza")
+"""
+
+[[cell]]
+id   = "lambda-inside-finally-returns"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a lambda written inside `:>` is a function, and its `<~` returns"
+src  = """
+!? { >> "cuerpo" ¶ } :> {
+    g = x -> { <~ x * 2 }
+    >> g(2) ¶
+}
+"""
+oracle.py = """
+try:
+    print("cuerpo")
+finally:
+    def g(x):
+        return x * 2
+    print(g(2))
+"""
+
+[[cell]]
+id   = "try-inside-a-mapped-lambda"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `!?` inside a lambda that `$>` calls catches for that element"
+src  = """
+g = x -> {
+    !? { <~ 10 / x } :! ##Div { <~ 0 }
+    <~ 99
+}
+>> [1, 0, 2]$> g ¶
+"""
+oracle.py = """
+def g(x):
+    try:
+        return 10 // x
+    except ZeroDivisionError:
+        return 0
+print([g(x) for x in [1, 0, 2]])
+"""
+
+[[cell]]
+id   = "error-in-a-mapped-lambda-is-catchable"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "an error inside the lambda `$>` calls reaches the `!?` around the `$>`"
+src  = """
+!? {
+    >> [1, 0]$> (x -> 10 / x) ¶
+} :! ##Div {
+    >> "capturado fuera" ¶
+}
+"""
+oracle.py = """
+try:
+    print([10 // x for x in [1, 0]])
+except ZeroDivisionError:
+    print("capturado fuera")
+"""
+
+# ── Where it happened ───────────────────────────────────────────────────────
+
+[[cell]]
+id     = "rethrown-error-keeps-its-line"
+expect = "error"
+what   = "an error let through by a filter is reported at the line that raised it"
+src    = """
+!? {
+    >> 10 / 0 ¶
+} :! ##Index {
+    >> "no" ¶
+}
+"""
+
+[[cell]]
+id     = "error-through-finally-keeps-its-line"
+expect = "error"
+what   = "and one that crossed a `:>` is reported where it happened, not where the cleanup was"
+src    = """
+!? {
+    >> "a" ¶
+    >> 10 / 0 ¶
+} :> {
+    >> "limpieza" ¶
+}
+"""
+
+# ── Found while fixing the rest (2026-09-14) ────────────────────────────────
+
+[[cell]]
+id   = "propagate-runs-finally"
+what = "`$!!` leaves the function like `<~`, and owes the `:>` it crosses like `<~`"
+# No oracle: `$!!` is Zymbol's own. The VM emitted a bare `Return` for it and
+# skipped the cleanup; the tree-walker and the browser engine ran it.
+src  = """
+<# std/json => j
+f() {
+    !? {
+        v = j::decode("\\{")$!!
+        <~ v
+    } :> {
+        >> "limpieza" ¶
+    }
+    <~ 0
+}
+r = f()
+>> (r$!) ¶
+"""
+
+[[cell]]
+id   = "tail-call-inside-try-is-caught"
+oracle_literal_ok = "the labels are the observable of a path, not a typed answer — see the header"
+what = "a `<~ f(…)` inside `!?` is still inside it: the callee's error is caught there"
+# The VM turns `<~ f(n - 1)` into a tail call, which REPLACES the frame — and a
+# frame replaced is a `!?` gone. It is suppressed inside any `!?` now; it used to
+# be suppressed only when there was a `:>`. This cell was never seen red: the old
+# VM answered -1 by accident, because the replaced frame kept the handler the
+# `!?` had left armed. It holds the suppression, which nothing else would.
+src  = """
+f(n) {
+    ? n == 0 { <~ 10 / n }
+    !? { <~ f(n - 1) } :! ##Div { <~ -1 }
+    <~ 99
+}
+>> f(3) ¶
+"""
+oracle.py = """
+def f(n):
+    if n == 0:
+        return 10 // n
+    try:
+        return f(n - 1)
+    except ZeroDivisionError:
+        return -1
+    return 99
+print(f(3))
+"""
+
+[[cell]]
+id   = "input-eof-is-catchable"
+what = "running out of input inside `!?` is an error the `:!` meets"
+# No oracle. The VM raised it from inside its read-and-retry loop, where the jump
+# to the handler continued the READ loop instead: it read end-of-input again with
+# the handler already spent, and the error left uncaught.
+src  = """
+!? {
+    << n
+    >> n ¶
+} :! {
+    >> "sin entrada" ¶
+}
+>> "sigue" ¶
+"""
+
+# ── Building an error: `##Kind("message")` is a value, not a raise ──────────
+#
+# GAP-GOL-003, decided 2026-09-29 (D3): a program builds the same soft error
+# std/io, std/net, std/db and std/time return. So it travels as a VALUE — `$!`
+# sees it, `$!!` propagates it, and no `:!` meets it, because nothing was
+# thrown. What IS thrown is the failure to build one: a message that is not
+# text is a ##Type error, refused before running when the analyser knows the
+# type. No oracle in this block: Python has no soft error value, and returning
+# an exception object — the nearest thing — prints differently and answers a
+# different question.
+
+[[cell]]
+id   = "a-built-error-is-a-value"
+what = "`##Parse(\"…\")` builds an error value: it prints as it is written, `$!` is #1, `#?` reads the kind back"
+src  = """
+e = ##Parse("regla vacía")
+>> e ¶
+>> e$! ¶
+>> e#? ¶
+"""
+
+[[cell]]
+id   = "a-built-error-is-not-thrown"
+what = "building an error inside `!?` raises nothing: the body goes on and the `:!` does not run"
+src  = """
+!? {
+    x = ##IO("no lanzado")
+    >> "sigue: " x ¶
+} :! {
+    >> "capturado" ¶
+}
+"""
+
+[[cell]]
+id     = "a-built-error-propagates-to-the-system"
+expect = "error"
+what   = "`$!!` on a built error at the top level ends the program, naming the error"
+src    = """
+x = ##Parse("mala")
+x$!!
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "an-error-message-is-text"
+expect = "error"
+what   = "`##Parse(42)` is refused before running: an error's message is a String"
+src    = """
+e = ##Parse(42)
+>> e ¶
+"""
+
+[[cell]]
+id   = "a-message-known-only-at-run-time-is-a-type-error"
+what = "a message that turns out not to be text raises ##Type, and THAT is thrown, so `:! ##Type` meets it"
+src  = """
+hacer(x) {
+    <~ ##Parse(x)
+}
+!? {
+    >> hacer(42) ¶
+} :! ##Type {
+    >> "tipo" ¶
+}
+"""
+
+[[cell]]
+id   = "an-error-pattern-reads-the-message"
+what = "`##Kind(m) =>` matches an error of that kind and puts its message in `m`; `##Kind(_)` and `##Kind` match the kind alone (GAP-GOL-016, D7)"
+src  = """
+leer(r) {
+    <~ ?? r {
+        ##Parse(msg) => ("mensaje: " msg)
+        ##IO(_)      => "io"
+        ##Div        => "div"
+        _            => "valor"
+    }
+}
+>> leer(##Parse("mala")) ¶
+>> leer(##IO("x")) ¶
+>> leer(##Div("x")) ¶
+>> leer(7) ¶
+"""
+
+[[cell]]
+id   = "an-error-pattern-assigns-a-visible-name"
+what = "the binding is a birth like `m = …`: a name already visible is assigned, never shadowed (MEM-7)"
+src  = """
+m = "fuera"
+?? ##A("dentro") {
+    ##A(m) => { >> m ¶ }
+    _      => { >> "otro" ¶ }
+}
+>> m ¶
+"""

@@ -1,0 +1,183 @@
+# The syntax-variables axis — Phase B, family B14 of the diagnostics plan.
+#
+# Destructuring patterns, `\\ name`, and the indexed form after a hot name
+# (`x°[…]`), written wrong: the parser diagnostics no program provoked on
+# 2026-09-14. Every cell expects `error` and provokes its `help:` line, except
+# `hot-index-edit`, which declares its own `expect`.
+#
+# The indexed-assignment diagnostics used to be reached only after a HOT name:
+# for a plain name the dispatch looked ahead for a complete `name[…] op` before
+# it ever called parse_assignment, and for `x°` it routed on the `[` alone. That
+# asymmetry was the whole of GLB-027 and it is gone (2026-09-19, step 3.6) — the
+# hot name asks the same question, and `x[…] =` is the only way in for either.
+#
+# Six lines have no cell (reasons in the queue): each is a check that a token is
+# what the dispatch already confirmed it is.
+
+id      = "syntax-variables"
+what    = "the parser diagnostics of destructuring, `\\`, and indexed forms after a hot name: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "named-destructure-field-without-colon"
+what = "expected ':' after field name in named tuple destructure"
+src  = """
+d = #(a: 1, b: 2)
+#(a: x, b y) = d
+>> x ¶
+"""
+
+[[cell]]
+id   = "named-destructure-without-variable"
+what = "expected variable name after ':' in named tuple destructure"
+src  = """
+d = #(a: 1)
+#(a: 5) = d
+"""
+
+[[cell]]
+id   = "array-destructure-item-not-a-name"
+what = "expected identifier, '*rest', or '_' in array destructure"
+src  = """
+v = [1, 2]
+[a, 5] = v
+>> a ¶
+"""
+
+[[cell]]
+id   = "rest-without-a-name"
+what = "expected identifier after '*' in destructure"
+src  = """
+v = [1, 2]
+[a, *5] = v
+>> a ¶
+"""
+
+[[cell]]
+id   = "tuple-destructure-item-not-a-name"
+what = "unexpected token in tuple destructure pattern"
+src  = """
+t = (1, 2)
+(a, 5) = t
+>> a ¶
+"""
+
+[[cell]]
+id   = "destroy-without-a-name"
+what = "expected variable name after \\ — with its help"
+src  = """
+x = 1
+\\ 5
+"""
+
+[[cell]]
+id   = "hot-index-left-open"
+what = "expected ']' after index expression — after a hot name"
+src  = """
+x = [1, 2]
+x°[1 = 2
+"""
+
+[[cell]]
+id   = "hot-index-edit"
+what = "a hot name edits like a cold one — `x°[i]$~ v` writes, and the write anchors where `°` says"
+expect = "ok"
+# This cell used to be `hot-index-without-operator`, `x°[1] 5`, and measured the
+# help that taught `arr[i] = val` (GLB-027). The help was the symptom: `x°[` was
+# routed to the withdrawn indexed assignment unconditionally where `x[` asked
+# first, so the hot name lost BOTH halves of the form — this edit and the bare
+# read — while the same read in any expression worked. What `x°[1] 5` measures
+# now is the stray `5`, which is `refusal/stray-literal-statement` with a cold
+# name and already has its own cell. So the cell moved to what the step fixed.
+# Inside the loop, where `°` is doing its work: at global scope over a name that
+# already exists the analyzer warns that the `°` is redundant, which is right and
+# which zyjs does not implement — a hole the message inventory already counts,
+# and not what this cell is for.
+src  = """
+@ 2 {
+    acc° = [10, 20]
+    acc°[1]$~ 99
+    >> acc ¶
+    >> acc°[1] ¶
+    acc°[1]
+}
+"""
+
+# Found 2026-09-26 while renaming Klingon Galaxy's ship variable (GLB-070): two
+# warnings zyjs gives and the Rust engines do not. Registered, not fixed.
+
+[[cell]]
+id     = "destructure-in-a-block-onto-outer-names-warns-nothing"
+expect = "ok"
+what   = "`(x, n) = f(x, n)` inside a `?` block writes the outer `x` and `n`: nothing is unused"
+# ZYJS-042, open: zyjs warns `unused variable 'x'` and `'n'` — the
+# destructuring defines new names in the block frame instead of keeping the
+# visible ones, as `x = …` did before `defineOrKeep`.
+src    = """
+f(a, b) { <~ (a, b) }
+x = [1]
+n = 0
+@ 2 {
+    ? #1 {
+        (x, n) = f(x, n)
+    }
+    >> x n ¶
+}
+"""
+
+[[cell]]
+id     = "a-function-never-called-is-not-an-unused-variable"
+expect = "ok"
+what   = "a declared function nobody calls: no `unused variable` warning"
+# ZYJS-043, open: zyjs warns `unused variable 'g'`; neither Rust engine warns
+# about an uncalled function, and a function is not a variable in any case.
+src    = """
+g(a) { <~ a }
+>> 1 ¶
+"""
+
+[[cell]]
+id     = "prefix-hot-read-of-a-loop-variable-warns-nothing"
+expect = "ok"
+what   = "`v = °m` inside a block reads the loop's `m`: nothing is unused"
+# ZYJS-044, fixed 2026-09-26: zyjs defined `m` again at the boundary and warned
+# `unused variable 'm'` (ZyBank, verificación_almacén.zy:387).
+src    = """
+xs = [1, 2]
+v = 0
+@ m:xs {
+    ? m > 1 { v = °m }
+}
+>> v ¶
+"""
+
+[[cell]]
+id     = "prefix-hot-accumulator-nobody-reads-warns"
+expect = "warn"
+what   = "`s = °s i` in a loop and `s` never read: `unused variable 's'`"
+# ZYJS-046, open: both Rust engines warn; zyjs says nothing.
+src    = """
+total = 0
+@ i:1..3 {
+    s = °s i
+    total = total + i
+}
+>> total ¶
+"""
+
+[[cell]]
+id     = "underscore-name-in-a-loop-header-is-read-where-the-loop-stands"
+expect = "warn"   # `1.._n` warns that its direction is decided at runtime
+what   = "`_xs = [1, 2]` then `@ x:_xs { … }`: the header is read in the scope that declared `_xs`"
+# ZYJS-047, fixed 2026-09-26: zyjs checked the header inside the loop's frame
+# and refused `cannot access underscore variable '_xs' from inner scope`.
+src    = """
+_xs = [1, 2]
+@ x:_xs { >> x ¶ }
+f() {
+    _n = 2
+    @ i:1.._n { >> i ¶ }
+}
+f()
+"""

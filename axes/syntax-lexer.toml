@@ -1,0 +1,239 @@
+# The syntax-lexer axis — Phase B, family B3 of the diagnostics plan.
+#
+# The lexer's diagnostics that no program provoked on 2026-09-14
+# (`zyquality/messages/reach.py --list sintaxis`). Every cell expects `error`:
+# these are forms every engine must refuse, and each cell also provokes the
+# `help:` line that goes with its diagnostic.
+#
+# Two need their input exactly: the invalid escape is a CHAR literal (`'\\q'`)
+# — a string keeps an unknown escape as written — and the unterminated char
+# literal needs the quote to be the LAST byte of the file, which is why that
+# cell's source ends with no newline.
+
+id      = "syntax-lexer"
+what    = "the lexer's diagnostics: each form refused, with its help"
+engines = ["zytw", "zyvm", "zyjs"]
+expect  = "error"
+
+[[cell]]
+id   = "unterminated-multiline-comment"
+what = "Unterminated multi-line comment — and its help, add */"
+src  = """
+/* abierto
+>> 1 ¶
+"""
+
+[[cell]]
+id   = "empty-string-interpolation"
+what = "empty string interpolation {} — and its help"
+src  = """
+>> "a{}b" ¶
+"""
+
+[[cell]]
+id   = "char-literal-expects-closing-quote"
+what = "expected closing ' for char literal"
+src  = """
+c = 'ab'
+>> c ¶
+"""
+
+[[cell]]
+id   = "invalid-unicode-code-point"
+what = "invalid Unicode code point: a surrogate written as a base literal"
+src  = """
+c = 0xD800
+>> c ¶
+"""
+
+[[cell]]
+id   = "invalid-boolean-digit"
+what = "invalid boolean literal: digit {} is not valid after '#' — and its help"
+src  = """
+b = #2
+>> b ¶
+"""
+
+[[cell]]
+id   = "invalid-character-in-interpolation"
+what = "invalid character in string interpolation — and its help"
+src  = """
+>> "a{1}" ¶
+"""
+
+[[cell]]
+id   = "invalid-escape-in-char-literal"
+what = "invalid escape sequence in a char literal"
+src  = """
+c = '\\q'
+>> c ¶
+"""
+
+[[cell]]
+id   = "invalid-float-literal"
+what = "invalid float literal: an exponent with no digits"
+src  = """
+x = 1.0e+
+>> x ¶
+"""
+
+[[cell]]
+id   = "mixed-digit-scripts"
+what = "mixed digit scripts in numeric literal"
+src  = """
+x = 1٢
+>> x ¶
+"""
+
+[[cell]]
+id   = "unexpected-character"
+what = "unexpected character: a lone `&`"
+src  = """
+x = 1 & 2
+>> x ¶
+"""
+
+[[cell]]
+id   = "unterminated-execute-expression"
+what = "unterminated execute expression — and its help"
+src  = """
+x = </ ./a.zy
+>> x ¶
+"""
+
+[[cell]]
+id   = "unterminated-string-interpolation"
+what = "unterminated string interpolation — and its help"
+src  = """
+>> "a{b" ¶
+"""
+
+[[cell]]
+id   = "unterminated-char-literal-at-end-of-file"
+what = "unterminated char literal: the quote is the last byte"
+src  = """
+c = '"""
+
+[[cell]]
+id   = "uppercase-base-prefix"
+what = "a base prefix is lowercase: `0X41` is not a character literal — zyjs read it as `A`, both Rust engines refuse (found in step 2.1, 2026-09-15)"
+src  = """
+c = 0X41
+>> c ¶
+"""
+
+[[cell]]
+id     = "byte-order-mark"
+expect = "ok"
+what   = "a file that begins with a UTF-8 byte order mark runs — the Rust lexer glued the mark to the first identifier, so `x` was undefined (found in step 2.1, 2026-09-15; GLB-026)"
+src    = """\ufeffx = 1
+>> x ¶
+"""
+
+[[cell]]
+id     = "visible-symbol-in-a-name"
+expect = "ok"
+what   = "a visible symbol the language has no token for is a letter of a name: `€`, `±`, `§` and an emoji all name variables (GLB-026 A)"
+src    = """
+€precio = 5
+a±b = €precio
+§total = a±b
+_🔑 = §total
+>> _🔑 ¶
+"""
+
+[[cell]]
+id     = "invisible-character-in-a-name"
+expect = "error"
+what   = "an invisible character is not a letter: a soft hyphen inside a name is refused, and named by its code point rather than quoted (GLB-026 B). One occurrence only: how many errors an engine goes on to report after the first is GLB-028's question, not this cell's"
+src    = """
+a­b = 5
+>> 5 ¶
+"""
+
+[[cell]]
+id     = "backtick-is-not-a-name"
+expect = "error"
+what   = "the backtick names nothing and is no operator: it is refused rather than dropped (GLB-026 B)"
+src    = """
+x = 1
+>> `x ¶
+"""
+
+[[cell]]
+id     = "zero-width-joiner-inside-a-name"
+expect = "ok"
+what   = "ZWJ and ZWNJ join letters, so they are allowed INSIDE a name — never at its start (GLB-026 B)"
+src    = """
+a‌b = 5
+c‍d = a‌b
+>> c‍d ¶
+"""
+
+[[cell]]
+id     = "unterminated-string-at-end-of-file"
+expect = "error"
+what   = "a quote that never closes is an error, not a string"
+# `zyjs` consumed nothing and handed back what it had, so this printed `abc`
+# while both Rust engines refused the file (GLB-038, decided 2026-09-23).
+src    = """
+>> "abc
+"""
+
+[[cell]]
+id     = "unterminated-string-swallows-a-brace"
+expect = "error"
+what   = "unterminated string literal — and the block it ate is NOT reported"
+# A string with no closing quote runs on and eats whatever follows, the `}`
+# that closed a block included. Naming the brace described what the lexer saw;
+# the reader needs to know the quote never closed. And the second error, about
+# a brace they DID write, is suppressed.
+src    = """
+f() {
+    >> "abc
+}
+>> "fin" ¶
+"""
+
+[[cell]]
+id     = "unmatched-brace-in-a-closed-string"
+expect = "error"
+what   = "unmatched '}' in string — the string DOES close, so the brace really is the fault"
+# The other side of the rule above: same line as the opening quote means the
+# string closed and the loose brace is the actual mistake. `"\\{\\"n\\":1}"` is
+# the case that made this a rule.
+src    = """
+>> "a}b" ¶
+"""
+
+[[cell]]
+id     = "a-string-may-span-lines"
+expect = "ok"
+what   = "a line break is NOT the end of a string, which is why it cannot be the recovery boundary"
+src    = """
+x = "linea1
+linea2"
+>> x ¶
+"""
+
+[[cell]]
+id     = "quote-and-brace-both-left-open"
+expect = "error"
+what   = "both open: the QUOTE is reported first, because it opened first"
+# `>> \"a{b ¶` used to name only what the interpolation tripped on, which is the
+# symptom of reading past a quote that never closed (GLB-038, decided
+# 2026-09-24). The two Rust engines report both errors, in opening order; zyjs
+# reports the first, because its lexer throws rather than collecting.
+src    = """
+b = 1
+>> "a{b ¶
+"""
+
+[[cell]]
+id     = "interpolation-left-open-in-a-closed-string"
+expect = "error"
+what   = "unterminated string interpolation — the quote DOES close, so only the brace is open"
+src    = """
+b = 1
+>> "a{b" ¶
+"""
