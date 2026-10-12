@@ -9115,9 +9115,11 @@ de sintaxis.
 
 **Estado:** **corregido 2026-10-12** — el Gate de GitHub sobre `main` (`5a3d5b1`, intento 3, 18:49Z) da `all gates pass`
 con `zyquality` y `ZyDDT` en su `main` arreglado. **Lo que esa ejecución probó y lo que no:** `pins` se vio allí
-(`SKIPPED DM-02_array_equality.zy`, salida 0). El camino de `cost` **no** se ejerció en CI: ese runner dio todas las bases
-sobre el suelo y `cost` salió `GREEN` sin ninguna lectura apartada; lo sostiene la prueba local con el suelo forzado, y la
-primera ejecución con un runner rápido es la que lo mostrará en CI. Eran dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
+(`SKIPPED DM-02_array_equality.zy`, salida 0). El camino de `cost` no se ejerció en ella — ese runner dio todas las bases
+sobre el suelo — y sí en la siguiente, doce minutos después (`d2c53f8`, 19:01Z), que tocó un runner rápido: cinco filas
+con bases de 28–39 ms salieron `SKIPPED` (`zyvm` ×4, `zytw` ×1), sus razones contadas pasaron, y el veredicto fue
+`GREEN — … 5 timed ratio(s) under the floor, answered by the counted ones` y `all gates pass`. Las dos mitades están
+vistas en CI. Eran dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
 (`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
 el autor** (ver la tabla): `pins` da por «saltado» un `DM-` cuyo repo no está clonado, y en `cost` el contado exacto basta
 cuando el cronometrado no llega al suelo. Arreglo en `main` de `zyquality` y `ZyDDT` — el autor lo pidió allí ese mismo
