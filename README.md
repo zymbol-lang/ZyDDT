@@ -1,5 +1,7 @@
 # ZyDDT
 
+🌐 [zymbol-lang.org](https://zymbol-lang.org) · ▶ [playground](https://zymbol-lang.org/playground.html)
+
 **The verification layer for Zymbol: the known-knowns, held cheaply and forever.**
 
 Zymbol has three engines — `zytw` (tree-walker), `zyvm` (register VM), `zyjs`
