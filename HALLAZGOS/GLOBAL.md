@@ -9110,3 +9110,33 @@ La celda de arriba, con `open_finding = { zytw = "GLB-127", zyvm = "GLB-127" }`:
 cerrar esta ficha. El arreglo es de una línea en el parser (añadir `Plus` junto a `Not | Minus`), y **no se ha hecho**:
 es lo que el plan pide que no se haga fuera de su paso. `+"a"` dará entonces el error de tipo documentado en vez de uno
 de sintaxis.
+
+## GLB-128 — El Gate de GitHub da dos «sin veredicto» que son del entorno: un repositorio privado y un runner más rápido que la máquina donde se calibró
+
+**Estado:** **abierto** — dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
+(`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Sin decidir**: lo que falta
+es del autor, y el 2026-10-12 decidió publicar con esto documentado y arreglarlo en la v0.0.11
+**Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 2.4, al ver el Gate de GitHub por primera vez corriendo la
+capa de calidad entera (GLB-126 la había desbloqueado)
+**Familia:** [`GLB-126`](GLOBAL.md) — el Gate que no corría — y [`ZYVM-022`](zyvm.md) en lo que toca a `cost`
+
+| | qué dice CI | por qué | qué hay que decidir |
+|---|---|---|---|
+| `zyddt` · `pins` | `UNVERIFIED DM-02_array_equality.zy — DM-02 is a Divergente_ES id, and that repository is not cloned beside this one` → exit 2 | `Divergente_ES` es `zymbol-lang/divergente`, **privado**: un workflow público no lo clona sin un secreto | hacerlo público, darle a CI un token de sólo lectura, o que `pins` trate un repo no clonado como «saltado» y no como «sin veredicto» |
+| `cost` · 6 casos cronometrados | `NO VERDICT zyvm base run 39ms < 40ms floor — this ratio would measure process startup` → exit 2 | el runner es 2,1–2,4× más rápido que la máquina donde se calibró: bases de 29–41 ms allí, de 54–120 aquí | subir los tamaños (`n`), bajar el suelo `min_base_ms` (es «bajar la pregunta», movimiento 6 de `HOW_TO_CHANGE_ZYMBOL.md`), o que el contado exacto baste cuando el cronometrado no llega al suelo |
+
+Los seis casos: `growth/append-local` y `growth/append-several-local` (`zyvm`), `growth/module-call-that-reads-one-cell`
+(`zytw`, `zyvm`), `growth/sort-with-comparator` (`zytw`, `zyvm`). Las aserciones **contadas** de esos mismos casos pasan en
+CI con las razones exactas (pasos ×4,00, `copied` 0); sólo `zyjs`, que no cuenta, depende del reloj, y pasa.
+
+### Qué NO es
+
+Ninguna de las dos es una regresión del lenguaje ni de un motor, y por eso no hay celda que las sujete: son preguntas que
+el gate hace sobre su propio entorno. La señal es el propio Gate de GitHub, en rojo por «sin veredicto» y no por «falla».
+Es el comportamiento correcto de un gate que no debe leer «nada corrió» como «nada falló», y por eso mismo bloquea la
+precondición *CI green* de `agents/release_merge.md`, que no se cumple en `v0.0.10`.
+
+### Qué se midió en la ejecución que lo reveló
+
+`consensus` 677 de acuerdo, 0 divergen; `expect` 647 + 30; `reject` 55; `guide` 130; `llm` 88; `lsp` 14, 0 fuera de la
+línea base; `project` las 9 aplicaciones; `fmtcheck` 9 cuerpos; `bench` 16; `web` 15 suites; 29 premisas.
