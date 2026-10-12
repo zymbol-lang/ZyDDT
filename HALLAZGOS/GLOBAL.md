@@ -8993,3 +8993,87 @@ ejemplos del playground siguen de acuerdo con Rust.
 `refusal/match-identifier-pattern-names-a-function` (ahora `expect = "ok"`),
 `…-holds-a-function`, `…-names-a-module`, `refusal/module-alias-assigned`, `…-compared`, `…-as-an-argument` y el
 control `refusal/module-alias-reached-through-its-members`.
+
+## GLB-126 — `zyq` no compila con el OCaml del runner de CI: `In_channel` es de 4.14, y el Gate de GitHub lleva 100 ejecuciones en rojo
+
+**Estado:** **corregido 2026-10-11** — `Toml.read_channel` sustituye a `In_channel.input_all`, y `zyq` compila y
+pasa `selftest` con OCaml 4.13.1, el del runner (`zyquality` `738ad5f`). Lo que **no** se ha visto todavía es un
+Gate verde en GitHub: eso sólo lo dice el primer push, y lo que aparezca detrás es otro hallazgo
+**Encontrado por:** el plan de lanzamiento de la v0.0.10 (paso 2.4), al comprobar qué dispararía el push:
+`gh run list` dio 100 ejecuciones del Gate en `v0.0.10`, ninguna verde, y el log del job fallido el error
+**Familia:** ninguna — no es de un motor sino de la herramienta que los pregunta
+
+| | |
+|---|---|
+| último Gate verde, en cualquier rama | 2026-09-10 (`main` y `v0.0.9`, el día de la release anterior) |
+| ejecuciones en `v0.0.10` | 100 miradas, 100 rojas |
+| la más antigua de esas 100 (22 sep.) | `zyq` se construía y falló el paso `zyq suite`: ZyDDT `RED — a regression`, con `DIVERGE` en `runtime-modules-scripts/subscript-with-warnings-that-fails`. No se investigó más allá del log; esa celda está hoy de acuerdo |
+| desde `ee96870` (2 oct., `zyquality`) | `make` no termina, y sin `zyq` el paso siguiente sale con 127 |
+
+```text
+File "src/main.ml", line 747, characters 19-39:
+747 |      let listing = In_channel.input_all ic in
+                         ^^^^^^^^^^^^^^^^^^^^
+Error: Unbound module In_channel
+make: *** [Makefile:21: src/main.cmx] Error 2
+…
+./zyq: No such file or directory
+```
+
+El otro job del workflow, «Rust — tests, formatting, build», está en verde en las dos ejecuciones que se
+abrieron: la más reciente y la más antigua de las cien.
+
+### Por qué la puerta local no lo dice
+
+Porque no puede: el workspace compila con OCaml 5.3.0. `In_channel` entró en la biblioteca estándar en 4.14, y el
+runner (`ubuntu-22.04`) instala `ocaml-nox` 4.13.1 con `apt` (`interpreter/.github/workflows/gate.yml`, paso
+«OCaml for zyq»). El uso llegó con la comprobación de higiene de `audit` — leer `git ls-files -z` de un proceso —
+y es el único de todo `zyq`.
+
+La consecuencia es la que importa: **la puerta de GitHub no ejecutó la capa de calidad desde el 2 de octubre**. Un
+rojo que cambia de causa sigue siendo un rojo, y el segundo no se distingue del primero sin abrir el log.
+
+### Qué se hizo
+
+`Toml.read_channel`, hermano de `Toml.read_file` para un canal que no es un fichero: un `Buffer` y `input`,
+porque `in_channel_length` no significa nada sobre un pipe.
+
+Reproducido antes y después con el compilador del runner — `debian:12` bajo `podman`, `ocamlopt` 4.13.1, la misma
+versión que instala `ubuntu-22.04`:
+
+| | `make` | `zyq selftest` |
+|---|---|---|
+| antes | `Unbound module In_channel`, rc 2 | — |
+| después | rc 0 | 56 comprobaciones, todas pasan |
+
+Los otros nueve módulos compilaban ya en 4.13.1, y `main.ml` no escondía un segundo uso detrás del primero. Local,
+con 5.3.0, la puerta entera después del cambio: `all gates pass`, con las mismas cifras que antes de él.
+
+Decidido el mismo día por el autor, y aparte: OCaml no es ya un motor válido en Zymbol. El oráculo `ml` de
+`zyquality/engines.toml` se retiró (`f97e18e`) — no lo usaba nada: ningún programa `.ml` de oráculo en el
+workspace, ninguna celda ni caso que nombrara el id. `zyq` sigue escrito en OCaml: es una herramienta, no un motor.
+
+### Qué lo sujeta
+
+El paso `Build zyq` del Gate, en `ubuntu-22.04`: falló con el fuente anterior —cien veces— y es lo que fallará con
+el próximo uso de una biblioteca posterior a 4.13. No hay celda, porque no es una pregunta que se le haga a un
+motor. Sin CI se reproduce así:
+
+```bash
+podman run --rm -v "$PWD/zyquality:/src:ro" debian:12 bash -c '
+  apt-get update -qq && apt-get install -y -qq --no-install-recommends ocaml-nox make
+  mkdir -p /tmp/zq/src && cp /src/Makefile /tmp/zq && cp /src/src/*.ml /tmp/zq/src
+  cd /tmp/zq && make && ./zyq selftest'
+```
+
+Sólo las fuentes: los `.cmi` que deja el compilador del host son de otra versión y hacen fallar `make` antes, por
+una causa que no es ésta.
+
+### Lo que no se cierra aquí
+
+- Que el Gate de GitHub **pase entero**. `zyq` no corría allí desde el 2 de octubre; lo que haya detrás de
+  `Build zyq` no se conoce hasta que corra.
+- La precondición de `agents/release_merge.md`, *CI green on the branch*, que no se ha cumplido en `v0.0.10`
+  ninguna vez.
+- `engine.ml` conserva el campo `build` y la sustitución `{exe}`, que sólo usaba el oráculo `ml`. Se dejan: un
+  motor que necesite compilarse sigue siendo una entrada legítima, y quitarlos es otra decisión.
