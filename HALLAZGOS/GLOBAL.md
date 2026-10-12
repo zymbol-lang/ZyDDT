@@ -9113,12 +9113,16 @@ de sintaxis.
 
 ## GLB-128 — El Gate de GitHub da dos «sin veredicto» que son del entorno: un repositorio privado y un runner más rápido que la máquina donde se calibró
 
-**Estado:** **abierto** — dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
+**Estado:** **corregido 2026-10-12** — el Gate de GitHub sobre `main` (`5a3d5b1`, intento 3, 18:49Z) da `all gates pass`
+con `zyquality` y `ZyDDT` en su `main` arreglado. **Lo que esa ejecución probó y lo que no:** `pins` se vio allí
+(`SKIPPED DM-02_array_equality.zy`, salida 0). El camino de `cost` **no** se ejerció en CI: ese runner dio todas las bases
+sobre el suelo y `cost` salió `GREEN` sin ninguna lectura apartada; lo sostiene la prueba local con el suelo forzado, y la
+primera ejecución con un runner rápido es la que lo mostrará en CI. Eran dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
 (`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
 el autor** (ver la tabla): `pins` da por «saltado» un `DM-` cuyo repo no está clonado, y en `cost` el contado exacto basta
 cuando el cronometrado no llega al suelo. Arreglo en `main` de `zyquality` y `ZyDDT` — el autor lo pidió allí ese mismo
 día: son pruebas y no lenguaje, y `main` no debía quedarse con la marca roja de la v0.0.10; el intérprete no cambia —,
-probado en local con el suelo forzado; **sigue abierto hasta que un Gate de GitHub lo dé verde**, que es donde falló
+probado en local con el suelo forzado
 **Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 2.4, al ver el Gate de GitHub por primera vez corriendo la
 capa de calidad entera (GLB-126 la había desbloqueado)
 **Familia:** [`GLB-126`](GLOBAL.md) — el Gate que no corría — y [`ZYVM-022`](zyvm.md) en lo que toca a `cost`
