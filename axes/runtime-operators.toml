@@ -186,6 +186,16 @@ v = j::decode("\\"a\\"")
 """
 
 [[cell]]
+id     = "unary-plus-starts-an-output-item"
+expect = "ok"
+what   = "`>> +a`: the unary plus is a form of the language, and an output item is a place an expression starts"
+src    = """
+a = 10
+>> +a ¶
+"""
+open_finding = { zytw = "GLB-127", zyvm = "GLB-127" }
+
+[[cell]]
 id     = "constant-already-declared"
 expect = "error"
 what   = "constant '{}' already declared"
