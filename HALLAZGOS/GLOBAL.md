@@ -9331,3 +9331,71 @@ veces.
 ### Qué lo sujeta
 
 `zyquality/reject/collections/18_clave_repetida.zy`: los tres motores lo rechazan.
+
+---
+
+## GLB-132 — El diccionario busca una clave recorriendo sus pares: insertar n claves cuesta n² en los tres motores
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con `growth/dictionary-by-key` de `zyquality/cost` como deuda de los tres motores antes del arreglo. Es PERF-03 de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`),
+con la recomendación «implementar, como pieza propia» que el autor incorporó al plan el 2026-10-14
+**Encontrado por:** ZyBigBench (PERF-03), con la fila `dict_lookup_last` que se le añadió al traerlo: leer la
+**primera** clave parecía plano porque una búsqueda lineal la encuentra en seguida
+**Familia:** [`GLB-131`](GLOBAL.md), que tuvo que decidirse antes: un diccionario indexado por clave no puede guardar
+dos veces la misma
+
+```zymbol
+d = #(k0: 0)
+@ i:1..16000 {
+    k = "k" i
+    d[k]$~ i
+}
+s = 0
+@ i:1..16000 {
+    k = "k" i
+    s = s + d[k]
+}
+>> s ¶
+```
+
+Reloj, una corrida, de 4 000 a 16 000 claves:
+
+| | 4 000 | 16 000 | razón |
+|---|---:|---:|---:|
+| `zyvm` | 57 ms | 438 ms | 7,7 |
+| `zytw` | 66 ms | 651 ms | 9,9 |
+| `zyjs` | 302 ms | 2 685 ms | 8,9 |
+
+`--count` no lo ve: cada búsqueda es un paso.
+
+### Causa
+
+Los tres guardan el diccionario como una lista de pares y buscan recorriéndola: `Rc<Vec<(String, Value)>>` en los dos
+motores de Rust, y en `zymbol.js` los arreglos paralelos `v` y `keys`, con `keys.indexOf`.
+
+### Qué lo sujeta
+
+`growth/dictionary-by-key` en `zyquality/cost/cost.toml`, por reloj, en los tres motores, ya sin deuda. Y
+`zyquality/corpus/collections/diccionario_por_clave.zy`, que sujeta lo que escribir en el sitio podía romper: otro
+nombre, un argumento o un valor tomado en un bucle que comparten el diccionario conservan lo que tenían.
+
+### Corrección (2026-10-16)
+
+- **`zytw` y `zyvm`:** `NamedTuple(Rc<zymbol_common::Dict<Value>>)`, con `Dict<V> = IndexMap<String, V>`. Cada lectura,
+  escritura, consulta `$?`, desestructuración e igualdad busca por hash; borrar es `shift_remove`, que conserva el
+  orden que imprime `#(…)`. `count::make_mut_dict` cuenta la copia como `make_mut` la de un arreglo.
+- **`zyjs`:** un índice clave → posición por arreglo de claves (`dictIndex`, en un `WeakMap`), y la escritura de una
+  clave en el sitio cuando la variable es la única dueña del diccionario, con la marca `own` que ZYJS-014 dio a los
+  arreglos. Sin ella el índice no bastaba: cada escritura copiaba las dos listas. Un diccionario que una edición crea
+  como propio lleva sus propias claves, porque compartirlas con el original lo habría corrompido al escribir después.
+
+De paso salieron tres copias enteras del diccionario que no eran búsquedas: `d$-["k"]` en la VM clonaba el
+diccionario para quitar una clave, la escritura por ruta del tree-walker (`set_at_step`) clonaba el contenedor antes de
+`make_mut`, y `$-[a..b]` sobre un diccionario en la VM lo clonaba para rechazarlo. Las tres trabajan en el sitio.
+
+Reloj, 16 000 claves: `zyvm` 438 → 14 ms, `zytw` 651 → 28 ms, `zyjs` 2 685 → 399 ms.
+
+**Dos bordes cambian**, porque un `IndexMap` no guarda dos veces una clave: una consulta de `std/db` que nombra dos
+veces la misma columna, y un `json::decode_map` que renombra dos claves al mismo nombre, daban dos entradas y ahora una
+—en el sitio de la primera, con el valor de la última—. No se buscó en todo el espacio de trabajo; el corpus y las
+nueve aplicaciones de la puerta dan la misma salida que antes.
