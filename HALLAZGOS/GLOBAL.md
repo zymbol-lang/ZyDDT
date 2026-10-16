@@ -9180,3 +9180,53 @@ rojo; si no, hay que relanzar el Gate de `main` al terminar.
 runner dio bases de 59–225 ms en las mismas seis filas donde el de las 11:51Z dio 28–40 ms. El suelo de `cost` no depende
 sólo de la máquina de calibración: **varía entre ejecuciones del mismo workflow** en el mismo tipo de runner, así que subir
 `n` habría seguido a merced de cuál tocara.
+
+---
+
+## GLB-129 — `$[i:n]`, el corte por cuenta: los tres motores no coincidían en ninguno de sus errores
+
+**Estado:** **corregido 2026-10-16** — decidido por el autor ese día: la referencia es la VM, que escribe la forma como
+la escribió el lector y nombra la cuenta, como [`GLB-047`](GLOBAL.md) ya había hecho con `$-[i:n]`
+**Encontrado por:** una matriz de la forma de cuenta en los tres motores, al preparar PERF-05 a
+(`interpreter/ROADMAP_V0011_ES.md`); empezó por [`ZYVM-026`](zyvm.md), en la misma instrucción
+**Familia:** [`GLB-046`](GLOBAL.md) y [`GLB-047`](GLOBAL.md), que dejaron estricta y bien escrita la forma que
+**quita**, `$-[i:n]`, y no alcanzaron la que **corta**. Clase 2 de este fichero: no hay un motor que se salga
+
+```zymbol
+t = "ñandú"
+!? { >> t$[4:9] ¶ } :! ##Index { >> "Index: " _err ¶ } :! { >> "otro: " _err ¶ }
+!? { >> t$[2:-1] ¶ } :! ##Index { >> "Index: " _err ¶ } :! { >> "otro: " _err ¶ }
+!? { >> t$[2:2.0] ¶ } :! ##Type { >> "Type: " _err ¶ }
+```
+
+| | `t$[4:9]` | `t$[2:-1]` | `t$[2:2.0]` |
+|---|---|---|---|
+| `zytw` | `##Index`, «`[4..9]`» | **`##_`**, «slice start (2) cannot be greater than end (-1)» | «slice **end** must be an integer» |
+| `zyvm` | `##Index`, «`[4:9]`» | `##Index`, «slice count must be non-negative, got -1» | «slice **count** must be an integer» |
+| `zyjs` | `dú`, recortado | vacío | `an`: leyó el `2.0` como 2 |
+
+Lo mismo sobre un arreglo, y con el corte escrito a través de un parámetro. La familia no es un detalle del texto:
+`:! ##Index` capturaba la cuenta negativa en la VM y la dejaba pasar en el tree-walker.
+
+### Por qué no se veía
+
+Ningún fichero del corpus probaba un error de la forma de cuenta. Los que la usan la usan bien.
+
+### Corrección (2026-10-16)
+
+- **`zytw`** (`collection_ops.rs`, `eval_collection_slice`): una cuenta negativa se rechaza antes de los límites, como
+  `count_span` de la VM, con `##Index`; el mensaje de fuera de rango escribe `[i:n]`, y el de tipo dice `count`.
+- **`zyjs`** (`zymbol.js`, `$[i:n]`): estricto, como `$-[i:n]` desde GLB-046 — comprueba que los dos sean enteros,
+  rechaza la cuenta negativa y lo que se sale del texto, y deja de recortar.
+- **`zyvm`**: sin cambios. Era la referencia.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/slice_count_errors.zy`: lo que la forma acepta, lo que se sale por cada lado, la
+cuenta negativa y los tipos, sobre texto y arreglo, directo y a través de un parámetro, con la familia capturada por
+`:!`. Y `slice_count_not_integer.zy`, al lado, sin capturar: la suite `reach` sólo cuenta un diagnóstico como
+provocado cuando sale como `Runtime error:`.
+
+Al hacerlo salió un resto de la etapa 1 de la v0.0.11 en `reach.py`: ejecutaba cada programa con `run` y con
+`run --vm`, y desde que la VM es el motor por defecto los dos eran la VM. Ningún diagnóstico de ejecución del
+tree-walker podía verse provocado allí desde el 2026-10-13. Ahora nombra los dos motores.
