@@ -12,8 +12,9 @@
 | [`ZYVM-010`](#zyvm-010--soltar-valores-cuesta-entre-el-11-y-el-17--del-tiempo-de-la-vm) | **corregido 2026-10-10** | soltar valores al desmontar el marco y al escribir un registro, y un marco que medía todos los temporales que la función pidió alguna vez |
 | [`ZYVM-020`](#zyvm-020--n--sobre-un-nombre-que-es-estado-del-módulo-la-vm-le-da-un-registro-propio) | **corregido 2026-10-10** | `n° = n + i` con `n` estado del módulo: 3 donde los otros dos dan 16 |
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
+| [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
 
-**Ninguno abierto.** La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
+**Uno abierto:** `ZYVM-022`, que no está en la tabla. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
 Las chinchetas que los sujetan:
 
@@ -1634,3 +1635,89 @@ tomado:
 `autofree/call-result` en `zyquality/cost/cost.toml`, con `open_finding = { zyvm = "ZYVM-022" }`: el día que la VM
 pase, el caso se pone en rojo hasta que esta ficha se cierre y la marca se quite. Los dos programas son
 `casos/autofree_resultado_uno.zy` y `casos/autofree_resultado_secuencial.zy`.
+
+---
+
+## ZYVM-023 — `s = s "x"` copia el texto entero en cada añadido: construir un texto es cuadrático en la VM
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con sus tres casos de `zyquality/cost` como deuda antes del arreglo. Es el primero de la etapa 2
+(`interpreter/ROADMAP_V0011_ES.md`, PERF-06), con la recomendación «implementar» que el autor incorporó al plan el
+2026-10-14
+**Encontrado por:** ZyBigBench (PERF-06), por curva de crecimiento; traído a `zyquality/bench/big/` el 2026-10-14
+**Familia:** [`ZYVM-003`](zyvm.md) y [`ZYVM-013`](zyvm.md) — una edición que se escribe en un registro nuevo en vez
+de en su receptor; aquí no hay `Rc` con dos dueños, sino un búfer que nunca se reutiliza
+
+```zymbol
+s = ""
+@ _i:1..32000 { s = s "x" }
+>> s$# ¶
+```
+
+`zymbol run --count`, la misma forma con el receptor en sus tres sitios posibles:
+
+| receptor | `zyvm` bytes 2 000 → 8 000 | razón | `zytw` |
+|---|---:|---:|---:|
+| variable del programa | 4,2 MB → 34,5 MB | **8,12** | 1,89 |
+| variable local de una función | 4,3 MB → 34,5 MB | **8,11** | 1,76 |
+| estado de un módulo | 4,3 MB → 34,6 MB | **7,97** | 1,26 |
+
+A 32 000 añadidos la VM pide 515 MB al asignador para un texto de 32 KB; el tree-walker, 223 KB. Los pasos
+crecen ×4,00 exactos: el coste está dentro de una instrucción, en lo que copia. ZyBigBench lo midió en
+instrucciones: 128 000 añadidos, 968 M contra 290 M con la mitad.
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_binary`: `BinaryOp::Concat` emite `ConcatStr(dst, r_l, r_r)` con `dst` un
+temporal nuevo, y la asignación copia después el temporal a la variable. La VM tiene la vía rápida —`ConcatStr`
+reutiliza el búfer del operando izquierdo, con `try_into_string`, cuando `dst == a`—, pero el compilador nunca la
+alcanza: destino y operando izquierdo no son el mismo registro, así que cada añadido reserva un texto de la longitud
+entera y copia el anterior dentro.
+
+### Alcance
+
+Todo programa que construya un texto por partes: un informe, una línea de tablero, un buffer de pantalla. La salida
+es idéntica; sólo lo ve una curva.
+
+### Corrección (2026-10-16)
+
+`compile_assignment_inner` reconoce `s = s x y …` —una cadena de `Concat` cuya hoja de más a la izquierda es el
+receptor— y emite `ConcatStr(s, s, x)`, `ConcatStr(s, s, y)` sobre el registro de la propia variable, por los mismos
+tres caminos que `ConcatBuild` (GLB-118): la variable local, la del programa con su ranura espejo, y el estado de un
+módulo. Lo que hubo que cuidar:
+
+- **Izquierda a derecha.** Todos los operandos se evalúan antes del primer añadido, así que ven el `s` con el que
+  empezó la sentencia. Un operando que *es* el registro del receptor (`s = s "-" s`) se copia aparte antes.
+- **Un `<~` en la misma sentencia** (`r = r escribe(r<~)`) deja la lectura fijada y sigue por el camino de la copia,
+  como en ZYVM-013.
+- **La ranura.** El estado de un módulo y la variable espejo de un programa guardan una segunda referencia al
+  texto, y con dos dueños `try_into_string` copia. `DetachGlobal` soltaba la ranura sólo para agregados; ahora también
+  para un texto que comparte búfer con el registro (`ZyStr::shares_buffer`). Si un operando escribió el estado entre
+  la lectura y el añadido, la ranura tiene otro texto y no se toca: `mete()` en el fichero del corpus de abajo.
+
+`zymbol run --count`, `bytes` de 2 000 a 8 000 añadidos:
+
+| receptor | antes | ahora |
+|---|---:|---:|
+| variable del programa | 4,2 MB → 34,5 MB (×8,12) | 2,26 MB → 2,52 MB (×1,12) |
+| variable local de una función | 4,3 MB → 34,5 MB (×8,11) | 2,26 MB → 2,53 MB (×1,12) |
+| estado de un módulo | 4,3 MB → 34,6 MB (×7,97) | 2,35 MB → 2,61 MB (×1,11) |
+
+Los pasos bajan un 8 % en las dos primeras (sin el `CopyReg` de vuelta) y suben un 8 % en el estado de un módulo
+(`DetachGlobal` y la limpieza de temporales del estado). Sin instrucciones de `perf`: `perf_event_paranoid` está en 3
+en esta máquina.
+
+`zyquality/corpus/modules_scope/concat_receptor.zy` (con su módulo `concat_receptor_m.zy`) recoge las formas que el
+arreglo podía romper: el receptor como operando, un alias que comparte el texto, números, un receptor que no es
+texto, una cadena corta que crece, un alias dentro de una función, el estado de un módulo leído antes y después, un
+operando que reescribe el estado, una lambda que captura la variable, paréntesis, texto no ASCII y un `<~` en la
+misma sentencia. Da la misma salida en los tres motores y con `ZYMBOL_POISON_TEMPS=1`.
+
+### Qué lo sujeta
+
+`growth/concat-local`, `growth/concat-in-function` y `growth/concat-module-state` en `zyquality/cost/cost.toml`, sin
+deuda: la razón contada de `bytes` es exacta. Mientras el hallazgo estuvo abierto los tres llevaban
+`open_finding = { zyvm = "ZYVM-023" }`, y por él el corredor de `cost/` aprendió a leer `open_finding` en las
+razones contadas: hasta entonces ninguna deuda declarada era de `--count`. Una deuda se da por pagada sólo cuando
+pasan **todas** las lecturas de su motor, porque un defecto al que el conteo es ciego pasa todas las razones
+contadas mientras sigue abierto.
