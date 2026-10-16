@@ -9465,3 +9465,40 @@ Con un número, «qué llamada cuenta» pasó a ser una pregunta con respuesta v
 distinto. La regla que quedó es la de la VM: `<~ f(…)` a la propia función, en cualquier punto del cuerpo, sin un
 `!?` de esa función abierto —cuerpo, `:!` o `:>`—. Dos hallazgos salieron de ahí y se corrigieron con este:
 [`ZYTW-017`](zytw.md) y [`ZYVM-027`](zyvm.md).
+
+---
+
+## GLB-134 — El binario estático de Linux (musl) es hasta 17 veces más lento que el de glibc en lo que reserva bloques grandes
+
+**Estado:** **abierto** — reproducido el 2026-10-16 con los binarios oficiales de la v0.0.10. Es PERF-08 de la etapa 2
+(`interpreter/ROADMAP_V0011_ES.md`): es de empaquetado y se decide en la release. Sin celda: esta máquina no tiene el
+target `x86_64-unknown-linux-musl`, así que nada de la puerta puede construir el estático ni medirlo
+**Encontrado por:** ZyBigBench (PERF-08), que lo midió en otra máquina; aquí no se había reproducido
+**Familia:** [`ZYVM-023`](zyvm.md) y [`GLB-130`](GLOBAL.md): lo que más se dispara es lo que copiaba un texto entero
+
+Los dos binarios de la release v0.0.10 para x86-64, del mismo commit, con su SHA-256 verificado contra
+`SHA256SUMS_x86_64_linux.txt`: `zymbol_lang_v0.0.10_x86_64_linux` (`static-pie linked`, la descarga para «cualquier
+Linux») y el `zymbol` del `.deb` (enlazado con glibc). `zyquality/bench/big/`, VM, tiempo de CPU (sin `perf`):
+
+| operación (`gap.py`) | n | estático | glibc | estático/glibc |
+|---|---:|---:|---:|---:|
+| `str_concat` | 128 000 | 4 578 ms | 263 ms | **17,4** |
+| `str_concat` | 64 000 | 1 207 ms | 40 ms | **30** |
+| `str_slice_small` | 147 456 | 659 ms | 144 ms | **4,6** |
+| `str_interp` | 1 000 000 | 244 ms | 183 ms | 1,33 |
+| `closure_create_call` | 1 000 000 | 255 ms | 200 ms | 1,28 |
+| los 16 programas de `run.py` | — | — | — | 1,005 (media geométrica) |
+
+Pasos y bytes de `--count` son idénticos en los dos: el programa hace lo mismo y cada petición al asignador cuesta
+más. Lo que se dispara es lo que pide y suelta bloques grandes una y otra vez; donde no, no hay diferencia.
+
+### Lo que ya cambió
+
+Las dos operaciones peores eran justo copias de un texto entero, y esta rama ya no las hace: `s = s "x"` amplía su
+búfer (ZYVM-023) y un corte copia sólo el trozo (GLB-130). Cuánto queda de la diferencia en el `HEAD` no se ha
+medido: hace falta construir el estático.
+
+### Lo que hay que decidir
+
+En la release. La recomendación del mapa de ruta: `mimalloc` sólo para el target musl, detrás del asignador que cuenta
+para `--count`.
