@@ -1838,3 +1838,46 @@ contestar `'\0'` como hacía `StrCharAt`.
 
 Caracteres de uno a cuatro bytes, `@>`, `@!`, un texto vacío y un bucle anidado dan la misma salida en los tres
 motores y con `ZYMBOL_POISON_TEMPS=1`.
+
+---
+
+## ZYVM-026 — Un texto cortado donde su tipo no se conoce al compilar: la VM recortaba el rango como antes de D3
+
+**Estado:** **corregido 2026-10-16** — encontrado y corregido el mismo día, al preparar PERF-05 a
+**Encontrado por:** la lectura de las instrucciones de corte para PERF-05 a (`interpreter/ROADMAP_V0011_ES.md`):
+`ArraySlice` tenía su propia rama para un texto, con el `.max(0).min(len)` que `StrSlice` había dejado en D3
+**Familia:** las reglas estrictas de D3 (pasos 4.3 y 4.4) y la revocación de D2 (2026-09-20): un corte que se sale de
+la colección se rechaza, y uno escrito de mayor a menor invierte
+
+```zymbol
+hasta(s, a, b) { <~ s$[a..b] }
+t = "ñandú"
+>> hasta(t, 3, 1) " | " t$[3..1] ¶
+>> hasta(t, 2, 9) ¶
+```
+
+| | `hasta(t, 3, 1)` | `hasta(t, 2, 9)` |
+|---|---|---|
+| `zytw`, `zyjs`, y la VM con `t$[…]` | `nañ` | `##Index(slice indices out of bounds: [2..9] …)` |
+| `zyvm` con un parámetro | vacío | `andú` |
+
+### Causa
+
+El compilador elige la instrucción por el tipo estático: `StrSlice` si sabe que es un texto, `ArraySlice` si no lo
+sabe —un parámetro, el resultado de una llamada—. `ArraySlice` llevaba su propia rama para un texto, escrita «para
+módulos» antes de D3, con el rango recortado a la longitud y sin dirección. Las dos instrucciones contestaban cosas
+distintas al mismo corte.
+
+### Alcance
+
+Toda función que corte el texto que recibe. Un rango bien escrito dentro del texto daba lo mismo, por eso no se
+veía; uno invertido o fuera de rango daba un valor plausible en vez del de los otros dos motores.
+
+### Corrección (2026-10-16)
+
+Una función, `str_slice`, con la regla de `StrSlice`, y las dos instrucciones la llaman.
+
+### Qué lo sujeta
+
+`zyquality/corpus/strings/31_slice_in_a_function.zy`: diez cortes, cada uno escrito por un parámetro y, al lado,
+sobre el texto directamente. Divergía en la VM en todos los que invierten el rango o se salen del texto.
