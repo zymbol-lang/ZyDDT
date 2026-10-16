@@ -1721,3 +1721,57 @@ deuda: la razón contada de `bytes` es exacta. Mientras el hallazgo estuvo abier
 razones contadas: hasta entonces ninguna deuda declarada era de `--count`. Una deuda se da por pagada sólo cuando
 pasan **todas** las lecturas de su motor, porque un defecto al que el conteo es ciego pasa todas las razones
 contadas mientras sigue abierto.
+
+---
+
+## ZYVM-024 — `@ ch:s` recorre la variable, no el texto que tenía al empezar: si el cuerpo reescribe `s`, la VM lee el texto nuevo y, pasado su final, da el carácter 0
+
+**Estado:** **corregido 2026-10-16** — encontrado y corregido el mismo día, antes que PERF-04
+**Encontrado por:** la lectura de `compile_foreach_loop` para el arreglo de PERF-04 (`interpreter/ROADMAP_V0011_ES.md`,
+etapa 2), cuya receta dice «sobre la cadena que había al entrar al bucle»: hoy no es así
+**Familia:** ninguna abierta. Es el aliasing que el camino genérico de ese mismo bucle ya había resuelto para los
+diccionarios («Into a FRESH register, not over `r_coll`»), y que el camino del texto no tiene
+
+```zymbol
+s = "abcd"
+@ ch:s {
+    >> ch
+    s = "zz"
+}
+>> " " s ¶
+```
+
+| | salida |
+|---|---|
+| `zytw`, `zyjs` | `abcd zz` |
+| `zyvm` | `az` + dos caracteres 0 + ` zz` |
+
+Lo mismo con un texto más largo (`aYZ` donde los otros dicen `abc`) y con uno no ASCII (`ñaaaa` por `ñandú`). Un
+arreglo no lo sufre: el bucle tiene su propia referencia.
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_foreach_loop`: cuando el iterable es de tipo estático `String`, el bucle
+cuenta los caracteres una vez (`StrLen`) y en cada vuelta emite `StrCharAt(item, r_coll, idx)`. Si el iterable es
+un nombre, `r_coll` **es** el registro de la variable, así que cada vuelta lee lo que la variable tiene en ese
+momento. Y `StrCharAt` contesta `'\0'` a un índice fuera del texto en vez de fallar, por eso el error no se ve.
+
+### Alcance
+
+Un programa que recorre un texto y lo reescribe dentro del bucle —un analizador que consume su entrada, un
+autómata—. Un texto al que sólo se le añade al final (`u = u ch`) da lo mismo por casualidad: el prefijo no cambia.
+No lo ve ninguna prueba: ningún fichero del corpus reescribía el texto que recorre.
+
+### Qué lo sujeta
+
+`zyquality/corpus/loops/14_foreach_string_snapshot.zy`, con su golden de `zytw`: seis formas —un texto más corto,
+uno más largo, uno que crece al final, uno no ASCII, uno dentro de una función y, para comparar, un arreglo—.
+Divergía en la VM en tres de ellas.
+
+### Corrección (2026-10-16)
+
+El camino del texto copia el iterable a un registro propio del bucle antes de contar sus caracteres, como ya
+hacía el camino genérico. La copia es un incremento del contador de referencias, no del texto. Con
+`ZYMBOL_POISON_TEMPS=1` da el mismo golden.
+
+El `'\0'` de `StrCharAt` deja de alcanzarse, pero sigue ahí: PERF-04 sustituye esa instrucción.
