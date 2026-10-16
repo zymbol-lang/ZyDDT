@@ -1775,3 +1775,66 @@ hacía el camino genérico. La copia es un incremento del contador de referencia
 `ZYMBOL_POISON_TEMPS=1` da el mismo golden.
 
 El `'\0'` de `StrCharAt` deja de alcanzarse, pero sigue ahí: PERF-04 sustituye esa instrucción.
+
+---
+
+## ZYVM-025 — `@ ch:texto` busca cada carácter desde el principio del texto: recorrer un texto es cuadrático en la VM
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con `growth/foreach-over-text` de `zyquality/cost` como deuda antes del arreglo. Es PERF-04 de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`), con la
+recomendación «implementar» que el autor incorporó al plan el 2026-10-14
+**Encontrado por:** ZyBigBench (PERF-04), por curva de crecimiento
+**Familia:** [`ZYVM-024`](zyvm.md), la misma instrucción: aquél era *qué* texto lee cada vuelta, éste *cuánto* le
+cuesta leerlo
+
+```zymbol
+s = ""
+@ _i:1..80000 { s = s "ñ" }
+k = 0
+@ ch:s { ? ch == 'ñ' { k = k + 1 } }
+>> k ¶
+```
+
+Reloj, una corrida, binario de release:
+
+| texto | n → 4n | `zyvm` | `zytw` |
+|---|---|---:|---:|
+| «ñ» | 20 000 → 80 000 | 47 ms → 387 ms | 18 ms → 51 ms |
+| «ñ» | 80 000 → 320 000 | 399 ms → 5 933 ms (**×14,9**) | 51 ms → 118 ms |
+| «x» | 320 000 → 1 280 000 | 1 257 ms → 21 367 ms (**×17**) | 135 ms → 471 ms |
+
+`--count` no lo ve: `steps` crece ×4,00 exacto, porque cada vuelta es **una** instrucción, recorra lo que recorra.
+
+### Causa
+
+`zymbol-vm/src/lib.rs`, `StrCharAt(dst, s, i)`: el bucle de texto pide el carácter `i` en cada vuelta, y la
+instrucción lo busca. Con texto ASCII llama antes a `s.is_ascii()`, que recorre el texto entero (a unos 40 GB/s,
+por eso tarda en notarse); con texto no ASCII, además, a `s.chars().nth(i)`, que lo recorre hasta `i`.
+
+### Alcance
+
+Todo programa que recorra un texto carácter a carácter: un analizador, un contador, un cifrado. Con texto ASCII
+corto no se nota; con un fichero leído entero, sí.
+
+### Qué lo sujeta
+
+`growth/foreach-over-text` en `zyquality/cost/cost.toml`, por reloj y con texto no ASCII, ya sin deuda. Mientras
+estuvo abierto sus razones contadas pasaban y el reloj daba `KNOWN` (×14,87), y el corredor no lo dio por pagado:
+fue la primera prueba de que una deuda se paga sólo cuando pasan todas las lecturas de su motor.
+
+### Corrección (2026-10-16)
+
+`StrCharAt(dst, s, i)` —el carácter `i`— se sustituye por `StrCharNext(dst, s, cursor)`: el carácter que empieza en
+el byte `cursor`, y el cursor avanza tras él. El bucle de texto guarda el cursor en un registro propio junto al
+contador de caracteres, que sigue decidiendo cuándo termina, así que `@>` y `@!` no cambian. Cada vuelta es O(1) y
+no reserva nada; es seguro porque desde [`ZYVM-024`](zyvm.md) el bucle recorre una copia del texto que nada puede
+modificar. Un cursor fuera del texto o en medio de un carácter es un fallo del compilador, y se rechaza en vez de
+contestar `'\0'` como hacía `StrCharAt`.
+
+| texto | n | antes | ahora |
+|---|---:|---:|---:|
+| «ñ» | 320 000 | 5 933 ms | 58 ms |
+| «x» | 1 280 000 | 21 367 ms | 207 ms |
+
+Caracteres de uno a cuatro bytes, `@>`, `@!`, un texto vacío y un bucle anidado dan la misma salida en los tres
+motores y con `ZYMBOL_POISON_TEMPS=1`.
