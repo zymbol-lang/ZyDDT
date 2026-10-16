@@ -1881,3 +1881,27 @@ Una función, `str_slice`, con la regla de `StrSlice`, y las dos instrucciones l
 
 `zyquality/corpus/strings/31_slice_in_a_function.zy`: diez cortes, cada uno escrito por un parámetro y, al lado,
 sobre el texto directamente. Divergía en la VM en todos los que invierten el rango o se salen del texto.
+
+---
+
+## ZYVM-027 — Una recursión en cola dentro de un módulo no era una llamada en cola en la VM
+
+**Estado:** **corregido 2026-10-16** — encontrado al alinear la llamada en cola para [`GLB-133`](GLOBAL.md)
+**Encontrado por:** `C::baja(30000)`, con `baja` recursiva en cola dentro de un módulo: `modulo` en el tree-walker,
+`##Depth` en la VM
+**Familia:** [`GLB-133`](GLOBAL.md), [`ZYTW-017`](zytw.md)
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, la regla que emite `TailCall` en un `Statement::Return`: busca la función llamada sólo
+en `function_index`, y una función de un
+módulo se resuelve por `module_scope`. Dentro de un módulo la búsqueda fallaba y la llamada se compilaba como una
+llamada normal.
+
+### Corrección (2026-10-16)
+
+La misma resolución que `compile_call`: `function_index` primero y `module_scope` después.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/depth_tail_calls.zy`, con su módulo `depth_tail_calls_m.zy`.

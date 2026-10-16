@@ -1013,3 +1013,39 @@ copia el texto entero.
 
 `growth/read-a-text` en `zyquality/cost/cost.toml`, por `--count` (`clock_off`), con
 `open_finding = { zytw = "ZYTW-016" }`. Y `growth/slice-a-text`, que también lo paga en el tree-walker.
+
+---
+
+## ZYTW-017 — Dentro de un `!?`, el tree-walker desactivaba la llamada en cola de todo lo que se llamara desde ahí
+
+**Estado:** **corregido 2026-10-16** — encontrado al alinear la llamada en cola para [`GLB-133`](GLOBAL.md)
+**Encontrado por:** la frontera de 10 000 llamadas: `!? { >> cuenta(30000) ¶ }`, con `cuenta` recursiva en cola, daba
+`##Depth` en el tree-walker y `cuerpo` en la VM
+**Familia:** [`GLB-133`](GLOBAL.md)
+
+```zymbol
+cuenta(n) {
+    ? n == 0 { <~ "cuerpo" }
+    <~ cuenta(n - 1)
+}
+!? { >> cuenta(30000) ¶ } :! { >> "no: " _err ¶ }
+```
+
+### Causa
+
+`try_depth` era un campo del intérprete, no de cada marco. La llamada en cola se desactiva con un `!?` abierto (el
+marco debe su manejador o su `:>`), y con el contador global bastaba un `!?` en **quien llama** para desactivarla en
+toda la cadena de llamadas de debajo, donde ningún manejador está armado. La VM lo decide por función (`try_stack`
+es de cada `FunctionCtx`). Antes del límite no se veía: el tree-walker abortaba hacia los 9 000 niveles por la pila, y
+la VM llegaba al final.
+
+Y al revés, el tree-walker sí tomaba la llamada en cola dentro de un `:!` o un `:>` propio, donde la VM no.
+
+### Corrección (2026-10-16)
+
+`try_depth` se guarda y se pone a 0 en `take_call_state`, y se restaura en `restore_call_state`. Y cuenta también
+durante la cláusula `:!` y el `:>`, no sólo durante el cuerpo, como el `try_stack` de la VM.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/depth_tail_calls.zy`.

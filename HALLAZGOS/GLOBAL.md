@@ -9399,3 +9399,69 @@ Reloj, 16 000 claves: `zyvm` 438 → 14 ms, `zytw` 651 → 28 ms, `zyjs` 2 685 �
 veces la misma columna, y un `json::decode_map` que renombra dos claves al mismo nombre, daban dos entradas y ahora una
 —en el sitio de la primera, con el valor de la última—. No se buscó en todo el espacio de trabajo; el corpus y las
 nueve aplicaciones de la puerta dan la misma salida que antes.
+
+---
+
+## GLB-133 — Una recursión profunda aborta el proceso sin un error de Zymbol, y cada motor a una profundidad distinta
+
+**Estado:** **corregido 2026-10-16** — reproducido, decidido (D7) y corregido ese día. Es PERF-07 de la etapa 2
+(`interpreter/ROADMAP_V0011_ES.md`), y D7 la decidió el autor ese día: el error se captura con `!?`, su familia es
+una nueva, `##Depth`, y el límite es de 10 000 llamadas activas, el mismo número en los tres motores
+**Encontrado por:** ZyBigBench (PERF-07)
+**Familia:** ninguna abierta. El hilo de 64 MiB que `zymbol-cli` creó para el programa (antes eran los 8 MiB del hilo
+principal: 1 099 niveles en el tree-walker, 593 por `$>` en la VM) subió el techo, pero no lo convirtió en un error
+
+```zymbol
+f(n) {
+    ? n == 0 { <~ 0 }
+    <~ 1 + f(n - 1)
+}
+!? { >> f(50000) ¶ } :! { >> "capturado: " _err ¶ }
+>> "sigue" ¶
+```
+
+Dónde muere cada motor, con la pila de 64 MiB:
+
+| | recursión directa | a través de `$>` |
+|---|---|---|
+| `zytw` | entre 8 000 y 10 000 | entre 5 000 y 8 000 |
+| `zyvm` | llega a 1 000 000 | entre 2 000 y 3 000 (unos 23 KB de pila de Rust por reentrada del bucle) |
+| `zyjs` | llega a 100 000; a 1 000 000, sin memoria | igual |
+
+Los dos de Rust terminan con código 134 y «fatal runtime error: stack overflow»; `!?` no lo ve y «sigue» no se
+imprime. La salida ya escrita sí sale. Los tres optimizan la llamada en cola: `<~ f(n - 1)` llega a 200 000.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/depth_limit.zy` —la frontera exacta, `$>`, la llamada en cola y la captura—,
+`depth_uncaught.zy`, sin capturar, y `depth_tail_calls.zy` (con su módulo), que fija qué llamada cuenta. Y la sonda
+`zyquality/docs/llm/126b_depth_limit.zy`, por la frase de `LLM.md` § 12 que cambió.
+
+### La decisión (D7, 2026-10-16)
+
+El autor eligió las tres recomendaciones: el error **se captura** con `!?`, como el `RecursionError` de Python; su
+familia es una **nueva, `##Depth`** —no `##Range`, que en Zymbol es un valor fuera de rango, ni `##_`, que `:!` no
+puede elegir—; y el límite es de **10 000 llamadas activas, el mismo número en los tres motores**, para que un programa
+a una profundidad dada conteste igual en todos. El coste, dicho al decidir: en la VM, la recursión directa que llegaba
+a 1 000 000 se corta en 10 000.
+
+### Corrección (2026-10-16)
+
+- **`zymbol_common::depth`**: el límite, el mensaje («call depth exceeded: more than 10000 calls active at once»), la
+  pila del programa —de 64 a **512 MiB**, reservada y no ocupada— y un seguro que mira cuánta pila queda y lanza el
+  mismo error antes de que se agote por un camino que no pase por una llamada. `errkind` lo clasifica como `Depth`.
+- **`zytw`**: un contador `active_calls` en sus dos entradas de llamada (`eval_lambda_call`,
+  `eval_traditional_function_call`). `call_depth` no servía: no cuenta la lambda que no toma el estado de llamada.
+- **`zyvm`**: la profundidad es `frame_stack.len() - 1`, comprobada en los tres sitios que apilan un marco: `Call`,
+  `CallDynamic` y `call_callable`, el de `$>`, `$|`, `$<` y `$^`.
+- **`zyjs`**: un contador en `callFunc` y una pila de marcos `{función, !? abiertos}` que decide la llamada en cola con la
+  regla de los dos de Rust. Sus llamadas viven en el montón y no necesitan optimizarse; necesitan contar lo mismo.
+- **El hilo del programa** marca su base. `zymbol build` (`zymbol-standalone`) y el REPL, que corrían en el hilo
+  principal de 8 MiB, corren ahora en uno de `PROGRAM_STACK`.
+
+### La llamada en cola tuvo que alinearse antes
+
+Con un número, «qué llamada cuenta» pasó a ser una pregunta con respuesta visible, y los tres motores contestaban
+distinto. La regla que quedó es la de la VM: `<~ f(…)` a la propia función, en cualquier punto del cuerpo, sin un
+`!?` de esa función abierto —cuerpo, `:!` o `:>`—. Dos hallazgos salieron de ahí y se corrigieron con este:
+[`ZYTW-017`](zytw.md) y [`ZYVM-027`](zyvm.md).
