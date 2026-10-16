@@ -9230,3 +9230,60 @@ provocado cuando sale como `Runtime error:`.
 Al hacerlo salió un resto de la etapa 1 de la v0.0.11 en `reach.py`: ejecutaba cada programa con `run` y con
 `run --vm`, y desde que la VM es el motor por defecto los dos eran la VM. Ningún diagnóstico de ejecución del
 tree-walker podía verse provocado allí desde el 2026-10-13. Ahora nombra los dos motores.
+
+---
+
+## GLB-130 — `s$[a..b]` copia el texto entero para cortar un trozo: en la VM y en el tree-walker
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con `growth/slice-a-text` de `zyquality/cost` como deuda antes del arreglo. Es PERF-05 a de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`), con la
+recomendación «implementar» que el autor incorporó al plan el 2026-10-14
+**Encontrado por:** ZyBigBench (PERF-05), y `--count` en `zyquality/bench/big/` el 2026-10-14: un corte de 10
+caracteres sobre 73 728 pedía 516 KB al asignador en la VM y 590 KB en el tree-walker
+**Familia:** [`ZYVM-025`](zyvm.md) — buscar por posición en un texto; aquí, además, copiándolo. La otra mitad de
+PERF-05 —contar los caracteres de un texto en cada `s$#`, `s[i]` o corte— es PERF-05 b, aplazada por D8, y no se archiva
+aquí
+
+```zymbol
+s = ""
+@ _i:1..8000 { s = s "ñ" }
+corta(x, i) { <~ x$[i..i] }
+k = 0
+@ i:1..8000 { k = k + (s$[i..i])$# + (s$[i:1])$# + corta(s, i)$# }
+>> k ¶
+```
+
+`zymbol run --count`, `bytes`, de 2 000 a 8 000:
+
+| | 2 000 | 8 000 | razón |
+|---|---:|---:|---:|
+| `zyvm` | 74 MB | 1 155 MB | 15,5 |
+| `zytw` | 105 MB | 1 666 MB | 15,9 |
+
+### Causa
+
+Las tres instrucciones que cortan un texto en la VM (`StrSlice`, `StrSliceCount`, y `ArraySlice` cuando el tipo no
+se conoce) y el corte del tree-walker (`eval_collection_slice`) hacen `s.chars().collect::<Vec<char>>()` —4 bytes
+por carácter— y cortan el vector.
+
+### Qué lo sujeta
+
+`growth/slice-a-text` en `zyquality/cost/cost.toml`, sólo por `--count` (`clock_off`): el reloj sigue cuadrático por
+PERF-05 b aunque el corte deje de copiar. Para eso se añadió `clock_off` al corredor de `cost/`, con su razón impresa
+en cada corrida. En el tree-walker el caso sigue `KNOWN` por [`ZYTW-016`](zytw.md): leer `s` lo copia, haya corte o no.
+
+### Corrección (2026-10-16)
+
+`zymbol_common::text`: `char_len` y `char_range`, que localizan un trozo por posición de carácter y lo **prestan**
+—sin copiar el texto, y por bytes directamente si es ASCII—. Los usan las tres instrucciones de corte de la VM (por
+`str_slice` y `str_slice_count`) y el corte del tree-walker, y también los dos `s[i]` del tree-walker, que copiaban el
+texto para leer un carácter. `bytes` de 2 000 a 8 000:
+
+| | antes | ahora |
+|---|---:|---:|
+| `zyvm` | 74 MB → 1 155 MB | 2,33 MB → 2,66 MB |
+| `zytw` | 105 MB → 1 666 MB | 32 MB → 514 MB (ZYTW-016) |
+
+Los demás `chars().collect()` de los dos motores se revisaron: son ediciones que construyen un texto del mismo tamaño
+(quitar, insertar, escribir en una posición), búsquedas que recorren el texto de todos modos, y la interpolación. Ahí
+copiar a `Vec<char>` cuesta una constante, no una curva, y se quedan.

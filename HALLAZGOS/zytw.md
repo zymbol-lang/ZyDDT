@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Ninguno abierto.** `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Uno abierto, `ZYTW-016`**, deuda declarada el 2026-10-16. `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -980,3 +980,36 @@ nombre y habría obligado a todo callback llamado por su efecto a terminar en `<
 Cuatro celdas en `axes/runtime-functions-hof.toml` (`block-lambda-called-for-its-effect`,
 `…-without-return-is-unit`, `…-returns-on-one-path`, `…-as-a-callback`) y
 `zyquality/corpus/lambdas/15_block_without_return.zy` con su golden.
+
+---
+
+## ZYTW-016 — Leer una variable de texto la copia: el texto del tree-walker no tiene `Rc`
+
+**Estado:** **abierto** — deuda declarada el 2026-10-16, sin corregir: el mapa de ruta de la v0.0.11
+(`interpreter/ROADMAP_V0011_ES.md`, etapa 2, PERF-05 b) dice que se archiva con su caso `KNOWN`, y el rendimiento del
+tree-walker no es prioridad salvo donde comparte el defecto con la VM. Sujeto por `growth/read-a-text` de
+`zyquality/cost` (`open_finding`)
+**Encontrado por:** el control de GLB-130: el mismo bucle sin cortes, sólo con `s$#`, era igual de cuadrático en el
+tree-walker
+**Familia:** `HLZ-012` y `HLZ-014`, que dieron un `Rc` a `Array`, `Tuple` y `NamedTuple` en el tree-walker y dejaron
+fuera el texto
+
+```zymbol
+s = ""
+@ _i:1..8000 { s = s "ñ" }
+k = 0
+@ _i:1..8000 { k = k + s$# }
+>> k ¶
+```
+
+`bytes` de 2 000 a 8 000: `zytw` 8,1 MB → 128 MB (×15,9); `zyvm` 2,29 MB → 2,58 MB.
+
+### Causa
+
+`Value::String(String)`: leer la variable clona el `String`. Cada `s$#`, cada corte, cada argumento de una llamada
+copia el texto entero.
+
+### Qué lo sujeta
+
+`growth/read-a-text` en `zyquality/cost/cost.toml`, por `--count` (`clock_off`), con
+`open_finding = { zytw = "ZYTW-016" }`. Y `growth/slice-a-text`, que también lo paga en el tree-walker.
