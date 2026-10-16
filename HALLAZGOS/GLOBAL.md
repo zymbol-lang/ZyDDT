@@ -9287,3 +9287,47 @@ texto para leer un carácter. `bytes` de 2 000 a 8 000:
 Los demás `chars().collect()` de los dos motores se revisaron: son ediciones que construyen un texto del mismo tamaño
 (quitar, insertar, escribir en una posición), búsquedas que recorren el texto de todos modos, y la interpolación. Ahí
 copiar a `Vec<char>` cuesta una constante, no una curva, y se quedan.
+
+---
+
+## GLB-131 — `#(a: 1, a: 2)`: un literal de diccionario con una clave repetida se aceptaba, y guardaba las dos
+
+**Estado:** **corregido 2026-10-16** — decidido por el autor ese día: una clave repetida en un literal se rechaza
+**Encontrado por:** el diseño de PERF-03 (`interpreter/ROADMAP_V0011_ES.md`, etapa 2): un diccionario indexado por
+clave no puede guardar dos veces la misma, y había que saber qué hacía el lenguaje con ella
+**Familia:** la revocación de D2 (2026-09-20): las colecciones son estrictas. Clase 1 de este fichero —los tres
+motores coincidían—: ningún diferencial podía verlo
+
+```zymbol
+x = #(a: 1, a: 2)
+>> x["a"] " " x$# ¶
+x["a"]$~ 5
+>> x ¶
+@ k:x { >> k " " }
+```
+
+Los tres motores daban `1 2`, `#(a: 5, a: 2)` y `a a`: la lectura y la escritura iban a la primera, `$#` contaba dos y
+el recorrido pasaba dos veces por la clave. `check` no avisaba. Y el diseño ya lo prohibía: `zymbol-design/COLLECTIONS.md`
+§ 5 dice *«Keys are unique»*. Los tres motores incumplían el documento, no un hueco de él.
+
+Control: escribir con `$~` una clave que el diccionario ya tiene la modifica y no la repite. La repetición sólo podía
+entrar por un literal.
+
+### La decisión
+
+Que las claves sean únicas lo decía el diseño; qué hacer con un literal que repite una, no. Tres salidas:
+rechazarla, que gane la última (Python, JavaScript), o que gane la primera (lo que ya devolvía una lectura). El autor
+eligió **rechazarla**: una clave escrita dos veces en un literal es casi siempre un error de
+escritura, y las dos otras la harían desaparecer en silencio.
+
+### Corrección (2026-10-16)
+
+Las claves de un literal son estáticas —un nombre o un texto sin interpolar—, así que se rechaza al **analizar** el
+programa, en los dos parsers (`zymbol-parser`, que comparten `zytw` y `zyvm`, y el de `zymbol.js`), con el mismo
+texto: «key 'a' appears twice in the dictionary». `check` lo dice y ningún motor ejecuta nada. Ninguno de los 3 580
+ficheros `.zy` del espacio de trabajo —corpus, ejemplos, aplicaciones, curso, celdas de ZyDDT— escribía una clave dos
+veces.
+
+### Qué lo sujeta
+
+`zyquality/reject/collections/18_clave_repetida.zy`: los tres motores lo rechazan.
