@@ -3505,3 +3505,37 @@ Una evaluación, usada por las seis comparaciones.
 ### Qué lo sujeta
 
 `zyquality/corpus/match/patrones_anidados_y_comparacion.zy`.
+
+---
+
+## ZYJS-066 — Un `:!` dentro de otro `:!`: zyjs creaba un segundo `_err`, y el de fuera volvía a leer su propio error
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 3 de la etapa 1 de la v0.0.11 (flujo de
+errores)
+**Encontrado por:** un `!?` dentro de un `:!`, y `_err` leído después en el `:!` de fuera
+**Familia:** MEM-7 (`zymbol-design/PREMISES.md`): dentro de un entorno fuerte un nombre designa una cosa, y un bloque
+no puede tener una segunda con el mismo nombre. Es la regla con la que nace el `m` de `##Kind(m) =>`
+
+```zymbol
+!? { y = [1][3] } :! {
+    !? { z = 1 / 0 } :! { >> "in:" _err " " }
+    >> "out:" _err ¶
+}
+```
+
+`zytw` y `zyvm`: `in:##Div(…) out:##Div(…)` — el `_err` es uno, y el `:!` de dentro lo asignó. `zyjs`:
+`out:##Index(…)` — el de dentro era otro.
+
+### Causa
+
+`zymbol.js`, `execTryCatch`: cada `:!` hacía `catchEnv.def('_err', …)`, un `_err` nuevo que tapaba al visible. La
+asignación normal no servía para corregirlo: en zyjs un nombre con `_` no se asigna ni se lee a través de un padre.
+
+### Corrección (2026-10-16)
+
+La cláusula define el suyo, para leerlo dentro, y además asigna el `_err` visible del mismo entorno fuerte, buscado
+a mano subiendo hasta la frontera de la función.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/catchable/err_anidado.zy`.
