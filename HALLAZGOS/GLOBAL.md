@@ -9502,3 +9502,47 @@ medido: hace falta construir el estático.
 
 En la release. La recomendación del mapa de ruta: `mimalloc` sólo para el target musl, detrás del asignador que cuenta
 para `--count`.
+
+---
+
+## GLB-135 — `@ s() { … }`: la condición de un bucle se evaluaba una vez de más en los dos motores de Rust
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 1 de la etapa 1 de la v0.0.11 (bucles y
+variables calientes) y corregido el mismo día
+**Encontrado por:** una condición con efecto (`eco(x)` imprime y devuelve), el método de la sonda de operando con
+efecto
+**Familia:** la regla de `@ <expr>` (un `Int` es una cuenta, un `Bool` una condición), que obliga a leer el valor
+antes de saber qué bucle es
+
+```zymbol
+s() {
+    >> "?"
+    <~ #1
+}
+c = 0
+@ s() && c < 2 { c = c + 1 }
+```
+
+| condición | comprobaciones | `zytw` | `zyvm` | `zyjs` |
+|---|---:|---:|---:|---:|
+| `eco(k) < 2` | 3 | 4 | 3 | 3 |
+| `s() && c < 2` | 3 | 4 | 4 | 3 |
+| `c < 2 && s()` | 2 | 3 | 3 | 2 |
+| `s()` con `@!` en la segunda vuelta | 2 | 3 | 3 | 2 |
+
+### Causa
+
+Para saber si `@ <expr>` es una cuenta o una condición hay que leer el valor. El tree-walker
+(`loops.rs`, `run_loop`) lo leía para decidir y, si era `Bool`, entraba en un bucle que volvía a evaluar la condición
+antes de la primera vuelta; lo hacía con cualquier condición, también con una comparación. La VM sólo pasa por ahí
+cuando el tipo no se conoce al compilar (`compile_adaptive_loop`): con una comparación lo sabe, con una llamada no.
+
+### Corrección (2026-10-16)
+
+En los dos, el valor leído para decidir es la primera comprobación, y la condición se vuelve a evaluar después de
+cada vuelta. En la VM, `r_i` —que ya contaba las vueltas— dice cuál es la primera.
+
+### Qué lo sujeta
+
+`zyquality/corpus/loops/15_while_condition_once.zy`: las cuatro formas de arriba, `@>`, una condición falsa desde el
+principio y una cuenta.
