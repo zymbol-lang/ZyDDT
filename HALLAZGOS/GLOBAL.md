@@ -9546,3 +9546,118 @@ cada vuelta. En la VM, `r_i` —que ya contaba las vueltas— dice cuál es la p
 
 `zyquality/corpus/loops/15_while_condition_once.zy`: las cuatro formas de arriba, `@>`, una condición falsa desde el
 principio y una cuenta.
+
+---
+
+## GLB-136 — Un entero negativo en base: complemento a dos de 64 bits en Rust, el signo dentro del relleno en zyjs
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 4 de la etapa 1 de la v0.0.11 (cadenas y
+formato), y decidido por el autor ese día: el signo delante
+**Encontrado por:** `0x|(0 - 1)|` en la sonda de cadenas
+**Familia:** el modelo de enteros (`zymbol_common::num`): ±(2⁵³ − 1), no un `i64`
+
+```zymbol
+>> 0x|255| " " 0x|(0 - 255)| " " 0d|(0 - 1)| " " 0b|(0 - 5)| ¶
+```
+
+| | antes | ahora |
+|---|---|---|
+| `zytw`, `zyvm` | `0x00FF 0xFFFFFFFFFFFFFF01 0d-001 0b111…1011` | `0x00FF -0x00FF -0d0001 -0b101` |
+| `zyjs` | `0x00FF 0x0-FF 0d00-1 0b-101` | igual que los de Rust |
+
+Los de Rust formateaban el `i64` de la implementación: un ancho que el modelo no tiene, y un valor que no se puede
+leer sin conocerlo. `zyjs` ponía el signo dentro del relleno. Con positivos los tres coincidían: `0x` y `0d` rellenan a
+cuatro dígitos y `0b` y `0o` no.
+
+### La decisión
+
+Tres salidas: el signo delante y los dígitos del valor absoluto (lo que hace Python: `hex(-255)` es `'-0xff'`),
+rechazarlo con `##Range`, o el complemento a dos. El autor eligió **el signo delante**. Ningún programa del espacio
+de trabajo formateaba un negativo en base: los cinco ficheros que usan el formato le pasan caracteres o enteros
+positivos.
+
+### Corrección (2026-10-16)
+
+`zymbol_common::num::base_string`, que usan el tree-walker y la VM, y la misma regla en `zymbol.js`. `GUIDE.md`
+§ 18 lo dice con un ejemplo.
+
+### Qué lo sujeta
+
+`zyquality/corpus/arithmetic/09_base_negative.zy`.
+
+---
+
+## GLB-137 — Tras un `>>` sin `¶`, una línea que empieza por una edición se imprime y no se hace, y `check` callaba
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 1 de la etapa 1 de la v0.0.11, y decidido
+por el autor ese día: un aviso en `check`, en los tres motores
+**Encontrado por:** la propia sonda: `>> c` y en la línea siguiente `d["z"]$~ 2`, que nunca editó `d`
+**Familia:** la regla del resultado (`zymbol-design/COLLECTIONS.md` § 1): un `$` cuyo resultado se usa construye. Los
+tres motores coincidían; es la clase 1 de este fichero
+
+```zymbol
+d = #(x: 1)
+>> "a"
+d["z"]$~ 2
+>> ¶
+>> d ¶
+```
+
+Los tres: `a#(x: 1, z: 2)` y después `#(x: 1)`. Un salto de línea no termina `>>` —termina en `¶`, `\\`, `}`, `;`,
+otro `>>`, una palabra de sentencia o una asignación—, así que la edición era un elemento más de la salida: imprimió
+lo que construiría y `d` no cambió. Una asignación en esa línea (`n = 7`) sí empieza una sentencia.
+
+### La decisión
+
+Repartir una salida en varias líneas es una forma usada: 181 veces en 1 261 ficheros del espacio de trabajo. Una línea
+que empieza por una edición sólo aparecía en la sonda. Tres salidas: un aviso en `check`, que una edición al principio
+de línea empiece siempre una sentencia, o dejarlo y documentarlo. El autor eligió **el aviso**, que no cambia ningún
+programa.
+
+### Corrección (2026-10-16)
+
+`zymbol-semantic` (`type_check.rs`, `Statement::Output`) y el comprobador de `zymbol.js` avisan con el mismo texto
+cuando un elemento de `>>` que empieza en una línea posterior a la del anterior es una edición (`$~`, `$+`, `$+[i]`,
+`$-`, `$--`, `$-[…]`, `$++`, `$^`, `$^+`, `$^-`): *this line continues the `>>` above: an edit here is printed, not
+made — end the output with ¶ to make it a statement*. `GUIDE.md` lo cuenta como trampa, junto a la del signo.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/semantic/salida_continua_con_edicion.zy`, un golden de `check`.
+
+---
+
+## GLB-138 — El formateador no era idempotente con un `??` dentro de una expresión, y P3 no normalizaba la línea de un error de ejecución
+
+**Estado:** **corregido 2026-10-16** — encontrado por la puerta al meter en el corpus los ficheros del sondeo de cinco
+zonas
+**Encontrado por:** la suite `fmt` (`zyquality/fmt/fmt_property.sh`), con P2 sobre `match/patrones_anidados_y_comparacion.zy`
+y `sondeo_v0011/zona2_patrones.zy`, y P3 sobre tres ficheros más
+**Familia:** `zymbol-design/FORMATTER_RULES.md`; [`GLB-137`](GLOBAL.md), que explica una de las tres P3
+
+```zymbol
+r = (?? 1 { 1 => "a" _ => "b" })
+```
+
+La primera pasada pone los brazos en líneas propias; la segunda metía una línea en blanco después de `{`.
+`fmt(fmt(x)) ≠ fmt(x)`.
+
+### Causa
+
+`zymbol-formatter`, `format_match`: la línea en blanco entre brazos se decide comparando con `last_src_line`, y un `??`
+no la ponía en la línea de su `{` —un bloque sí (`format_block`)—. Dentro de una expresión seguía valiendo el final de
+la sentencia anterior, y el primer brazo, una línea por debajo de su sentencia, parecía precedido de un hueco.
+
+Las P3 eran del arnés: `normalize_spans` sólo normalizaba `:línea:columna`, y un error de ejecución dice
+`--> fichero:línea`; y P3 comparaba los avisos del análisis, que hablan de la disposición del texto, que es justo lo
+que el formateador cambia —al unir una salida continuada en una línea, el aviso de GLB-137 desaparece y el programa
+hace lo mismo—.
+
+### Corrección (2026-10-16)
+
+`format_match` mide los brazos desde la línea del `{`, como un bloque. El arnés normaliza también `--> fichero:línea`
+y deja fuera de P3 los bloques `warning:`. Ningún fichero más pasó a saltarse: 48 antes y después.
+
+### Qué lo sujeta
+
+La propia suite `fmt`, sobre los dos ficheros que lo encontraron.
