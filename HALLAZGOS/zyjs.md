@@ -3432,3 +3432,34 @@ patrón crearía aquello con lo que compara. zyjs lo leía como una expresión.
 
 `refusal/hot-name-as-a-match-pattern`.
 
+
+---
+
+## ZYJS-063 — `()` es un valor en zyjs: `<~ ()` corría en el navegador y en ningún otro motor
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 1 de la etapa 1 de la v0.0.11, al escribir
+`<~ ()` en una sonda
+**Encontrado por:** la sonda de bucles: los dos parsers de Rust la rechazaron y zyjs siguió
+**Familia:** la notación de las colecciones de la v0.0.9 (`zymbol-design/COLLECTIONS.md`): no hay tupla vacía, el
+diccionario vacío es `#()` y la ausencia de valor es `##_`
+
+```zymbol
+f() { <~ () }
+>> "[" f() "]" ¶
+```
+
+`zytw` y `zyvm`: `error: expected expression, found ')'`. `zyjs`: `[]`. `REFERENCE.md` y `GUIDE.md` lo dicen
+expresamente: `()` no parsea, «there is no empty tuple in Zymbol».
+
+### Causa
+
+`zymbol.js`, el paréntesis en `parsePrimary`: `()` devolvía `{ type: 'Literal', kind: 'unit' }`.
+
+### Corrección (2026-10-16)
+
+Lo rechaza con el texto de los parsers de Rust. Ningún ejemplo del playground lo usaba: las suites de `web` y el
+consenso de los ejemplos siguen en verde.
+
+### Qué lo sujeta
+
+`zyquality/reject/collections/19_parentesis_vacios.zy`.
