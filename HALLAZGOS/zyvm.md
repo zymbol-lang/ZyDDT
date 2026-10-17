@@ -1905,3 +1905,43 @@ La misma resolución que `compile_call`: `function_index` primero y `module_scop
 ### Qué lo sujeta
 
 `zyquality/corpus/errors/runtime/depth_tail_calls.zy`, con su módulo `depth_tail_calls_m.zy`.
+
+---
+
+## ZYVM-028 — `s$#`, `s[i]` y un corte recorrían el texto entero cada vez: cuadráticos dentro de un bucle
+
+**Estado:** **corregido 2026-10-17** — es PERF-05 b de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`), que D8 había
+aplazado y el autor metió en la etapa el 2026-10-17, con Python como oráculo: «debemos acercarnos porque no es una
+competencia, es una validación»
+**Encontrado por:** ZyBigBench (PERF-05), y `gap.py` en instrucciones el 2026-10-17: `str_len` a ×31 de Python a n y
+×61 a 2n; `str_slice_small` a ×42 y ×85 — la distancia crecía
+**Familia:** [`GLB-130`](GLOBAL.md), que quitó la copia del corte y dejó el recorrido; [`ZYTW-016`](zytw.md), la mitad
+del tree-walker, que sigue abierta
+
+### Causa
+
+Una posición de Zymbol cuenta caracteres y un `str` se direcciona por bytes. `s$#` contaba los caracteres en cada
+llamada (`is_ascii()` y, si no, `chars().count()`), `s[i]` contaba y luego avanzaba hasta `i`, y un corte contaba para
+validar los límites y recorría hasta ellos.
+
+### Corrección (2026-10-17)
+
+El texto del montón de un `ZyStr` guarda su número de caracteres, calculado la primera vez que alguien lo pide
+(`char_len`). Un texto cuyo número de caracteres es su longitud es ASCII, y entonces una posición es un byte:
+`s[i]` y un corte no recorren nada. El valor detrás de un `Rc` compartido no cambia nunca —escribir en el sitio saca el
+`String` de su único dueño y crea un texto nuevo, con el recuento sin calcular—, así que el recuento no puede quedarse
+viejo. `ZyStr` sigue ocupando 8 bytes.
+
+Instrucciones (`perf`, mediana de 7), VM, frente a Python:
+
+| operación | antes, n → 2n | ahora, n → 2n |
+|---|---|---|
+| `str_len` (`m = s$#`, 20 000 veces) | ×31 → ×61 | ×1,2 → ×1,2 |
+| `str_slice_small` (2 000 cortes) | ×42 → ×85 | ×2,1 → ×2,1 |
+
+Un texto no ASCII sigue recorriéndose hasta la posición en `s[i]` y en un corte; `s$#` ya no.
+
+### Qué lo sujeta
+
+`zyquality/corpus/strings/32_char_count_kept.zy` —un texto que crece en el sitio leído entre añadidos, un alias que
+lo comparte, ASCII y no ASCII— y la prueba `char_len_is_counted_once_and_stays_true` de `zy_str.rs`.
