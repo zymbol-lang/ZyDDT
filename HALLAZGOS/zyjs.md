@@ -3463,3 +3463,45 @@ consenso de los ejemplos siguen en verde.
 ### Qué lo sujeta
 
 `zyquality/reject/collections/19_parentesis_vacios.zy`.
+
+---
+
+## ZYJS-064 — Un `_` dentro de una lista de patrones anidada: zyjs abortaba con «'_' is undefined»
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 2 de la etapa 1 de la v0.0.11 (`??`)
+**Encontrado por:** `?? #[1, [2, 3]] { [1, [2, _]] => … }`, que los dos de Rust casan
+**Familia:** [`ZYJS-065`](zyjs.md), la misma sonda
+
+### Causa
+
+`zymbol.js`, el análisis de una lista de patrones: un elemento que abría `[` se analizaba como una expresión —un
+arreglo literal— y su `_` se evaluaba como una variable al casar.
+
+### Corrección (2026-10-16)
+
+`parseListPattern`, que se llama a sí mismo cuando un elemento abre `[`; `matchPattern` casa el elemento anidado como
+un patrón, con la misma doble lectura que arriba (estructura sobre un arreglo, pertenencia sobre un escalar).
+
+### Qué lo sujeta
+
+`zyquality/corpus/match/patrones_anidados_y_comparacion.zy`.
+
+---
+
+## ZYJS-065 — El operando de un patrón `==` o `<>` se evaluaba dos veces en zyjs
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 2 de la etapa 1 de la v0.0.11
+**Encontrado por:** `== eco(1) || == eco(7)`, con `eco` que imprime: `<1><1><7><7>` en zyjs, `<1><7>` en Rust
+**Familia:** [`ZYJS-064`](zyjs.md)
+
+### Causa
+
+`matchPattern`, `case 'comparison'`: evaluaba el operando al principio y, para `==` y `<>`, otra vez.
+
+### Corrección (2026-10-16)
+
+Una evaluación, usada por las seis comparaciones.
+
+### Qué lo sujeta
+
+`zyquality/corpus/match/patrones_anidados_y_comparacion.zy`.
