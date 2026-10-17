@@ -1974,3 +1974,35 @@ cada vuelta eran nueve despachos (la dirección se preguntaba dos veces en cada 
 
 `zyquality/corpus/loops/16_range_ends_at_max_int.zy`: hacia arriba, hacia abajo, y con un paso que salta el límite en
 los dos sentidos.
+
+---
+
+## ZYVM-030 — Un parámetro que nada lee no tenía registro: la llamada escribía fuera del marco
+
+**Estado:** **corregido 2026-10-17** — encontrado al quitar los `LoadUnit` que preceden a un `Return`, en la etapa 2
+de la v0.0.11; está en la v0.0.10 publicada
+**Encontrado por:** `f(a, b, c) { <~ a }`, en una build de depuración de la VM: `unsafe precondition(s) violated:
+slice::get_unchecked_mut requires that the index is within the slice`, y el proceso aborta. La build de release
+contestaba bien, por suerte
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `eliminate_dead_code`: cuando quita instrucciones inalcanzables, vuelve a contar los
+registros del trozo con las que quedan, y un parámetro que ninguna instrucción lee no está en ninguna. `f` quedaba
+con un registro para tres parámetros. `Call`, `CallDynamic` y `TailCall` escriben cada argumento en el marco con
+`get_unchecked_mut` / `ptr::write`, sin comprobar límites, así que `b` y `c` iban más allá del final del `Vec`:
+dentro de su capacidad casi siempre, pisando memoria que nadie usaba; fuera de ella, el montón. En la v0.0.10 la
+escritura era una asignación, que además soltaba lo que hubiese allí.
+
+Hacía falta código inalcanzable para que el recuento corriese —el `LoadUnit` + `Return` implícito tras un `<~`
+final lo es siempre— y un parámetro sin leer, que sólo provoca un aviso.
+
+### Corrección (2026-10-17)
+
+Un trozo nunca tiene menos registros que parámetros.
+
+### Qué lo sujeta
+
+La prueba `a_frame_holds_every_parameter_even_one_nothing_reads` de `zymbol-compiler/tests/compile_smoke.rs`, que
+falla sin la corrección (`f: 1 registers for 3 parameters`), y `zyquality/corpus/functions/parametro_sin_leer.zy`, el
+programa, que sólo una build de depuración ve fallar.
