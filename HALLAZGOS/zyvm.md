@@ -1945,3 +1945,32 @@ Un texto no ASCII sigue recorriéndose hasta la posición en `s[i]` y en un cort
 
 `zyquality/corpus/strings/32_char_count_kept.zy` —un texto que crece en el sitio leído entre añadidos, un alias que
 lo comparte, ASCII y no ASCII— y la prueba `char_len_is_counted_once_and_stays_true` de `zy_str.rs`.
+
+---
+
+## ZYVM-029 — Un bucle contado que acaba en el entero más grande abortaba en la VM al salir
+
+**Estado:** **corregido 2026-10-17** — encontrado al fundir el control del bucle contado en una instrucción, en la
+etapa 2 de la v0.0.11
+**Encontrado por:** `@ i:9007199254740989..9007199254740991 { … }`: el tree-walker y zymbol.js corren las tres vueltas y
+siguen; la VM corre las tres y para con `integer overflow: 9007199254740991 + 1`
+**Familia:** [`GLB-135`](GLOBAL.md), el otro defecto del control de un bucle `@` encontrado en la v0.0.11
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_range_loop`: al final de cada vuelta el contador oculto avanzaba con `AddInt`
+(o `SubInt`) y la comparación con el límite venía después, en la cabecera. `AddInt` comprueba el entero seguro, así
+que el paso que iba a sacar el contador del rango desbordaba antes de que nadie mirase el límite. Con un paso mayor
+que 1 bastaba con que el último valor estuviese a menos de un paso del máximo.
+
+### Corrección (2026-10-17)
+
+Una instrucción nueva, `RangeStep`, hace el final de la vuelta entero: calcula el siguiente valor en `i64` —los dos
+operandos caben en ±(2^53−1), la suma no sale de un `i64`—, lo compara con el límite y sólo lo guarda si vuelve al
+cuerpo. Fuera del rango no escribe nada, así que no hay nada que desbordar. Es también lo que pesaba: el control de
+cada vuelta eran nueve despachos (la dirección se preguntaba dos veces en cada una) y ahora son dos.
+
+### Qué lo sujeta
+
+`zyquality/corpus/loops/16_range_ends_at_max_int.zy`: hacia arriba, hacia abajo, y con un paso que salta el límite en
+los dos sentidos.
