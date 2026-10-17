@@ -3539,3 +3539,26 @@ a mano subiendo hasta la frontera de la función.
 ### Qué lo sujeta
 
 `zyquality/corpus/errors/catchable/err_anidado.zy`.
+
+---
+
+## ZYJS-067 — `$>` sobre un texto: zyjs pegaba los resultados en un texto aunque no fuesen caracteres
+
+**Estado:** **corregido 2026-10-17** — encontrado al escribir la sonda de `$>`, `$|` y `$<` sin reentrada en la VM, en
+la etapa 2 de la v0.0.11
+**Encontrado por:** `"abc" $> (c -> ##!c)`: `zytw` y `zyvm` dan `[97, 98, 99]`, un array; `zyjs`, `979899`, un texto
+
+### Causa
+
+`zymbol.js`, `evalCollectionOp`, `fromStr`: lo que sale de recorrer un texto se reconstruía siempre como texto,
+pegando la representación de cada resultado. Los dos motores de Rust (`hof_rebuild`) reconstruyen un texto sólo si
+todos los resultados son caracteres o textos; si no, la lambda ha dejado el texto atrás y la respuesta es un array.
+Ningún fichero del corpus pasaba por ahí con resultados que no fuesen caracteres.
+
+### Corrección (2026-10-17)
+
+La regla de Rust: texto si todos son `char` o `str`, array si no.
+
+### Qué lo sujeta
+
+`zyquality/corpus/strings/33_map_over_text_shape.zy`: números, caracteres, textos, una mezcla, `$|` y `$<`.
