@@ -9453,7 +9453,9 @@ a 1 000 000 se corta en 10 000.
 - **`zytw`**: un contador `active_calls` en sus dos entradas de llamada (`eval_lambda_call`,
   `eval_traditional_function_call`). `call_depth` no servía: no cuenta la lambda que no toma el estado de llamada.
 - **`zyvm`**: la profundidad es `frame_stack.len() - 1`, comprobada en los tres sitios que apilan un marco: `Call`,
-  `CallDynamic` y `call_callable`, el de `$>`, `$|`, `$<` y `$^`.
+  `CallDynamic` y `call_callable`, el de `$>`, `$|`, `$<` y `$^`. El seguro de pila sólo en `call_callable`, la única
+  que recurre en Rust: en las otras dos leía la pila del hilo en cada llamada y encarecía un ~8 % un bucle de llamadas
+  pequeñas (medido el 2026-10-17; se quitó ese día).
 - **`zyjs`**: un contador en `callFunc` y una pila de marcos `{función, !? abiertos}` que decide la llamada en cola con la
   regla de los dos de Rust. Sus llamadas viven en el montón y no necesitan optimizarse; necesitan contar lo mismo.
 - **El hilo del programa** marca su base. `zymbol build` (`zymbol-standalone`) y el REPL, que corrían en el hilo
