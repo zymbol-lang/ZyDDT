@@ -14,7 +14,7 @@
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
 | [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
 
-**Uno abierto:** `ZYVM-022`, que no está en la tabla. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
+**Ninguno abierto.** `ZYVM-022`, que no está en la tabla, se corrigió el 2026-10-19. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
 Las chinchetas que los sujetan:
 
@@ -1563,10 +1563,10 @@ asignación antes de la lectura.
 
 ## ZYVM-022 — Lo que devuelve una llamada y se usa una vez sobrevive en su registro temporal: la VM tiene dos arrays donde el tree-walker tiene uno
 
-**Estado:** **abierto** — deuda conocida desde la v0.0.8 («VM expression temporaries», `IMPL_V008.md` § B.1), pasada
-al ROADMAP el 2026-08-31 y nunca archivada: ni ficha ni celda, y con la fecha límite que se puso a sí misma pasada
-tres veces. Medida de nuevo el 2026-10-11, tras ZYVM-010, y sigue en pie. Sujeta por el caso
-`autofree/call-result` de `zyquality/cost` (`open_finding`). **Sin decidir**: es del autor si se corrige
+**Estado:** **corregido 2026-10-19** — deuda conocida desde la v0.0.8 («VM expression temporaries», `IMPL_V008.md`
+§ B.1), archivada el 2026-10-11 y corregida por decisión del autor (grupo 3 del plan de cierre,
+`interpreter/ROADMAP_V0011_ES.md`: la opción de liberar sólo lo que puede ser una colección, medida antes, y deuda si
+costaba más de un 2 % de pasos). Sujeta por `autofree/call-result` de `zyquality/cost`, que pasa
 **Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 3.2: el ROADMAP pedía re-medir la deuda de auto-free
 antes de reescribirla y esa medición no tenía dónde vivir
 **Familia:** [`ZYVM-010`](zyvm.md) (el marco de llamada: reutiliza los temporales por sentencia, y esa reutilización es
@@ -1630,11 +1630,29 @@ tomado:
 - **Liberar en la última lectura** (la receta de `IMPL_V008.md` § B.1): la instrucción que consume el temporal por
   última vez lo toma en vez de copiarlo. Es el cambio de asignador de registros que la v0.0.8 describía.
 
+### Corrección (2026-10-19)
+
+La salida elegida, medida en tres pasos con `--count` sobre los 16 programas de `zyquality/bench/big/` contra el mismo
+`HEAD` sin el cambio:
+
+| variante | pasos, media geométrica | el peor | `autofree/call-result` |
+|---|---:|---:|---:|
+| limpiar al acabar la sentencia todo temporal de tipo desconocido | +18,7 % | `loop_mod` +62,5 % | 68 → 39 MiB |
+| sólo los que recibieron el resultado de una llamada | +0,45 % | `match_loop` +6,4 % | 68 → 39 MiB |
+| …salvo si una instrucción aritmética los leyó después | **+0,05 %** | `nqueens` +0,8 % | 68 → 39 MiB |
+
+La primera era la opción tal como se escribió y quedaba lejos del 2 %: casi todo temporal tiene tipo desconocido, y se
+limpiaba en cada vuelta de cada bucle. La segunda es lo que esta ficha describe —el resultado de una llamada—, pero
+`acc = acc + classify(i)` pagaba un paso por vuelta en limpiar un número. La tercera es la que quedó: `emit` apunta en
+`call_results` el registro que escribe un `Call`, `CallDynamic` o `CallBuiltin`, y lo quita si una instrucción aritmética
+lo lee —si corrió, lo que hay es un número; si no, la sentencia ya terminó con un error—; `release_temps` emite un
+`LoadUnit` para los que siguen apuntados. Dejar uno sin limpiar sólo cuesta memoria, como antes; nunca da una respuesta
+distinta.
+
 ### Qué lo sujeta
 
-`autofree/call-result` en `zyquality/cost/cost.toml`, con `open_finding = { zyvm = "ZYVM-022" }`: el día que la VM
-pase, el caso se pone en rojo hasta que esta ficha se cierre y la marca se quite. Los dos programas son
-`casos/autofree_resultado_uno.zy` y `casos/autofree_resultado_secuencial.zy`.
+`autofree/call-result` en `zyquality/cost/cost.toml`, sin `open_finding` desde la corrección: la VM da ×1,01 (39 MiB
+contra 39). Los dos programas son `casos/autofree_resultado_uno.zy` y `casos/autofree_resultado_secuencial.zy`.
 
 ---
 
