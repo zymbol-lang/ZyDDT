@@ -9746,9 +9746,10 @@ indexarse— y las pruebas `char_byte_agrees_with_a_walk_from_the_start` y
 
 ## GLB-140 — `m[i>j]$~ v`: una edición de dos niveles copia el array exterior entero en el tree-walker y en zyjs
 
-**Estado:** **abierto** — encontrado el 2026-10-19 al probar lo que `zyquality/bench/big/HALLAZGOS.md` dejó en «Falta
-probar» (el coste de `$~` profundo). Sujeto por `growth/update-nested` de `zyquality/cost` (`open_finding` en `zytw` y
-`zyjs`); la VM pasa. Corregirlo o dejarlo como deuda está por decidir
+**Estado:** **corregido 2026-10-19** — encontrado ese día al probar lo que `zyquality/bench/big/HALLAZGOS.md` dejó en
+«Falta probar» (el coste de `$~` profundo), y corregido el mismo día en `zytw` y `zyjs` por decisión del autor (grupo 2
+del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`). Sujeto por `growth/update-nested` de `zyquality/cost`, que pasa
+en los tres motores
 **Encontrado por:** una sonda que fija las ediciones y dobla las filas
 **Familia:** `HLZ-012` y `HLZ-014`, que dieron a las colecciones del tree-walker un `Rc` y la copia al escribir;
 [`ZYVM-013`](zyvm.md), el mismo defecto en la VM con un nivel; [`ZYJS-014`](zyjs.md), la escritura en el sitio de zyjs
@@ -9788,12 +9789,71 @@ parámetro `<~` pasa lo mismo: la VM copia 0 y el tree-walker, 1 612 000. En zyj
 - **`zyjs`**: la edición por ruta reconstruye cada nivel con `[...col.v]` (`zymbol.js`, ~7754), sin el atajo de
   «este valor es sólo mío» que `ZYJS-014` dio a la escritura de un nivel.
 
-### Qué haría falta
+### Corrección (2026-10-19)
 
-En el tree-walker, que la edición profunda tome la raíz de su variable como hace la de un nivel, y la devuelva al
-terminar. En zyjs, el mismo `own` de `ZYJS-014`, nivel a nivel.
+- **`zytw`**: `assign_update` lleva también la forma profunda (y lo que el parser reescribe en ella, `d.x["y"]$~ v` y
+  `d.x$+ 3`) por `edit_receiver_done`, con los operandos en el mismo orden. `deep_update_in` comprueba primero la ruta
+  sin leer ni copiar nada; si es de arrays, tuplas y diccionarios y cada paso está, la escribe nivel a nivel con
+  `make_mut`, y cada nivel se copia sólo si alguien más lo tiene. Cualquier otra forma —un texto en el camino, un paso
+  que no está, una posición en un diccionario— va por el `deep_update_value` de siempre, sobre una copia: falla con las
+  mismas palabras y deja la variable como estaba.
+- **`zyjs`**: `DeepUpdate` usa la marca `own` de `ZYJS-014`, y `deepUpdateValue` escribe en el sitio **el nivel de
+  fuera**. Los de dentro se siguen copiando: nada los marca, y una fila que otro nombre leyó de la matriz (`r = m[2]`)
+  no puede ver la escritura. Así deja de copiar las filas y copia sólo la que escribe.
+
+| | antes | ahora |
+|---|---:|---:|
+| `zytw`, 400 filas, 4 000 ediciones, `copied` | 1 612 000 | 0 |
+| `zytw`, lo mismo a través de `<~` | 1 612 000 | 0 |
+| `zytw`, `growth/update-nested` por reloj | ×15 (133 → 2 006 ms) | ×3,0 |
+| `zyjs`, `growth/update-nested`, 8 000 → 32 000 | 384 → 5 916 ms | 275 → 474 ms |
+
+Comparar el tree-walker de antes con el de ahora sacó dos divergencias que la puerta no veía, archivadas aparte y
+corregidas el mismo día: [`ZYTW-018`](zytw.md) (el tree-walker no añadía la clave en el último paso de una ruta) y
+[`GLB-141`](GLOBAL.md) (la VM y zyjs leían una clave ausente a medio camino como `Unit`).
 
 ### Qué lo sujeta
 
 `growth/update-nested` en `zyquality/cost/cost.toml`, por `--count` (`copied` y `bytes`) en los motores de Rust y por
-reloj en zyjs.
+reloj en los tres. La corrección, `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`: un alias que no ve la
+edición, una fila leída antes, una fila compartida, tres niveles con tuplas y posiciones negativas, un diccionario con una
+clave que se añade, un texto en el último paso, seis rechazos con la variable intacta y un operando que escribe el
+receptor (`GLB-115`).
+
+---
+
+## GLB-141 — `d[k>j]$~ v` con `k` ausente: la VM y zyjs leían la clave como `Unit` y decían «cannot index into Unit»
+
+**Estado:** **corregido 2026-10-19** — encontrado y corregido el mismo día, al comparar el tree-walker de antes y el de
+después de [`GLB-140`](GLOBAL.md)
+**Encontrado por:** la sección de rechazos de `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`
+**Familia:** [`ZYTW-018`](zytw.md), la otra cara de la misma regla: la clave se añade sólo en el último paso
+
+```zymbol
+d = #(a: #(b: 1), lista: [10, 20])
+k = "zz"
+!? { d[k>1]$~ 0 } :! { >> _err ¶ }
+!? { >> d[k>1] ¶ } :! { >> _err ¶ }
+```
+
+| | la edición | la lectura (el control) |
+|---|---|---|
+| `zytw` | `##Key(no key 'zz' in dictionary — available: a, lista)` | `##Key(…)` |
+| `zyvm` | `##Type(cannot index into Unit — expected array, tuple, or string)` | `##Key(…)` |
+| `zyjs` | `##Type(cannot index into Unit — expected array, tuple, or string)` | `##Key(…)` |
+
+### Causa
+
+Una clave ausente se **añade** cuando es el último paso, como en `d["k"]$~ v`. La VM (`vm_deep_set_in`) y zyjs
+(`deepUpdateValue`) la añadían en cualquier paso: creaban un `Unit` y seguían bajando por él, y el paso siguiente fallaba
+por no poder entrar en un `Unit`. Es el `undefined` de JavaScript que `zymbol-design/COLLECTIONS.md` descarta en «An
+absent key is `##Key`», y la lectura de la misma ruta ya daba `##Key` en los tres.
+
+### Corrección (2026-10-19)
+
+En los dos: una clave ausente con más pasos detrás es `##Key`, con el mensaje de la lectura (`missing_key_msg`,
+`Interpreter.missingKeyMsg`). No hacía falta decisión: el diseño ya lo decía.
+
+### Qué lo sujeta
+
+`E4` en `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`.
