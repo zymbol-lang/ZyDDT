@@ -1939,7 +1939,8 @@ Instrucciones (`perf`, mediana de 7), VM, frente a Python:
 | `str_len` (`m = s$#`, 20 000 veces) | ×31 → ×61 | ×1,2 → ×1,2 |
 | `str_slice_small` (2 000 cortes) | ×42 → ×85 | ×2,1 → ×2,1 |
 
-Un texto no ASCII sigue recorriéndose hasta la posición en `s[i]` y en un corte; `s$#` ya no.
+Un texto no ASCII sigue recorriéndose hasta la posición en `s[i]` y en un corte; `s$#` ya no. Eso tiene ficha propia
+desde el 2026-10-19, [`GLB-139`](GLOBAL.md), con su caso en `zyquality/cost/`.
 
 ### Qué lo sujeta
 
