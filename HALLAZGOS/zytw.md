@@ -1051,3 +1051,39 @@ durante la cláusula `:!` y el `:>`, no sólo durante el cuerpo, como el `try_st
 ### Qué lo sujeta
 
 `zyquality/corpus/errors/runtime/depth_tail_calls.zy`.
+
+---
+
+## ZYTW-018 — `d[k>c]$~ v` con `c` ausente: el tree-walker abortaba en vez de añadir la clave
+
+**Estado:** **corregido 2026-10-19** — encontrado y corregido el mismo día, al comparar el tree-walker de antes y el de
+después de [`GLB-140`](GLOBAL.md)
+**Encontrado por:** `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`, que el tree-walker de antes no
+terminaba
+**Familia:** [`GLB-141`](GLOBAL.md), la otra cara de la misma regla
+
+```zymbol
+d = #(a: #(b: 1))
+d.a["c"]$~ 3
+k = "a"
+e = d[k>"c"]$~ 4
+>> d " " e ¶
+```
+
+`zyvm` y `zyjs` dan `#(a: #(b: 1, c: 3)) #(a: #(b: 1, c: 4))`; el tree-walker abortaba en la segunda línea con
+`Runtime error: no key 'c' in dictionary — available: b`. Con `d.a` sin `c`, la forma funcional de la cuarta línea
+abortaba igual. El control, `d["c"]$~ 3` de un nivel, añade la clave en los tres.
+
+### Causa
+
+`deep_update_value` leía el elemento de **cada** paso antes de escribirlo, también el del último. En un diccionario,
+leer una clave ausente es `##Key`, así que no llegaba nunca a `set_at_step`, cuyo comentario dice justo que la añade.
+
+### Corrección (2026-10-19)
+
+El último paso en un diccionario escribe su clave sin leerla antes, en el camino funcional; el camino en el sitio de
+`GLB-140` ya lo hacía. La sentencia, la forma funcional y la de claves en variables añaden la clave en los tres motores.
+
+### Qué lo sujeta
+
+`zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy` (`d.a["c"]$~ 3`).
