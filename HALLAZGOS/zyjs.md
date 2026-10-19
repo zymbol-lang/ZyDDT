@@ -29,7 +29,7 @@
 | [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **corregido 2026-09-15** | un módulo importado con el bloque de exportación mal escrito se cargaba sin error |
 | ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
 
-**Uno abierto, `ZYJS-068`**, encontrado el 2026-10-19. Esta línea dijo «ninguno abierto» del 2026-10-10 a ese día, y «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Ninguno abierto.** `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3567,9 +3567,10 @@ La regla de Rust: texto si todos son `char` o `str`, array si no.
 
 ## ZYJS-068 — `m$+ [0, 0, 0]`: con un literal de colección como operando, zyjs copia el receptor en cada añadido
 
-**Estado:** **abierto** — encontrado el 2026-10-19 al calibrar `growth/update-nested` para [`GLB-140`](GLOBAL.md):
-construir las filas costaba más que editarlas. Sujeto por `growth/append-rows` de `zyquality/cost` (`open_finding`); los
-dos motores de Rust pasan. Corregirlo o dejarlo hasta la etapa 4 del mapa de ruta está por decidir
+**Estado:** **corregido 2026-10-19** — encontrado ese día al calibrar `growth/update-nested` para
+[`GLB-140`](GLOBAL.md) (construir las filas costaba más que editarlas) y corregido el mismo día por decisión del autor
+(grupo 2 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`). Sujeto por `growth/append-rows` de `zyquality/cost`,
+que pasa en los tres motores
 **Encontrado por:** la calibración de un caso de `cost/`, al separar la construcción de la edición
 **Familia:** [`ZYJS-014`](zyjs.md), que dio a zyjs la escritura en el sitio; [`GLB-115`](GLOBAL.md), el orden de
 evaluación que decide cuándo puede usarla
@@ -3597,10 +3598,12 @@ operando que escribiera el receptor tiene que encontrarlo como estaba (GLB-115)�
 `Ident`, aritmética, un índice y `$#`. Un literal de array o de tupla (`type: 'Array'`) no está en ella, aunque sus
 elementos sean de esa lista, así que el añadido toma el camino que copia.
 
-### Qué haría falta
+### Corrección (2026-10-19)
 
-Que `plainOperand` acepte un literal de colección cuyos elementos sean todos `plainOperand`. Un literal no ejecuta
-código del programa, así que no puede escribir el receptor.
+`plainOperand` acepta un literal de array o de tupla (también `#(…)`, que es un `Tuple` con claves) cuyos elementos sean
+todos `plainOperand`: un literal no ejecuta código del programa, así que no puede escribir el receptor. Uno que lleve una
+llamada, `[f()]`, sigue por el camino que copia. `growth/append-rows`, 8 000 → 32 000: 312 → 6 634 ms antes, 171 →
+317 ms ahora.
 
 ### Qué lo sujeta
 
