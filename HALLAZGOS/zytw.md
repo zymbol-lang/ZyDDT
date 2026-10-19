@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Uno abierto, `ZYTW-016`**, deuda declarada el 2026-10-16. `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Uno abierto, `ZYTW-016`**, deuda declarada el 2026-10-16 y mantenida en la v0.0.11. `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -1087,3 +1087,51 @@ El último paso en un diccionario escribe su clave sin leerla antes, en el camin
 ### Qué lo sujeta
 
 `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy` (`d.a["c"]$~ 3`).
+
+---
+
+## ZYTW-019 — El valor del tree-walker medía 120 bytes: un array de enteros ocupaba seis veces lo de la VM
+
+**Estado:** **corregido 2026-10-19** — medido el 2026-10-19 en la revisión de `zyquality/bench/big/HALLAZGOS.md` y
+corregido ese día por decisión del autor (grupo 3 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`)
+**Encontrado por:** la sonda de `$-[1]` por el principio, que en el tree-walker iba 36 veces más lenta que Python y 15
+veces más que la VM sin copiar nada
+**Familia:** `HLZ-012` y `HLZ-014`, que dieron a las colecciones del tree-walker un `Rc`; [`ZYTW-016`](zytw.md), el texto
+que sigue sin él
+
+```zymbol
+v = []
+@ i:1..40000 { v$+ i }
+@ _i:1..40000 { v$-[1] }
+>> v$# ¶
+```
+
+El control, `v$-[v$#]`, quita el último: no desplaza nada.
+
+### Causa
+
+Todo valor de un `enum` de Rust mide lo que su variante más grande. `Value::Function(FunctionValue)` iba en línea, y un
+`FunctionValue` mide 120 bytes (`ErrorValue`, 48; `String`, 24): cada entero de un array ocupaba 120. Quitar el primero
+desplaza los que quedan —en cualquier lenguaje—, y el tree-walker desplazaba 7,5 veces la memoria de la VM, cuyo valor
+mide 16.
+
+### Corrección (2026-10-19)
+
+`Function(Box<FunctionValue>)` y `Error(Box<ErrorValue>)`, con dos constructores, `Value::function` y `Value::error`. La
+variante más grande pasa a ser `String`, y la etiqueta cabe en un hueco de su capacidad: **un valor mide 24 bytes**.
+Medido contra el binario anterior, tres corridas:
+
+| programa | antes | ahora |
+|---|---:|---:|
+| array de 2 000 000 de enteros, pico de memoria | 236,1 MiB | 53,3 MiB |
+| ese mismo, tiempo | ~437 ms | ~305 ms |
+| el programa de arriba (`$-[1]`, 40 000) | ~2 640 ms | ~313 ms |
+| 1 000 000 de llamadas | ~597 ms | ~566 ms |
+| 300 000 cierres creados y llamados | ~382 ms | ~388 ms |
+| 200 000 errores capturados | ~124 ms | ~131 ms |
+
+Lo que cuesta es una reserva más al crear una función o un error como valor.
+
+### Qué lo sujeta
+
+La prueba `a_value_is_as_large_as_a_string` de `zymbol-interpreter/src/lib.rs`.
