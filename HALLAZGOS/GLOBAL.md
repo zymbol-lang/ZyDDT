@@ -9722,3 +9722,58 @@ mismo índice de saltos; se sustituye en la etapa 4 del mapa de ruta.
 `growth/index-a-text` en `zyquality/cost/cost.toml`, por reloj: los contadores no ven un recorrido dentro de una
 instrucción. `growth/slice-a-text` lo menciona en su `clock_off`.
 
+---
+
+## GLB-140 — `m[i>j]$~ v`: una edición de dos niveles copia el array exterior entero en el tree-walker y en zyjs
+
+**Estado:** **abierto** — encontrado el 2026-10-19 al probar lo que `zyquality/bench/big/HALLAZGOS.md` dejó en «Falta
+probar» (el coste de `$~` profundo). Sujeto por `growth/update-nested` de `zyquality/cost` (`open_finding` en `zytw` y
+`zyjs`); la VM pasa. Corregirlo o dejarlo como deuda está por decidir
+**Encontrado por:** una sonda que fija las ediciones y dobla las filas
+**Familia:** `HLZ-012` y `HLZ-014`, que dieron a las colecciones del tree-walker un `Rc` y la copia al escribir;
+[`ZYVM-013`](zyvm.md), el mismo defecto en la VM con un nivel; [`ZYJS-014`](zyjs.md), la escritura en el sitio de zyjs
+con un nivel
+
+```zymbol
+fila = [0, 0, 0]
+m = []
+@ _i:1..400 { m$+ fila }
+@ k:1..4000 {
+    r = (k % 400) + 1
+    m[r>2]$~ k
+}
+>> m[1>2] ¶
+```
+
+4 000 ediciones, `--count`:
+
+| filas | `zytw` copied | `zytw` bytes | `zyvm` copied |
+|---:|---:|---:|---:|
+| 100 | 412 000 | 51 MB | 3 |
+| 200 | 812 000 | 99 MB | 3 |
+| 400 | 1 612 000 | 195 MB | 3 |
+| 800 | 3 212 000 | 388 MB | 3 |
+
+Son unas filas + 3 copias por edición, mientras que `m[r]$~ v`, de un nivel, copia 0 en los dos motores. A través de un
+parámetro `<~` pasa lo mismo: la VM copia 0 y el tree-walker, 1 612 000. En zyjs, 4 000 ediciones cuestan 61 ms con
+2 000 filas y 651 ms con 32 000, y la de un nivel no depende de las filas.
+
+### Causa
+
+- **`zytw`**: `eval_collection_update` lee la raíz con `self.eval_expr(&di.array)`, que clona el `Rc` de la variable,
+  y `deep_update_value` escribe sobre ese clon (`zymbol-interpreter/src/collection_ops.rs`, ~375). Con dos dueños,
+  `make_mut` copia el array exterior. La edición de un nivel pasa por `assign_update` y `edit_receiver_done`
+  (`variables.rs`), que escriben en la variable misma; la de varios niveles, dice su comentario, «takes the general
+  path».
+- **`zyjs`**: la edición por ruta reconstruye cada nivel con `[...col.v]` (`zymbol.js`, ~7754), sin el atajo de
+  «este valor es sólo mío» que `ZYJS-014` dio a la escritura de un nivel.
+
+### Qué haría falta
+
+En el tree-walker, que la edición profunda tome la raíz de su variable como hace la de un nivel, y la devuelva al
+terminar. En zyjs, el mismo `own` de `ZYJS-014`, nivel a nivel.
+
+### Qué lo sujeta
+
+`growth/update-nested` en `zyquality/cost/cost.toml`, por `--count` (`copied` y `bytes`) en los motores de Rust y por
+reloj en zyjs.
