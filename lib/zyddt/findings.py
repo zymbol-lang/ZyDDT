@@ -43,7 +43,10 @@ def state_of(estado: str) -> str:
 
 HEAD = re.compile(r"^##\s+([A-Z]{2,6}-\d+)\s+—", re.M)
 _ROW = re.compile(r"^\|\s*(?:~~)?\[?`([A-Z]{2,6}-\d+)`[^|]*\|([^|]*)\|")
-_SAID_OPEN = re.compile(r"abiert[oa]s?\s*:\s*((?:`[A-Z]{2,6}-\d+`(?:\s*,\s*|\s+y\s+)?)+)")
+# «abiertos: `X-1`», and as the headers write it: in bold, «**Uno abierto:**
+# `ZYVM-022`», or with a comma, «**Uno abierto, `ZYTW-016`**». The bold form
+# let a header name a fixed finding as open for a day (2026-10-19).
+_SAID_OPEN = re.compile(r"abiert[oa]s?\**\s*[:,]\s*\**\s*((?:`[A-Z]{2,6}-\d+`(?:\s*,\s*|\s+y\s+)?)+)")
 _ID = re.compile(r"`([A-Z]{2,6}-\d+)`")
 
 
