@@ -9663,3 +9663,62 @@ y deja fuera de P3 los bloques `warning:`. Ningún fichero más pasó a saltarse
 ### Qué lo sujeta
 
 La propia suite `fmt`, sobre los dos ficheros que lo encontraron.
+
+---
+
+## GLB-139 — `s[i]` y un corte buscan su posición recorriendo el texto: cuadráticos dentro de un bucle — en la VM y el tree-walker con un texto no ASCII, en zyjs con cualquiera
+
+**Estado:** **abierto** — encontrado el 2026-10-19 al revisar `zyquality/bench/big/HALLAZGOS.md` contra la rama
+`v0.0.11`. Es lo que [`ZYVM-028`](zyvm.md) dejó dicho en una frase («un texto no ASCII sigue recorriéndose hasta la
+posición») sin ficha ni caso. Sujeto por `growth/index-a-text` de `zyquality/cost` (`open_finding`, los tres motores).
+Corregirlo o dejarlo como deuda está por decidir
+**Encontrado por:** la revisión de PERF-05 b, con una sonda de `s[i]` sobre un texto de «ñ» y su control en ASCII
+**Familia:** [`ZYVM-028`](zyvm.md), que dio a la VM el recuento de caracteres; [`GLB-130`](GLOBAL.md), que quitó la copia
+del corte; [`ZYTW-016`](zytw.md), la copia del texto en el tree-walker, que aquí no interviene
+
+```zymbol
+s = ""
+@ _i:1..32000 { s = s "ñ" }
+k = 0
+@ i:1..32000 { ? s[i] == 'ñ' { k = k + 1 } }
+>> k ¶
+```
+
+Tiempo de pared, n → 4n, el texto y el bucle a la vez (`--count` no lo ve: cada `s[i]` es un paso, y los bytes crecen
+lineales en los dos motores de Rust):
+
+| motor | texto | n → 4n | ms | razón |
+|---|---|---|---|---:|
+| `zyvm` | «ñ» | 32 000 → 128 000 | 71 → 941 | ×13 |
+| `zyvm` | ASCII | 32 000 → 128 000 | 19 → 19 | plano |
+| `zytw` | «ñ» | 16 000 → 64 000 | 140 → 1 820 | ×13 |
+| `zytw` | ASCII | 32 000 → 64 000 (×2) | 56 → 129 | ×2,3 |
+| `zyjs` | «ñ» | 6 000 → 24 000 | 378 → 5 609 | ×15 |
+| `zyjs` | ASCII | 8 000 → 32 000, menos el control | 377 → 9 168 | ×24 |
+
+Python indexa un texto en O(1) a cualquier tamaño: guarda los caracteres de ancho fijo.
+
+### Causa
+
+Una posición de Zymbol cuenta caracteres y el texto se guarda en UTF-8.
+
+- **`zyvm`**: desde `ZYVM-028` el texto sabe cuántos caracteres tiene, y si son tantos como bytes es ASCII y una
+  posición es un byte. Si no, `index_value` llega al carácter con `s.chars().nth(i)`
+  (`zymbol-vm/src/lib.rs`, ~1314), y un corte con `zymbol_common::text::char_range`, que recorre con `char_indices`.
+- **`zytw`**: `zymbol_common::text::char_len` y `char_range` en cada `s[i]` (`expr_eval.rs` ~443, `index_nav.rs` ~286).
+  Sin un recuento guardado, `char_len` cuenta el texto entero aunque se pida `s[1]`.
+- **`zyjs`**: `[...obj.v]` construye un array con todos los caracteres en cada `s[i]` (`zymbol.js` ~10692), y lo mismo
+  `s$#` (~10967). Por eso no depende de que el texto sea ASCII.
+
+### Qué haría falta
+
+En Rust, saber dónde empieza el carácter n sin recorrer: un índice de saltos guardado junto al recuento (un byte de
+cada K caracteres), o una representación de ancho fijo para el texto que no es ASCII. Es la otra mitad de la decisión
+D8, que eligió el recuento. En zyjs, contar una vez (`Array.from` guardado en el valor) o usar `codePointAt` con el
+mismo índice de saltos; se sustituye en la etapa 4 del mapa de ruta.
+
+### Qué lo sujeta
+
+`growth/index-a-text` en `zyquality/cost/cost.toml`, por reloj: los contadores no ven un recorrido dentro de una
+instrucción. `growth/slice-a-text` lo menciona en su `clock_off`.
+
