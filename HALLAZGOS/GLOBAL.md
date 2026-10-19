@@ -9668,10 +9668,11 @@ La propia suite `fmt`, sobre los dos ficheros que lo encontraron.
 
 ## GLB-139 — `s[i]` y un corte buscan su posición recorriendo el texto: cuadráticos dentro de un bucle — en la VM y el tree-walker con un texto no ASCII, en zyjs con cualquiera
 
-**Estado:** **abierto** — encontrado el 2026-10-19 al revisar `zyquality/bench/big/HALLAZGOS.md` contra la rama
-`v0.0.11`. Es lo que [`ZYVM-028`](zyvm.md) dejó dicho en una frase («un texto no ASCII sigue recorriéndose hasta la
-posición») sin ficha ni caso. Sujeto por `growth/index-a-text` de `zyquality/cost` (`open_finding`, los tres motores).
-Corregirlo o dejarlo como deuda está por decidir
+**Estado:** **abierto** en `zytw` y `zyjs`, como deuda declarada de la v0.0.11 por decisión del autor;
+**corregido en `zyvm`** el mismo día que se encontró, el 2026-10-19, al revisar `zyquality/bench/big/HALLAZGOS.md`
+contra la rama `v0.0.11`. Es lo que [`ZYVM-028`](zyvm.md) dejó dicho en una frase («un texto no ASCII sigue
+recorriéndose hasta la posición») sin ficha ni caso. Sujeto por `growth/index-a-text` de `zyquality/cost`
+(`open_finding` en `zytw` y `zyjs`; la VM pasa)
 **Encontrado por:** la revisión de PERF-05 b, con una sonda de `s[i]` sobre un texto de «ñ» y su control en ASCII
 **Familia:** [`ZYVM-028`](zyvm.md), que dio a la VM el recuento de caracteres; [`GLB-130`](GLOBAL.md), que quitó la copia
 del corte; [`ZYTW-016`](zytw.md), la copia del texto en el tree-walker, que aquí no interviene
@@ -9710,17 +9711,36 @@ Una posición de Zymbol cuenta caracteres y el texto se guarda en UTF-8.
 - **`zyjs`**: `[...obj.v]` construye un array con todos los caracteres en cada `s[i]` (`zymbol.js` ~10692), y lo mismo
   `s$#` (~10967). Por eso no depende de que el texto sea ASCII.
 
-### Qué haría falta
+### Decisión (el autor, 2026-10-19)
 
-En Rust, saber dónde empieza el carácter n sin recorrer: un índice de saltos guardado junto al recuento (un byte de
-cada K caracteres), o una representación de ancho fijo para el texto que no es ASCII. Es la otra mitad de la decisión
-D8, que eligió el recuento. En zyjs, contar una vez (`Array.from` guardado en el valor) o usar `codePointAt` con el
-mismo índice de saltos; se sustituye en la etapa 4 del mapa de ruta.
+Grupo 1 del plan de cierre de la v0.0.11 (`interpreter/ROADMAP_V0011_ES.md`): **migas en la VM**; el tree-walker y
+zyjs se quedan como deuda declarada en esta versión. Las otras dos salidas para la VM —recordar la última posición, que
+deja cuadrático el acceso hacia atrás o al azar, y un texto de ancho fijo como el de Python, que rehace `ZyStr`— se
+descartaron. En el tree-walker, arreglarlo pide que su texto deje de ser un `String` copiado en cada lectura
+(`ZYTW-016`); en zyjs, el motor se sustituye en la etapa 4.
+
+### Corrección en `zyvm` (2026-10-19)
+
+Un texto del montón que no es ASCII guarda, la primera vez que se le pide una posición, el byte donde empieza cada
+carácter 64 (`ZyStr::char_byte`, `zymbol-vm/src/zy_str.rs`). `s[i]` y un corte saltan a la miga anterior y caminan
+menos de 64 caracteres. La celda vacía ocupa una palabra (`OnceCell<Box<Vec<usize>>>`): el `Heap` de un texto pasa de
+32 a 40 bytes. Como el recuento de `ZYVM-028`, no puede quedarse viejo: el texto detrás de un `Rc` compartido no
+cambia, y uno que crece en el sitio es un `Heap` nuevo.
+
+| `zyvm`, «ñ» | antes | ahora |
+|---|---:|---:|
+| `s[i]`, 128 000 | 941 ms | 39 ms |
+| `s[i]`, 512 000 | — | 93 ms |
+| `growth/index-a-text`, n → 4n | ×12,1 | ×2,6 |
+| `growth/slice-a-text` por reloj, 200 000 → 800 000 | apagado | ×3,4 |
 
 ### Qué lo sujeta
 
-`growth/index-a-text` en `zyquality/cost/cost.toml`, por reloj: los contadores no ven un recorrido dentro de una
-instrucción. `growth/slice-a-text` lo menciona en su `clock_off`.
+`growth/index-a-text` y `growth/slice-a-text` en `zyquality/cost/cost.toml`, por reloj: los contadores no ven un
+recorrido dentro de una instrucción. La corrección, `zyquality/corpus/strings/34_position_crumbs.zy` —posiciones antes,
+en y después de cada miga con caracteres de uno a cuatro bytes, cortes que la cruzan, y un texto que crece después de
+indexarse— y las pruebas `char_byte_agrees_with_a_walk_from_the_start` y
+`the_crumbs_of_a_text_nobody_indexes_cost_one_word` de `zy_str.rs`.
 
 ---
 

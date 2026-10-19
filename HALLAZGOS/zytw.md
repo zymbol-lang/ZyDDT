@@ -985,7 +985,9 @@ Cuatro celdas en `axes/runtime-functions-hof.toml` (`block-lambda-called-for-its
 
 ## ZYTW-016 — Leer una variable de texto la copia: el texto del tree-walker no tiene `Rc`
 
-**Estado:** **abierto** — deuda declarada el 2026-10-16, sin corregir: el mapa de ruta de la v0.0.11
+**Estado:** **abierto** — deuda declarada el 2026-10-16, y **se mantiene en la v0.0.11** por decisión del autor del
+2026-10-19 (grupo 1 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`), junto con la mitad de [`GLB-139`](GLOBAL.md)
+que es del tree-walker. Antes de eso: el mapa de ruta de la v0.0.11
 (`interpreter/ROADMAP_V0011_ES.md`, etapa 2, PERF-05 b) dice que se archiva con su caso `KNOWN`, y el rendimiento del
 tree-walker no es prioridad salvo donde comparte el defecto con la VM. Sujeto por `growth/read-a-text` de
 `zyquality/cost` (`open_finding`)
