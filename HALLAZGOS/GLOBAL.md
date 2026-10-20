@@ -9888,3 +9888,48 @@ En los dos: una clave ausente con más pasos detrás es `##Key`, con el mensaje 
 ### Qué lo sujeta
 
 `E4` en `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`.
+
+## GLB-142 — Una capa que reexporta N funciones de un módulo hacía parsear ese módulo N veces antes de ejecutar nada
+
+**Estado:** **abierto** — encontrado el 2026-10-20 al medir 3.3 de la v0.0.11 (`.zyb`: cuánto del arranque es el
+front-end); está en la v0.0.10 publicada
+**Encontrado por:** `GO/試験/api試験.zy`, 899 líneas en 6 ficheros: `zymbol run` gasta 51 ms de CPU y el ejecutable que
+`zymbol build --release` hace del mismo programa —el mismo bytecode, sin front-end— 4,7. `zymbol check` sola, 56
+**Motores:** los dos de Rust, que comparten el análisis semántico; también `zymbol check` y el LSP, que usan las mismas
+tablas. `zyjs` tiene su propio comprobador y no se midió
+
+### Medición
+
+Cada fase del front-end de `zymbol run`, repetida 30 veces en un mismo proceso (un programa aparte que llama a las mismas
+funciones de `zymbol-semantic` y `zymbol-compiler`), en ms por pasada:
+
+| fase | `api試験` (importa `api/english`, `api/espanol`) | `盤試験` | `नियमपरीक्षा` (Chaturanga) |
+|---|---|---|---|
+| lexer + parser del fichero | 0,17 | 0,70 | 1,04 |
+| `module_arities` | **16,2** | 0,48 | 1,50 |
+| `module_out_slots` | 0,70 | 0,47 | 1,51 |
+| `module_exports` | **16,4** | 0,47 | 1,52 |
+| compilar el programa entero, módulos incluidos | 2,0 | 1,45 | 3,42 |
+
+`module_out_slots` recorre los mismos imports que las otras dos y tarda 23 veces menos. Lo que tiene `api試験` y no los
+otros son las dos capas de idioma de `api/`, que sólo reexportan: `english.zy` tiene 32 reexportaciones (25 funciones y 7 constantes) de `核/盤`,
+`核/規則` y `核/計算`.
+
+### Causa
+
+`zymbol-semantic/src/call_arity.rs`: `arities_of_file` y `exports_of_file` siguen cada `ExportItem::ReExport` llamando a
+`arities_of_import` / `exports_of_import`, que **lee y parsea de nuevo el módulo de origen** —para cada elemento, no para
+cada módulo—. Una capa que reexporta N nombres de un módulo de M líneas cuesta N × M, y `zymbol run` lo paga dos veces
+(`module_arities` y `module_exports`) antes de compilar. Es el patrón de i18n que recomienda `zymbol-design/I18N.md`: una
+capa por idioma sobre el núcleo.
+
+### Corrección prevista
+
+Cada fichero se parsea una vez por consulta: `arities_of_file` y `exports_of_file` guardan lo que ya resolvieron, por
+ruta y profundidad, durante una misma llamada a `module_arities` / `module_exports`. La profundidad entra en la clave para
+que el resultado sea el de hoy también en una cadena de más de `MAX_REEXPORT_DEPTH` saltos.
+
+### Qué lo sujetará
+
+Una prueba de `call_arity.rs` que cuente cuántas veces se parsea cada fichero con una capa que reexporta varias funciones
+de un mismo módulo: hoy, una vez por función.
