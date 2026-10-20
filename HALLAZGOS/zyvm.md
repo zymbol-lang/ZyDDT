@@ -14,7 +14,7 @@
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
 | [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
 
-**Ninguno abierto.** `ZYVM-022`, que no está en la tabla, se corrigió el 2026-10-19. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
+**Uno abierto:** `ZYVM-031`. `ZYVM-022`, que no está en la tabla, se corrigió el 2026-10-19. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
 Las chinchetas que los sujetan:
 
@@ -2025,3 +2025,52 @@ Un trozo nunca tiene menos registros que parámetros.
 La prueba `a_frame_holds_every_parameter_even_one_nothing_reads` de `zymbol-compiler/tests/compile_smoke.rs`, que
 falla sin la corrección (`f: 1 registers for 3 parameters`), y `zyquality/corpus/functions/parametro_sin_leer.zy`, el
 programa, que sólo una build de depuración ve fallar.
+
+## ZYVM-031 — El ejecutable de `zymbol build` no tenía `std/net` ni `std/db` aunque el `zymbol` que lo construía sí
+
+**Estado:** **abierto** — encontrado el 2026-10-20 al preparar 3.1 de la v0.0.11, leyendo quién construye una VM. Lo
+introdujo la propia rama `v0.0.11`, nunca publicada: `std/db` desde D4 (`interpreter` del 2026-10-19) y `std/net` desde
+la build compacta (`17bfdb8`, 2026-10-20)
+**Encontrado por:** leer `zymbol-standalone/src/lib.rs`, `write_cargo_toml`, y comprobarlo con dos programas
+
+### Reproducción
+
+Con un `zymbol` de la rama compilado `cargo build --release --features db`:
+
+```text
+$ cat nethead.zy
+<# std/net => net
+r = net::head("http://127.0.0.1:1/")
+>> r ¶
+$ zymbol run nethead.zy            # y --tw
+#0
+$ zymbol build nethead.zy -o nethead && ./nethead
+Runtime error: std/net is not available in this build (compiled without HTTP support)
+
+$ cat dbconn.zy
+<# std/db => db
+c = db::connect("sqlite", "Driver=NoSuchDriver")
+>> "reached" ¶
+$ zymbol run dbconn.zy
+reached
+$ zymbol build dbconn.zy -o dbconn && ./dbconn
+Runtime error: std/db is not available in this build (compiled without ODBC support)
+```
+
+`net::head` contra un puerto cerrado contesta `#0` sin red, así que el primero es determinista.
+
+### Causa
+
+`zymbol build` compila el programa con el compilador del propio `zymbol` y genera un proyecto de Cargo que depende de
+`zymbol-vm` por ruta, **sin features**: `zymbol-vm = { path = "…" }`. El compilador tiene las del binario que lo
+lleva —Cargo las une—, la VM generada sólo las suyas por defecto, que son `[]` desde D4. El compilador emite los ids de
+`std/net` y `std/db`, y la VM del ejecutable cae en el `net_dispatch` / `db_dispatch` que existe para lo inalcanzable.
+Hasta D4 `db` estaba en los defectos de `zymbol-vm`, y `ureq` era obligatorio en ella hasta `17bfdb8`; por eso antes
+funcionaba. Nada de la puerta ejecuta `zymbol build` con un programa que importe uno de los dos.
+
+### Corrección prevista
+
+Que el proyecto generado pida para `zymbol-vm` las mismas features que tiene el compilador que produjo su bytecode:
+`zymbol-standalone` gana `http` y `db`, que encienden las de su `zymbol-compiler` y que el CLI le pasa, y
+`write_cargo_toml` las escribe.
+
