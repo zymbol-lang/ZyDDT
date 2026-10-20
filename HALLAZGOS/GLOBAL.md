@@ -9940,3 +9940,38 @@ funciones de un módulo, y un contador de parseos por fichero que sólo existe e
 
 `zymbol check` construye esas tablas para los imports de **cada** fichero que comprueba, así que un módulo con k
 importadores se parsea k veces. `zymbol run` no: sólo las construye para el fichero principal. Va en su propia ficha.
+
+## GLB-143 — `zymbol check` parsea un módulo una vez por cada fichero que lo importa
+
+**Estado:** **abierto** — encontrado el 2026-10-20 al cerrar [`GLB-142`](GLOBAL.md); está en la v0.0.10 publicada
+**Encontrado por:** el mismo programa de `GLB-142`: corregido aquél, `zymbol check 試験/api試験.zy` seguía en 25 ms de CPU
+donde `zymbol run` gasta 18
+**Motores:** ninguno; es `zymbol check` (y por la misma vía el LSP, que comprueba fichero a fichero)
+
+### Medición
+
+Un módulo `m` de 803 líneas (200 funciones exportadas), k módulos `l0 … lk-1` que lo importan y exportan una función cada
+uno, y un principal que importa los k. CPU, mediana de 25:
+
+| k | `zymbol check` | `zymbol run` |
+|---|---|---|
+| 1 | 14,2 ms | 13,3 ms |
+| 2 | 11,5 | 14,3 |
+| 4 | 24,0 | 15,1 |
+| 8 | 29,9 | 9,4 |
+| 16 | 45,9 | 16,6 |
+| 32 | 76,8 | 12,6 |
+
+Unos 2 ms por importador, y lineal: no es cuadrático, es lo que cuesta parsear `m` otra vez cada vez.
+
+### Causa
+
+`check_file` (`zymbol-cli`) visita cada fichero una sola vez, pero `check_source` construye para cada uno las tablas de
+sus imports —`module_arities`, `module_out_slots`, `module_exports`—, y cada tabla lee y parsea el módulo importado. Un
+módulo con k importadores se parsea 3 k veces. `zymbol run` construye esas tablas sólo para el fichero principal.
+
+### Corrección posible
+
+Que la memoria por fichero de `GLB-142` dure toda la comprobación y no una consulta: un objeto con las tablas ya
+resueltas, que `check_file` pase a cada `check_source`. Cambia la firma pública de las tres funciones de
+`zymbol-semantic`, que también usa el LSP. Sin decidir.
