@@ -9891,7 +9891,7 @@ En los dos: una clave ausente con más pasos detrás es `##Key`, con el mensaje 
 
 ## GLB-142 — Una capa que reexporta N funciones de un módulo hacía parsear ese módulo N veces antes de ejecutar nada
 
-**Estado:** **abierto** — encontrado el 2026-10-20 al medir 3.3 de la v0.0.11 (`.zyb`: cuánto del arranque es el
+**Estado:** **corregido 2026-10-20** (`interpreter` `c64c8cd`) — encontrado el mismo día al medir 3.3 de la v0.0.11 (`.zyb`: cuánto del arranque es el
 front-end); está en la v0.0.10 publicada
 **Encontrado por:** `GO/試験/api試験.zy`, 899 líneas en 6 ficheros: `zymbol run` gasta 51 ms de CPU y el ejecutable que
 `zymbol build --release` hace del mismo programa —el mismo bytecode, sin front-end— 4,7. `zymbol check` sola, 56
@@ -9923,13 +9923,20 @@ cada módulo—. Una capa que reexporta N nombres de un módulo de M líneas cue
 (`module_arities` y `module_exports`) antes de compilar. Es el patrón de i18n que recomienda `zymbol-design/I18N.md`: una
 capa por idioma sobre el núcleo.
 
-### Corrección prevista
+### Corrección (2026-10-20)
 
 Cada fichero se parsea una vez por consulta: `arities_of_file` y `exports_of_file` guardan lo que ya resolvieron, por
 ruta y profundidad, durante una misma llamada a `module_arities` / `module_exports`. La profundidad entra en la clave para
-que el resultado sea el de hoy también en una cadena de más de `MAX_REEXPORT_DEPTH` saltos.
+que el resultado sea el de antes también en una cadena de más de `MAX_REEXPORT_DEPTH` saltos. Las dos tablas bajan de
+16,2 y 16,4 ms a 1,4 cada una en `api試験`, y `zymbol run 試験/api試験.zy` de 51 a 18 ms de CPU.
 
-### Qué lo sujetará
+### Qué lo sujeta
 
-Una prueba de `call_arity.rs` que cuente cuántas veces se parsea cada fichero con una capa que reexporta varias funciones
-de un mismo módulo: hoy, una vez por función.
+`a_reexport_layer_parses_its_source_module_once`, en `zymbol-semantic/src/call_arity.rs`: una capa que reexporta diez
+funciones de un módulo, y un contador de parseos por fichero que sólo existe en las pruebas. Falla sin la corrección
+(«module_arities parsed core.zy 10 times for a layer re-exporting 10 of its functions»).
+
+### Lo que no corrige
+
+`zymbol check` construye esas tablas para los imports de **cada** fichero que comprueba, así que un módulo con k
+importadores se parsea k veces. `zymbol run` no: sólo las construye para el fichero principal. Va en su propia ficha.
