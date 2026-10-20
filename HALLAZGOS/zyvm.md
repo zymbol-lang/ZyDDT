@@ -14,7 +14,7 @@
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
 | [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
 
-**Uno abierto:** `ZYVM-031`. `ZYVM-022`, que no está en la tabla, se corrigió el 2026-10-19. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
+**Ninguno abierto.** `ZYVM-022` y `ZYVM-031`, que no están en la tabla, se corrigieron el 2026-10-19 y el 2026-10-20. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
 Las chinchetas que los sujetan:
 
@@ -2028,7 +2028,7 @@ programa, que sólo una build de depuración ve fallar.
 
 ## ZYVM-031 — El ejecutable de `zymbol build` no tenía `std/net` ni `std/db` aunque el `zymbol` que lo construía sí
 
-**Estado:** **abierto** — encontrado el 2026-10-20 al preparar 3.1 de la v0.0.11, leyendo quién construye una VM. Lo
+**Estado:** **corregido 2026-10-20** (`interpreter` `7dd33bb`) — encontrado el mismo día al preparar 3.1 de la v0.0.11, leyendo quién construye una VM. Lo
 introdujo la propia rama `v0.0.11`, nunca publicada: `std/db` desde D4 (`interpreter` del 2026-10-19) y `std/net` desde
 la build compacta (`17bfdb8`, 2026-10-20)
 **Encontrado por:** leer `zymbol-standalone/src/lib.rs`, `write_cargo_toml`, y comprobarlo con dos programas
@@ -2068,9 +2068,18 @@ lleva —Cargo las une—, la VM generada sólo las suyas por defecto, que son `
 Hasta D4 `db` estaba en los defectos de `zymbol-vm`, y `ureq` era obligatorio en ella hasta `17bfdb8`; por eso antes
 funcionaba. Nada de la puerta ejecuta `zymbol build` con un programa que importe uno de los dos.
 
-### Corrección prevista
+### Corrección (2026-10-20)
 
-Que el proyecto generado pida para `zymbol-vm` las mismas features que tiene el compilador que produjo su bytecode:
-`zymbol-standalone` gana `http` y `db`, que encienden las de su `zymbol-compiler` y que el CLI le pasa, y
-`write_cargo_toml` las escribe.
+El proyecto generado pide para `zymbol-vm` las mismas features que tiene el compilador que produjo su bytecode:
+`zymbol-standalone` gana `http` y `db`, que encienden las de su `zymbol-compiler` y que encienden a su vez las del CLI, y
+`cargo_toml` (antes dentro de `write_cargo_toml`) las escribe. Con el `zymbol` de la puerta, los dos programas de arriba
+dan `#0` y `reached` como ejecutables.
+
+### Qué lo sujeta
+
+`the_generated_vm_has_the_modules_its_compiler_accepts`, en `zymbol-standalone/src/lib.rs`: compila `<# std/net` y
+`<# std/db` con el compilador del crate y exige que el `Cargo.toml` generado pida la feature de cada uno que acepte, y
+ninguna de los que rechace. Falla sin la corrección («the compiler accepts `<# std/net`, and the generated `zymbol-vm =
+{ path = "/v", features = [] }` does not ask for `http`») y pasa con y sin features. Una primera versión pasaba un
+`base_dir` vacío y salía roja por otra razón: sin directorio base el compilador no mira los imports, y aceptaba siempre.
 
