@@ -9943,7 +9943,8 @@ importadores se parsea k veces. `zymbol run` no: sólo las construye para el fic
 
 ## GLB-143 — `zymbol check` parsea un módulo una vez por cada fichero que lo importa
 
-**Estado:** **abierto** — encontrado el 2026-10-20 al cerrar [`GLB-142`](GLOBAL.md); está en la v0.0.10 publicada
+**Estado:** **corregido 2026-10-20** (`interpreter` `05256b3`, decisión del autor el mismo día) — encontrado al cerrar
+[`GLB-142`](GLOBAL.md); está en la v0.0.10 publicada
 **Encontrado por:** el mismo programa de `GLB-142`: corregido aquél, `zymbol check 試験/api試験.zy` seguía en 25 ms de CPU
 donde `zymbol run` gasta 18
 **Motores:** ninguno; es `zymbol check` (y por la misma vía el LSP, que comprueba fichero a fichero)
@@ -9970,8 +9971,24 @@ Unos 2 ms por importador, y lineal: no es cuadrático, es lo que cuesta parsear 
 sus imports —`module_arities`, `module_out_slots`, `module_exports`—, y cada tabla lee y parsea el módulo importado. Un
 módulo con k importadores se parsea 3 k veces. `zymbol run` construye esas tablas sólo para el fichero principal.
 
-### Corrección posible
+### Corrección (2026-10-20)
 
-Que la memoria por fichero de `GLB-142` dure toda la comprobación y no una consulta: un objeto con las tablas ya
-resueltas, que `check_file` pase a cada `check_source`. Cambia la firma pública de las tres funciones de
-`zymbol-semantic`, que también usa el LSP. Sin decidir.
+`zymbol_semantic::ModuleTables` guarda los ficheros ya parseados y lo ya resuelto —la memoria de `GLB-142` es parte de él—;
+`check_file` mantiene uno para toda la comprobación, y `run` y `build` uno para sus tres tablas. Las funciones libres
+`module_arities`, `module_out_slots` y `module_exports` no cambian de firma: cada una usa uno nuevo, así que el LSP, que
+comprueba un búfer contra ficheros que cambian, ve lo que veía. Después, con el mismo programa de arriba:
+
+| k | `zymbol check` |
+|---|---|
+| 1 | 12,5 ms |
+| 4 | 13,2 |
+| 16 | 14,9 |
+| 32 | 18,0 |
+
+`zymbol check GO/試験/api試験.zy`: 5,9 ms (56 antes de `GLB-142`, 25 entre los dos).
+
+### Qué lo sujeta
+
+`one_module_tables_parses_a_shared_module_once`, en `zymbol-semantic/src/call_arity.rs`: dos ficheros que importan el
+mismo módulo y las tres tablas de cada uno con un solo `ModuleTables`; el contador de parseos exige uno. No pudo verse en
+rojo antes: el objeto es la corrección. Lo que estaba en rojo era la medición de arriba, que se archivó antes del arreglo.
