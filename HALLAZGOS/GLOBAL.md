@@ -9472,9 +9472,11 @@ distinto. La regla que quedó es la de la VM: `<~ f(…)` a la propia función, 
 
 ## GLB-134 — El binario estático de Linux (musl) es hasta 17 veces más lento que el de glibc en lo que reserva bloques grandes
 
-**Estado:** **abierto** — reproducido el 2026-10-16 con los binarios oficiales de la v0.0.10. Es PERF-08 de la etapa 2
-(`interpreter/ROADMAP_V0011_ES.md`): es de empaquetado y se decide en la release. Sin celda: esta máquina no tiene el
-target `x86_64-unknown-linux-musl`, así que nada de la puerta puede construir el estático ni medirlo
+**Estado:** **corregido 2026-10-19** — reproducido el 2026-10-16 con los binarios oficiales de la v0.0.10, y medido y
+corregido el 2026-10-19 en el `HEAD` por decisión del autor (grupo 4 del plan de cierre,
+`interpreter/ROADMAP_V0011_ES.md`: medir el estático y, si algo quedaba por encima de ×1,5, `mimalloc` sólo para ese
+target, debajo del asignador que cuenta). Sin celda: la puerta no construye el estático; lo sujeta la medición de abajo,
+que hay que repetir en la release
 **Encontrado por:** ZyBigBench (PERF-08), que lo midió en otra máquina; aquí no se había reproducido
 **Familia:** [`ZYVM-023`](zyvm.md) y [`GLB-130`](GLOBAL.md): lo que más se dispara es lo que copiaba un texto entero
 
@@ -9500,10 +9502,39 @@ Las dos operaciones peores eran justo copias de un texto entero, y esta rama ya 
 búfer (ZYVM-023) y un corte copia sólo el trozo (GLB-130). Cuánto queda de la diferencia en el `HEAD` no se ha
 medido: hace falta construir el estático.
 
-### Lo que hay que decidir
+### Medido en el `HEAD` (2026-10-19)
 
-En la release. La recomendación del mapa de ruta: `mimalloc` sólo para el target musl, detrás del asignador que cuenta
-para `--count`.
+Esta máquina no tenía el target: se instaló con `rustup target add x86_64-unknown-linux-musl`, y el C de `ring` y de
+`mimalloc` se compiló con el `gcc` del sistema (la CI usa `musl-gcc`, de `musl-tools`). Los dos binarios sin `std/db`,
+del mismo commit; tiempo de CPU, mediana de 5; pico de memoria (`ru_maxrss`):
+
+| programa | glibc | musl | musl + `mimalloc` |
+|---|---:|---:|---:|
+| «hola» | 10,9 MiB | 10,8 MiB | 10,8 MiB |
+| `s = s "x"`, 2 000 000 | 113 ms / 10,6 MiB | 233 ms / 10,8 MiB | 123 ms / 13,4 MiB |
+| interpolación, 2 000 000 | 436 ms | 652 ms | 454 ms |
+| 200 000 claves de diccionario | 67 ms / 24,5 MiB | 98 ms / 21,8 MiB | 60 ms / 23,4 MiB |
+| recorrer 2 000 000 «ñ» | 196 ms / 12,6 MiB | 301 ms / 10,9 MiB | 191 ms / 13,0 MiB |
+| 1 000 000 de cierres | 137 ms | 161 ms | 109 ms |
+| `hof_chain` | 342 ms / 16,0 MiB | 397 ms / 11,5 MiB | 348 ms / 19,3 MiB |
+| los 16 programas de `bench/big`, frente a glibc | — | ×1,052 | ×0,983 |
+
+Lo peor ya no era ×17 sino ×2,1 —`s = s "x"`—: esta rama dejó de copiar textos enteros (`ZYVM-023`, `GLB-130`). Seguía
+por encima de ×1,5.
+
+### Corrección (2026-10-19)
+
+`mimalloc` (0.1.52, con `libmimalloc-sys` 0.1.49) como asignador de debajo del `CountingAllocator`, sólo con
+`target_env = "musl"`: los binarios de glibc, macOS y Windows siguen con el del sistema. `--count` da exactamente las
+mismas cifras con los dos. Tal como viene, `mimalloc` retenía memoria: compromete un arena entero al empezar y devuelve
+las páginas libres al cabo de un segundo, y un programa que hace crecer un texto llegaba al doble de pico (21,2 MiB contra
+10,6). `tune_allocator` (`zymbol-cli/src/main.rs`) fija al arrancar tres opciones: compromiso bajo demanda, un primer
+arena de 4 MiB y purgar a los 20 ms. Purgar en el acto dejaba la memoria como glibc pero devolvía el tiempo perdido en
+`hof_chain` (×1,22, crea y suelta arrays de 100 000 en un bucle); a 20 ms, ×1,04. Lo que queda es un pico de 1 a 6 MiB
+más en los programas que hacen crecer colecciones o textos, y 160 KB más de binario.
+
+Comprobado con el estático: 672 de 672 goldens y 0 divergencias en 709 ficheros con los dos motores
+(`zyq … --without STD_DB`, porque el estático no lleva `std/db`).
 
 ---
 
