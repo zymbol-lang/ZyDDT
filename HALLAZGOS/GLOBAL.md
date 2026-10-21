@@ -9700,7 +9700,11 @@ La propia suite `fmt`, sobre los dos ficheros que lo encontraron.
 
 ## GLB-139 — `s[i]` y un corte buscan su posición recorriendo el texto: cuadráticos dentro de un bucle — en la VM y el tree-walker con un texto no ASCII, en zyjs con cualquiera
 
-**Estado:** **abierto** en `zytw` y `zyjs`, como deuda declarada de la v0.0.11 por decisión del autor;
+**Estado:** **corregido 2026-10-21 en `zytw` y `zyjs`** — decidido ese día por el autor, **B** entre tres salidas (A,
+sólo zyjs; C, mantener la deuda): deroga la deuda declarada del 2026-10-19 para estos dos motores, porque la etapa 4, que
+iba a sustituir zyjs, está en pausa, y zyjs tardaba 9,4 s con 32 000 caracteres. Cierra también [`ZYTW-016`](zytw.md).
+Lo que se hizo y lo que lo sujeta, en «Corrección en `zytw` y `zyjs`» abajo. Antes: **abierto** en `zytw` y `zyjs`, como
+deuda declarada de la v0.0.11 por decisión del autor;
 **corregido en `zyvm`** el mismo día que se encontró, el 2026-10-19, al revisar `zyquality/bench/big/HALLAZGOS.md`
 contra la rama `v0.0.11`. Es lo que [`ZYVM-028`](zyvm.md) dejó dicho en una frase («un texto no ASCII sigue
 recorriéndose hasta la posición») sin ficha ni caso. Sujeto por `growth/index-a-text` de `zyquality/cost`
@@ -9773,6 +9777,33 @@ recorrido dentro de una instrucción. La corrección, `zyquality/corpus/strings/
 en y después de cada miga con caracteres de uno a cuatro bytes, cortes que la cruzan, y un texto que crece después de
 indexarse— y las pruebas `char_byte_agrees_with_a_walk_from_the_start` y
 `the_crumbs_of_a_text_nobody_indexes_cost_one_word` de `zy_str.rs`.
+
+### Corrección en `zytw` y `zyjs` (2026-10-21)
+
+- **`zytw`**: `Value::String` guarda un `Text` (`zymbol_common::text`) en vez de un `String`: un `Rc` con su número de
+  caracteres y sus migas, el mismo modelo que `ZyStr` sin la forma en línea ni el código `unsafe`. Leer una variable ya
+  no copia el texto ([`ZYTW-016`](zytw.md)), y `s[i]`, un corte, `s$#` y la cuenta de `#?` usan el recuento guardado y
+  la miga más cercana. Una escritura en el sitio (`s = s x`, `$+`, `$++`) pasa por `Text::edit`, que copia antes si el
+  texto está compartido y olvida el recuento y las migas. Las migas se construyen y se recorren con las mismas funciones
+  que la VM (`crumbs_of`, `byte_from_crumb`), que dejó de tener su copia. Un `Value` pasa de 24 a 16 bytes, como el de la
+  VM.
+- **`zyjs`**: un texto guarda sus caracteres la primera vez que se le piden (`strChars`, en el valor). Es seguro porque
+  zyjs nunca cambia un texto en el sitio: cada edición hace uno nuevo con `mkStr`. Lo usan el índice, los tres cortes
+  (`$[a..b]`, hacia atrás y `$[a:n]`), `s$#`, `$??`, la cuenta de `#?` y las longitudes de los límites.
+
+| programa de arriba, «ñ» | antes | después |
+|---|---:|---:|
+| `zytw`, 8 000 → 32 000 | 55 → 718 ms (×13) | 14 → 36 ms (×2,6) |
+| `zyjs`, 8 000 → 32 000 | 536 → 9 438 ms (×17,6) | 190 → 537 ms (×2,8) |
+| `zyjs`, cortes (`growth/slice-a-text`), 6 000 → 24 000 | 677 → 11 534 ms | 318 → 714 ms |
+
+Verificado contra el alias, que es el riesgo de compartir: una escritura en el sitio por cada camino (`s = s x`, `$+`,
+`$++`, un parámetro, un texto dentro de un array) no llega a la variable que compartía el texto, y después de cada
+escritura el índice y el corte ven el texto nuevo, también más allá de la miga 64; los tres motores dan lo mismo. Lo
+sujetan los mismos casos de `cost`, ahora **por reloj en los tres motores** (el tree-walker a 200 000, zyjs a 6 000):
+`growth/index-a-text`, `growth/slice-a-text` y `growth/read-a-text`, estos dos con zyjs añadido; y en Rust,
+`text_positions_agree_with_a_walk_from_the_start` y `an_edit_forgets_what_the_text_knew_and_never_reaches_a_sharer`
+(`zymbol-common/src/text.rs`).
 
 ---
 
