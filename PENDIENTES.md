@@ -33,10 +33,7 @@
 
 ## 1. Del lenguaje: decidido, sin corregir
 
-| ID | Qué | Motores | Origen | Comprobado |
-|---|---|---|---|---|
-| GLB-139 | `s[i]` y un corte buscan su posición recorriendo el texto: cuadrático en un bucle | `zytw`, `zyjs` (la VM, corregida) | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-139 | 2026-10-20: `cost` `growth/index-a-text` en KNOWN. Deuda declarada de la v0.0.11 por decisión del autor |
-| ZYTW-016 | El tree-walker copia un texto cada vez que lo lee | `zytw` | `ZyDDT/HALLAZGOS/zytw.md` § ZYTW-016 | 2026-10-20: `cost` `growth/read-a-text` y `growth/slice-a-text` en KNOWN. Deuda declarada de la v0.0.11 |
+Nada, a 2026-10-21.
 
 ## 2. Decisiones de diseño sin tomar
 

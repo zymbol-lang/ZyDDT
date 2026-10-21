@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Uno abierto, `ZYTW-016`**, deuda declarada el 2026-10-16 y mantenida en la v0.0.11. `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Ninguno abierto.** `ZYTW-016`, deuda declarada el 2026-10-16, se corrigió el 2026-10-21 con el texto compartido de [`GLB-139`](GLOBAL.md). `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -985,7 +985,11 @@ Cuatro celdas en `axes/runtime-functions-hof.toml` (`block-lambda-called-for-its
 
 ## ZYTW-016 — Leer una variable de texto la copia: el texto del tree-walker no tiene `Rc`
 
-**Estado:** **abierto** — deuda declarada el 2026-10-16, y **se mantiene en la v0.0.11** por decisión del autor del
+**Estado:** **corregido 2026-10-21** — por decisión del autor ese día, con la salida B de [`GLB-139`](GLOBAL.md):
+`Value::String` guarda un `Text` compartido (`zymbol_common::text`), y leer la variable copia un puntero. El programa de
+abajo, de 2 000 a 8 000: `bytes` 0,20 MB → 0,68 MB (antes 8,1 MB → 128 MB). Sujeto por `growth/read-a-text` y
+`growth/slice-a-text`, sin `open_finding` y por reloj también en el tree-walker. Antes: **abierto** — deuda declarada el
+2026-10-16, y **se mantenía en la v0.0.11** por decisión del autor del
 2026-10-19 (grupo 1 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`), junto con la mitad de [`GLB-139`](GLOBAL.md)
 que es del tree-walker. Antes de eso: el mapa de ruta de la v0.0.11
 (`interpreter/ROADMAP_V0011_ES.md`, etapa 2, PERF-05 b) dice que se archiva con su caso `KNOWN`, y el rendimiento del
