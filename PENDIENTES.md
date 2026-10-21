@@ -66,9 +66,7 @@ Corregidas en su origen, a falta de una medición que la puerta no puede hacer.
 
 ## 4. Documentación
 
-| ID | Qué | Origen | Comprobado |
-|---|---|---|---|
-| ERROR-BEN-004 | `MANUAL.md` sigue diciendo que la VM es «~1.1–1.5× más rápida que Python en la mayoría de las cargas», y no se sostiene fuera de los bucles de enteros. El documento está marcado como instantánea obsoleta de la v0.0.4, pero la frase sigue ahí | `zyquality/bench/python/HALLAZGOS.md` § ERROR-BEN-004 | 2026-10-21: `interpreter/MANUAL.md:121` |
+Nada, a 2026-10-21.
 
 ## 5. Restos en las aplicaciones
 
