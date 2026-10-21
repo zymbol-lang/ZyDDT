@@ -9080,9 +9080,11 @@ una causa que no es ésta.
 
 ## GLB-127 — `>> +a`: el `+` unario al principio de un elemento de `>>` lo rechazan `zytw` y `zyvm`, y `zyjs` lo acepta
 
-**Estado:** **abierto** — hallado y sin corregir. Sujeto por la celda `runtime-operators/unary-plus-starts-an-output-item`
-(`open_finding`). No hay nada que decidir: la forma ya está decidida (GLB-019, 2026-09-15: *el `+` unario es forma del
-lenguaje*) y `GUIDE.md` la documenta. Falta que el parser de `>>` la acepte
+**Estado:** **corregido 2026-10-21** — sin decisión que tomar: la forma la decidió GLB-019 (2026-09-15, *el `+` unario es
+forma del lenguaje*). `parse_output_item_term` acepta `Plus` junto a `Not | Minus`; zyjs no cambia. Verificado en los tres
+motores con el valor y el código de salida: `>> +a`, `>> 0 + +a`, `>> 2 * +a`, `>> +a ^ 2`, `>> ++a` (rechazo igual en los
+tres), `>> +-a`, y `+` sobre String, `""`, array, `[]` y Bool (mismo aviso, mismo error de ejecución, salida 1 en los
+tres). El barrido destapó [`GLB-144`](GLOBAL.md), que este arreglo agravaba, y [`GLB-145`](GLOBAL.md)
 **Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 3.5: al ejecutar todos los bloques de `GUIDE.md`, no sólo
 los anotados, `>> +a ¶ // 10` no pasaba `zymbol check`
 **Familia:** [`GLB-019`](GLOBAL.md) — la celda que lo decidió usa `(+v)` y `x = (+v)`, que sí pasan, y no cubría esta posición
@@ -9106,10 +9108,9 @@ puso ahí el `-`, lista exactamente esas dos. El `+` unario llegó a `parse_unar
 
 ### Qué lo sujeta
 
-La celda de arriba, con `open_finding = { zytw = "GLB-127", zyvm = "GLB-127" }`: el día que pasen, queda en rojo hasta
-cerrar esta ficha. El arreglo es de una línea en el parser (añadir `Plus` junto a `Not | Minus`), y **no se ha hecho**:
-es lo que el plan pide que no se haga fuera de su paso. `+"a"` dará entonces el error de tipo documentado en vez de uno
-de sintaxis.
+`runtime-operators/unary-plus-starts-an-output-item` (sin `open_finding` desde el 2026-10-21, con oráculo) y
+`runtime-operators/unary-plus-after-an-operator-in-output`, para la otra posición donde el término empieza: tras `+`,
+`*` y antes de `^`. `+"a"` da ya el error de tipo documentado en vez de uno de sintaxis.
 
 ## GLB-128 — El Gate de GitHub da dos «sin veredicto» que son del entorno: un repositorio privado y un runner más rápido que la máquina donde se calibró
 
@@ -9992,3 +9993,47 @@ comprueba un búfer contra ficheros que cambian, ve lo que veía. Después, con 
 `one_module_tables_parses_a_shared_module_once`, en `zymbol-semantic/src/call_arity.rs`: dos ficheros que importan el
 mismo módulo y las tres tablas de cada uno con un solo `ModuleTables`; el contador de parseos exige uno. No pudo verse en
 rojo antes: el objeto es la corrección. Lo que estaba en rojo era la medición de arriba, que se archivó antes del arreglo.
+
+## GLB-144 — En `>>`, un texto interpolado no tomaba operadores ni postfijo en `zytw` y `zyvm`: `>> "a{x}" -1` imprimía `a3-1`
+
+**Estado:** **corregido 2026-10-21** — sin decisión que tomar: la regla está escrita (`REFERENCE.md` § `>>`, `GUIDE.md`
+§ salida: *`+` y `-` unen dos argumentos, no los separan*) y un texto interpolado es un literal de texto. `parse_output`
+(`zymbol-parser/src/io.rs`) ya no lo toma aparte: pasa por `parse_output_item` como cualquier otro elemento, y
+`parse_primary_expr` construye el mismo `InterpolatedString`, así que `zymbol fmt` reimprime lo mismo. zyjs no cambia
+**Encontrado por:** el barrido de tipos y posiciones de [`GLB-127`](GLOBAL.md): con `+` aceptado al empezar un elemento,
+`>> "a{x}" +a` pasaba de error de sintaxis a imprimir `a=1010` sin aviso; con `-` ya lo hacía antes
+**Familia:** [`GLB-127`](GLOBAL.md); `>>~` no lo tenía: `parse_output_items_same_line` siempre llamó a `parse_output_item`
+
+```zymbol
+x = 3
+>> "a{x}" -1 ¶
+```
+
+Antes del arreglo, cada forma con el texto interpolado y con su control en texto plano (`"a3"`):
+
+| forma | `zytw` = `zyvm`, interpolado | `zytw` = `zyvm`, plano | `zyjs`, los dos |
+|---|---|---|---|
+| `"a{x}" -1` | `a3-1` | error de aritmética | error de aritmética |
+| `"a{x}" +1` | `a31` | `+ is arithmetic only` | `+ is arithmetic only` |
+| `"a{x}" * 2` | `expected expression, found '*'` | error de aritmética | error de aritmética |
+| `"a{x}"$#` | `expected expression, found '$#'` | `2` | `2` |
+| `"a{x}"[1]` | `a3[1]` | `a` | `a` |
+| `"a{x}" [1, 2]` | `a3[1, 2]` | `expected ']' after index` | `expected ']' after index` |
+| `"a{x}" .x` | `expected expression, found '.'` | `the dot reaches a dictionary key` | ídem |
+
+Después, las 16 formas (las siete, sus controles y `"a{x}" (1)`, `"a{x}" !#1`) dan lo mismo en los tres motores, y el
+interpolado lo mismo que el plano.
+
+### Por qué
+
+El cierre de `parse_output` tenía una rama propia para `StringInterpolated`, de cuando el texto se expandía en piezas; al
+pasar a un solo literal (para que el formateador reimprimiera lo escrito) la rama se quedó, y con ella el atajo que saltaba
+los operadores y el postfijo. El comentario de al lado decía además que un literal no toma postfijo (`"text" [1,2,3]` como
+dos elementos), lo que ya era falso para el texto plano; se corrigió.
+
+### Qué lo sujeta
+
+Cuatro celdas de `runtime-operators`, la primera con oráculo: `interpolated-string-takes-postfix-in-output`,
+`interpolated-string-minus-joins-in-output`, `interpolated-string-plus-joins-in-output` y el control
+`interpolated-string-juxtaposes-in-output` (con oráculo: lo que va entre paréntesis o es un nombre sigue siendo un segundo
+elemento). Con el parser de antes, las tres primeras dan rojo; está en la tabla de arriba.
