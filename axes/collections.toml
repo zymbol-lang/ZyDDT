@@ -118,6 +118,42 @@ fs = [() -> 1, () -> "s"]
 >> fs$# ¶
 """
 
+# A unary over a literal has the literal's kind. Until 2026-10-21 zyjs gave it
+# none when checking an edit, and said nothing: `[1] $+ !#1` and `a[1]$~ !#1`
+# ran in the browser while both Rust analysers refuse them (ZYJS-069). The
+# literal `[1, !#1]` was already checked by another path, in all three.
+
+[[cell]]
+id      = "a-negated-bool-appended-to-ints-is-checked"
+premise = "COL-3"
+expect  = "error"
+what    = "`[1] $+ !#1` — `!#1` is a Bool, appended to `[Int]` (ZYJS-069)"
+src     = """
+a = [1] $+ !#1
+>> a ¶
+"""
+
+[[cell]]
+id      = "a-negated-bool-written-into-ints-is-checked"
+premise = "COL-3"
+expect  = "error"
+what    = "`a[1]$~ !#1` — the write half of the edit family, same check (ZYJS-069)"
+src     = """
+a = [1, 2]
+a[1]$~ !#1
+>> a ¶
+"""
+
+[[cell]]
+id      = "a-negated-number-appended-to-numbers-is-not-a-mix"
+premise = "COL-3"
+expect  = "ok"
+what    = "the control: `[1] $+ -3` stays `[Int]` (ZYJS-069)"
+src     = """
+a = [1] $+ -3
+>> a ¶
+"""
+
 # ── COL-4: the tuple is positional, immutable, unordered ────────────────────
 
 [[cell]]

@@ -3608,3 +3608,37 @@ llamada, `[f()]`, sigue por el camino que copia. `growth/append-rows`, 8 000 →
 ### Qué lo sujeta
 
 `growth/append-rows` en `zyquality/cost/cost.toml`, por reloj en zyjs y por `--count` en los motores de Rust.
+
+## ZYJS-069 — `[1] $+ !#1`: con un unario como operando, zyjs no comprobaba la colección estricta y ejecutaba lo que Rust rechaza
+
+**Estado:** **corregido 2026-10-21** — sin decisión que tomar: la colección `[…]` es homogénea (COL-3) y la edición entera
+se comprueba (L46). `staticKind` no conocía `UnaryOp` y devolvía `null`, que en esa comprobación significa «no digo
+nada». Ahora un `!` sobre un Bool es Bool, y un `-` o `+` sobre un Int o un Float conserva su tipo; cualquier otro
+operando sigue sin decir nada
+**Encontrado por:** el barrido de [`GLB-145`](GLOBAL.md), al probar un unario como argumento de `$+`
+**Motores:** `zyjs`. Los dos analizadores Rust lo rechazaban ya
+
+```zymbol
+a = [1] $+ !#1
+>> a ¶
+```
+
+| forma | `zytw` = `zyvm` | `zyjs` antes | `zyjs` después |
+|---|---|---|---|
+| `[1] $+ !#1` | `cannot append Bool to [Int]` | `[1, #0]` | `cannot append Bool to [Int]` |
+| `[#1] $+ -3` | `cannot append Int to [Bool]` | `[#1, -3]` | `cannot append Int to [Bool]` |
+| `a[1]$~ !#1`, con `a = [1]` | `cannot write Bool to [Int]` | `[#0]` | `cannot write Bool to [Int]` |
+| `[1, !#1]` (el literal) | rechazo | rechazo | rechazo |
+
+El comentario de `shapeOf` dice que, donde sólo Rust decide, Rust *avisa* y no rechaza, y que por eso los dos ejecutan
+los mismos programas. Aquí Rust rechazaba, así que eso dejaba de ser cierto.
+
+Al darle celda salió el resto, que ya estaba antes sin unario (`[1] $+ #0`): el rechazo de la edición no decía en qué
+línea —un `CollectionOp` no la lleva— y plegaba la ayuda en el mensaje con una raya, donde los motores Rust la dan en su
+línea `= help:`. Ahora señala el elemento (o, sin él, el receptor) y separa la ayuda, como ya hacía el rechazo del
+literal; `zyquality/messages/baseline.txt` cambia esas dos entradas de zyjs a la forma nueva.
+
+### Qué lo sujeta
+
+`collections/a-negated-bool-appended-to-ints-is-checked`, `collections/a-negated-bool-written-into-ints-is-checked` y el
+control `collections/a-negated-number-appended-to-numbers-is-not-a-mix`, las tres de COL-3.
