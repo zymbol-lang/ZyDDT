@@ -10106,3 +10106,40 @@ motores de antes (el binario anterior y el `zymbol.js` anterior) las cinco que n
 
 El barrido destapó dos más que no son de precedencia: [`GLB-146`](GLOBAL.md) (la cuenta de `#?` sobre un número
 negativo) y [`ZYJS-069`](zyjs.md) (zyjs no comprobaba la colección estricta con un unario como operando).
+
+## GLB-146 — La cuenta de `#?` sobre un número: los motores Rust cuentan el signo y zyjs no
+
+**Estado:** **corregido 2026-10-21** — decidido ese día por el autor: **A, los caracteres de lo que se muestra**, signo
+y punto incluidos (`-3` → 2, `2.5` → 3, `-2.5` → 4), entre tres salidas: B, sólo las cifras (cambiaba los tres motores,
+6 ficheros del corpus y el ejemplo de `GUIDE.md`), y C, un número cuenta 1 como un Bool (además, 88 manuales). Era lo que
+ya contaban los motores Rust, lo que decía el ejemplo `(##., 4, 3.14)` de `GUIDE.md` y lo que fijaban los 20 goldens
+del corpus. Cambia zyjs, que cuenta ahora sobre la misma escritura que `>>` (`floatText`): dejaba fuera el signo, y
+contaba un Float con la escritura de JavaScript, así que `10000000000000000000000.0` daba 5 y `0.00000015` daba 6,
+contra 23 y 10. Cambia la tabla de `GUIDE.md` § 2, que decía «digit count». Verificado en los tres motores con 17 Float
+y 7 Int, los extremos incluidos (`1.5e300` → 301, `-9007199254740991` → 17), y bajo `#०९#` y `#٠٩#`: lo mismo en los
+tres. Sujeto por `type-symbol/negative-number-count` (con oráculo) y `type-symbol/float-count-is-its-display-length`;
+con el `zymbol.js` anterior las dos divergen
+**Encontrado por:** el barrido de [`GLB-145`](GLOBAL.md): `(-x)#?`
+**Motores:** divergen `zytw` = `zyvm` contra `zyjs`
+
+```zymbol
+a = -3
+b = 0
+c = -2.5
+d = 2.5
+e = -10
+f = "-3"
+>> a#? b#? c#? d#? e#? f#? ¶
+```
+
+| | `-3` | `0` | `-2.5` | `2.5` | `-10` | `"-3"` |
+|---|---|---|---|---|---|---|
+| `zytw` = `zyvm` | 2 | 1 | 4 | 3 | 3 | 2 |
+| `zyjs` | 1 | 1 | 3 | 3 | 2 | 2 |
+
+`GUIDE.md` § 2 llama a la cuenta de un Int *digit count*, y a la de un Float *digit count of display*. Ninguno de los tres
+lo cumple al pie de la letra: los motores Rust cuentan los caracteres del texto (signo y punto incluidos), y zyjs quita el
+signo pero cuenta el punto (`2.5` da 3 en los tres, con dos cifras). Hay que decidir qué es la cuenta de un número —las
+cifras, los caracteres del texto o las cifras más el punto— y corregir después `GUIDE.md` o los motores. La memoria del
+proyecto dice ya que no se pregunte nada por la cuenta de `#?` (*«nunca preguntar por la cuenta de `#?`»*), y esto es una
+razón más.
