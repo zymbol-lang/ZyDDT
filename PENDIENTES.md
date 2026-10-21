@@ -72,6 +72,4 @@ Nada, a 2026-10-21.
 
 El lenguaje ya lo permite; la aplicación todavía no se ha migrado.
 
-| ID | Qué | Origen |
-|---|---|---|
-| ZethyCLI G4 (resto) | `lib/config.zy` sigue leyendo su configuración con `jq` a través de `<\ \>` | `ZethyCLI/GAPS.md` § G4 y su fila |
+Nada, a 2026-10-21.
