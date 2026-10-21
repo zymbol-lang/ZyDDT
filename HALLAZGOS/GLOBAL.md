@@ -10037,3 +10037,72 @@ Cuatro celdas de `runtime-operators`, la primera con oráculo: `interpolated-str
 `interpolated-string-minus-joins-in-output`, `interpolated-string-plus-joins-in-output` y el control
 `interpolated-string-juxtaposes-in-output` (con oráculo: lo que va entre paréntesis o es un nombre sigue siendo un segundo
 elemento). Con el parser de antes, las tres primeras dan rojo; está en la tabla de arriba.
+
+## GLB-145 — `-v[1]`, `!b[1]`, `-v$#`: los motores Rust aplican el unario antes que el postfijo y zyjs después
+
+**Estado:** **corregido 2026-10-21** — decidido ese día por el autor: **A, el postfijo une más fuerte** (`-v[1]` es
+`-(v[1])`), entre tres salidas y con los programas de abajo delante. Los tres caminos del parser Rust donde empieza un
+unario —la expresión (`parse_unary`), el argumento de `$+` (`parse_postfix_structural`) y el elemento de `>>`
+(`parse_output_item_term`)— pasan por un solo `parse_prefixed`, al que cada uno da su postfijo. En zyjs, que ya leía
+A, el operando del unario conserva el «sin encadenar» del argumento de `$+`: `[1] $+ -4 $+ 5` fallaba con `cannot
+append to Int`, porque se leía `[1] $+ -(4 $+ 5)`; y su analizador nombra ya el tipo de `x#?`, `(String, Int, Any)`,
+así que `-x#?` avisa como en Rust. `IMPLEMENTATION.md` § 10 cambia el orden de sus dos niveles. La única
+forma que deja de dar un valor es `-x#?`, que antes era el tipo de `-x` y ahora niega la tupla de `#?` (error en los
+tres); `(-x)#?` es la forma que lo pregunta. En el código de las aplicaciones no aparece ninguna vez. Antes de decidirse,
+la celda no tenía `expect` y llevaba `open_finding = "GLB-145"`; la sustituyen las de abajo
+**Encontrado por:** el barrido de [`GLB-127`](GLOBAL.md): `>> +v[1]`, y después lo mismo fuera de `>>`
+**Motores:** divergen `zytw` = `zyvm` contra `zyjs`
+
+```zymbol
+v = [4, 5]
+r = -v[1]
+>> r ¶
+```
+
+| forma | `zytw` = `zyvm` | `zyjs` | `check` |
+|---|---|---|---|
+| `r = -v[1]` | `negation requires numeric operand, got Array` | `-4` | aviso `unary - on non-numeric type: [Int]` |
+| `r = +v[1]` | `unary plus requires numeric operand, got Array` | `4` | aviso |
+| `r = !b[1]` | error en ejecución | `#0` | aviso `logical not on non-boolean type: [Bool]` |
+| `r = -v$#` | error en ejecución | `-2` | aviso |
+| `>> -v$#` | `expected expression, found '$#'` | `-2` | — |
+| `r = -f()` | `-6` | `-6` | — |
+| `>> -(v[1])` | `-4` | `-4` | — |
+
+### Lo que hay escrito
+
+- `interpreter/IMPLEMENTATION.md` § 10 (la jerarquía de la EBNF) pone el unario **por encima** del postfijo, que es lo
+  que hacen los motores Rust. Pero ese documento es derivado: describe el parser, no lo decide (`HOW_TO_CHANGE_ZYMBOL.md`,
+  salida 1).
+- Los propios motores Rust no lo cumplen con las llamadas: `-f()` es `-(f())`, porque la llamada se reconoce dentro del
+  primario.
+- El comentario de DI-03 en `parse_output_item_term` lo dejó fuera a sabiendas: *«`>> -(arr$#)` is the form that works,
+  and changing that is a precedence question of its own»*.
+
+### Las dos salidas
+
+- **A — el postfijo une más fuerte** (zyjs, y Python, C y JavaScript): `-v[1]` es `-(v[1])`. Cambian los motores Rust en
+  `parse_unary` (que hoy termina en `parse_primary_expr`) y `IMPLEMENTATION.md` § 10.
+- **B — el unario une más fuerte** (lo escrito en `IMPLEMENTATION.md`): cambia zyjs, y las llamadas de los motores Rust
+  pasan a ser `(-f)()`.
+
+Recomendación: **A**. Con B, `-v[1]`, `!b[1]` y `-v$#` no tienen ningún programa correcto: negar una colección es siempre
+un error, y el analizador ya avisa de ello. A da a cada una de esas formas el único significado que puede funcionar, y es
+el que ya tienen las llamadas en los tres motores.
+
+Una consecuencia que no es del lenguaje: mientras la celda estuvo sin decidir, era lo único que provocaba el aviso
+`logical not on non-boolean type` (`!b[1]`), y se quitó de `zyquality/messages/reach.baseline`. Con A, `!b[1]` ya no
+avisa, y `reach` lo dio por no provocado. No volvió a la línea base: tiene una celda propia,
+`runtime-operators/logical-not-on-a-non-boolean` (`!n` con `n = 7`), como la tenía ya su hermano `unary -`.
+
+### Qué lo sujeta
+
+Seis celdas de `runtime-operators`, cinco con oráculo: `unary-binds-around-a-postfix` (índice, `$#`, clave y `!` sobre
+un elemento), `negated-membership-needs-no-parentheses` (`? !vistos$? 5`, la forma que diecisiete sitios escribían
+entre paréntesis), `unary-binds-around-a-postfix-in-output`, `unary-in-an-append-argument-does-not-chain`, el control
+`unary-and-a-call-unchanged` (`!es_par(3)` y `-2 ^ 2` = 4, como antes) y `unary-over-a-type-query-is-refused`. Con los
+motores de antes (el binario anterior y el `zymbol.js` anterior) las cinco que no son el control dan `WRONG`, y
+`unary-in-an-append-argument-does-not-chain` también en `zyjs`.
+
+El barrido destapó dos más que no son de precedencia: [`GLB-146`](GLOBAL.md) (la cuenta de `#?` sobre un número
+negativo) y [`ZYJS-069`](zyjs.md) (zyjs no comprobaba la colección estricta con un unario como operando).

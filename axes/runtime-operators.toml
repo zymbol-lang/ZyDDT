@@ -498,6 +498,19 @@ x = "a"
 """
 
 [[cell]]
+id     = "logical-not-on-a-non-boolean"
+expect = "warn"
+what   = "`n = 7`, then `!n`: the analysers warn `logical not on non-boolean type: Int`. Until GLB-145 the only provoker of this warning was `!b[1]`, read as `!` over an array"
+src    = """
+n = 7
+!? {
+    >> (!n) ¶
+} :! {
+    >> "refused" ¶
+}
+"""
+
+[[cell]]
 id     = "arithmetic-on-a-name-holding-an-inferred-number"
 expect = "ok"
 what   = "the control: a name given a parameter inferred numeric holds a `Number`, which is numeric — `x = a`, then `x - 1`, warns nothing"
@@ -715,4 +728,115 @@ s, t = "a", "b"
 for _ in range(4):
     print("refused")
 print(s, s + t)
+"""
+
+# ── A unary applies to its operand with the operand's postfix (GLB-145) ──
+#
+# Decided by the author on 2026-10-21, option A of three: the postfix binds
+# tighter. `-v[1]` is `-(v[1])`, `!seen$? x` is `!(seen$? x)`. The Rust engines
+# read `(-v)[1]` until that day — negating an array, which can only fail — and
+# zyjs already read it so. Each cell asks the value, against Python, in the
+# three places a unary starts: an expression, an item of `>>`, and the argument
+# of `$+`, which takes no `$` operation of its own (`[1] $+ -4 $+ 5` is
+# `([1] $+ -4) $+ 5` — zyjs lost that through a unary until the same day).
+
+[[cell]]
+id     = "unary-binds-around-a-postfix"
+expect = "ok"
+what   = "`-v[1]`, `!b[1]`, `-v$#`, `-d.precio`: the unary applies to the element, the length, the key (GLB-145)"
+src    = """
+v = [4, 5]
+b = [#1, #0]
+d = #(precio: 10)
+r = -v[1]
+s = !b[1]
+t = -v$#
+u = -d.precio
+>> r " " s " " t " " u ¶
+"""
+oracle.py = """
+v = [4, 5]; b = [True, False]; d = {"precio": 10}
+zy_bool = lambda x: "#1" if x else "#0"
+print(-v[0], zy_bool(not b[0]), -len(v), -d["precio"])
+"""
+
+[[cell]]
+id     = "negated-membership-needs-no-parentheses"
+expect = "ok"
+what   = "`? !vistos$? 5`: the negation of a membership test, the form 17 places wrote as `!(vistos$? 5)` (GLB-145)"
+src    = """
+vistos = [3, 7]
+n = 0
+? !vistos$? 5 { n = n + 1 }
+? !vistos$? 7 { n = n + 10 }
+? !(vistos$? 3) { n = n + 100 }
+a = !vistos$? 5
+b = !vistos$? 7
+>> n " " a " " b ¶
+"""
+oracle.py = """
+vistos = [3, 7]
+zy_bool = lambda x: "#1" if x else "#0"
+n = 0
+if 5 not in vistos: n += 1
+if 7 not in vistos: n += 10
+if not (3 in vistos): n += 100
+print(n, zy_bool(5 not in vistos), zy_bool(7 not in vistos))
+"""
+
+[[cell]]
+id     = "unary-binds-around-a-postfix-in-output"
+expect = "ok"
+what   = "`>> -v[1]`, `>> 2 * -v[2]`, `>> -v$# ^ 2`: inside `>>` too, with `^` still outside the unary (GLB-145)"
+src    = """
+v = [4, 5]
+>> -v[1] ¶
+>> 2 * -v[2] ¶
+>> -v$# ^ 2 ¶
+"""
+oracle.py = """
+v = [4, 5]
+print(-v[0])
+print(2 * -v[1])
+print((-len(v)) ** 2)
+"""
+
+[[cell]]
+id     = "unary-in-an-append-argument-does-not-chain"
+expect = "ok"
+what   = "`[1] $+ -v[2] $+ 6` is `([1] $+ -(v[2])) $+ 6`: the unary takes the index and leaves the next `$+` (GLB-145)"
+src    = """
+v = [4, 5]
+w = [1] $+ -4 $+ 5
+x = [1] $+ -v[2] $+ 6
+>> w " " x ¶
+"""
+oracle.py = """
+v = [4, 5]
+print([1] + [-4] + [5], [1] + [-v[1]] + [6])
+"""
+
+[[cell]]
+id     = "unary-and-a-call-unchanged"
+expect = "ok"
+what   = "the control: `!es_par(3)` and `-2 ^ 2` read as they did before the decision — a call, and `^`, which is not a postfix (GLB-145)"
+src    = """
+es_par(n) { <~ n % 2 == 0 }
+r = !es_par(3)
+s = -2 ^ 2
+>> r " " s ¶
+"""
+oracle.py = """
+zy_bool = lambda x: "#1" if x else "#0"
+print(zy_bool(not (3 % 2 == 0)), (-2) ** 2)
+"""
+
+[[cell]]
+id     = "unary-over-a-type-query-is-refused"
+expect = "error"
+what   = "`-x#?` is `-(x#?)`: negating the tuple `#?` returns, an error — `(-x)#?` is the form that asks the type of `-x` (GLB-145)"
+src    = """
+x = 3
+t = -x#?
+>> t ¶
 """
