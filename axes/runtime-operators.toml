@@ -193,7 +193,83 @@ src    = """
 a = 10
 >> +a ¶
 """
-open_finding = { zytw = "GLB-127", zyvm = "GLB-127" }
+oracle.py = """
+print(+10)
+"""
+
+# ── A unary plus after an operator inside one output item (GLB-127) ──
+#
+# The cell above held GLB-127 until 2026-10-21. `>> 0 + +a` failed in the Rust
+# parser the same way, one level down: the right-hand side of `+` in `>>` is a
+# term, and the term only knew `-` and `!`. `* +a` and `+a ^ 2` reach it too.
+
+[[cell]]
+id     = "unary-plus-after-an-operator-in-output"
+expect = "ok"
+what   = "`>> 0 + +a`, `>> 2 * +a`, `>> +a ^ 2`: the unary plus is a term, as `-` is (GLB-127)"
+src    = """
+a = 3
+>> 0 + +a ¶
+>> 2 * +a ¶
+>> +a ^ 2 ¶
+"""
+oracle.py = """
+a = 3
+print(0 + +a)
+print(2 * +a)
+print((+a) ** 2)
+"""
+
+# ── An interpolated string in `>>` is a string literal (GLB-144) ──
+#
+# The Rust `>>` parser took an interpolated string ahead of everything else, as
+# an item of its own: no operator and no postfix applied to it, so `"a{x}" -1`
+# printed `a3-1` where `"a3" -1` is the documented arithmetic error, and
+# `"a{x}"$#` was a syntax error. zyjs treated both strings alike. The cells ask
+# the consequence: the value that comes out, or that nothing does.
+
+[[cell]]
+id     = "interpolated-string-takes-postfix-in-output"
+expect = "ok"
+what   = "`>> \"a{x}\"$# \"a{x}\"[1]`: a postfix applies to an interpolated string as to a plain one (GLB-144)"
+src    = """
+x = 3
+>> "a{x}"$# " " "a{x}"[1] ¶
+"""
+oracle.py = """
+s = "a3"
+print(f"{len(s)} {s[0]}")
+"""
+
+[[cell]]
+id     = "interpolated-string-minus-joins-in-output"
+expect = "error"
+what   = "`>> \"a{x}\" -1` is `\"a3\" - 1`, the arithmetic error on a string, not two items (GLB-144)"
+src    = """
+x = 3
+>> "a{x}" -1 ¶
+"""
+
+[[cell]]
+id     = "interpolated-string-plus-joins-in-output"
+expect = "error"
+what   = "`>> \"a{x}\" +1` is `\"a3\" + 1`: `+` is arithmetic only, not two items (GLB-144)"
+src    = """
+x = 3
+>> "a{x}" +1 ¶
+"""
+
+[[cell]]
+id     = "interpolated-string-juxtaposes-in-output"
+expect = "ok"
+what   = "the control: a parenthesised or named item after an interpolated string is still a second item (GLB-144)"
+src    = """
+x = 3
+>> "a{x}" (-1) x ¶
+"""
+oracle.py = """
+print("a3" + str(-1) + "3")
+"""
 
 [[cell]]
 id     = "constant-already-declared"
