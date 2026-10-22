@@ -9537,6 +9537,27 @@ más en los programas que hacen crecer colecciones o textos, y 160 KB más de bi
 Comprobado con el estático: 672 de 672 goldens y 0 divergencias en 709 ficheros con los dos motores
 (`zyq … --without STD_DB`, porque el estático no lleva `std/db`).
 
+### Comprobación intermedia (2026-10-21)
+
+La medición de la release sigue pendiente; ésta es del `HEAD` de `v0.0.11` (`daad067`), después de todo lo que cambió desde
+el 2026-10-19 —las etapas 3.1, 3.2 y 3.4, y el texto compartido del tree-walker (`GLB-139`)—. Los dos binarios del mismo
+commit, con las características por defecto (sin `std/db`, como los de la release): el estático con
+`RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target x86_64-unknown-linux-musl` y el C de `ring` y
+`mimalloc` con el `gcc` del sistema (`CC_x86_64_unknown_linux_musl=gcc`: esta máquina no tiene `musl-gcc`, sin lo cual
+la compilación falla), y el de glibc con `cargo build --release`.
+
+- **Los 16 programas** (`bench/big/ab.py`, VM, 5 rondas alternadas): media geométrica musl/glibc **×0,995**, entre ×0,860
+  y ×1,382, con los mismos pasos de `--count` en los 16. El ×1,382 era `strings_scan_long`, y era ruido: con 15 rondas,
+  ×1,039 (29,8 ms de glibc en la primera, 39,6 en la segunda).
+- **Las cuatro operaciones de la tabla de arriba** (`gap.py --no-tw --clock --runs 5`, la n mayor): `str_concat`
+  20 → 7 ms (el estático, más rápido), `str_interp` 137 → 147 ms (×1,07), `closure_create_call` 122 → 116 ms, y
+  `str_slice_small` por debajo de la resolución del reloj en los dos.
+- **Pico de memoria** (`ru_maxrss`): «hola» 10,9 → 11,0 MiB; `s = s "x"` con 2 000 000, 10,9 → 13,6; `hof_chain`
+  16,2 → 20,0 — el «de 1 a 6 MiB más» de la corrección.
+
+La corrección se sostiene. Para que la medición de la release no dependa de que alguien se acuerde, la fase 5 de
+`agents/release_installers.md` la pide ahora con los dos ficheros publicados, y dice qué cuenta como «se sostiene».
+
 ---
 
 ## GLB-135 — `@ s() { … }`: la condición de un bucle se evaluaba una vez de más en los dos motores de Rust
