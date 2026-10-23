@@ -41,7 +41,6 @@ Son del autor: implementar, aplazar con una razón, o rechazar con una razón.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| G2 | Inyección en `<\ "{v}" \>`: se interpola sin escapar | `interpreter/AGENTIC.md` § gaps, G2 | 2026-10-21: con `v = "x; echo INYECTADO"` se ejecutan las dos órdenes |
 | G3 | Sin límite de terminación en los motores Rust: un bucle infinito o una recursión de cola corren hasta un timeout externo | `interpreter/AGENTIC.md` § gaps, G3 | 2026-10-21: `zymbol run --help` no tiene ninguna opción de límite |
 | G4 | Usar una variable destruida (`\ x`) solo se detecta al ejecutar | `interpreter/AGENTIC.md` § gaps, G4 | 2026-10-21: `check` no da ningún error; `run` falla con `use after destruction` |
 | G5 | Un `??` que no cubre todos los casos solo se detecta al ejecutar | `interpreter/AGENTIC.md` § gaps, G5 | 2026-10-21: `check` no da ningún error; `run` falla con `no pattern matched` |

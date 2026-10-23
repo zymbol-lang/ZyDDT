@@ -163,3 +163,90 @@ nombre = "zymbol"
 r = <\ "echo hola {nombre}" \>
 >> r
 '''
+
+# ── A value in the command is one quoted word (G2, 2026-10-21) ──────────────
+#
+# AGENTIC.md G2, decided by the author on 2026-10-21 (option A of four): what
+# is written in `<\ … \>` is the command, and every value placed in it is data —
+# exactly one shell word, quoted; a collection, one word per element. A value
+# used to be pasted in: the first cell ran `echo INYECTADO` as a second command,
+# a space split a value in two, and a `'` broke the quotes programs put around
+# a value by hand. `printf '%s|'` prints each word it receives followed by `|`,
+# so the cells ask what the command got, not what it echoed.
+
+[[cell]]
+id     = "shell-value-is-not-a-command"
+expect = "ok"
+what   = "`v = \"x; echo INYECTADO\"` in the command is text: one word, nothing runs (G2)"
+src    = '''
+v = "x; echo INYECTADO"
+r = <\ "printf '%s|' " v \>
+>> r ¶
+'''
+oracle.py = '''
+v = "x; echo " + "INYECTADO"
+print(v + "|")
+'''
+
+[[cell]]
+id     = "shell-value-with-a-quote-and-a-space"
+expect = "ok"
+what   = "a value holding `'`, a space and `$( )` reaches the command as itself, side by side or as `{v}` (G2)"
+src    = '''
+ruta = "it's a $(id).txt"
+r1 = <\ "printf '%s|' " ruta \>
+r2 = <\ "printf '%s|' {ruta}" \>
+>> r1 ¶
+>> r2 ¶
+'''
+oracle.py = '''
+ruta = "it" + "'s a $(id).txt"
+print(ruta + "|")
+print(ruta + "|")
+'''
+
+[[cell]]
+id     = "shell-collection-is-one-word-per-element"
+expect = "ok"
+what   = "a collection is one quoted word per element, at any depth (G2)"
+src    = '''
+partes = ["uno dos", "tres"]
+anid = ("a b", ["c", "d e"])
+r1 = <\ "printf '%s|' " partes \>
+r2 = <\ "printf '%s|' " anid \>
+>> r1 ¶
+>> r2 ¶
+'''
+oracle.py = '''
+print("|".join(["uno" + " dos", "tres"]) + "|")
+print("|".join(["a" + " b", "c", "d" + " e"]) + "|")
+'''
+
+[[cell]]
+id     = "shell-empty-value-is-an-empty-word"
+expect = "ok"
+what   = "an empty text is one empty word, not no word (G2)"
+src    = '''
+vacio = ""
+r = <\ "printf '<%s>' " vacio " fin" \>
+>> r ¶
+'''
+oracle.py = '''
+print("<" + "" + "><" + "fin" + ">")
+'''
+
+[[cell]]
+id     = "shell-written-text-stays-syntax"
+expect = "ok"
+what   = "the control: what is written — a pipe, quotes, a written char — is still the shell's syntax (G2)"
+src    = '''
+cmd = "printf"
+r1 = <\ "echo hola | tr a-z A-Z" \>
+r2 = <\ cmd ' ' "'%s|' a b" \>
+>> r1 ¶
+>> r2 ¶
+'''
+oracle.py = '''
+print("hola".upper())
+print("a|" + "b|")
+'''
