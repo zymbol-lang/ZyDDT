@@ -59,7 +59,7 @@ Corregidas en su origen, a falta de una medición que la puerta no puede hacer.
 
 | ID | Qué falta | Dónde se hace, y lo último medido |
 |---|---|---|
-| PERF-08 / GLB-134 | Repetir la medición del binario estático con musl **en la release**: la puerta no construye el estático. Es un paso de la fase 5 de `agents/release_installers.md` desde el 2026-10-21 | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-134, «Comprobación intermedia»: el `HEAD` del 2026-10-21 se sostiene (×0,995 en los 16 programas) |
+| PERF-08 / GLB-134 | Repetir la medición del binario estático con musl **en la release**: la puerta no construye el estático. Es un paso de la fase 5 de `agents/release_installers.md` desde el 2026-10-21 | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-134, «Segunda comprobación intermedia»: el `HEAD` del 2026-10-23 (`ebf127d`) se sostiene — ×1,050 en los 16 programas, `s = s "x"` ×1,025 —, y los avisos de 5 rondas eran ruido |
 
 ## 4. Documentación
 
