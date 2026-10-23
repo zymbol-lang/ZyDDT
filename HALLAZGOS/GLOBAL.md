@@ -9558,6 +9558,26 @@ la compilación falla), y el de glibc con `cargo build --release`.
 La corrección se sostiene. Para que la medición de la release no dependa de que alguien se acuerde, la fase 5 de
 `agents/release_installers.md` la pide ahora con los dos ficheros publicados, y dice qué cuenta como «se sostiene».
 
+### Segunda comprobación intermedia (2026-10-23)
+
+Sobre `ebf127d`, después de cambiar justo lo que este binario ejecuta: las migas de la VM pasaron a las funciones
+compartidas con el tree-walker (`GLB-139`), `<\ \>` construye de otra forma su orden (G2), las órdenes se lanzan por
+`zymbol_common::shell::run_command` con un hilo vigilante posible (G3), y la CLI enlaza `crossterm`. Mismos dos
+binarios, mismo procedimiento.
+
+- **Los 16 programas** (`ab.py`, 5 rondas): media geométrica **×1,050**, con los mismos pasos de `--count`. Por encima
+  de ×1,2 salieron tres, y ninguno lo sostuvo: con 15 rondas, `strings_scan_short` ×0,96 y `array_update` ×1,10 (dura
+  5 ms); `strings_scan_long` siguió en ×1,30, y con 21 ejecuciones alternadas de cada binario resultó ser el ruido de
+  glibc: entre 26,5 y 43,5 ms el mismo binario, mediana ×1,085 y mínimos ×1,02.
+- **`s = s "x"` con 2 000 000** (la operación que era ×17 en la v0.0.10), 21 ejecuciones alternadas: mediana 130,7 ms
+  glibc frente a 133,9 el estático, **×1,025**. `gap.py` la mide con n = 128 000, unos 10 ms, donde cada lado ha salido
+  más rápido un día distinto: no sirve para esta pregunta a ese tamaño.
+- **Pico de memoria**: «hola» 10,9 → 10,8 MiB; `s = s "x"` 10,9 → 14,1; `hof_chain` 16,4 → 20,0 — lo mismo que el
+  2026-10-21.
+
+Se sostiene. Lo que esto deja para la medición de la release: un programa de decenas de milisegundos necesita la
+distribución y no la mediana de cinco, y `str_concat` de `gap.py` se lee a un tamaño mayor o no se lee.
+
 ---
 
 ## GLB-135 — `@ s() { … }`: la condición de un bucle se evaluaba una vez de más en los dos motores de Rust
