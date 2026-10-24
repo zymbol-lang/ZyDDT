@@ -710,27 +710,60 @@ rnd::semilla(1.5)
 
 # ── A time limit on a `std/net` request (ZethyCLI G1) ───────────────────────
 #
-# Decided by the author on 2026-10-24, option A of four: an optional time limit,
-# in seconds, after the headers — `net::get(url, headers, s)`, the same for `post`
-# and `post_json`, and `net::head(url, s)`. Past it, a soft `##Network(timeout:
-# no answer within N s)`. A cell has no server to talk to, so the limit itself
-# is held by `zymbol-cli/tests/cli_net_timeout.rs` (both Rust engines, against
-# a server that accepts and never answers) and `web/tests/test_net.mjs` (zyjs).
-# What a cell can ask is the hard refusal of a limit that is not a positive
-# number, which comes before any request.
+# Decided by the author on 2026-10-24: a time limit in seconds, an Int or a
+# Float, `0` or more, `0` being none. A request takes the one after its headers
+# — `net::get(url, headers, s)`, the same for `post` and `post_json`, and
+# `net::head(url, s)` — and otherwise the process's own, set by `net::timeout(s)`,
+# which returns the one it replaces. Past it, a soft `##Network(timeout: no
+# answer within N s)`. A cell has no server to talk to, so the limit itself is
+# held by `zymbol-cli/tests/cli_net_timeout.rs` (both Rust engines, against a
+# server that accepts and never answers) and `web/tests/test_net.mjs` (zyjs).
+# What a cell can ask is everything before a request: what `timeout` returns,
+# that the process's limit is the process's, and the refusals.
 
 [[cell]]
-id     = "net-get-limit-not-positive"
-expect = "error"
-what   = "net::get: the time limit must be a positive number of seconds — 0, and before any request (ZethyCLI G1)"
+id     = "net-timeout-returns-the-one-it-replaces"
+expect = "ok"
+what   = "`net::timeout(s)` gives back the limit it replaces, as the program wrote it, and 0 when there was none (ZethyCLI G1)"
 src    = """
 <# std/net => net
-r = net::get("http://127.0.0.1:9/", [], 0)
+>> net::timeout(5) " " net::timeout(2.5) " " net::timeout(0) " " net::timeout(0) ¶
+"""
+
+[[cell]]
+id     = "net-timeout-is-the-process-s"
+expect = "ok"
+what   = "a module that sets the limit sets it for whoever imports it — the process's, as `random::semilla` is (ZethyCLI G1)"
+src    = """
+<# std/net => net
+<# ./m/red => red
+red::preparar()
+>> net::timeout(0) ¶
+"""
+
+[cell.files]
+"m/red.zy" = """
+# red {
+    <# std/net => net
+    #> { preparar }
+    preparar() {
+        _antes = net::timeout(3)
+    }
+}
+"""
+
+[[cell]]
+id     = "net-get-limit-negative"
+expect = "error"
+what   = "net::get: the time limit must be a number of seconds, 0 or more — a negative one, before any request (ZethyCLI G1)"
+src    = """
+<# std/net => net
+r = net::get("http://127.0.0.1:9/", [], -1)
 >> "no llega" ¶
 """
 
 [[cell]]
-id     = "net-get-limit-not-positive-met"
+id     = "net-get-limit-negative-met"
 expect = "ok"
 what   = "and inside `!?` it is met, with the family the catch received"
 src    = """
@@ -743,11 +776,21 @@ src    = """
 """
 
 [[cell]]
-id     = "net-head-limit-not-positive"
+id     = "net-head-limit-negative"
 expect = "error"
-what   = "net::head: the time limit must be a positive number of seconds — a negative one (ZethyCLI G1)"
+what   = "net::head: the time limit must be a number of seconds, 0 or more (ZethyCLI G1)"
 src    = """
 <# std/net => net
 r = net::head("http://127.0.0.1:9/", -1)
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "net-timeout-negative"
+expect = "error"
+what   = "net::timeout: the time limit must be a number of seconds, 0 or more (ZethyCLI G1)"
+src    = """
+<# std/net => net
+_p = net::timeout(-2)
 >> "no llega" ¶
 """
