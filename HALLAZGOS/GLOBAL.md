@@ -10218,8 +10218,9 @@ razón más.
 
 ## GLB-147 — Tras `\ x`, volver a asignar `x` dentro de un bloque: la VM recupera la `x` de fuera y el tree-walker y zyjs crean una del bloque
 
-**Estado:** **abierto — decisión del autor pendiente.** Sujeto por `lifetime/assigning-a-destroyed-name-inside-a-block`,
-sin `expect` y con `open_finding = "GLB-147"`: KNOWN mientras diverjan
+**Estado:** **corregido 2026-10-23** — decidido por el autor ese día, opción B de 4: `\` deja el sitio del nombre, y
+una asignación desde cualquier bloque de su entorno fuerte lo devuelve allí (la regla de `GLB-120`, la del estado de un
+módulo, para todo nombre). Sujeto por cuatro celdas de `lifetime/`, tres con oráculo
 **Encontrado por:** las sondas de G4 (`interpreter/AGENTIC.md`), el 2026-10-23, al comprobar que una asignación vuelve a dar
 vida a un nombre destruido
 **Motores:** divergen `zyvm` contra `zytw` = `zyjs`
@@ -10261,3 +10262,75 @@ destruction`), y eso habría que igualarlo.
 
 El aviso de G4 no depende de la respuesta: en ninguno de estos casos avisa, porque la destrucción no es segura a la
 salida del bloque, y no avisar es lo prudente.
+
+### Medido otra vez el 2026-10-23, antes de decidir
+
+Con `zymbol 0.0.11` (`interpreter` en `bd608aa`) y `zymbol.js` en `b38bb0f`, sobre lugares y clases de valor, cada lectura
+dentro de un `!?` para que un fallo no corte las demás:
+
+| lugar de la asignación tras `\` | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| cuerpo de un `@` mientras, Int | error | `2` | error |
+| `?`, String | error | `t` | error |
+| cuerpo de un `@` sobre un rango, Array | error | `[3]` | error |
+| la variable del propio `@` | error | **error** | error |
+| brazo de `??`, Bool | error | `#0` | error |
+| `?` dentro de `?` | error | `9` | error |
+| `\` en un bloque, `=` en otro hermano | error | `8` | error |
+| local de una función, `=` en un `?` | `-1` (el `:!`) | `4` | `-1` |
+
+La VM tampoco era coherente consigo misma: devolvía el nombre con `=` y no con la variable de un bucle ni con una
+desestructuración (`#(a: x, …) = d`). Y el estado de un módulo ya hacía B en los tres (`destruir_estado` 37 da `3`): era
+lo que el autor decidió en `GLB-120`, *«una variable destruida se puede volver a construir con ese nombre — no es muy
+distinto de asignarle `##_`»*. El analizador también suponía B: tras `\ x`, `? #1 { x° = 7 }` avisa *«`°` initializer
+is redundant; remove it»*, un consejo que con A habría roto el programa.
+
+Uso real: ninguno. Ni las doce aplicaciones, ni `web/examples`, ni el curso reasignan un nombre dentro de un bloque
+después de `\`; en el corpus sólo lo hace `destruir_estado` 37, que no cambiaba con ninguna opción.
+
+### Decisión (2026-10-23)
+
+El autor: **B**, de cuatro (A: un nombre destruido no existe y cambia la VM; C: rechazarlo al analizar, eximiendo el
+estado de un módulo; D: aplazarlo a v0.0.12). La regla: **`\` deja el sitio del nombre; una asignación desde
+cualquier bloque de su entorno fuerte lo devuelve allí.** Un bloque que no corre y un bucle que da cero vueltas no
+devuelven nada: leer el nombre sigue siendo `use after destruction`. Una lambda y una función tampoco: escriben sólo lo
+que declaran (`MEM-6`), y el nombre del fichero sigue destruido después de llamarlas.
+
+### Implementado el mismo día
+
+- **tree-walker** (`zymbol-interpreter/src/lib.rs`): `dead_variables` recuerda, de cada nombre, el ámbito del que lo
+  quitó el `\`, y `set_variable` lo devuelve a ese ámbito cuando no está a la vista. Cubre `=`, la variable de un bucle,
+  las desestructuraciones y el `:!`, porque todos pasan por ahí. Al cerrar un ámbito se olvida lo que murió en él.
+- **zyjs** (`Env.set`): la regla que ya valía para `isModuleScope` vale para cualquier entorno que tenga la marca. Y
+  `def` borra sólo la marca de su propio entorno: borrarla en todos los padres hacía que la variable de un bucle,
+  definida en el ámbito de cada vuelta, se llevara el `\` de fuera, y el bucle ya no tenía qué devolver.
+- **VM** (`zymbol-compiler`): `finish_binding` emite `Revive` tras escribir la variable de un bucle (rango, array,
+  texto) y cada nombre de una desestructuración, como `compile_assignment` ya hacía con `=`. No cuesta nada a un
+  programa que no escribe `\`: sólo se emite para los nombres que algún `\` del cuerpo nombra (`destroyable`).
+- **G4** (`zymbol-semantic/src/destroyed.rs` y `destroyedReads`): con B, el aviso de G4 *sí* dependía de la respuesta,
+  al revés de lo que decía esta ficha. Tras `\ x`, `@ i:1..3 { ? i > 1 { >> x ¶ }  x = i }` lee desde la segunda vuelta
+  lo que dejó la anterior, y G4 lo daba por destrucción segura. Ahora un nombre que el cuerpo asigna en algún punto no
+  se considera destruido con seguridad dentro del cuerpo.
+
+**Comprobado:** los 8 lugares de arriba y otros 24 programas (`_`, parámetros, lambdas, funciones, desestructuración por
+posición y por clave, `for` sobre array y texto, cero vueltas, `\` dos veces, `\` dentro de un bucle, el `:!`, un local
+de módulo) dan lo mismo en los tres motores, y el programa de control (mismo nivel, `\` en un bloque y `=` fuera, lectura
+dentro del bloque, lectura tras `\`, `##_`, un bloque que no corre) no cambia. `cargo test`: 1102 pasan, 0 fallan.
+Sujeto por `lifetime/assigning-a-destroyed-name-inside-a-block` y `lifetime/a-destroyed-name-keeps-its-place`, las dos
+con oráculo; por `lifetime/a-loop-turn-sees-the-earlier-assignment-is-not-warned` (G4), y por
+`lifetime/a-lambda-or-a-function-gives-nothing-back`, el control, también con oráculo. Las tres primeras salen en rojo contra el binario y el
+`zymbol.js` de antes. Además, la VM de antes falla 5 de las 14 líneas de la segunda contra el oráculo (las tres
+variables de bucle y las dos desestructuraciones).
+
+**Lo que queda, y no es esto:**
+
+- La premisa no lo dice con todas las letras. `MEM-6` habla de *«a name its strong environment already holds»*, y
+  `GLB-147` existía porque no estaba claro si un nombre destruido sigue «held». Una frase en `MEM-8` lo dejaría escrito;
+  eso es del autor, en un commit que no cambie nada más. Propuesta: *«A destroyed name keeps its place in its strong
+  environment: assigning it again, from any block of that environment, gives it back there.»*
+- El precio del arreglo de G4: tras `\ x`, `@ i:1..3 { >> x ¶  x = i }` falla seguro en la primera vuelta, y ya no se
+  avisa. Va en la dirección prudente, la de no dar avisos falsos.
+- El aviso *«`°` initializer is redundant»* sólo lo dan los dos motores Rust; zyjs no lo daba antes y sigue sin darlo.
+  Es anterior a esta ficha.
+- *«was destroyed after its last use»* es la redacción de los tres motores para un `\` explícito, aunque suena a la
+  liberación automática. No se ha tocado.

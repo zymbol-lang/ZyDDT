@@ -41,7 +41,6 @@ Son del autor: implementar, aplazar con una razón, o rechazar con una razón.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| GLB-147 | Tras `\ x`, volver a asignar `x` dentro de un bloque: la VM recupera la `x` de fuera (`2`) y el tree-walker y zyjs crean una del bloque (`undefined`). Decidir A (un nombre destruido no existe, como pide MEM-6) o B (`\` deja el sitio) | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-147 | 2026-10-23: celda `lifetime/assigning-a-destroyed-name-inside-a-block` en KNOWN |
 | G5 | Un `??` que no cubre todos los casos solo se detecta al ejecutar | `interpreter/AGENTIC.md` § gaps, G5 | 2026-10-21: `check` no da ningún error; `run` falla con `no pattern matched` |
 | G8 | `std/random` no deja fijar la semilla: no hay ejecución reproducible | `interpreter/AGENTIC.md` § gaps, G8 | 2026-10-21: `std/random` exporta `entero`, `rango` y `peso_f64`, ninguna semilla |
 | DIS-ZYE-001 | Inicio, Fin, RePág, AvPág, Supr, F1–F12 y Shift+Tab llegan todas como `0d0`, que es el «no hay tecla» de `<<\|?`. `--keys` tampoco las nombra | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-001 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
