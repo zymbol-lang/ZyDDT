@@ -10322,12 +10322,12 @@ con oráculo; por `lifetime/a-loop-turn-sees-the-earlier-assignment-is-not-warne
 `zymbol.js` de antes. Además, la VM de antes falla 5 de las 14 líneas de la segunda contra el oráculo (las tres
 variables de bucle y las dos desestructuraciones).
 
-**Lo que queda, y no es esto:**
+**Lo que queda, y no es esto** (la premisa ya no):
 
-- La premisa no lo dice con todas las letras. `MEM-6` habla de *«a name its strong environment already holds»*, y
-  `GLB-147` existía porque no estaba claro si un nombre destruido sigue «held». Una frase en `MEM-8` lo dejaría escrito;
-  eso es del autor, en un commit que no cambie nada más. Propuesta: *«A destroyed name keeps its place in its strong
-  environment: assigning it again, from any block of that environment, gives it back there.»*
+- La premisa lo dice desde el 2026-10-24: el autor añadió al `Normative` de `MEM-8`, en un commit de
+  `zymbol-design` que no cambia nada más (`4ff424e`), *«A destroyed name keeps its place in its strong environment:
+  assigning it again, from any block of that environment, gives it back there.»* `MEM-6` hablaba de *«a name its
+  strong environment already holds»*, y `GLB-147` existía porque no estaba claro si un nombre destruido sigue «held».
 - El precio del arreglo de G4: tras `\ x`, `@ i:1..3 { >> x ¶  x = i }` falla seguro en la primera vuelta, y ya no se
   avisa. Va en la dirección prudente, la de no dar avisos falsos.
 - El aviso *«`°` initializer is redundant»* sólo lo dan los dos motores Rust; zyjs no lo daba antes y sigue sin darlo.
