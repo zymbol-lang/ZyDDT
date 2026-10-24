@@ -501,3 +501,163 @@ b = 3 > 4
 >> ?? n { <= 5 => "poco"  > 5 => "mucho" } ¶
 >> ?? n { == 7 => "siete"  <> 7 => "otro" } ¶
 """
+
+# ── What a pattern is: the three engines accept and refuse the same ones ────
+#
+# Found by G5's probes on 2026-10-24. A pattern is one token — two with a sign —
+# or a range between two Int literals or two Char literals, a list of those, a
+# comparison, `_`, a name or an error kind; that is the Rust grammar, and the
+# language. The VM did not compile a Char range (ZYVM-032); zyjs read a pattern
+# as an expression and ran `1 + 2 =>`, `f(3) =>`, `[1 + 2] =>`, Float, String
+# and variable ranges and a `_? cond =>` guard (ZYJS-070), and checked no
+# pattern's type against the scrutinee's (ZYJS-071); and both Rust analysers
+# refused a comparison on a parameter inferred as a number (GLB-149).
+
+[[cell]]
+id     = "char-range-pattern"
+expect = "ok"
+what   = "`'a'..'z' =>` and `'A'..'Z' || '0'..'9' =>` classify characters, and a Char range against an Int is a run-time `##Type` — the VM refused to compile the program (ZYVM-032)"
+src    = """
+clase(c) {
+    <~ ?? c {
+        'a'..'z' => 1
+        'A'..'Z' || '0'..'9' => 2
+        _ => 3
+    }
+}
+t = 0
+@ c:"qM7-az" { t = t * 10 + clase(c) }
+>> t ¶
+!? { >> clase(5) ¶ } :! { >> (_err#?)[1] ¶ }
+"""
+oracle.py = """
+def clase(c):
+    if 'a' <= c <= 'z': return 1
+    if 'A' <= c <= 'Z' or '0' <= c <= '9': return 2
+    return 3
+t = 0
+for c in "qM7-az": t = t * 10 + clase(c)
+print(t)
+print("##Type")
+"""
+oracle_literal_ok = "the second line is the family the catch receives, which names a kind rather than computing one"
+
+[[cell]]
+id     = "pattern-is-not-an-expression"
+expect = "error"
+what   = "`1 + 2 =>` is not a pattern: a pattern is one token — zyjs read an expression and ran it (ZYJS-070)"
+src    = """
+n = 3
+>> ?? n { 1 + 2 => "suma"  _ => "no" } ¶
+"""
+
+[[cell]]
+id     = "pattern-is-not-a-call"
+expect = "error"
+what   = "`f(3) =>` is not a pattern — zyjs called the function and compared (ZYJS-070)"
+src    = """
+f(x) { <~ x }
+n = 3
+>> ?? n { f(3) => "llamada"  _ => "no" } ¶
+"""
+
+[[cell]]
+id     = "list-pattern-element-is-not-an-expression"
+expect = "error"
+what   = "`[1 + 2] =>`: an element of a list pattern is one token too (ZYJS-070)"
+src    = """
+>> ?? [3] { [1 + 2] => "x"  _ => "no" } ¶
+"""
+
+[[cell]]
+id     = "float-range-pattern-is-refused"
+expect = "error"
+what   = "`1.0..5.0 =>`: a range is Int..Int or Char..Char — zyjs accepted it and failed only when it ran (ZYJS-070)"
+src    = """
+f = 2.5
+>> ?? f { 1.0..5.0 => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "string-range-pattern-is-refused"
+expect = "error"
+what   = "`\"a\"..\"c\" =>` is refused as a Float range is (ZYJS-070)"
+src    = """
+s = "b"
+>> ?? s { "a".."c" => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "variable-range-pattern-is-refused"
+expect = "error"
+what   = "`a..b =>`, with `a` and `b` variables, is refused — zyjs ran it (ZYJS-070)"
+src    = """
+a = 1
+b = 9
+n = 4
+>> ?? n { a..b => "dentro"  _ => "fuera" } ¶
+"""
+
+[[cell]]
+id     = "guard-pattern-is-refused"
+expect = "error"
+what   = "`_? x > 1 =>` is not a pattern — zyjs ran it as a guard (ZYJS-070)"
+src    = """
+x = 2
+>> ?? x { _? x > 1 => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "pattern-of-another-type-is-refused"
+expect = "error"
+what   = "an Int pattern against a tuple is refused before running — zyjs took the `_` and went on (ZYJS-071)"
+src    = """
+t = (1, 2)
+>> ?? t { 1 => "uno"  _ => "otro" } ¶
+"""
+
+[[cell]]
+id     = "range-of-another-type-is-refused"
+expect = "error"
+what   = "an Int range against a String is refused before running — zyjs failed only when it ran (ZYJS-071)"
+src    = """
+s = "x"
+>> ?? s { 1..5 => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "comparison-on-a-number-parameter"
+expect = "ok"
+what   = "`?? x { < 0 => … }` on a parameter used in arithmetic runs: `Number` is a scalar — both Rust analysers refused it (GLB-149)"
+src    = """
+signo(x) {
+    y = x * 2
+    <~ ?? x {
+        < 0 => y - 1
+        _ => y + 1
+    }
+}
+>> signo(-3) " " signo(4) ¶
+"""
+oracle.py = """
+def signo(x):
+    y = x * 2
+    return y - 1 if x < 0 else y + 1
+print(signo(-3), signo(4))
+"""
+
+# ── A range inside a list pattern (GLB-148, undecided) ──────────────────────
+#
+# `?? 3 { [1..5] => … }` — the Rust grammar accepts a range as an element, and
+# no document says what it means. The tree-walker matches (containment, as for
+# a value), the VM does not, and zyjs refuses the program. The cell asks for
+# agreement and names no engine.
+
+[[cell]]
+id     = "range-inside-a-list-pattern"
+what   = "`[1..5] =>` against 3 and against [3]: what a range inside a list pattern means (GLB-148, undecided)"
+src    = """
+>> ?? [3] { [1..5] => "lista"  _ => "no" } ¶
+>> ?? 3 { [1..5] => "contiene"  _ => "no" } ¶
+"""
+open_finding = "GLB-148"

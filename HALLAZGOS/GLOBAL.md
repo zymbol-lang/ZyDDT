@@ -10334,3 +10334,60 @@ variables de bucle y las dos desestructuraciones).
   Es anterior a esta ficha.
 - *«was destroyed after its last use»* es la redacción de los tres motores para un `\` explícito, aunque suena a la
   liberación automática. No se ha tocado.
+
+## GLB-148 — Un rango dentro de un patrón de lista: `[1..5] =>` tiene tres respuestas
+
+**Estado:** **abierto — decisión del autor pendiente.** Sujeto por `runtime-match-patterns/range-inside-a-list-pattern`,
+sin `expect` y con `open_finding = "GLB-148"`: KNOWN mientras diverjan
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24, al probar un rango de Char dentro de una lista
+**Motores:** los tres contestan distinto
+
+```zymbol
+>> ?? [3] { [1..5] => "lista"  _ => "no" } ¶
+>> ?? 3 { [1..5] => "contiene"  _ => "no" } ¶
+```
+
+| | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `[3]` contra `[1..5]` (estructural) | `lista` | `lista` | `ranges can only be used in for-each loops` (al analizar) |
+| `3` contra `[1..5]` (pertenencia) | `contiene` | `no` | — |
+
+La gramática de Rust admite un rango como elemento de un patrón de lista (`parse_pattern_primary` dentro de `[ … ]`).
+`GUIDE.md` § 7 no lo menciona: un elemento es *«`_`, a nested list pattern, a name whose value is compared, or a
+value»*. El tree-walker trata el rango como en cualquier otro sitio; la VM lo ignora al probar la pertenencia, y zyjs no
+lo admite. Nada del corpus, de las aplicaciones ni de los ejemplos lo escribe (medido el 2026-10-24).
+
+### La pregunta
+
+- **A** — un elemento puede ser un rango, y significa lo que en un brazo: `[1..5]` contra un escalar es «está en 1..5», y
+  contra un array de un elemento, que ese elemento lo está. Cambian la VM (pertenencia) y zyjs.
+- **B** — un elemento no puede ser un rango: se rechaza al analizar, como ya hace zyjs. Cambian los dos Rust.
+
+## GLB-149 — Los analizadores Rust rechazaban una comparación en `??` sobre un parámetro que infieren numérico
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: `Number` es Int o Float todavía sin decidir, un escalar
+**Encontrado por:** al dar a zyjs el chequeo de tipo de patrones (`ZYJS-071`), el 2026-10-24
+**Motores:** `zytw` y `zyvm`, por el analizador que comparten. `zyjs` lo ejecutaba
+
+```zymbol
+signo(x) {
+    y = x * 2
+    <~ ?? x {
+        < 0 => y - 1
+        _ => y + 1
+    }
+}
+>> signo(-3) " " signo(4) ¶
+```
+
+| | `zytw` = `zyvm` antes | después, y `zyjs` |
+|---|---|---|
+| el de arriba | `error: comparison pattern requires scalar scrutinee, got Number` | `-7 9` |
+
+`check_pattern_type` admitía en una comparación Int, Float, Char, String, `Any` y `Unknown`, y no `Number`, el tipo que
+el analizador da a un parámetro usado en aritmética. Así que `?? x { < 0 => … }` no corría en ninguno de los dos motores
+Rust en cuanto la función hacía una cuenta con `x`. Ahora `Number` es uno más.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/comparison-on-a-number-parameter`, con oráculo.

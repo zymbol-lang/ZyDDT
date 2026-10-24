@@ -3642,3 +3642,70 @@ literal; `zyquality/messages/baseline.txt` cambia esas dos entradas de zyjs a la
 
 `collections/a-negated-bool-appended-to-ints-is-checked`, `collections/a-negated-bool-written-into-ints-is-checked` y el
 control `collections/a-negated-number-appended-to-numbers-is-not-a-mix`, las tres de COL-3.
+
+## ZYJS-070 — zyjs leía un patrón de `??` como una expresión y ejecutaba formas que Rust rechaza
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: un patrón es lo que lee `parse_pattern_primary` en Rust
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24
+**Motores:** `zyjs`. Los dos Rust rechazan todas estas formas al analizar
+
+| forma | `zytw` = `zyvm` | `zyjs` antes | `zyjs` después |
+|---|---|---|---|
+| `1 + 2 =>` | `expected '=>' after pattern` | la suma, comparada | el mismo rechazo, en la misma columna |
+| `f(3) =>` | `expected '=>' after pattern` | la llamada, comparada | el mismo |
+| `a[1] =>` | `expected '=>' after pattern` | el índice, comparado | el mismo |
+| `[1 + 2] =>` | `expected ']' to close list pattern` | la suma, comparada | el mismo |
+| `1.0..5.0 =>`, `"a".."c" =>` | `expected '=>' after pattern` | `range pattern type mismatch` al ejecutar | el mismo rechazo |
+| `a..b =>`, con variables | `expected '=>' after pattern` | ejecutado | el mismo rechazo |
+| `_? x > 1 =>` | `expected pattern, found '_?'` | ejecutado como guarda | el mismo rechazo |
+
+### Causa y corrección
+
+`parseMatchPatternPrimary` leía el valor con `parseAdditive`, así que cualquier expresión era un patrón, y un `..` detrás
+de cualquiera de ellas formaba un rango; `_?` construía un patrón `guard` que Rust nunca tuvo. Ahora un patrón literal
+es un token —dos con signo— y si el parser consumió más, el error es el de Rust en el token siguiente; el `..` sólo
+sigue a un Int o a un Char literal; el elemento de un patrón de lista se lee igual; y `_?` es `expected pattern`. El
+caso `guard` del intérprete se ha quitado: ya no se puede construir.
+
+### Qué no cubre
+
+El elemento de un patrón de lista que es un rango (`[1..5] =>`) sigue rechazado aquí: qué significa no está decidido
+(`GLB-148`).
+
+### Qué lo sujeta
+
+`runtime-match-patterns/pattern-is-not-an-expression`, `pattern-is-not-a-call`,
+`list-pattern-element-is-not-an-expression`, `float-range-pattern-is-refused`, `string-range-pattern-is-refused`,
+`variable-range-pattern-is-refused` y `guard-pattern-is-refused`.
+
+## ZYJS-071 — zyjs no comprobaba el tipo de un patrón contra el del sujeto
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: es `check_pattern_type` de `type_check.rs`
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24
+**Motores:** `zyjs`. Los dos Rust rechazan estos programas al analizar
+
+| programa | `zytw` = `zyvm` | `zyjs` antes | `zyjs` después |
+|---|---|---|---|
+| `t = (1, 2)`, `?? t { 1 => "uno"  _ => "otro" }` | `pattern type Int does not match scrutinee type (Int, Int)` | `otro` | el mismo rechazo |
+| `u = ##_`, `?? u { 1 => "uno" }` | `pattern type Int does not match scrutinee type Unit` | `no pattern matched` al ejecutar | el mismo rechazo |
+| `?? "x" { 1..5 => 1  _ => 2 }` | `range pattern type Int does not match scrutinee type String` | `range pattern type mismatch` al ejecutar | el mismo rechazo |
+| `?? 'b' { 1..200 => … }`, `?? 66 { 'a'..'z' => … }` | el rechazo de rango, con sus tipos | al ejecutar | el mismo rechazo |
+
+### Corrección
+
+`Checker.checkPatternType` sigue a `check_pattern_type`, con sus palabras: el tipo de un literal y del principio de un
+rango contra el del sujeto, con la misma relación de compatibilidad (`typesCompatibleStatic`); una comparación contra un
+sujeto que no es escalar; las alternativas de `||` y los elementos de una lista, contra el elemento cuando el sujeto es
+un array. El tipo del sujeto lo nombra `argType`; donde no lo nombra no dice nada, como Rust con `Unknown`. Los patrones
+llevan ahora la línea y la columna de su primer token, para que el rechazo diga dónde. `zyquality/messages/baseline.txt`
+pierde las tres entradas de Rust que ya no son de un solo lado.
+
+### Qué no cubre
+
+Donde sólo Rust sabe el tipo del sujeto, sólo Rust rechaza: `par() { <~ (1, 2) }` y luego `?? par() { 1 => … }` sigue
+corriendo en zyjs (`otro`), porque su comprobador no infiere lo que devuelve una función. Es el límite de ese comprobador,
+no de `??`.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/pattern-of-another-type-is-refused` y `range-of-another-type-is-refused`.

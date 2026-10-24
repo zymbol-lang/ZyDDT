@@ -41,6 +41,7 @@ Son del autor: implementar, aplazar con una razón, o rechazar con una razón.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
+| GLB-148 | Un rango dentro de un patrón de lista (`[1..5] =>`): el tree-walker lo trata como en un brazo, la VM lo ignora al probar la pertenencia y zyjs lo rechaza. Decidir A (es un rango, como en un brazo) o B (no se admite) | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-148 | 2026-10-24: celda `runtime-match-patterns/range-inside-a-list-pattern` en KNOWN |
 | G8 | `std/random` no deja fijar la semilla: no hay ejecución reproducible | `interpreter/AGENTIC.md` § gaps, G8 | 2026-10-21: `std/random` exporta `entero`, `rango` y `peso_f64`, ninguna semilla |
 | DIS-ZYE-001 | Inicio, Fin, RePág, AvPág, Supr, F1–F12 y Shift+Tab llegan todas como `0d0`, que es el «no hay tecla» de `<<\|?`. `--keys` tampoco las nombra | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-001 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
 | DIS-ZYE-002 | Shift y Ctrl sobre una flecha se pierden: Shift+→ llega como → | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-002 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |

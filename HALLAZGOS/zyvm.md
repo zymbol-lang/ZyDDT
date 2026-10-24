@@ -2083,3 +2083,34 @@ ninguna de los que rechace. Falla sin la corrección («the compiler accepts `<#
 { path = "/v", features = [] }` does not ask for `http`») y pasa con y sin features. Una primera versión pasaba un
 `base_dir` vacío y salía roja por otra razón: sin directorio base el compilador no mira los imports, y aceptaba siempre.
 
+
+## ZYVM-032 — `'a'..'z' =>`: la VM no compilaba un rango de Char como patrón de `??`
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: la gramática admite `Char..Char` en un patrón, y el
+tree-walker y zyjs lo ejecutaban
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24, al barrer `??` sobre seis clases de sujeto
+**Motores:** `zyvm`. `zytw` y `zyjs` ya lo ejecutaban
+
+```zymbol
+c = 'b'
+>> ?? c { 'a'..'m' => 1  _ => 2 } ¶
+```
+
+| | `zytw` | `zyvm` antes | `zyvm` después | `zyjs` |
+|---|---|---|---|---|
+| el de arriba | `1` | `error: unsupported construct: non-int range in match` | `1` | `1` |
+| `'A'..'Z' \|\| '0'..'9' =>` | igual que `zytw` | el mismo rechazo | igual que `zytw` | igual |
+| un Char range contra un Int que llega por un parámetro | `##Type(range pattern type mismatch)` | el mismo rechazo | `##Type(range pattern type mismatch)` | igual |
+
+El rechazo era al compilar: el programa entero no arrancaba, aunque el brazo nunca se alcanzara.
+
+### Causa y corrección
+
+`emit_pattern_test` sólo sabía emitir `MatchRange(reg, i64, i64, label)` y devolvía `Unsupported("non-int range in
+match")` para cualquier otro límite. Una instrucción nueva, `MatchCharRange(reg, char, char, label)`, hace con un Char
+lo que `MatchRange` con un Int, y con cualquier otro valor da el `range pattern type mismatch` del tree-walker. Las tres
+tablas del compilador que enumeran los saltos de una instrucción la conocen. Cuesta nada a un programa que no la usa.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/char-range-pattern`, con oráculo.
