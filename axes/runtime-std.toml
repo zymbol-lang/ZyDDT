@@ -707,3 +707,47 @@ src    = """
 rnd::semilla(1.5)
 >> "no llega" ¶
 """
+
+# ── A time limit on a `std/net` request (ZethyCLI G1) ───────────────────────
+#
+# Decided by the author on 2026-10-24, option A of four: an optional time limit,
+# in seconds, after the headers — `net::get(url, headers, s)`, the same for `post`
+# and `post_json`, and `net::head(url, s)`. Past it, a soft `##Network(timeout:
+# no answer within N s)`. A cell has no server to talk to, so the limit itself
+# is held by `zymbol-cli/tests/cli_net_timeout.rs` (both Rust engines, against
+# a server that accepts and never answers) and `web/tests/test_net.mjs` (zyjs).
+# What a cell can ask is the hard refusal of a limit that is not a positive
+# number, which comes before any request.
+
+[[cell]]
+id     = "net-get-limit-not-positive"
+expect = "error"
+what   = "net::get: the time limit must be a positive number of seconds — 0, and before any request (ZethyCLI G1)"
+src    = """
+<# std/net => net
+r = net::get("http://127.0.0.1:9/", [], 0)
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "net-get-limit-not-positive-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/net => net
+!? {
+    _r = net::get("http://127.0.0.1:9/", [], "5")
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "net-head-limit-not-positive"
+expect = "error"
+what   = "net::head: the time limit must be a positive number of seconds — a negative one (ZethyCLI G1)"
+src    = """
+<# std/net => net
+r = net::head("http://127.0.0.1:9/", -1)
+>> "no llega" ¶
+"""

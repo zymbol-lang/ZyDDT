@@ -39,6 +39,10 @@ Nada, a 2026-10-21.
 
 Son del autor: implementar, aplazar con una razón, o rechazar con una razón.
 
+**Aplazado a v0.0.12** por el autor el 2026-10-24: todo lo de esta sección (ZethyCLI G1, la excepción, se cerró ese día), y cualquier
+hallazgo nuevo de diseño, a menos que bloquee la salida de la v0.0.11. La razón es el calendario: la v0.0.11
+sale el 2026-11-01 y es una release de optimización.
+
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
 | DIS-ZYE-001 | Inicio, Fin, RePág, AvPág, Supr, F1–F12 y Shift+Tab llegan todas como `0d0`, que es el «no hay tecla» de `<<\|?`. `--keys` tampoco las nombra | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-001 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
@@ -46,7 +50,6 @@ Son del autor: implementar, aplazar con una razón, o rechazar con una razón.
 | DIS-ZYE-003 | Ctrl+/, Ctrl+Espacio y Alt+letra llegan como un carácter imprimible (`7`, espacio, la letra) | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-003 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
 | DIS-ZYE-004 | Dentro de `>>\|` el cursor del terminal está oculto y nada lo muestra ni lo coloca | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-004 | `ZyEdit/hypotheses/cursor/` — HOLDS, 2026-10-20 |
 | DIS-ZYE-005 | Ningún programa Zymbol puede arrancar otro en un terminal, escribirle y leer lo que dibuja. Es el resto de GAP-GOL-009, y bloquea las etapas 4 y 5 de ZyEdit | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-005 | las dos comprobaciones de `ZyEdit/hypotheses/` tuvieron que escribirse en Python |
-| ZethyCLI G1 (resto) | `std/net` no tiene control de timeout desde Zymbol | `ZethyCLI/GAPS.md` § G1 y su fila | 2026-10-21: `GUIDE.md` § `std/net` solo admite cabeceras opcionales |
 | Serpiente IDEA-001 | Un módulo `std/ansi` con nombres para los colores de `>>~`, en vez de números sueltos | `serpiente/HALLAZGOS_ES.md` § IDEA-001 | «propuesto», sin decisión |
 | Zofía IDEA-Z004 | Lectura con tipo y longitud en el propio operador: `<< :###2 "…"` | `Zofia/HALLAZGOS.md` § IDEA-Z004 | «propuesto», sin decisión |
 
