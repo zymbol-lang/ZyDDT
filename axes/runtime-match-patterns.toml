@@ -69,8 +69,8 @@ t(v) {
 
 [[cell]]
 id     = "no-pattern-matched-in-match-expression-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received — and `check` warned first, since the `??` has no `_` (G5)"
 src    = """
 t(v) {
     <~ ?? v { 1 => "uno" }
@@ -255,8 +255,8 @@ f(v) {
 
 [[cell]]
 id     = "match-statement-no-arm-matches-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received: `##_`, in the three engines"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received: `##_`, in the three engines — and `check` warned first, since the `??` has no `_` (G5)"
 src    = """
 v = 2
 !? {
@@ -328,7 +328,9 @@ src    = """
 # Object]` (GLB-107, corrected 2026-10-07: the signal leaves the expression in
 # the tree-walker, and a statement takes a thrown one in zyjs). The same
 # unwinding serves a `<~` inside a function and an `@!` inside a loop — the
-# three cells after the first two.
+# three cells after the first two. The first two gained a `_ => 0` arm that
+# never runs on 2026-10-24, when a `??` without `_` began to be warned (G5):
+# what they ask is the `<~`, and an `ok` is what they assert.
 
 [[cell]]
 id     = "top-level-return-inside-a-match-value-exits"
@@ -340,6 +342,7 @@ x = ?? v {
     1 => {
         <~ 5
     }
+    _ => 0
 }
 >> x ¶
 """
@@ -354,6 +357,7 @@ x = 1 + (?? v {
     1 => {
         <~ 7
     }
+    _ => 0
 })
 >> x ¶
 """
@@ -411,4 +415,89 @@ f(v) {
     <~ 9
 }
 >> f(1) ¶
+"""
+
+# ── A `??` that may find no arm is warned before it runs (G5) ───────────────
+#
+# Decided by the author on 2026-10-24, option A of four: `check`, `run` and the
+# LSP warn about a `??` with no `_` arm that is not provably complete — a Bool
+# with `#1` and `#0`, or two comparisons against constants that leave no number
+# out. The run-time error stays the error; each program below meets a value an
+# arm does match, so what the cell asserts is the warning alone. Measured over
+# 1 327 files of the corpus and the applications: it warns once, in the probe
+# that exists to raise the error (`sondeo_v0011/zona2_patrones.zy`).
+
+[[cell]]
+id     = "match-without-wildcard-is-warned"
+expect = "warn"
+what   = "a `??` giving a value, with no `_` arm, is warned though this value matches (G5)"
+src    = """
+n = 2
+>> ?? n {
+    1 => "uno"
+    2 => "dos"
+} ¶
+"""
+
+[[cell]]
+id     = "match-statement-without-wildcard-is-warned"
+expect = "warn"
+what   = "the same as a statement, over a String (G5)"
+src    = """
+s = "azul"
+?? s {
+    "azul" => { >> 1 ¶ }
+    "verde" => { >> 2 ¶ }
+}
+"""
+
+[[cell]]
+id     = "match-half-a-bool-is-warned"
+expect = "warn"
+what   = "a Bool with only `#1` is not complete (G5)"
+src    = """
+b = 4 > 3
+>> ?? b { #1 => "si" } ¶
+"""
+
+[[cell]]
+id     = "match-comparisons-that-leave-a-gap-are-warned"
+expect = "warn"
+what   = "`< 0` and `> 0` leave 0 out, and a name used as a pattern is known only when it runs (G5)"
+src    = """
+k = 3
+>> ?? k {
+    < 0 => "neg"
+    > 0 => "pos"
+} ¶
+dias = ["lun", "mar"]
+>> ?? "mar" { dias => "laborable" } ¶
+"""
+
+[[cell]]
+id     = "match-in-a-function-and-a-lambda-is-warned"
+expect = "warn"
+what   = "inside a function and inside a lambda, whose bodies are checked where they are written (G5)"
+src    = """
+f(x) {
+    <~ ?? x { 1 => "uno" }
+}
+g = x -> ?? x { 2 => "dos" }
+>> f(1) g(2) ¶
+"""
+
+[[cell]]
+id     = "complete-match-is-not-warned"
+expect = "ok"
+what   = "the control of G5: `_`, `_` as an alternative, a Bool with both values, and comparisons that cover every number are complete, and nothing is said"
+src    = """
+n = 7
+>> ?? n { 1 => "uno"  _ => "otro" } ¶
+>> ?? n { 1 || _ => "cualquiera" } ¶
+b = 3 > 4
+>> ?? b { #1 => "si"  #0 => "no" } ¶
+>> ?? b { #1 || #0 => "siempre" } ¶
+>> ?? n { < 0 => "neg"  >= 0 => "no neg" } ¶
+>> ?? n { <= 5 => "poco"  > 5 => "mucho" } ¶
+>> ?? n { == 7 => "siete"  <> 7 => "otro" } ¶
 """
