@@ -621,3 +621,140 @@ src    = """
     }
 }
 """
+
+# ── A read `\` has certainly destroyed is warned before it runs (G4) ─────────
+#
+# AGENTIC.md G4, decided by the author on 2026-10-23 (option A of four): where
+# every path to a read goes through `\ x` with no new assignment, `check` and
+# `run` warn — and the program still runs, the run-time error is still the
+# error, `!?` still catches it: MEM-8 keeps that error at run time, because a
+# `\` in a branch that never runs destroys nothing. Until then `check` said "No
+# errors or warnings". Each read sits in `!?`, so a cell ends in its warning
+# and not in the error.
+
+[[cell]]
+id     = "read-after-destruction-is-warned"
+expect = "warn"
+what   = "`\\ x` then `>> x`: warned before it runs, and the run-time error is still met (G4)"
+src    = """
+x = 5
+\\x
+!? {
+    >> x ¶
+} :! {
+    >> "falla" ¶
+}
+"""
+
+[[cell]]
+id     = "read-after-destruction-in-a-function-is-warned"
+expect = "warn"
+what   = "the same inside a function, whose body is checked on its own (G4)"
+src    = """
+f() {
+    y = 1
+    \\y
+    !? {
+        <~ y
+    } :! {
+        <~ 0
+    }
+}
+>> f() ¶
+"""
+
+[[cell]]
+id     = "compound-assignment-after-destruction-is-warned"
+expect = "warn"
+what   = "`x += 1` after `\\ x` reads `x` first: warned on its own line (G4)"
+src    = """
+x = 5
+\\x
+!? {
+    x += 1
+} :! {
+    >> "falla" ¶
+}
+"""
+
+[[cell]]
+id     = "interpolation-after-destruction-is-warned"
+expect = "warn"
+what   = "`\"{x}\"` after `\\ x` is a read too (G4)"
+src    = """
+x = 5
+\\x
+!? {
+    >> "v={x}" ¶
+} :! {
+    >> "falla" ¶
+}
+"""
+
+[[cell]]
+id     = "calling-a-destroyed-lambda-is-warned"
+expect = "warn"
+what   = "`g()` after `\\ g` reads `g` (G4)"
+src    = """
+g = () -> 1
+\\g
+!? {
+    >> g() ¶
+} :! {
+    >> "falla" ¶
+}
+"""
+
+[[cell]]
+id     = "lambda-parameter-reusing-a-destroyed-name-is-not-warned"
+expect = "ok"
+what   = "the control: a lambda whose parameter is called `x` reads its own `x` (G4)"
+src    = """
+x = 5
+\\x
+f = (x) -> x + 1
+>> f(2) ¶
+"""
+
+[[cell]]
+id     = "a-loop-that-may-assign-is-not-warned"
+expect = "ok"
+what   = "the control: `\\ x` inside a loop's branch is not certain, and nothing is said (G4)"
+src    = """
+x = 5
+n = 0
+@ n < 3 {
+    n = n + 1
+    ? n == 9 { \\x }
+}
+>> x ¶
+"""
+
+# ── Assigning a destroyed name again, inside a block (GLB-147, undecided) ───
+#
+# Found by G4's probes on 2026-10-23. After `\ x`, `x = …` inside a loop's body
+# (or a `!?`) makes a block-local `x` in the tree-walker and zyjs — read after
+# the block, `x` is undefined — and the outer `x` again in the VM, which prints
+# 2. Which one the language means is the author's to decide: the cell asks for
+# agreement and names no engine. The same question at file level with a loop's
+# own variable (`\ x`, then `@ x:1..3 { }`, then `>> x`) is refused by all
+# three, with two different messages.
+
+[[cell]]
+id     = "assigning-a-destroyed-name-inside-a-block"
+what   = "`\\ x`, then `x = n` inside a loop's body, then `>> x` after it (GLB-147, undecided)"
+src    = """
+x = 5
+\\x
+n = 0
+@ n < 2 {
+    n = n + 1
+    x = n
+}
+!? {
+    >> x ¶
+} :! {
+    >> "no hay x" ¶
+}
+"""
+open_finding = "GLB-147"

@@ -347,7 +347,10 @@ x = id(5)
 
 [[cell]]
 id     = "use-after-destruction-is-a-plain-error"
-expect = "ok"
+# `warn` since 2026-10-23: the read is certain to fail, and G4 warns about it
+# before it runs. The family the catch receives — what this cell asks — is
+# unchanged.
+expect = "warn"
 what   = "a name called `index` read after `\\ index` is a `##_`, declared — the cell checks the family itself, since `:! ##_` would meet any (GLB-099)"
 src    = """
 id(v) { <~ v }
