@@ -730,19 +730,22 @@ n = 0
 >> x ¶
 """
 
-# ── Assigning a destroyed name again, inside a block (GLB-147, undecided) ───
+# ── Assigning a destroyed name again, inside a block (GLB-147) ──────────────
 #
 # Found by G4's probes on 2026-10-23. After `\ x`, `x = …` inside a loop's body
-# (or a `!?`) makes a block-local `x` in the tree-walker and zyjs — read after
-# the block, `x` is undefined — and the outer `x` again in the VM, which prints
-# 2. Which one the language means is the author's to decide: the cell asks for
-# agreement and names no engine. The same question at file level with a loop's
-# own variable (`\ x`, then `@ x:1..3 { }`, then `>> x`) is refused by all
-# three, with two different messages.
+# (or a `!?`) made a block-local `x` in the tree-walker and zyjs — read after
+# the block, `x` was undefined — and gave the outer `x` back in the VM, which
+# printed 2; the VM itself left `x` destroyed when the assignment was a loop's
+# own variable or a destructuring. Decided by the author the same day, option B
+# of four: `\` keeps the name's place, and an assignment from any block of its
+# strong environment gives it back there — the rule GLB-120 had decided for a
+# module's state, now for every name. A block that does not run, and a loop
+# that turns zero times, give nothing back.
 
 [[cell]]
 id     = "assigning-a-destroyed-name-inside-a-block"
-what   = "`\\ x`, then `x = n` inside a loop's body, then `>> x` after it (GLB-147, undecided)"
+expect = "ok"
+what   = "`\\ x`, then `x = n` inside a loop's body, then `>> x` after it: the loop gave `x` back to the file, and it holds the last turn's value (GLB-147)"
 src    = """
 x = 5
 \\x
@@ -757,4 +760,176 @@ n = 0
     >> "no hay x" ¶
 }
 """
-open_finding = "GLB-147"
+oracle.py = """
+dead = {"x"}
+n = 0
+while n < 2:
+    n += 1
+    x = n
+    dead.discard("x")
+print("no hay x" if "x" in dead else x)
+"""
+
+[[cell]]
+id     = "a-destroyed-name-keeps-its-place"
+expect = "ok"
+what   = "after `\\ x`, every way a block can assign `x` gives it back to the scope `\\` took it from — `=` in a `?`, a `??` arm, a `_`, a nested block, a `!?` and its `:!`, a loop's body, a loop's variable over a range, an array and a text, a destructuring by position and by key, and in a function's own body — while a block that does not run and a loop that turns zero times give nothing back (GLB-147)"
+oracle_literal_ok = "each step prints its tag and, on a failed read, the word ERROR; `si` and `yb` are typed in the source because a text cannot be computed without being written; what the oracle computes is which reads fail and what each name holds after its block"
+src    = """
+t(etq, v) {
+    >> etq " " v ¶
+}
+a = "no"
+\\a
+? #1 { a = "si" }
+!? { t("01", a) } :! { >> "01 ERROR" ¶ }
+b = 1
+\\b
+k = 2
+?? k {
+    1 => { b = 10 }
+    _ => { b = k * 10 }
+}
+!? { t("02", b) } :! { >> "02 ERROR" ¶ }
+c = [0]
+\\c
+? k == 1 { c = [1] } _ { c = [k, k] }
+!? { t("03", c) } :! { >> "03 ERROR" ¶ }
+d = 1
+\\d
+? #1 { ? k > 0 { @ i:1..k { d = i * 3 } } }
+!? { t("04", d) } :! { >> "04 ERROR" ¶ }
+e = 1
+\\e
+!? {
+    e = 7
+    _z = 1 / (k - 2)
+} :! {
+    e = e + 1
+}
+!? { t("05", e) } :! { >> "05 ERROR" ¶ }
+f = 1
+\\f
+@ f:2..4 { }
+!? { t("06", f) } :! { >> "06 ERROR" ¶ }
+g = 1
+\\g
+@ g:[k, k + 1] { }
+!? { t("07", g) } :! { >> "07 ERROR" ¶ }
+h = "z"
+\\h
+@ h:["xa", "yb"] { }
+!? { t("08", h) } :! { >> "08 ERROR" ¶ }
+m = 1
+\\m
+? #1 { [m, _r] = [k + 5, 0] }
+!? { t("09", m) } :! { >> "09 ERROR" ¶ }
+p = 1
+\\p
+dic = #(uno: k + 6, dos: 0)
+? #1 { #(uno: p, dos: _q) = dic }
+!? { t("10", p) } :! { >> "10 ERROR" ¶ }
+q = 1
+? #1 { \\q }
+? #1 { q = k * 4 }
+!? { t("11", q) } :! { >> "11 ERROR" ¶ }
+loc(j) {
+    w = 1
+    \\w
+    i = 0
+    @ i < j {
+        i = i + 1
+        w = i + 100
+    }
+    !? { <~ w } :! { <~ -1 }
+}
+t("12", loc(k))
+r = 1
+\\r
+? k == 9 { r = 2 }
+!? { t("13", r) } :! { >> "13 ERROR" ¶ }
+s = 1
+\\s
+@ s:[] { }
+!? { t("14", s) } :! { >> "14 ERROR" ¶ }
+"""
+oracle.py = """
+k = 2
+out = []
+def t(tag, v): out.append(f"{tag} {v}")
+def fmt(v): return "[" + ", ".join(str(x) for x in v) + "]" if isinstance(v, list) else str(v)
+t("01", "si")
+t("02", 10 if k == 1 else k * 10)
+t("03", fmt([k, k] if k != 1 else [1]))
+d = None
+if k > 0:
+    for i in range(1, k + 1): d = i * 3
+t("04", d)
+e = 7                                   # assigned, then 1 / 0 fails
+e = e + 1                               # the handler reads the e the body gave back
+t("05", e)
+t("06", list(range(2, 5))[-1])
+t("07", [k, k + 1][-1])
+t("08", ["xa", "yb"][-1])
+t("09", k + 5)
+t("10", k + 6)
+t("11", k * 4)
+def loc(j):
+    w = None
+    for i in range(1, j + 1): w = i + 100
+    return -1 if w is None else w
+t("12", loc(k))
+out.append("13 ERROR")                  # the block did not run: still destroyed
+out.append("14 ERROR")                  # zero turns: still destroyed
+print("\\n".join(out))
+"""
+
+[[cell]]
+id     = "a-loop-turn-sees-the-earlier-assignment-is-not-warned"
+expect = "ok"
+what   = "after `\\ x`, a read in a loop's body before the body assigns `x` is not warned: from the second turn on it reads what the turn before gave back (GLB-147; G4 must not call it certain)"
+src    = """
+x = 5
+\\x
+@ i:1..3 {
+    ? i > 1 { >> x ¶ }
+    x = i
+}
+"""
+
+[[cell]]
+id     = "a-lambda-or-a-function-gives-nothing-back"
+expect = "warn"
+what   = "the control of GLB-147: after `\\ x` at file level, a lambda and a named function that assign `x` — in their body or in a block of it — write only what they declare (MEM-6), and the file's `x` is still destroyed after calling them; G4 warns the reads, which are certain to fail"
+oracle_literal_ok = "each step prints its tag and, on a failed read, the word ERROR; what the oracle computes is what each call returns and that the file's name stays destroyed"
+src    = """
+x = 5
+\\x
+f = n -> {
+    ? #1 { x = n * 2 }
+    <~ n + 1
+}
+>> "01 " f(3) ¶
+!? { v = x  >> "02 " v ¶ } :! { >> "02 ERROR" ¶ }
+g() {
+    x = 40
+    ? #1 { x = x + 2 }
+    <~ x
+}
+>> "03 " g() ¶
+!? { v = x  >> "04 " v ¶ } :! { >> "04 ERROR" ¶ }
+"""
+oracle.py = """
+dead = {"x"}
+def f(n):
+    _x = n * 2                          # the lambda's own
+    return n + 1
+def g():
+    x = 40
+    x = x + 2
+    return x
+print("01", f(3))
+print("02 ERROR" if "x" in dead else "02 ?")
+print("03", g())
+print("04 ERROR" if "x" in dead else "04 ?")
+"""
