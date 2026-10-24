@@ -646,18 +646,69 @@ def signo(x):
 print(signo(-3), signo(4))
 """
 
-# ── A range inside a list pattern (GLB-148, undecided) ──────────────────────
+# ── A range or a comparison inside a list pattern (GLB-148) ─────────────────
 #
-# `?? 3 { [1..5] => … }` — the Rust grammar accepts a range as an element, and
-# no document says what it means. The tree-walker matches (containment, as for
-# a value), the VM does not, and zyjs refuses the program. The cell asks for
-# agreement and names no engine.
+# Found by G5's probes on 2026-10-24: `?? 3 { [1..5] => … }` had three answers —
+# the tree-walker matched, the VM did not, zyjs refused the program — and the
+# same for `[< 3]`. Decided by the author the same day, option A of four: an
+# element means what the same pattern means in an arm. Against a scalar the
+# list is "one of these"; against an array, element by element. The VM had
+# taken every element it did not know for a `_` in the structural test (`[9]`
+# matched `[1..5]`, `[[9, 2]]` matched `[[1, _]]`) and for "never" in the
+# containment test, a name included (`?? 3 { [a] => … }` with `a = 3`); zyjs
+# shared the last one.
 
 [[cell]]
 id     = "range-inside-a-list-pattern"
-what   = "`[1..5] =>` against 3 and against [3]: what a range inside a list pattern means (GLB-148, undecided)"
+expect = "ok"
+what   = "a range, a comparison, a nested list and a name inside a list pattern mean what they mean in an arm — against a scalar and against an array (GLB-148)"
 src    = """
->> ?? [3] { [1..5] => "lista"  _ => "no" } ¶
->> ?? 3 { [1..5] => "contiene"  _ => "no" } ¶
+p(etq, r) {
+    >> etq " " r ¶
+}
+a = 3
+p("01", ?? 3 { [1..5] => "sí"  _ => "no" })
+p("02", ?? 9 { [1..5] => "sí"  _ => "no" })
+p("03", ?? 4 { [1..2, 4..6] => "sí"  _ => "no" })
+p("04", ?? -2 { [-5..-1] => "sí"  _ => "no" })
+p("05", ?? 'c' { ['a'..'e'] => "sí"  _ => "no" })
+p("06", ?? [3] { [1..5] => "sí"  _ => "no" })
+p("07", ?? [9] { [1..5] => "sí"  _ => "no" })
+p("08", ?? [3, 7] { [1..5, _] => "sí"  _ => "no" })
+p("09", ?? [3, 7] { [1..5, 6..9] => "sí"  _ => "no" })
+p("10", ?? [3, 7] { [1..5] => "sí"  _ => "no" })
+p("11", ?? ['b'] { ['a'..'e'] => "sí"  _ => "no" })
+p("12", ?? 2 { [< 3] => "sí"  _ => "no" })
+p("13", ?? 5 { [< 3] => "sí"  _ => "no" })
+p("14", ?? [2] { [< 3] => "sí"  _ => "no" })
+p("15", ?? [5] { [< 3] => "sí"  _ => "no" })
+p("16", ?? [[9, 2]] { [[1, _]] => "sí"  _ => "no" })
+p("17", ?? 3 { [a] => "sí"  _ => "no" })
 """
-open_finding = "GLB-148"
+oracle.py = """
+# A pattern, as an arm reads it: ('rng', lo, hi), ('cmp', f), ('lst', [...]),
+# ('val', v) or '_'. A list against an array is element by element; against
+# anything else, "one of these".
+def m(p, v):
+    if p == '_': return True
+    k = p[0]
+    if k == 'rng': return p[1] <= v <= p[2]
+    if k == 'cmp': return p[1](v)
+    if k == 'val': return v == p[1]
+    if isinstance(v, list):
+        return len(v) == len(p[1]) and all(m(q, x) for q, x in zip(p[1], v))
+    return any(m(q, v) for q in p[1])
+L = lambda *ps: ('lst', list(ps))
+a = 3
+cases = [
+    (3, L(('rng', 1, 5))), (9, L(('rng', 1, 5))), (4, L(('rng', 1, 2), ('rng', 4, 6))),
+    (-2, L(('rng', -5, -1))), ('c', L(('rng', 'a', 'e'))), ([3], L(('rng', 1, 5))),
+    ([9], L(('rng', 1, 5))), ([3, 7], L(('rng', 1, 5), '_')), ([3, 7], L(('rng', 1, 5), ('rng', 6, 9))),
+    ([3, 7], L(('rng', 1, 5))), (['b'], L(('rng', 'a', 'e'))),
+    (2, L(('cmp', lambda x: x < 3))), (5, L(('cmp', lambda x: x < 3))),
+    ([2], L(('cmp', lambda x: x < 3))), ([5], L(('cmp', lambda x: x < 3))),
+    ([[9, 2]], L(L(('val', 1), '_'))), (3, L(('val', a))),
+]
+for i, (v, p) in enumerate(cases, 1):
+    print("%02d %s" % (i, "sí" if m(p, v) else "no"))
+"""

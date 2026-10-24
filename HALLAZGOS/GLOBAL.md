@@ -10337,8 +10337,9 @@ variables de bucle y las dos desestructuraciones).
 
 ## GLB-148 — Un rango dentro de un patrón de lista: `[1..5] =>` tiene tres respuestas
 
-**Estado:** **abierto — decisión del autor pendiente.** Sujeto por `runtime-match-patterns/range-inside-a-list-pattern`,
-sin `expect` y con `open_finding = "GLB-148"`: KNOWN mientras diverjan
+**Estado:** **corregido 2026-10-24** — decidido por el autor ese día, opción A de 4: un elemento de un patrón de lista
+puede ser un rango o una comparación, y significa lo que el mismo patrón en un brazo. Sujeto por
+`runtime-match-patterns/range-inside-a-list-pattern`, con oráculo
 **Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24, al probar un rango de Char dentro de una lista
 **Motores:** los tres contestan distinto
 
@@ -10362,6 +10363,54 @@ lo admite. Nada del corpus, de las aplicaciones ni de los ejemplos lo escribe (m
 - **A** — un elemento puede ser un rango, y significa lo que en un brazo: `[1..5]` contra un escalar es «está en 1..5», y
   contra un array de un elemento, que ese elemento lo está. Cambian la VM (pertenencia) y zyjs.
 - **B** — un elemento no puede ser un rango: se rechaza al analizar, como ya hace zyjs. Cambian los dos Rust.
+
+### Medido otra vez el 2026-10-24, antes de decidir
+
+Con `interpreter` en `7e0e5cc` y `web` en `aa1112a`, sobre rangos de Int (con signo) y de Char, comparaciones, varios
+elementos, pertenencia y estructura:
+
+| | qué pregunta | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|---|
+| `?? 3 { [1..5] => … }` | ¿3 está en 1..5? | sí | **no** | rechaza el programa |
+| `?? 4 { [1..2, 4..6] => … }` | ¿en alguno de los dos? | sí | **no** | rechaza |
+| `?? 'c' { ['a'..'e'] => … }` | un rango de Char | sí | **no** | rechaza |
+| `?? [9] { [1..5] => … }` | estructura | no | **sí** | rechaza |
+| `?? [3, 7] { [1..5, _] => … }` | estructura con `_` | sí | sí | rechaza |
+| `?? 2 { [< 3] => … }` | una comparación | sí | **no** | rechaza |
+| `?? [5] { [< 3] => … }` | comparación, estructura | no | **sí** | rechaza |
+
+El analizador que comparten los dos Rust ya trataba el elemento como un rango: `?? "x" { [1..5] => … }` es `range
+pattern type Int does not match scrutinee type String`. Nada del corpus, de `reject/`, de las doce aplicaciones, del curso
+ni de `web/examples` escribe un rango o una comparación dentro de un patrón de lista.
+
+### Decisión (2026-10-24)
+
+El autor: **A**, de cuatro (B: no se admite, rechazo al analizar en los tres; C: el rango sí y la comparación no; D:
+aplazar a v0.0.12). Un elemento de un patrón de lista **significa lo que el mismo patrón en un brazo**: contra un escalar,
+la lista es «uno de estos»; contra un array, elemento a elemento. Es la equivalencia que `GUIDE.md` § 7 ya enseñaba
+(`['p', 'P']` es `'p' || 'P'`), ahora para todos los patrones que la gramática admite dentro de `[ … ]`: `[1..5, 7]` es
+`1..5 || 7`.
+
+### Implementado el mismo día
+
+- **VM** (`emit_pattern_test`, `zymbol-compiler`): los dos caminos de un patrón de lista mandan a `emit_pattern_test`
+  cada elemento que trataban con un brazo vacío. En la estructura, un rango, una comparación o una lista anidada se
+  probaba como `_`, y por eso `[9]` encajaba con `[1..5]` y `[[9, 2]]` con `[[1, _]]`. En la pertenencia no encajaba
+  nunca, tampoco un nombre: `?? 3 { [a] => … }` con `a = 3` iba al `_`.
+- **zyjs**: el parser lee un rango o una comparación dentro de `[ … ]` con `parseMatchPatternPrimary`, igual que en un
+  brazo y con las mismas comprobaciones, y lo guarda como un elemento `nested`. La pertenencia prueba ahora un `nested` y
+  un nombre como `match_stmt.rs`; el `?? 3 { [a] => … }` de arriba también iba al `_` aquí.
+- De paso, en zyjs: `checkMatchPattern` no leía el valor de una comparación, y `tope = 3` y luego `?? 2 { < tope => … }`
+  avisaba *«unused variable 'tope'»*, un aviso que los dos Rust no dan; tampoco bajaba a un elemento `nested`.
+
+**Comprobado:** las 17 líneas de la celda, los rechazos de tipo (`[1..5]` contra un String, `['a'..'e']` contra un Int)
+con su línea y su columna, y el programa de control (pertenencia con valores, estructura con `_`, rangos como
+alternativas, comparación en un brazo, lista dentro de lista), igual en los tres motores. Sujeto por
+`runtime-match-patterns/range-inside-a-list-pattern`, con oráculo; en rojo contra el binario y el `zymbol.js` de antes,
+y la VM de antes falla 9 de sus 17 líneas contra el oráculo.
+
+**Lo que queda, y no es esto:** `||` sigue sin admitirse dentro de una lista (`[1 || 3]` es `expected ']' to close
+list pattern` en los tres motores, como dice `GUIDE.md`), y un error (`##Kind`) tampoco.
 
 ## GLB-149 — Los analizadores Rust rechazaban una comparación en `??` sobre un parámetro que infieren numérico
 
