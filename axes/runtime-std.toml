@@ -604,3 +604,106 @@ t(v) {
     >> (_err#?)[1] ¶
 }
 """
+
+# ── `random::semilla(n)`: one seed, one sequence, in the three engines (G8) ──
+#
+# Decided by the author on 2026-10-24, option A of four (`interpreter/AGENTIC.md`
+# G8): `semilla(n)` fixes `std/random` from that point, and the same seed gives
+# the same sequence in the tree-walker, the VM and zyjs. The generator is
+# xoshiro256++ with its state expanded from the seed by splitmix64 — one Rust
+# implementation (`zymbol_intrinsics::random`), mirrored in zyjs (`ZyRandom`).
+# The oracle below writes both algorithms from their published definitions, so
+# a seeded sequence is checked against an implementation that is not ours.
+# Without `semilla`, nothing changes: the corpus's property files still hold.
+
+[[cell]]
+id     = "random-seed-fixes-the-sequence"
+expect = "ok"
+what   = "after `semilla(s)`, 300 draws of `entero`, then `rango`, `peso_f64` and an `entero` over the whole integer range, for seven seeds including 0, negatives and the limits of the integer (G8)"
+src    = """
+<# std/random => azar
+semillas = [0, 1, -1, 42, 9007199254740991, -9007199254740991, 123456789]
+@ s:semillas {
+    azar::semilla(s)
+    suma = 0
+    @ 300 { suma = (suma + azar::entero(-1000, 1000)) % 1000003 }
+    >> s " " suma " " azar::rango(97) " " azar::peso_f64() " " azar::entero(-9007199254740991, 9007199254740991) ¶
+}
+"""
+oracle.py = """
+M = (1 << 64) - 1
+def splitmix(x):
+    x = (x + 0x9E3779B97F4A7C15) & M
+    z = x
+    z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & M
+    z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & M
+    return x, z ^ (z >> 31)
+def rotl(x, k): return ((x << k) | (x >> (64 - k))) & M
+class Xoshiro256pp:
+    def __init__(self, seed):
+        x, self.s = seed & M, []
+        for _ in range(4):
+            x, z = splitmix(x)
+            self.s.append(z)
+    def next(self):
+        s = self.s
+        r = (rotl((s[0] + s[3]) & M, 23) + s[0]) & M
+        t = (s[1] << 17) & M
+        s[2] ^= s[0]; s[3] ^= s[1]; s[1] ^= s[2]; s[0] ^= s[3]
+        s[2] ^= t; s[3] = rotl(s[3], 45)
+        return r
+def entero(g, lo, hi): return lo + g.next() % (hi - lo + 1)
+def fmt(f):
+    t = repr(round(f, 3))
+    return t[:-2] if t.endswith('.0') else t
+for s in [0, 1, -1, 42, 9007199254740991, -9007199254740991, 123456789]:
+    g = Xoshiro256pp(s)
+    suma = 0
+    for _ in range(300):
+        suma = (suma + entero(g, -1000, 1000))
+        suma = int(suma - 1000003 * int(suma / 1000003))   # % truncates toward zero, as Zymbol's does
+    r = g.next() % 97
+    p = ((g.next() % 201) - 100) / 1000
+    e = entero(g, -9007199254740991, 9007199254740991)
+    print(s, suma, r, fmt(p), e)
+"""
+
+[[cell]]
+id     = "random-seed-is-the-process-s"
+expect = "ok"
+what   = "a module that calls `semilla` fixes the sequence of whoever imports it — the state is the process's, as the numeral mode is (G8)"
+src    = """
+<# ./m/dado => dado
+<# std/random => azar
+dado::preparar(7)
+a = azar::entero(1, 6)
+b = dado::tirar()
+azar::semilla(7)
+c = azar::entero(1, 6)
+d = azar::entero(1, 6)
+>> (a == c) " " (b == d) ¶
+"""
+oracle.py = """
+print("#1 #1")
+"""
+oracle_literal_ok = "the program compares two runs of the same seed; the oracle states that they are equal, which is the claim"
+
+[cell.files]
+"m/dado.zy" = """
+# dado {
+    #> { preparar, tirar }
+    <# std/random => azar
+    preparar(n) { azar::semilla(n) }
+    tirar() { <~ azar::entero(1, 6) }
+}
+"""
+
+[[cell]]
+id     = "random-semilla-expected-int"
+expect = "error"
+what   = "random::semilla: expected ### — a seed is an Int (G8)"
+src    = """
+<# std/random => rnd
+rnd::semilla(1.5)
+>> "no llega" ¶
+"""

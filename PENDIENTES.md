@@ -41,7 +41,6 @@ Son del autor: implementar, aplazar con una razón, o rechazar con una razón.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| G8 | `std/random` no deja fijar la semilla: no hay ejecución reproducible | `interpreter/AGENTIC.md` § gaps, G8 | 2026-10-21: `std/random` exporta `entero`, `rango` y `peso_f64`, ninguna semilla |
 | DIS-ZYE-001 | Inicio, Fin, RePág, AvPág, Supr, F1–F12 y Shift+Tab llegan todas como `0d0`, que es el «no hay tecla» de `<<\|?`. `--keys` tampoco las nombra | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-001 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
 | DIS-ZYE-002 | Shift y Ctrl sobre una flecha se pierden: Shift+→ llega como → | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-002 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
 | DIS-ZYE-003 | Ctrl+/, Ctrl+Espacio y Alt+letra llegan como un carácter imprimible (`7`, espacio, la letra) | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-003 | `ZyEdit/hypotheses/keys/` — HOLDS, 2026-10-20 |
