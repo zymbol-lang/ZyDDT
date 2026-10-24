@@ -10215,3 +10215,49 @@ signo pero cuenta el punto (`2.5` da 3 en los tres, con dos cifras). Hay que dec
 cifras, los caracteres del texto o las cifras más el punto— y corregir después `GUIDE.md` o los motores. La memoria del
 proyecto dice ya que no se pregunte nada por la cuenta de `#?` (*«nunca preguntar por la cuenta de `#?`»*), y esto es una
 razón más.
+
+## GLB-147 — Tras `\ x`, volver a asignar `x` dentro de un bloque: la VM recupera la `x` de fuera y el tree-walker y zyjs crean una del bloque
+
+**Estado:** **abierto — decisión del autor pendiente.** Sujeto por `lifetime/assigning-a-destroyed-name-inside-a-block`,
+sin `expect` y con `open_finding = "GLB-147"`: KNOWN mientras diverjan
+**Encontrado por:** las sondas de G4 (`interpreter/AGENTIC.md`), el 2026-10-23, al comprobar que una asignación vuelve a dar
+vida a un nombre destruido
+**Motores:** divergen `zyvm` contra `zytw` = `zyjs`
+
+```zymbol
+x = 5
+\x
+n = 0
+@ n < 2 {
+    n = n + 1
+    x = n
+}
+>> x ¶
+```
+
+| programa | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| el de arriba (asignación dentro del cuerpo de un bucle) | `'x' is undefined — did you mean 'x°'` | `2` | `'x' is undefined …` |
+| lo mismo dentro de un `!?` (`x = 1` y luego un fallo; `:!` lee `x`) | `'x' is undefined …` | `1` | `'x' is undefined …` |
+| `\x`, luego `@ x:1..3 { }`, luego `>> x` (nivel de fichero) | `'x' is undefined …` | `use after destruction …` | `'x' is undefined …` |
+| lo mismo con `x` estado de un módulo, en una función suya (`corpus/modules_scope/destruir_estado.zy`, 37) | `3` | `3` | `3` |
+| control: `\x`, luego `x = 3` en el mismo bloque, luego `>> x` | `3` | `3` | `3` |
+
+### La pregunta
+
+Tras `\ x`, el nombre no existe. Una asignación en el mismo bloque lo crea de nuevo (el control). Dentro de un bloque
+anidado, la regla de siempre es que una asignación a un nombre que no existe fuera crea uno del bloque (`MEM-6`), y eso
+hacen el tree-walker y zyjs; la VM, en cambio, reutiliza la `x` de fuera, como si `\` no la hubiera quitado del ámbito.
+Hay que decidir cuál de las dos es la del lenguaje:
+
+- **A — un nombre destruido no existe** (el tree-walker y zyjs): una asignación dentro de un bloque crea uno del bloque,
+  y leerlo después del bloque es «undefined». Cambia la VM. Es lo que `MEM-6` dice para cualquier otro nombre que no
+  existe.
+- **B — `\` deja el sitio del nombre** (la VM): una asignación en un bloque anidado lo devuelve a la vida en el ámbito de
+  fuera. Cambian el tree-walker y zyjs, y `MEM-6` necesitaría una excepción.
+
+En los dos casos queda la tercera fila: el mismo programa da dos mensajes distintos (`undefined` frente a `use after
+destruction`), y eso habría que igualarlo.
+
+El aviso de G4 no depende de la respuesta: en ninguno de estos casos avisa, porque la destrucción no es segura a la
+salida del bloque, y no avisar es lo prudente.
