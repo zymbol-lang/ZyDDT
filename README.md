@@ -40,8 +40,8 @@ did. ZyDDT is the one that names the rule.
 
 ## Status
 
-Measured on 2026-10-02: **45 axes, 1363 cells and 12 pins**, run by every engine
-in about two minutes; `zyq suite` runs the whole layer as one of its suites. Not
+Measured on 2026-10-25: **46 axes, 1 765 cells and 12 pins**, all agreeing, run by every
+engine in about two minutes; `zyq suite` runs the whole layer as one of its suites. Not
 one file has been copied over from ZyQuality: the migration's triage
 ([`MIGRATION.md`](MIGRATION.md)) has not started, and the first files ZyQuality
 retired instead of moving are recorded in `zyquality/dropped.tsv`.
@@ -97,19 +97,19 @@ routing comes out of the run rather than out of a reading.
 ### Where it stands, measured
 
 The per-axis table is what `zyddt axis` prints at its foot, and it is not copied
-here: a copy is the thing that rots. The totals, on 2026-10-02:
+here: a copy is the thing that rots. The totals, on 2026-10-25:
 
 | | cells | |
 |---|---:|---|
-| declared | 1363 | 45 axes; 12 pins beside them |
-| with an `expect` | 909 | the category each engine must reach is asserted |
-| with an oracle | 130 | agreement checked against an implementation that is not ours |
-| green by agreement alone | 345 | `operator` (252), `type-symbol` (48), `addressing` (23) above all: if one hides an error all three engines share, this layer cannot see it |
-| declared debt | 11 | `open_finding`: red cells of filed, open findings, reported as KNOWN ([`VERDICTS.md`](VERDICTS.md) § 12) |
+| declared | 1 765 | 46 axes; 12 pins beside them |
+| with an `expect` | 1 306 | the category each engine must reach is asserted |
+| with an oracle | 194 | agreement checked against an implementation that is not ours |
+| green by agreement alone | 343 | `operator` (252), `type-symbol` (48), `addressing` (23) above all: if one hides an error all three engines share, this layer cannot see it |
+| declared debt | 0 | `open_finding`: red cells of filed, open findings, reported as KNOWN ([`VERDICTS.md`](VERDICTS.md) § 12) |
 
 `known` is the newest column and the one to read first: each KNOWN names the
 ficha that owns it, and `zyddt findings` lists the open fichas nothing holds —
-six on that day.
+six on 2026-10-02, none on 2026-10-25, when no finding was open.
 
 `narrowed` is agreement with a surface excused by a rule — `[2/3]` in the report,
 and it matters most for this pair: with `zyjs` excused, only `zytw` and `zyvm`
