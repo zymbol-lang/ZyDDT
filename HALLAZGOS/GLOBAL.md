@@ -10440,3 +10440,42 @@ Rust en cuanto la función hacía una cuenta con `x`. Ahora `Number` es uno más
 ### Qué lo sujeta
 
 `runtime-match-patterns/comparison-on-a-number-parameter`, con oráculo.
+
+## GLB-150 — `zymbol run --timeout` mataba todos los procesos del usuario en Ubuntu 22.04
+
+**Estado:** **corregido 2026-10-25** — sin decisión que tomar: G3 ya decía qué termina (los comandos de `<\ \>` y lo
+que ellos lanzaron), y esto terminaba también todo lo demás
+**Encontrado por:** la puerta de GitHub, roja en las siete subidas de `interpreter` desde `58b168c` (G3, 2026-10-23),
+siempre en «Unit and integration tests», siempre a los 51–54 minutos y siempre con *The hosted runner lost communication
+with the server*, sin log. Visto al auditar los documentos el 2026-10-25
+**Motores:** `zytw` y `zyvm`, por el CLI que comparten. `zyjs` no tiene `--timeout`
+
+```zymbol
+r = <\ "sleep 5" \>
+>> r ¶
+```
+
+`zymbol run --timeout 0.5` sobre ese programa, en `ubuntu:22.04` (procps 3.3.17), con un `sleep 60` testigo en otro grupo
+de procesos y pids de dos cifras que empiezan por 1, binarios estáticos de los dos commits:
+
+| | `b2a14b0` | después |
+|---|---|---|
+| código de salida de `zymbol` | 137 — se mató a sí mismo | 124, con su aviso |
+| el testigo | muerto | vivo |
+| el `sleep 5` | — | terminado con el programa |
+
+`stop_running_commands` terminaba cada comando lanzando `kill -KILL -<pgid>`. procps-ng 3.3 lee `-17` como una opción y
+se queda con su primera cifra: hace `kill(-1, SIGKILL)`, que alcanza **todos los procesos del usuario**. En el runner de
+GitHub eso es su propio agente, y el job moría sin dejar log. procps 4 (Debian 13, donde se escribió G3) lo lee bien, por
+eso pasaba aquí. `--` no lo arregla: procps 3.3 lo rechaza. Ahora es la llamada al sistema, `libc::kill(-pgid, SIGKILL)`,
+y nunca con un pgid de 0 o 1.
+
+No era sólo de la integración continua: cualquiera que corriera `--timeout` con un comando en marcha en Ubuntu 22.04 o
+Debian 11 y 12 perdía todas sus sesiones.
+
+### Qué lo sujeta
+
+`interpreter/crates/zymbol-cli/tests/cli_timeout.rs`, `ending_a_command_spares_every_other_process`: un proceso fuera del
+grupo del comando sigue vivo después de `--timeout`, en los dos motores. Lo corre `cargo test` en la puerta de GitHub,
+que es Ubuntu 22.04: el sitio donde falla. Una celda de ZyDDT no puede: pregunta qué imprime un programa, no qué
+procesos quedan vivos.
