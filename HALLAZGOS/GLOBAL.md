@@ -3733,7 +3733,7 @@ operación»).
 
 ### Medido otra vez (2026-10-05)
 
-- **La parte 2 ya estaba corregida**: el commit `6159f04` del 2026-09-23 («vm: name what the reader
+- **La parte 2 ya estaba corregida**: el commit `0e0d766` del 2026-09-23 («vm: name what the reader
   wrote…») cambió «ms» por «duration», y la ficha no se actualizó. Los tres dicen hoy
   `@~ requires non-negative duration, got -5`. Ese mensaje nombra el valor, y está bien: es un
   error de **valor** (el tipo es correcto), como `replacement count must be non-negative, got -1`.
@@ -7589,7 +7589,7 @@ y `top-level-exit-of-a-string-in-a-match-value`. Con los motores de antes, las s
 **Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09 (D3): una mezcla ascendente estable
 con la regla B, la misma en los tres motores llamada por llamada
 **Encontrado por:** ZyBench, `BUG-BEN-001`, una medición de la VM contra Python hecha en otra sesión sobre
-`820a60a` (2026-10-04); validado aquí contra la rama `v0.0.10` el 2026-10-08
+`7af111b` (2026-10-04); validado aquí contra la rama `v0.0.10` el 2026-10-08
 
 ```zymbol
 x = 7
@@ -7760,7 +7760,7 @@ Al medir aparecieron dos cosas que **no** se tocaron: una ruta indirecta de `Int
 ([`GLB-113`](GLOBAL.md)), y que en una asignación los motores Rust no aceptan una cast como operando yuxtapuesto
 y `zyjs` sí ([`GLB-114`](GLOBAL.md)); `##'` se comporta en eso como sus hermanas. `zymbol-design/SYMBOLS.md` y
 `SIMBOLOS_ES.md` decían que `##'` es *«input typespec position only»*; corregidos con permiso del autor el
-2026-10-09 (`f51357b`), con la fila de v0.0.10 en § 19: ninguna marca nueva. GLB-114 se corrigió el mismo día.
+2026-10-09 (`a0924b5`), con la fila de v0.0.10 en § 19: ninguna marca nueva. GLB-114 se corrigió el mismo día.
 Y el escáner de ZyFmtCheck tomaba el `'` de `##'` por una comilla de apertura: ZyBF, con `##'cinta[p]`, lo puso en
 rojo en cuanto entró en la puerta; ya lee `##'` y `##"` como marcas.
 
@@ -8720,7 +8720,7 @@ x = [1, 2]
 
 ### Qué se observaba
 
-Medido el 2026-10-11 sobre `d736ae6`, los tres con `rc 0` y los tres con el mismo aviso
+Medido el 2026-10-11 sobre `0a8d29e`, los tres con `rc 0` y los tres con el mismo aviso
 (`if condition should be Bool, got …`):
 
 | `x` | `zytw` | `zyvm` | `zyjs` |
@@ -8997,7 +8997,7 @@ control `refusal/module-alias-reached-through-its-members`.
 ## GLB-126 — `zyq` no compila con el OCaml del runner de CI: `In_channel` es de 4.14, y el Gate de GitHub lleva 100 ejecuciones en rojo
 
 **Estado:** **corregido 2026-10-11** — `Toml.read_channel` sustituye a `In_channel.input_all`, y `zyq` compila y
-pasa `selftest` con OCaml 4.13.1, el del runner (`zyquality` `738ad5f`). Lo que **no** se ha visto todavía es un
+pasa `selftest` con OCaml 4.13.1, el del runner (`zyquality` `a5bac7e`). Lo que **no** se ha visto todavía es un
 Gate verde en GitHub: eso sólo lo dice el primer push, y lo que aparezca detrás es otro hallazgo
 **Encontrado por:** el plan de lanzamiento de la v0.0.10 (paso 2.4), al comprobar qué dispararía el push:
 `gh run list` dio 100 ejecuciones del Gate en `v0.0.10`, ninguna verde, y el log del job fallido el error
@@ -9008,7 +9008,7 @@ Gate verde en GitHub: eso sólo lo dice el primer push, y lo que aparezca detrá
 | último Gate verde, en cualquier rama | 2026-09-10 (`main` y `v0.0.9`, el día de la release anterior) |
 | ejecuciones en `v0.0.10` | 100 miradas, 100 rojas |
 | la más antigua de esas 100 (22 sep.) | `zyq` se construía y falló el paso `zyq suite`: ZyDDT `RED — a regression`, con `DIVERGE` en `runtime-modules-scripts/subscript-with-warnings-that-fails`. No se investigó más allá del log; esa celda está hoy de acuerdo |
-| desde `ee96870` (2 oct., `zyquality`) | `make` no termina, y sin `zyq` el paso siguiente sale con 127 |
+| desde `6b878cd` (2 oct., `zyquality`) | `make` no termina, y sin `zyq` el paso siguiente sale con 127 |
 
 ```text
 File "src/main.ml", line 747, characters 19-39:
@@ -9050,7 +9050,7 @@ Los otros nueve módulos compilaban ya en 4.13.1, y `main.ml` no escondía un se
 con 5.3.0, la puerta entera después del cambio: `all gates pass`, con las mismas cifras que antes de él.
 
 Decidido el mismo día por el autor, y aparte: OCaml no es ya un motor válido en Zymbol. El oráculo `ml` de
-`zyquality/engines.toml` se retiró (`f97e18e`) — no lo usaba nada: ningún programa `.ml` de oráculo en el
+`zyquality/engines.toml` se retiró (`72f0ca0`) — no lo usaba nada: ningún programa `.ml` de oráculo en el
 workspace, ninguna celda ni caso que nombrara el id. `zyq` sigue escrito en OCaml: es una herramienta, no un motor.
 
 ### Qué lo sujeta
@@ -9114,14 +9114,14 @@ puso ahí el `-`, lista exactamente esas dos. El `+` unario llegó a `parse_unar
 
 ## GLB-128 — El Gate de GitHub da dos «sin veredicto» que son del entorno: un repositorio privado y un runner más rápido que la máquina donde se calibró
 
-**Estado:** **corregido 2026-10-12** — el Gate de GitHub sobre `main` (`5a3d5b1`, intento 3, 18:49Z) da `all gates pass`
+**Estado:** **corregido 2026-10-12** — el Gate de GitHub sobre `main` (`22bc0f2`, intento 3, 18:49Z) da `all gates pass`
 con `zyquality` y `ZyDDT` en su `main` arreglado. **Lo que esa ejecución probó y lo que no:** `pins` se vio allí
 (`SKIPPED DM-02_array_equality.zy`, salida 0). El camino de `cost` no se ejerció en ella — ese runner dio todas las bases
-sobre el suelo — y sí en la siguiente, doce minutos después (`d2c53f8`, 19:01Z), que tocó un runner rápido: cinco filas
+sobre el suelo — y sí en la siguiente, doce minutos después (`2a69199`, 19:01Z), que tocó un runner rápido: cinco filas
 con bases de 28–39 ms salieron `SKIPPED` (`zyvm` ×4, `zytw` ×1), sus razones contadas pasaron, y el veredicto fue
 `GREEN — … 5 timed ratio(s) under the floor, answered by the counted ones` y `all gates pass`. Las dos mitades están
 vistas en CI. Eran dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
-(`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
+(`349c0db`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
 el autor** (ver la tabla): `pins` da por «saltado» un `DM-` cuyo repo no está clonado, y en `cost` el contado exacto basta
 cuando el cronometrado no llega al suelo. Arreglo en `main` de `zyquality` y `ZyDDT` — el autor lo pidió allí ese mismo
 día: son pruebas y no lenguaje, y `main` no debía quedarse con la marca roja de la v0.0.10; el intérprete no cambia —,
@@ -9169,14 +9169,14 @@ cambie el recuento). `zyjs` sigue en el reloj y pasa.
 
 ### Y el Gate de `main` de la v0.0.10: otra causa, y no es de esta ficha
 
-El Gate que corrió sobre `main` (`5a3d5b1`, 11:51Z) dio además `expect` y `consensus` en rojo. No son estas dos: clonó los
+El Gate que corrió sobre `main` (`22bc0f2`, 11:51Z) dio además `expect` y `consensus` en rojo. No son estas dos: clonó los
 hermanos de `main`, que seguían en v0.0.9 — se fusionaron entre las 14:30 y las 14:37Z —, y vio 666 `.zy`, 41 rechazos y
 selftest de 51 donde la rama veía 683, 55 y 56. El árbol del intérprete en `main` es idéntico al de la rama, cuyo Gate
 (hermanos en `v0.0.10`) pasó todo salvo estas dos preguntas. El Gate clona los hermanos **al correr**, así que evalúa
 `main` contra el `main` de cada uno en ese instante: fusionar los hermanos primero y el intérprete el último evita ese
 rojo; si no, hay que relanzar el Gate de `main` al terminar.
 
-**Medido al relanzarlo** (16:07Z, `5a3d5b1`, hermanos ya fusionados): 56 / 683 / 55 como en la rama; `selftest`, `audit`,
+**Medido al relanzarlo** (16:07Z, `22bc0f2`, hermanos ya fusionados): 56 / 683 / 55 como en la rama; `selftest`, `audit`,
 `reject`, `expect` y `consensus` pasan y sólo `suites` falla — por `pins`. El «sin veredicto» de `cost` **no apareció**: ese
 runner dio bases de 59–225 ms en las mismas seis filas donde el de las 11:51Z dio 28–40 ms. El suelo de `cost` no depende
 sólo de la máquina de calibración: **varía entre ejecuciones del mismo workflow** en el mismo tipo de runner, así que subir
@@ -9539,7 +9539,7 @@ Comprobado con el estático: 672 de 672 goldens y 0 divergencias en 709 ficheros
 
 ### Comprobación intermedia (2026-10-21)
 
-La medición de la release sigue pendiente; ésta es del `HEAD` de `v0.0.11` (`daad067`), después de todo lo que cambió desde
+La medición de la release sigue pendiente; ésta es del `HEAD` de `v0.0.11` (`55665b8`), después de todo lo que cambió desde
 el 2026-10-19 —las etapas 3.1, 3.2 y 3.4, y el texto compartido del tree-walker (`GLB-139`)—. Los dos binarios del mismo
 commit, con las características por defecto (sin `std/db`, como los de la release): el estático con
 `RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target x86_64-unknown-linux-musl` y el C de `ring` y
@@ -9560,7 +9560,7 @@ La corrección se sostiene. Para que la medición de la release no dependa de qu
 
 ### Segunda comprobación intermedia (2026-10-23)
 
-Sobre `ebf127d`, después de cambiar justo lo que este binario ejecuta: las migas de la VM pasaron a las funciones
+Sobre `30195b2`, después de cambiar justo lo que este binario ejecuta: las migas de la VM pasaron a las funciones
 compartidas con el tree-walker (`GLB-139`), `<\ \>` construye de otra forma su orden (G2), las órdenes se lanzan por
 `zymbol_common::shell::run_command` con un hilo vigilante posible (G3), y la CLI enlaza `crossterm`. Mismos dos
 binarios, mismo procedimiento.
@@ -9964,7 +9964,7 @@ En los dos: una clave ausente con más pasos detrás es `##Key`, con el mensaje 
 
 ## GLB-142 — Una capa que reexporta N funciones de un módulo hacía parsear ese módulo N veces antes de ejecutar nada
 
-**Estado:** **corregido 2026-10-20** (`interpreter` `c64c8cd`) — encontrado el mismo día al medir 3.3 de la v0.0.11 (`.zyb`: cuánto del arranque es el
+**Estado:** **corregido 2026-10-20** (`interpreter` `b6a9b64`) — encontrado el mismo día al medir 3.3 de la v0.0.11 (`.zyb`: cuánto del arranque es el
 front-end); está en la v0.0.10 publicada
 **Encontrado por:** `GO/試験/api試験.zy`, 899 líneas en 6 ficheros: `zymbol run` gasta 51 ms de CPU y el ejecutable que
 `zymbol build --release` hace del mismo programa —el mismo bytecode, sin front-end— 4,7. `zymbol check` sola, 56
@@ -10016,7 +10016,7 @@ importadores se parsea k veces. `zymbol run` no: sólo las construye para el fic
 
 ## GLB-143 — `zymbol check` parsea un módulo una vez por cada fichero que lo importa
 
-**Estado:** **corregido 2026-10-20** (`interpreter` `05256b3`, decisión del autor el mismo día) — encontrado al cerrar
+**Estado:** **corregido 2026-10-20** (`interpreter` `a4a59e1`, decisión del autor el mismo día) — encontrado al cerrar
 [`GLB-142`](GLOBAL.md); está en la v0.0.10 publicada
 **Encontrado por:** el mismo programa de `GLB-142`: corregido aquél, `zymbol check 試験/api試験.zy` seguía en 25 ms de CPU
 donde `zymbol run` gasta 18
@@ -10265,7 +10265,7 @@ salida del bloque, y no avisar es lo prudente.
 
 ### Medido otra vez el 2026-10-23, antes de decidir
 
-Con `zymbol 0.0.11` (`interpreter` en `bd608aa`) y `zymbol.js` en `b38bb0f`, sobre lugares y clases de valor, cada lectura
+Con `zymbol 0.0.11` (`interpreter` en `0d09818`) y `zymbol.js` en `b38bb0f`, sobre lugares y clases de valor, cada lectura
 dentro de un `!?` para que un fallo no corte las demás:
 
 | lugar de la asignación tras `\` | `zytw` | `zyvm` | `zyjs` |
@@ -10325,7 +10325,7 @@ variables de bucle y las dos desestructuraciones).
 **Lo que queda, y no es esto** (la premisa ya no):
 
 - La premisa lo dice desde el 2026-10-24: el autor añadió al `Normative` de `MEM-8`, en un commit de
-  `zymbol-design` que no cambia nada más (`4ff424e`), *«A destroyed name keeps its place in its strong environment:
+  `zymbol-design` que no cambia nada más (`9414170`), *«A destroyed name keeps its place in its strong environment:
   assigning it again, from any block of that environment, gives it back there.»* `MEM-6` hablaba de *«a name its
   strong environment already holds»*, y `GLB-147` existía porque no estaba claro si un nombre destruido sigue «held».
 - El precio del arreglo de G4: tras `\ x`, `@ i:1..3 { >> x ¶  x = i }` falla seguro en la primera vuelta, y ya no se
@@ -10366,7 +10366,7 @@ lo admite. Nada del corpus, de las aplicaciones ni de los ejemplos lo escribe (m
 
 ### Medido otra vez el 2026-10-24, antes de decidir
 
-Con `interpreter` en `7e0e5cc` y `web` en `aa1112a`, sobre rangos de Int (con signo) y de Char, comparaciones, varios
+Con `interpreter` en `68da8d5` y `web` en `aa1112a`, sobre rangos de Int (con signo) y de Char, comparaciones, varios
 elementos, pertenencia y estructura:
 
 | | qué pregunta | `zytw` | `zyvm` | `zyjs` |
@@ -10445,7 +10445,7 @@ Rust en cuanto la función hacía una cuenta con `x`. Ahora `Number` es uno más
 
 **Estado:** **corregido 2026-10-25** — sin decisión que tomar: G3 ya decía qué termina (los comandos de `<\ \>` y lo
 que ellos lanzaron), y esto terminaba también todo lo demás
-**Encontrado por:** la puerta de GitHub, roja en las siete subidas de `interpreter` desde `58b168c` (G3, 2026-10-23),
+**Encontrado por:** la puerta de GitHub, roja en las siete subidas de `interpreter` desde `662a963` (G3, 2026-10-23),
 siempre en «Unit and integration tests», siempre a los 51–54 minutos y siempre con *The hosted runner lost communication
 with the server*, sin log. Visto al auditar los documentos el 2026-10-25
 **Motores:** `zytw` y `zyvm`, por el CLI que comparten. `zyjs` no tiene `--timeout`
@@ -10458,7 +10458,7 @@ r = <\ "sleep 5" \>
 `zymbol run --timeout 0.5` sobre ese programa, en `ubuntu:22.04` (procps 3.3.17), con un `sleep 60` testigo en otro grupo
 de procesos y pids de dos cifras que empiezan por 1, binarios estáticos de los dos commits:
 
-| | `b2a14b0` | después |
+| | `11d121d` | después |
 |---|---|---|
 | código de salida de `zymbol` | 137 — se mató a sí mismo | 124, con su aviso |
 | el testigo | muerto | vivo |

@@ -266,7 +266,7 @@ perfectamente»*.
 
 | rojas | qué son |
 |---:|---|
-| 4 | la fila `file-var`: una función lee los nombres de nivel de fichero. **No es una regresión**: el aislamiento se retiró a propósito el 2026-08-24 (`fbccc8e`, ZyBank `ERROR-ZYB-002`) y `GUIDE.md` § 10b, que lo documentaba como deliberado, se retiró con él. Son la **decisión pendiente sobre la premisa 2**, no un defecto que arreglar sin validar |
+| 4 | la fila `file-var`: una función lee los nombres de nivel de fichero. **No es una regresión**: el aislamiento se retiró a propósito el 2026-08-24 (`5f74974`, ZyBank `ERROR-ZYB-002`) y `GUIDE.md` § 10b, que lo documentaba como deliberado, se retiró con él. Son la **decisión pendiente sobre la premisa 2**, no un defecto que arreglar sin validar |
 | ~~2~~ | [`ZYTW-001`](zytw.md) — **corregida el 2026-09-12**. El hueco era mayor que la ficha: el analizador no entraba en el cuerpo de una lambda de bloque, así que allí dentro un nombre inexistente, una aridad mal y una marca `<~` ausente eran todos silencio |
 
 Las 12 verdes no son decoración: **cuatro de las cinco premisas se cumplen hoy y
@@ -282,7 +282,7 @@ y es del autor.
 
 > **Corregido el 2026-10-02:** el párrafo de arriba nunca fue cierto. `zyddt suite`
 > corre **todos** los ejes de `axes/`, y está en `zyquality/suites.toml` desde el
-> 2026-09-09 (zyquality `a322389`): `isolation`, escrito el 2026-09-12, estuvo en
+> 2026-09-09 (zyquality `143689e`): `isolation`, escrito el 2026-09-12, estuvo en
 > el gate desde el día en que se escribió. Hoy tiene 47 celdas, todas en verde.
 
 Lo que el eje **no** cubre, y hay que decirlo aquí: las premisas 3 y 4 —un módulo

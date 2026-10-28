@@ -766,7 +766,7 @@ que quedaba», al final de la ficha.
 ### Lo que añadió una medición de fuera (ZyBench, documentado el 2026-10-08)
 
 `IDEA-BEN-002`, de ZyBench —una medición de la VM contra Python hecha en otra
-sesión—, perfiló con callgrind sobre `820a60a` (2026-10-04) y aporta el dato que
+sesión—, perfiló con callgrind sobre `7af111b` (2026-10-04) y aporta el dato que
 esta ficha dejaba **sin separar**. En `fib(22)`, ~1 000 instrucciones por
 llamada, `Vec::resize` era el 23 % (rellenar con `Unit` el marco de 7 registros:
 `resize(n, Value::Unit)` clona el valor en cada hueco) y soltarlo al volver el
@@ -2028,9 +2028,9 @@ programa, que sólo una build de depuración ve fallar.
 
 ## ZYVM-031 — El ejecutable de `zymbol build` no tenía `std/net` ni `std/db` aunque el `zymbol` que lo construía sí
 
-**Estado:** **corregido 2026-10-20** (`interpreter` `7dd33bb`) — encontrado el mismo día al preparar 3.1 de la v0.0.11, leyendo quién construye una VM. Lo
+**Estado:** **corregido 2026-10-20** (`interpreter` `1f2b7fd`) — encontrado el mismo día al preparar 3.1 de la v0.0.11, leyendo quién construye una VM. Lo
 introdujo la propia rama `v0.0.11`, nunca publicada: `std/db` desde D4 (`interpreter` del 2026-10-19) y `std/net` desde
-la build compacta (`17bfdb8`, 2026-10-20)
+la build compacta (`5176b3b`, 2026-10-20)
 **Encontrado por:** leer `zymbol-standalone/src/lib.rs`, `write_cargo_toml`, y comprobarlo con dos programas
 
 ### Reproducción
@@ -2065,7 +2065,7 @@ Runtime error: std/db is not available in this build (compiled without ODBC supp
 `zymbol-vm` por ruta, **sin features**: `zymbol-vm = { path = "…" }`. El compilador tiene las del binario que lo
 lleva —Cargo las une—, la VM generada sólo las suyas por defecto, que son `[]` desde D4. El compilador emite los ids de
 `std/net` y `std/db`, y la VM del ejecutable cae en el `net_dispatch` / `db_dispatch` que existe para lo inalcanzable.
-Hasta D4 `db` estaba en los defectos de `zymbol-vm`, y `ureq` era obligatorio en ella hasta `17bfdb8`; por eso antes
+Hasta D4 `db` estaba en los defectos de `zymbol-vm`, y `ureq` era obligatorio en ella hasta `5176b3b`; por eso antes
 funcionaba. Nada de la puerta ejecuta `zymbol build` con un programa que importe uno de los dos.
 
 ### Corrección (2026-10-20)

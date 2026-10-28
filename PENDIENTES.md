@@ -17,7 +17,7 @@
 > pendiente, es una nota.
 >
 > **Comprobado el 2026-10-21.** Cada fila se volvió a ejecutar ese día con el binario de release
-> de `interpreter` en `c3468c1` (rama `v0.0.11`), salvo donde la columna dice otra cosa. El
+> de `interpreter` en `9666867` (rama `v0.0.11`), salvo donde la columna dice otra cosa. El
 > mismo día se cerraron en su origen once entradas que seguían diciendo «abierta» y no lo
 > estaban: DM-28, DM-29, ZethyCLI G1–G3, GO IDEA-001, Zofía GAP-Z005 e IDEA-Z002, BUG-BEN-001,
 > IDEA-BEN-002 e IDEA-GOL-007; y a GAP-GOL-009 se le anotó el resto que dejó (DIS-ZYE-005).
@@ -59,7 +59,7 @@ Corregidas en su origen, a falta de una medición que la puerta no puede hacer.
 
 | ID | Qué falta | Dónde se hace, y lo último medido |
 |---|---|---|
-| PERF-08 / GLB-134 | Repetir la medición del binario estático con musl **en la release**: la puerta no construye el estático. Es un paso de la fase 5 de `agents/release_installers.md` desde el 2026-10-21 | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-134, «Segunda comprobación intermedia»: el `HEAD` del 2026-10-23 (`ebf127d`) se sostiene — ×1,050 en los 16 programas, `s = s "x"` ×1,025 —, y los avisos de 5 rondas eran ruido |
+| PERF-08 / GLB-134 | Repetir la medición del binario estático con musl **en la release**: la puerta no construye el estático. Es un paso de la fase 5 de `agents/release_installers.md` desde el 2026-10-21 | `ZyDDT/HALLAZGOS/GLOBAL.md` § GLB-134, «Segunda comprobación intermedia»: el `HEAD` del 2026-10-23 (`30195b2`) se sostiene — ×1,050 en los 16 programas, `s = s "x"` ×1,025 —, y los avisos de 5 rondas eran ruido |
 
 ## 4. Documentación
 
