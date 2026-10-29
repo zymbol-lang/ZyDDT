@@ -576,3 +576,18 @@ t(v) {
 }
 >> t(1114112) ¶
 """
+
+[[cell]]
+id     = "decimal-count-in-native-digits"
+expect = "ok"
+what   = "the count after `#.`, `#!`, `#,.` and `#^.` may be written in any script's digits, as the three engines read every other literal"
+# Found 2026-10-29 by the v0.0.11 manuals: zyjs reads only [0-9] there and refuses
+# `#.२|x|`, which both Rust engines accept (ZYJS-072).  The Devanagari two and the
+# Arabic-Indic two are one program because the lexer's rule is one rule.
+src    = """
+>> #.२|3.14159| ¶
+>> #!٢|3.14159| ¶
+>> #,.２|3.14159| ¶
+>> #^.२|3.14159| ¶
+"""
+open_finding = { zyjs = "ZYJS-072" }

@@ -28,8 +28,9 @@
 | [`ZYJS-021`](#zyjs-021--los-errores-de-sintaxis-de-los-operadores--nombran-tokens-y-dos-dicen-object-object) | **corregido 2026-09-15** | los errores de sintaxis de `$` nombraban tokens internos, y dos decían `[object Object]` |
 | [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **corregido 2026-09-15** | un módulo importado con el bloque de exportación mal escrito se cargaba sin error |
 | ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
+| [`ZYJS-072`](#zyjs-072--la-cuenta-de-decimales-de-un-operador-de-formato-solo-admite-cifras-ascii) | **abierto 2026-10-29** | `#.२\|x\|`, `#!२\|x\|`, `#,.२\|x\|` y `#^.२\|x\|` se rechazan; los dos Rust los aceptan |
 
-**Ninguno abierto.** `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Uno abierto: `ZYJS-072`** (2026-10-29), sujeto por una celda `KNOWN`. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3709,3 +3710,42 @@ no de `??`.
 ### Qué lo sujeta
 
 `runtime-match-patterns/pattern-of-another-type-is-refused` y `range-of-another-type-is-refused`.
+
+---
+
+## ZYJS-072 — La cuenta de decimales de un operador de formato sólo admite cifras ASCII
+
+**Estado:** **abierto 2026-10-29** — sin decisión que tomar: los dos Rust ya dicen lo que el lenguaje hace, y `zyjs` es el que no lo sigue
+**Encontrado por:** la revisión de los manuales v0.0.11 (`web/data/manuals/v0011/`), al comparar los 76 bloques `zymbol` de cada manual en los tres motores, el 2026-10-29
+**Motores:** `zyjs`. `zytw` y `zyvm` coinciden entre sí
+
+| programa | `zytw` = `zyvm` | `zyjs` |
+|---|---|---|
+| `>> #.२\|3.14159\| ¶` | `3.14` | `expected a decimal count after '#.'` |
+| `>> #!२\|3.14159\| ¶` | `3.14` | `expected a decimal count after '#!'` |
+| `>> #,.२\|3.14159\| ¶` | `3.14` | `expected a decimal count after '#,'` |
+| `>> #^.२\|3.14159\| ¶` | `3.14e0` | `expected a decimal count after '#^'` |
+| `>> #.٢\|…\|`, `#.２\|…\|`, `#.𝟚\|…\|` | `3.14` | el mismo rechazo |
+| `n = 2` y `>> #.n\|3.14159\| ¶` | `3.14` | `3.14` |
+
+No depende de `#०९#`: con o sin modo numeral, `zyjs` sólo lee `[0-9]` como cuenta (`readDigits` del lexer de
+`web/src/zymbol/zymbol.js`). Los dos Rust aceptan una cifra de cualquiera de los 69 bloques, que es lo que el lenguaje
+promete en el resto de sus literales. Una cuenta dada por un nombre (`#.n|x|`) funciona en los tres.
+
+### Qué rompe
+
+Cualquier manual v0.0.11 que escriba sus literales en cifras propias tiene un bloque de redondeo con `#.<cifra>|π|`, y
+ese bloque (el 72 de los 76) da distinto en el navegador. Son **20 manuales**: hi, ar, bn, ur, pa, te, ta, mr, fa, th,
+gu, kn, my, ps, ml, ne, lo, ku, si y km. Los otros 31 no escriben la cuenta en cifras propias y los tres motores coinciden
+en los 76 bloques.
+
+### Qué no se ha decidido
+
+Si se corrige `readDigits` para que acepte cualquier `\p{Nd}` de los 69 bloques —que es lo que hace el lexer de Rust—
+o si los manuales dejan la cuenta en ASCII, que es válido en los tres. Lo primero es lo que dice la premisa del lenguaje;
+lo segundo sólo esconde la diferencia.
+
+### Qué lo sujeta
+
+`runtime-format-convert/decimal-count-in-native-digits`, con `open_finding = { zyjs = "ZYJS-072" }`: sale como `KNOWN`
+mientras `zyjs` rechace la forma, y en rojo (`DEBT PAID`) el día que la acepte.
