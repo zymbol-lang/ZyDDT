@@ -581,13 +581,35 @@ t(v) {
 id     = "decimal-count-in-native-digits"
 expect = "ok"
 what   = "the count after `#.`, `#!`, `#,.` and `#^.` may be written in any script's digits, as the three engines read every other literal"
-# Found 2026-10-29 by the v0.0.11 manuals: zyjs reads only [0-9] there and refuses
-# `#.२|x|`, which both Rust engines accept (ZYJS-072).  The Devanagari two and the
-# Arabic-Indic two are one program because the lexer's rule is one rule.
+# Found 2026-10-29 by the v0.0.11 manuals: zyjs read only [0-9] there and refused
+# `#.२|x|`, which both Rust engines accept (ZYJS-072, fixed the same day).  The
+# Devanagari two and the Arabic-Indic two are one program because the lexer's rule
+# is one rule.
 src    = """
 >> #.२|3.14159| ¶
 >> #!٢|3.14159| ¶
 >> #,.２|3.14159| ¶
 >> #^.२|3.14159| ¶
+>> #.१२|3.14159265358979| ¶
+>> #.𝟚|3.14159| ¶
 """
-open_finding = { zyjs = "ZYJS-072" }
+
+[[cell]]
+id     = "decimal-count-in-mixed-digit-scripts-is-refused"
+expect = "error"
+what   = "the count is one literal, so its digits are of one script: `#.२2|x|` is refused as `२2` is"
+# The other half of ZYJS-072: once zyjs read every script, it had to refuse a
+# count that mixes two, with the words of the Rust lexer.
+src    = """
+>> #.२2|3.14159| ¶
+"""
+
+[[cell]]
+id     = "decimal-count-name-with-native-digits"
+expect = "ok"
+what   = "a count given by name is a name by the rule of every other name, digits of any script included"
+# zyjs read the count's name as [\p{L}_0-9] and stopped at `२` (ZYJS-072).
+src    = """
+n२ = 3
+>> #.n२|3.14159| ¶
+"""

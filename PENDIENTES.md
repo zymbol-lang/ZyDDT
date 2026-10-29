@@ -35,9 +35,7 @@
 
 Actualizado el 2026-10-29.
 
-| ID | Qué | Origen | Comprobado |
-|---|---|---|---|
-| ZYJS-072 | `zyjs` sólo lee `[0-9]` en la cuenta de `#.`, `#!`, `#,.` y `#^.`: `#.२\|x\|` se rechaza en el navegador y los dos Rust lo aceptan. Afecta al bloque de redondeo de 20 manuales v0.0.11 con cifras propias | `ZyDDT/HALLAZGOS/zyjs.md` § ZYJS-072 | `runtime-format-convert/decimal-count-in-native-digits` — `KNOWN`, 2026-10-29 |
+Nada.
 
 ## 2. Decisiones de diseño sin tomar
 
