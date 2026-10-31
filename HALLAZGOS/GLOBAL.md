@@ -10479,3 +10479,40 @@ Debian 11 y 12 perdía todas sus sesiones.
 grupo del comando sigue vivo después de `--timeout`, en los dos motores. Lo corre `cargo test` en la puerta de GitHub,
 que es Ubuntu 22.04: el sitio donde falla. Una celda de ZyDDT no puede: pregunta qué imprime un programa, no qué
 procesos quedan vivos.
+
+## GLB-151 — Dos workflows publicaban el mismo binario estático aarch64, y una de sus dos sumas no casaba con él
+
+**Estado:** **corregido 2026-10-31** — decisión del autor (la opción recomendada de tres): se retira
+`release-aarch64-static.yml`; `release-linux.yml` ya construía ese binario y publica su suma en
+`SHA256SUMS_aarch64_linux.txt`
+**Encontrado por:** el ensayo de los cuatro workflows de release desde la rama `v0.0.11`, contra un release en borrador
+(`v0.0.11-rc1`, nunca publicado), el 2026-10-31, al pasar `sha256sum -c` por **todos** los ficheros de suma
+**Motores:** ninguno: es la publicación. Afecta a la descarga `zymbol_lang_vX.Y.Z_aarch64_linux`
+
+Los dos construían `zymbol_lang_v0.0.11_aarch64_linux` con `cross` y lo subían con `--clobber`:
+
+| workflow | subió | su fichero de suma |
+|---|---|---|
+| `release-aarch64-static.yml` | 18:32Z | `SHA256_aarch64_linux.txt`: `6010008f…` |
+| `release-linux.yml` (publica después de verificar el `.deb`) | 18:39Z | `SHA256SUMS_aarch64_linux.txt`: `2706bef7…` |
+
+En la release queda el último que sube, y el orden es fijo: `publish-linux` espera al verify del `.deb`. El binario
+publicado era el de `release-linux.yml`, y `SHA256_aarch64_linux.txt` no casaba con él. Hasta la v0.0.10 los dos builds
+salían idénticos byte a byte y las dos sumas coincidían; `agents/release_installers.md` ya avisaba de que nada lo
+obligaba. En la v0.0.11 dejaron de serlo. Publicada así, la release habría llevado un fichero de suma falso, y quien
+verificara la descarga con él la habría visto alterada.
+
+`sha256sum -c SHA256SUMS_*.txt`, la orden que el agente daba para la fase 5, no lo habría visto: no lee `SHA256_*.txt`.
+
+### Qué se cambió
+
+- `interpreter/.github/workflows/release-aarch64-static.yml`, borrado. La release pasa de 17 ficheros a 16: el binario
+  sigue, con su suma en `SHA256SUMS_aarch64_linux.txt`.
+- `interpreter/packaging/build-release.sh`: los dos comentarios que lo nombraban.
+- `agents/release_installers.md` (tres workflows, 16 ficheros, `sha256sum -c SHA256*.txt`) y `agents/web_release.md`
+  (cinco ficheros de suma).
+
+### Qué lo sujeta
+
+Ninguna prueba: no hay nada que ejecutar antes de que exista una release. Lo sujeta la fase 5 de
+`agents/release_installers.md`, que ahora comprueba cada fichero `SHA256*` de la release contra el fichero que nombra.
