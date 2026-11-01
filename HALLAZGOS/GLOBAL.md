@@ -9477,7 +9477,8 @@ distinto. La regla que quedó es la de la VM: `<~ f(…)` a la propia función, 
 corregido el 2026-10-19 en el `HEAD` por decisión del autor (grupo 4 del plan de cierre,
 `interpreter/ROADMAP_V0011_ES.md`: medir el estático y, si algo quedaba por encima de ×1,5, `mimalloc` sólo para ese
 target, debajo del asignador que cuenta). Sin celda: la puerta no construye el estático; lo sujeta la medición de abajo,
-que hay que repetir en la release
+que se repite en cada release — en la v0.0.11, con sus dos ficheros publicados el 2026-11-01, **se sostiene** (§ «En la
+release v0.0.11»)
 **Encontrado por:** ZyBigBench (PERF-08), que lo midió en otra máquina; aquí no se había reproducido
 **Familia:** [`ZYVM-023`](zyvm.md) y [`GLB-130`](GLOBAL.md): lo que más se dispara es lo que copiaba un texto entero
 
@@ -9577,6 +9578,29 @@ binarios, mismo procedimiento.
 
 Se sostiene. Lo que esto deja para la medición de la release: un programa de decenas de milisegundos necesita la
 distribución y no la mediana de cinco, y `str_concat` de `gap.py` se lee a un tamaño mayor o no se lee.
+
+### En la release v0.0.11 (2026-11-01)
+
+Los dos ficheros que se descargan, de la release `v0.0.11` (tag en `02acac3`), con su SHA-256 verificado contra
+`SHA256SUMS_x86_64_linux.txt`: `zymbol_lang_v0.0.11_x86_64_linux` (`static-pie linked`, `12e44302…1930`) y el `zymbol`
+de `zymbol_lang_v0.0.11_x86_64.deb` (glibc, `eebe494d…d630`). Los dos dicen `zymbol 0.0.11` y traen `repl` y `lsp`:
+son las características por defecto, no la compilación compacta. Misma máquina y mismo procedimiento que el
+2026-10-21 y el 2026-10-23; VM, tiempo de CPU (sin `perf`).
+
+- **Los 16 programas** (`ab.py`, 5 rondas alternadas): media geométrica estático/glibc **×1,040**, entre ×0,856
+  (`array_update`) y ×1,424, con los mismos pasos de `--count` y la misma salida en los 16. Por encima de ×1,2
+  salieron `strings_scan_long` (×1,424) y `strings_scan_short` (×1,222), los mismos de las dos comprobaciones
+  anteriores; con 21 rondas alternadas, **×0,793** y **×0,872**: ruido otra vez, y esta vez a favor del estático.
+- **`s = s "x"` con 2 000 000** (la operación que era ×17 en la v0.0.10), 21 ejecuciones alternadas con el reloj del
+  propio programa: mediana 117,0 ms glibc frente a 123,0 el estático, **×1,051** (mínimos 98 y 110 ms).
+- **`gap.py`** (`--no-tw --clock --runs 5`, la n mayor): `str_interp` 134 → 154 ms (×1,15), `closure_create_call`
+  120 → 116 ms, `str_concat` 7,0 → 7,0 ms, y `str_slice_small` por debajo de la resolución del reloj en los dos. A
+  n = 64 000, `str_concat` dio 3,0 → 11 ms: el tamaño que la comprobación anterior dejó dicho que no se lee.
+- **Pico de memoria** (`ru_maxrss`, por `wait4`): «hola» 12,1 → 12,1 MiB; `s = s "x"` con 2 000 000, 12,0 → 12,0;
+  `hof_chain` 16,3 → 19,9.
+
+Se sostiene en lo que se publicó. La medición no deja de pedirse: la fase 5 de `agents/release_installers.md` la
+repite en cada release, porque la puerta sigue sin construir el estático.
 
 ---
 
