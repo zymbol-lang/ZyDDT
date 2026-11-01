@@ -30,7 +30,7 @@
 
 [[engine]]
 id        = "zytw"
-cmd       = ["${ZYMBOL_BIN:-zymbol}", "run", "{file}"]
+cmd       = ["${ZYMBOL_BIN:-zymbol}", "run", "--tw", "{file}"]
 check_cmd = ["${ZYMBOL_BIN:-zymbol}", "check", "{file}"]
 desc      = "Rust tree-walker — the diagnostics bench"
 
@@ -38,7 +38,7 @@ desc      = "Rust tree-walker — the diagnostics bench"
 id        = "zyvm"
 cmd       = ["${ZYMBOL_BIN:-zymbol}", "run", "--vm", "{file}"]
 check_cmd = ["${ZYMBOL_BIN:-zymbol}", "check", "{file}"]
-desc      = "Rust register VM — the future default"
+desc      = "Rust register VM — the default engine"
 
 [[engine]]
 id        = "zyjs"

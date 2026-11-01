@@ -12,8 +12,9 @@
 | [`ZYVM-010`](#zyvm-010--soltar-valores-cuesta-entre-el-11-y-el-17--del-tiempo-de-la-vm) | **corregido 2026-10-10** | soltar valores al desmontar el marco y al escribir un registro, y un marco que medía todos los temporales que la función pidió alguna vez |
 | [`ZYVM-020`](#zyvm-020--n--sobre-un-nombre-que-es-estado-del-módulo-la-vm-le-da-un-registro-propio) | **corregido 2026-10-10** | `n° = n + i` con `n` estado del módulo: 3 donde los otros dos dan 16 |
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
+| [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
 
-**Ninguno abierto.** La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
+**Ninguno abierto.** `ZYVM-022` y `ZYVM-031`, que no están en la tabla, se corrigieron el 2026-10-19 y el 2026-10-20. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
 Las chinchetas que los sujetan:
 
@@ -765,7 +766,7 @@ que quedaba», al final de la ficha.
 ### Lo que añadió una medición de fuera (ZyBench, documentado el 2026-10-08)
 
 `IDEA-BEN-002`, de ZyBench —una medición de la VM contra Python hecha en otra
-sesión—, perfiló con callgrind sobre `820a60a` (2026-10-04) y aporta el dato que
+sesión—, perfiló con callgrind sobre `7af111b` (2026-10-04) y aporta el dato que
 esta ficha dejaba **sin separar**. En `fib(22)`, ~1 000 instrucciones por
 llamada, `Vec::resize` era el 23 % (rellenar con `Unit` el marco de 7 registros:
 `resize(n, Value::Unit)` clona el valor en cada hueco) y soltarlo al volver el
@@ -1562,10 +1563,10 @@ asignación antes de la lectura.
 
 ## ZYVM-022 — Lo que devuelve una llamada y se usa una vez sobrevive en su registro temporal: la VM tiene dos arrays donde el tree-walker tiene uno
 
-**Estado:** **abierto** — deuda conocida desde la v0.0.8 («VM expression temporaries», `IMPL_V008.md` § B.1), pasada
-al ROADMAP el 2026-08-31 y nunca archivada: ni ficha ni celda, y con la fecha límite que se puso a sí misma pasada
-tres veces. Medida de nuevo el 2026-10-11, tras ZYVM-010, y sigue en pie. Sujeta por el caso
-`autofree/call-result` de `zyquality/cost` (`open_finding`). **Sin decidir**: es del autor si se corrige
+**Estado:** **corregido 2026-10-19** — deuda conocida desde la v0.0.8 («VM expression temporaries», `IMPL_V008.md`
+§ B.1), archivada el 2026-10-11 y corregida por decisión del autor (grupo 3 del plan de cierre,
+`interpreter/ROADMAP_V0011_ES.md`: la opción de liberar sólo lo que puede ser una colección, medida antes, y deuda si
+costaba más de un 2 % de pasos). Sujeta por `autofree/call-result` de `zyquality/cost`, que pasa
 **Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 3.2: el ROADMAP pedía re-medir la deuda de auto-free
 antes de reescribirla y esa medición no tenía dónde vivir
 **Familia:** [`ZYVM-010`](zyvm.md) (el marco de llamada: reutiliza los temporales por sentencia, y esa reutilización es
@@ -1629,8 +1630,487 @@ tomado:
 - **Liberar en la última lectura** (la receta de `IMPL_V008.md` § B.1): la instrucción que consume el temporal por
   última vez lo toma en vez de copiarlo. Es el cambio de asignador de registros que la v0.0.8 describía.
 
+### Corrección (2026-10-19)
+
+La salida elegida, medida en tres pasos con `--count` sobre los 16 programas de `zyquality/bench/big/` contra el mismo
+`HEAD` sin el cambio:
+
+| variante | pasos, media geométrica | el peor | `autofree/call-result` |
+|---|---:|---:|---:|
+| limpiar al acabar la sentencia todo temporal de tipo desconocido | +18,7 % | `loop_mod` +62,5 % | 68 → 39 MiB |
+| sólo los que recibieron el resultado de una llamada | +0,45 % | `match_loop` +6,4 % | 68 → 39 MiB |
+| …salvo si una instrucción aritmética los leyó después | **+0,05 %** | `nqueens` +0,8 % | 68 → 39 MiB |
+
+La primera era la opción tal como se escribió y quedaba lejos del 2 %: casi todo temporal tiene tipo desconocido, y se
+limpiaba en cada vuelta de cada bucle. La segunda es lo que esta ficha describe —el resultado de una llamada—, pero
+`acc = acc + classify(i)` pagaba un paso por vuelta en limpiar un número. La tercera es la que quedó: `emit` apunta en
+`call_results` el registro que escribe un `Call`, `CallDynamic` o `CallBuiltin`, y lo quita si una instrucción aritmética
+lo lee —si corrió, lo que hay es un número; si no, la sentencia ya terminó con un error—; `release_temps` emite un
+`LoadUnit` para los que siguen apuntados. Dejar uno sin limpiar sólo cuesta memoria, como antes; nunca da una respuesta
+distinta.
+
 ### Qué lo sujeta
 
-`autofree/call-result` en `zyquality/cost/cost.toml`, con `open_finding = { zyvm = "ZYVM-022" }`: el día que la VM
-pase, el caso se pone en rojo hasta que esta ficha se cierre y la marca se quite. Los dos programas son
-`casos/autofree_resultado_uno.zy` y `casos/autofree_resultado_secuencial.zy`.
+`autofree/call-result` en `zyquality/cost/cost.toml`, sin `open_finding` desde la corrección: la VM da ×1,01 (39 MiB
+contra 39). Los dos programas son `casos/autofree_resultado_uno.zy` y `casos/autofree_resultado_secuencial.zy`.
+
+---
+
+## ZYVM-023 — `s = s "x"` copia el texto entero en cada añadido: construir un texto es cuadrático en la VM
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con sus tres casos de `zyquality/cost` como deuda antes del arreglo. Es el primero de la etapa 2
+(`interpreter/ROADMAP_V0011_ES.md`, PERF-06), con la recomendación «implementar» que el autor incorporó al plan el
+2026-10-14
+**Encontrado por:** ZyBigBench (PERF-06), por curva de crecimiento; traído a `zyquality/bench/big/` el 2026-10-14
+**Familia:** [`ZYVM-003`](zyvm.md) y [`ZYVM-013`](zyvm.md) — una edición que se escribe en un registro nuevo en vez
+de en su receptor; aquí no hay `Rc` con dos dueños, sino un búfer que nunca se reutiliza
+
+```zymbol
+s = ""
+@ _i:1..32000 { s = s "x" }
+>> s$# ¶
+```
+
+`zymbol run --count`, la misma forma con el receptor en sus tres sitios posibles:
+
+| receptor | `zyvm` bytes 2 000 → 8 000 | razón | `zytw` |
+|---|---:|---:|---:|
+| variable del programa | 4,2 MB → 34,5 MB | **8,12** | 1,89 |
+| variable local de una función | 4,3 MB → 34,5 MB | **8,11** | 1,76 |
+| estado de un módulo | 4,3 MB → 34,6 MB | **7,97** | 1,26 |
+
+A 32 000 añadidos la VM pide 515 MB al asignador para un texto de 32 KB; el tree-walker, 223 KB. Los pasos
+crecen ×4,00 exactos: el coste está dentro de una instrucción, en lo que copia. ZyBigBench lo midió en
+instrucciones: 128 000 añadidos, 968 M contra 290 M con la mitad.
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_binary`: `BinaryOp::Concat` emite `ConcatStr(dst, r_l, r_r)` con `dst` un
+temporal nuevo, y la asignación copia después el temporal a la variable. La VM tiene la vía rápida —`ConcatStr`
+reutiliza el búfer del operando izquierdo, con `try_into_string`, cuando `dst == a`—, pero el compilador nunca la
+alcanza: destino y operando izquierdo no son el mismo registro, así que cada añadido reserva un texto de la longitud
+entera y copia el anterior dentro.
+
+### Alcance
+
+Todo programa que construya un texto por partes: un informe, una línea de tablero, un buffer de pantalla. La salida
+es idéntica; sólo lo ve una curva.
+
+### Corrección (2026-10-16)
+
+`compile_assignment_inner` reconoce `s = s x y …` —una cadena de `Concat` cuya hoja de más a la izquierda es el
+receptor— y emite `ConcatStr(s, s, x)`, `ConcatStr(s, s, y)` sobre el registro de la propia variable, por los mismos
+tres caminos que `ConcatBuild` (GLB-118): la variable local, la del programa con su ranura espejo, y el estado de un
+módulo. Lo que hubo que cuidar:
+
+- **Izquierda a derecha.** Todos los operandos se evalúan antes del primer añadido, así que ven el `s` con el que
+  empezó la sentencia. Un operando que *es* el registro del receptor (`s = s "-" s`) se copia aparte antes.
+- **Un `<~` en la misma sentencia** (`r = r escribe(r<~)`) deja la lectura fijada y sigue por el camino de la copia,
+  como en ZYVM-013.
+- **La ranura.** El estado de un módulo y la variable espejo de un programa guardan una segunda referencia al
+  texto, y con dos dueños `try_into_string` copia. `DetachGlobal` soltaba la ranura sólo para agregados; ahora también
+  para un texto que comparte búfer con el registro (`ZyStr::shares_buffer`). Si un operando escribió el estado entre
+  la lectura y el añadido, la ranura tiene otro texto y no se toca: `mete()` en el fichero del corpus de abajo.
+
+`zymbol run --count`, `bytes` de 2 000 a 8 000 añadidos:
+
+| receptor | antes | ahora |
+|---|---:|---:|
+| variable del programa | 4,2 MB → 34,5 MB (×8,12) | 2,26 MB → 2,52 MB (×1,12) |
+| variable local de una función | 4,3 MB → 34,5 MB (×8,11) | 2,26 MB → 2,53 MB (×1,12) |
+| estado de un módulo | 4,3 MB → 34,6 MB (×7,97) | 2,35 MB → 2,61 MB (×1,11) |
+
+Los pasos bajan un 8 % en las dos primeras (sin el `CopyReg` de vuelta) y suben un 8 % en el estado de un módulo
+(`DetachGlobal` y la limpieza de temporales del estado). Sin instrucciones de `perf`: `perf_event_paranoid` está en 3
+en esta máquina.
+
+`zyquality/corpus/modules_scope/concat_receptor.zy` (con su módulo `concat_receptor_m.zy`) recoge las formas que el
+arreglo podía romper: el receptor como operando, un alias que comparte el texto, números, un receptor que no es
+texto, una cadena corta que crece, un alias dentro de una función, el estado de un módulo leído antes y después, un
+operando que reescribe el estado, una lambda que captura la variable, paréntesis, texto no ASCII y un `<~` en la
+misma sentencia. Da la misma salida en los tres motores y con `ZYMBOL_POISON_TEMPS=1`.
+
+### Qué lo sujeta
+
+`growth/concat-local`, `growth/concat-in-function` y `growth/concat-module-state` en `zyquality/cost/cost.toml`, sin
+deuda: la razón contada de `bytes` es exacta. Mientras el hallazgo estuvo abierto los tres llevaban
+`open_finding = { zyvm = "ZYVM-023" }`, y por él el corredor de `cost/` aprendió a leer `open_finding` en las
+razones contadas: hasta entonces ninguna deuda declarada era de `--count`. Una deuda se da por pagada sólo cuando
+pasan **todas** las lecturas de su motor, porque un defecto al que el conteo es ciego pasa todas las razones
+contadas mientras sigue abierto.
+
+---
+
+## ZYVM-024 — `@ ch:s` recorre la variable, no el texto que tenía al empezar: si el cuerpo reescribe `s`, la VM lee el texto nuevo y, pasado su final, da el carácter 0
+
+**Estado:** **corregido 2026-10-16** — encontrado y corregido el mismo día, antes que PERF-04
+**Encontrado por:** la lectura de `compile_foreach_loop` para el arreglo de PERF-04 (`interpreter/ROADMAP_V0011_ES.md`,
+etapa 2), cuya receta dice «sobre la cadena que había al entrar al bucle»: hoy no es así
+**Familia:** ninguna abierta. Es el aliasing que el camino genérico de ese mismo bucle ya había resuelto para los
+diccionarios («Into a FRESH register, not over `r_coll`»), y que el camino del texto no tiene
+
+```zymbol
+s = "abcd"
+@ ch:s {
+    >> ch
+    s = "zz"
+}
+>> " " s ¶
+```
+
+| | salida |
+|---|---|
+| `zytw`, `zyjs` | `abcd zz` |
+| `zyvm` | `az` + dos caracteres 0 + ` zz` |
+
+Lo mismo con un texto más largo (`aYZ` donde los otros dicen `abc`) y con uno no ASCII (`ñaaaa` por `ñandú`). Un
+arreglo no lo sufre: el bucle tiene su propia referencia.
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_foreach_loop`: cuando el iterable es de tipo estático `String`, el bucle
+cuenta los caracteres una vez (`StrLen`) y en cada vuelta emite `StrCharAt(item, r_coll, idx)`. Si el iterable es
+un nombre, `r_coll` **es** el registro de la variable, así que cada vuelta lee lo que la variable tiene en ese
+momento. Y `StrCharAt` contesta `'\0'` a un índice fuera del texto en vez de fallar, por eso el error no se ve.
+
+### Alcance
+
+Un programa que recorre un texto y lo reescribe dentro del bucle —un analizador que consume su entrada, un
+autómata—. Un texto al que sólo se le añade al final (`u = u ch`) da lo mismo por casualidad: el prefijo no cambia.
+No lo ve ninguna prueba: ningún fichero del corpus reescribía el texto que recorre.
+
+### Qué lo sujeta
+
+`zyquality/corpus/loops/14_foreach_string_snapshot.zy`, con su golden de `zytw`: seis formas —un texto más corto,
+uno más largo, uno que crece al final, uno no ASCII, uno dentro de una función y, para comparar, un arreglo—.
+Divergía en la VM en tres de ellas.
+
+### Corrección (2026-10-16)
+
+El camino del texto copia el iterable a un registro propio del bucle antes de contar sus caracteres, como ya
+hacía el camino genérico. La copia es un incremento del contador de referencias, no del texto. Con
+`ZYMBOL_POISON_TEMPS=1` da el mismo golden.
+
+El `'\0'` de `StrCharAt` deja de alcanzarse, pero sigue ahí: PERF-04 sustituye esa instrucción.
+
+---
+
+## ZYVM-025 — `@ ch:texto` busca cada carácter desde el principio del texto: recorrer un texto es cuadrático en la VM
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con `growth/foreach-over-text` de `zyquality/cost` como deuda antes del arreglo. Es PERF-04 de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`), con la
+recomendación «implementar» que el autor incorporó al plan el 2026-10-14
+**Encontrado por:** ZyBigBench (PERF-04), por curva de crecimiento
+**Familia:** [`ZYVM-024`](zyvm.md), la misma instrucción: aquél era *qué* texto lee cada vuelta, éste *cuánto* le
+cuesta leerlo
+
+```zymbol
+s = ""
+@ _i:1..80000 { s = s "ñ" }
+k = 0
+@ ch:s { ? ch == 'ñ' { k = k + 1 } }
+>> k ¶
+```
+
+Reloj, una corrida, binario de release:
+
+| texto | n → 4n | `zyvm` | `zytw` |
+|---|---|---:|---:|
+| «ñ» | 20 000 → 80 000 | 47 ms → 387 ms | 18 ms → 51 ms |
+| «ñ» | 80 000 → 320 000 | 399 ms → 5 933 ms (**×14,9**) | 51 ms → 118 ms |
+| «x» | 320 000 → 1 280 000 | 1 257 ms → 21 367 ms (**×17**) | 135 ms → 471 ms |
+
+`--count` no lo ve: `steps` crece ×4,00 exacto, porque cada vuelta es **una** instrucción, recorra lo que recorra.
+
+### Causa
+
+`zymbol-vm/src/lib.rs`, `StrCharAt(dst, s, i)`: el bucle de texto pide el carácter `i` en cada vuelta, y la
+instrucción lo busca. Con texto ASCII llama antes a `s.is_ascii()`, que recorre el texto entero (a unos 40 GB/s,
+por eso tarda en notarse); con texto no ASCII, además, a `s.chars().nth(i)`, que lo recorre hasta `i`.
+
+### Alcance
+
+Todo programa que recorra un texto carácter a carácter: un analizador, un contador, un cifrado. Con texto ASCII
+corto no se nota; con un fichero leído entero, sí.
+
+### Qué lo sujeta
+
+`growth/foreach-over-text` en `zyquality/cost/cost.toml`, por reloj y con texto no ASCII, ya sin deuda. Mientras
+estuvo abierto sus razones contadas pasaban y el reloj daba `KNOWN` (×14,87), y el corredor no lo dio por pagado:
+fue la primera prueba de que una deuda se paga sólo cuando pasan todas las lecturas de su motor.
+
+### Corrección (2026-10-16)
+
+`StrCharAt(dst, s, i)` —el carácter `i`— se sustituye por `StrCharNext(dst, s, cursor)`: el carácter que empieza en
+el byte `cursor`, y el cursor avanza tras él. El bucle de texto guarda el cursor en un registro propio junto al
+contador de caracteres, que sigue decidiendo cuándo termina, así que `@>` y `@!` no cambian. Cada vuelta es O(1) y
+no reserva nada; es seguro porque desde [`ZYVM-024`](zyvm.md) el bucle recorre una copia del texto que nada puede
+modificar. Un cursor fuera del texto o en medio de un carácter es un fallo del compilador, y se rechaza en vez de
+contestar `'\0'` como hacía `StrCharAt`.
+
+| texto | n | antes | ahora |
+|---|---:|---:|---:|
+| «ñ» | 320 000 | 5 933 ms | 58 ms |
+| «x» | 1 280 000 | 21 367 ms | 207 ms |
+
+Caracteres de uno a cuatro bytes, `@>`, `@!`, un texto vacío y un bucle anidado dan la misma salida en los tres
+motores y con `ZYMBOL_POISON_TEMPS=1`.
+
+---
+
+## ZYVM-026 — Un texto cortado donde su tipo no se conoce al compilar: la VM recortaba el rango como antes de D3
+
+**Estado:** **corregido 2026-10-16** — encontrado y corregido el mismo día, al preparar PERF-05 a
+**Encontrado por:** la lectura de las instrucciones de corte para PERF-05 a (`interpreter/ROADMAP_V0011_ES.md`):
+`ArraySlice` tenía su propia rama para un texto, con el `.max(0).min(len)` que `StrSlice` había dejado en D3
+**Familia:** las reglas estrictas de D3 (pasos 4.3 y 4.4) y la revocación de D2 (2026-09-20): un corte que se sale de
+la colección se rechaza, y uno escrito de mayor a menor invierte
+
+```zymbol
+hasta(s, a, b) { <~ s$[a..b] }
+t = "ñandú"
+>> hasta(t, 3, 1) " | " t$[3..1] ¶
+>> hasta(t, 2, 9) ¶
+```
+
+| | `hasta(t, 3, 1)` | `hasta(t, 2, 9)` |
+|---|---|---|
+| `zytw`, `zyjs`, y la VM con `t$[…]` | `nañ` | `##Index(slice indices out of bounds: [2..9] …)` |
+| `zyvm` con un parámetro | vacío | `andú` |
+
+### Causa
+
+El compilador elige la instrucción por el tipo estático: `StrSlice` si sabe que es un texto, `ArraySlice` si no lo
+sabe —un parámetro, el resultado de una llamada—. `ArraySlice` llevaba su propia rama para un texto, escrita «para
+módulos» antes de D3, con el rango recortado a la longitud y sin dirección. Las dos instrucciones contestaban cosas
+distintas al mismo corte.
+
+### Alcance
+
+Toda función que corte el texto que recibe. Un rango bien escrito dentro del texto daba lo mismo, por eso no se
+veía; uno invertido o fuera de rango daba un valor plausible en vez del de los otros dos motores.
+
+### Corrección (2026-10-16)
+
+Una función, `str_slice`, con la regla de `StrSlice`, y las dos instrucciones la llaman.
+
+### Qué lo sujeta
+
+`zyquality/corpus/strings/31_slice_in_a_function.zy`: diez cortes, cada uno escrito por un parámetro y, al lado,
+sobre el texto directamente. Divergía en la VM en todos los que invierten el rango o se salen del texto.
+
+---
+
+## ZYVM-027 — Una recursión en cola dentro de un módulo no era una llamada en cola en la VM
+
+**Estado:** **corregido 2026-10-16** — encontrado al alinear la llamada en cola para [`GLB-133`](GLOBAL.md)
+**Encontrado por:** `C::baja(30000)`, con `baja` recursiva en cola dentro de un módulo: `modulo` en el tree-walker,
+`##Depth` en la VM
+**Familia:** [`GLB-133`](GLOBAL.md), [`ZYTW-017`](zytw.md)
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, la regla que emite `TailCall` en un `Statement::Return`: busca la función llamada sólo
+en `function_index`, y una función de un
+módulo se resuelve por `module_scope`. Dentro de un módulo la búsqueda fallaba y la llamada se compilaba como una
+llamada normal.
+
+### Corrección (2026-10-16)
+
+La misma resolución que `compile_call`: `function_index` primero y `module_scope` después.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/depth_tail_calls.zy`, con su módulo `depth_tail_calls_m.zy`.
+
+---
+
+## ZYVM-028 — `s$#`, `s[i]` y un corte recorrían el texto entero cada vez: cuadráticos dentro de un bucle
+
+**Estado:** **corregido 2026-10-17** — es PERF-05 b de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`), que D8 había
+aplazado y el autor metió en la etapa el 2026-10-17, con Python como oráculo: «debemos acercarnos porque no es una
+competencia, es una validación»
+**Encontrado por:** ZyBigBench (PERF-05), y `gap.py` en instrucciones el 2026-10-17: `str_len` a ×31 de Python a n y
+×61 a 2n; `str_slice_small` a ×42 y ×85 — la distancia crecía
+**Familia:** [`GLB-130`](GLOBAL.md), que quitó la copia del corte y dejó el recorrido; [`ZYTW-016`](zytw.md), la mitad
+del tree-walker, que sigue abierta
+
+### Causa
+
+Una posición de Zymbol cuenta caracteres y un `str` se direcciona por bytes. `s$#` contaba los caracteres en cada
+llamada (`is_ascii()` y, si no, `chars().count()`), `s[i]` contaba y luego avanzaba hasta `i`, y un corte contaba para
+validar los límites y recorría hasta ellos.
+
+### Corrección (2026-10-17)
+
+El texto del montón de un `ZyStr` guarda su número de caracteres, calculado la primera vez que alguien lo pide
+(`char_len`). Un texto cuyo número de caracteres es su longitud es ASCII, y entonces una posición es un byte:
+`s[i]` y un corte no recorren nada. El valor detrás de un `Rc` compartido no cambia nunca —escribir en el sitio saca el
+`String` de su único dueño y crea un texto nuevo, con el recuento sin calcular—, así que el recuento no puede quedarse
+viejo. `ZyStr` sigue ocupando 8 bytes.
+
+Instrucciones (`perf`, mediana de 7), VM, frente a Python:
+
+| operación | antes, n → 2n | ahora, n → 2n |
+|---|---|---|
+| `str_len` (`m = s$#`, 20 000 veces) | ×31 → ×61 | ×1,2 → ×1,2 |
+| `str_slice_small` (2 000 cortes) | ×42 → ×85 | ×2,1 → ×2,1 |
+
+Un texto no ASCII sigue recorriéndose hasta la posición en `s[i]` y en un corte; `s$#` ya no. Eso tiene ficha propia
+desde el 2026-10-19, [`GLB-139`](GLOBAL.md), con su caso en `zyquality/cost/`.
+
+### Qué lo sujeta
+
+`zyquality/corpus/strings/32_char_count_kept.zy` —un texto que crece en el sitio leído entre añadidos, un alias que
+lo comparte, ASCII y no ASCII— y la prueba `char_len_is_counted_once_and_stays_true` de `zy_str.rs`.
+
+---
+
+## ZYVM-029 — Un bucle contado que acaba en el entero más grande abortaba en la VM al salir
+
+**Estado:** **corregido 2026-10-17** — encontrado al fundir el control del bucle contado en una instrucción, en la
+etapa 2 de la v0.0.11
+**Encontrado por:** `@ i:9007199254740989..9007199254740991 { … }`: el tree-walker y zymbol.js corren las tres vueltas y
+siguen; la VM corre las tres y para con `integer overflow: 9007199254740991 + 1`
+**Familia:** [`GLB-135`](GLOBAL.md), el otro defecto del control de un bucle `@` encontrado en la v0.0.11
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `compile_range_loop`: al final de cada vuelta el contador oculto avanzaba con `AddInt`
+(o `SubInt`) y la comparación con el límite venía después, en la cabecera. `AddInt` comprueba el entero seguro, así
+que el paso que iba a sacar el contador del rango desbordaba antes de que nadie mirase el límite. Con un paso mayor
+que 1 bastaba con que el último valor estuviese a menos de un paso del máximo.
+
+### Corrección (2026-10-17)
+
+Una instrucción nueva, `RangeStep`, hace el final de la vuelta entero: calcula el siguiente valor en `i64` —los dos
+operandos caben en ±(2^53−1), la suma no sale de un `i64`—, lo compara con el límite y sólo lo guarda si vuelve al
+cuerpo. Fuera del rango no escribe nada, así que no hay nada que desbordar. Es también lo que pesaba: el control de
+cada vuelta eran nueve despachos (la dirección se preguntaba dos veces en cada una) y ahora son dos.
+
+### Qué lo sujeta
+
+`zyquality/corpus/loops/16_range_ends_at_max_int.zy`: hacia arriba, hacia abajo, y con un paso que salta el límite en
+los dos sentidos.
+
+---
+
+## ZYVM-030 — Un parámetro que nada lee no tenía registro: la llamada escribía fuera del marco
+
+**Estado:** **corregido 2026-10-17** — encontrado al quitar los `LoadUnit` que preceden a un `Return`, en la etapa 2
+de la v0.0.11; está en la v0.0.10 publicada
+**Encontrado por:** `f(a, b, c) { <~ a }`, en una build de depuración de la VM: `unsafe precondition(s) violated:
+slice::get_unchecked_mut requires that the index is within the slice`, y el proceso aborta. La build de release
+contestaba bien, por suerte
+
+### Causa
+
+`zymbol-compiler/src/lib.rs`, `eliminate_dead_code`: cuando quita instrucciones inalcanzables, vuelve a contar los
+registros del trozo con las que quedan, y un parámetro que ninguna instrucción lee no está en ninguna. `f` quedaba
+con un registro para tres parámetros. `Call`, `CallDynamic` y `TailCall` escriben cada argumento en el marco con
+`get_unchecked_mut` / `ptr::write`, sin comprobar límites, así que `b` y `c` iban más allá del final del `Vec`:
+dentro de su capacidad casi siempre, pisando memoria que nadie usaba; fuera de ella, el montón. En la v0.0.10 la
+escritura era una asignación, que además soltaba lo que hubiese allí.
+
+Hacía falta código inalcanzable para que el recuento corriese —el `LoadUnit` + `Return` implícito tras un `<~`
+final lo es siempre— y un parámetro sin leer, que sólo provoca un aviso.
+
+### Corrección (2026-10-17)
+
+Un trozo nunca tiene menos registros que parámetros.
+
+### Qué lo sujeta
+
+La prueba `a_frame_holds_every_parameter_even_one_nothing_reads` de `zymbol-compiler/tests/compile_smoke.rs`, que
+falla sin la corrección (`f: 1 registers for 3 parameters`), y `zyquality/corpus/functions/parametro_sin_leer.zy`, el
+programa, que sólo una build de depuración ve fallar.
+
+## ZYVM-031 — El ejecutable de `zymbol build` no tenía `std/net` ni `std/db` aunque el `zymbol` que lo construía sí
+
+**Estado:** **corregido 2026-10-20** (`interpreter` `1f2b7fd`) — encontrado el mismo día al preparar 3.1 de la v0.0.11, leyendo quién construye una VM. Lo
+introdujo la propia rama `v0.0.11`, nunca publicada: `std/db` desde D4 (`interpreter` del 2026-10-19) y `std/net` desde
+la build compacta (`5176b3b`, 2026-10-20)
+**Encontrado por:** leer `zymbol-standalone/src/lib.rs`, `write_cargo_toml`, y comprobarlo con dos programas
+
+### Reproducción
+
+Con un `zymbol` de la rama compilado `cargo build --release --features db`:
+
+```text
+$ cat nethead.zy
+<# std/net => net
+r = net::head("http://127.0.0.1:1/")
+>> r ¶
+$ zymbol run nethead.zy            # y --tw
+#0
+$ zymbol build nethead.zy -o nethead && ./nethead
+Runtime error: std/net is not available in this build (compiled without HTTP support)
+
+$ cat dbconn.zy
+<# std/db => db
+c = db::connect("sqlite", "Driver=NoSuchDriver")
+>> "reached" ¶
+$ zymbol run dbconn.zy
+reached
+$ zymbol build dbconn.zy -o dbconn && ./dbconn
+Runtime error: std/db is not available in this build (compiled without ODBC support)
+```
+
+`net::head` contra un puerto cerrado contesta `#0` sin red, así que el primero es determinista.
+
+### Causa
+
+`zymbol build` compila el programa con el compilador del propio `zymbol` y genera un proyecto de Cargo que depende de
+`zymbol-vm` por ruta, **sin features**: `zymbol-vm = { path = "…" }`. El compilador tiene las del binario que lo
+lleva —Cargo las une—, la VM generada sólo las suyas por defecto, que son `[]` desde D4. El compilador emite los ids de
+`std/net` y `std/db`, y la VM del ejecutable cae en el `net_dispatch` / `db_dispatch` que existe para lo inalcanzable.
+Hasta D4 `db` estaba en los defectos de `zymbol-vm`, y `ureq` era obligatorio en ella hasta `5176b3b`; por eso antes
+funcionaba. Nada de la puerta ejecuta `zymbol build` con un programa que importe uno de los dos.
+
+### Corrección (2026-10-20)
+
+El proyecto generado pide para `zymbol-vm` las mismas features que tiene el compilador que produjo su bytecode:
+`zymbol-standalone` gana `http` y `db`, que encienden las de su `zymbol-compiler` y que encienden a su vez las del CLI, y
+`cargo_toml` (antes dentro de `write_cargo_toml`) las escribe. Con el `zymbol` de la puerta, los dos programas de arriba
+dan `#0` y `reached` como ejecutables.
+
+### Qué lo sujeta
+
+`the_generated_vm_has_the_modules_its_compiler_accepts`, en `zymbol-standalone/src/lib.rs`: compila `<# std/net` y
+`<# std/db` con el compilador del crate y exige que el `Cargo.toml` generado pida la feature de cada uno que acepte, y
+ninguna de los que rechace. Falla sin la corrección («the compiler accepts `<# std/net`, and the generated `zymbol-vm =
+{ path = "/v", features = [] }` does not ask for `http`») y pasa con y sin features. Una primera versión pasaba un
+`base_dir` vacío y salía roja por otra razón: sin directorio base el compilador no mira los imports, y aceptaba siempre.
+
+
+## ZYVM-032 — `'a'..'z' =>`: la VM no compilaba un rango de Char como patrón de `??`
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: la gramática admite `Char..Char` en un patrón, y el
+tree-walker y zyjs lo ejecutaban
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24, al barrer `??` sobre seis clases de sujeto
+**Motores:** `zyvm`. `zytw` y `zyjs` ya lo ejecutaban
+
+```zymbol
+c = 'b'
+>> ?? c { 'a'..'m' => 1  _ => 2 } ¶
+```
+
+| | `zytw` | `zyvm` antes | `zyvm` después | `zyjs` |
+|---|---|---|---|---|
+| el de arriba | `1` | `error: unsupported construct: non-int range in match` | `1` | `1` |
+| `'A'..'Z' \|\| '0'..'9' =>` | igual que `zytw` | el mismo rechazo | igual que `zytw` | igual |
+| un Char range contra un Int que llega por un parámetro | `##Type(range pattern type mismatch)` | el mismo rechazo | `##Type(range pattern type mismatch)` | igual |
+
+El rechazo era al compilar: el programa entero no arrancaba, aunque el brazo nunca se alcanzara.
+
+### Causa y corrección
+
+`emit_pattern_test` sólo sabía emitir `MatchRange(reg, i64, i64, label)` y devolvía `Unsupported("non-int range in
+match")` para cualquier otro límite. Una instrucción nueva, `MatchCharRange(reg, char, char, label)`, hace con un Char
+lo que `MatchRange` con un Int, y con cualquier otro valor da el `range pattern type mismatch` del tree-walker. Las tres
+tablas del compilador que enumeran los saltos de una instrucción la conocen. Cuesta nada a un programa que no la usa.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/char-range-pattern`, con oráculo.

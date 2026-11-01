@@ -3,7 +3,7 @@
 > Un hallazgo entra aquí cuando el runner nombra a `zytw` como el motor que
 > incumple. La regla y el formato están en [`INDICE.md`](INDICE.md).
 
-**Ninguno abierto.** `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
+**Ninguno abierto.** `ZYTW-016`, deuda declarada el 2026-10-16, se corrigió el 2026-10-21 con el texto compartido de [`GLB-139`](GLOBAL.md). `ZYTW-010` se corrigió el 2026-10-10; esta línea nombró a `ZYTW-004` hasta ese día, corregido desde el 2026-09-16. El estado vivo lo calcula `./bin/zyddt findings` de la línea **Estado** de cada ficha, y pone en rojo (`STALE SUMMARY`) la frase de aquí que la contradiga. `ZYTW-002` y `ZYTW-003` se corrigieron el día que se encontraron. `ZYTW-001` lo encontró el primer eje que le preguntó por el
 alcance (`axes/isolation.toml`, 2026-09-12) y está corregido. Hasta ese día este
 fichero decía «ninguno todavía», y decía la verdad por la razón equivocada: nadie
 le había preguntado casi nada. La cifra que importa es la tabla de `zyddt axis`,
@@ -980,3 +980,162 @@ nombre y habría obligado a todo callback llamado por su efecto a terminar en `<
 Cuatro celdas en `axes/runtime-functions-hof.toml` (`block-lambda-called-for-its-effect`,
 `…-without-return-is-unit`, `…-returns-on-one-path`, `…-as-a-callback`) y
 `zyquality/corpus/lambdas/15_block_without_return.zy` con su golden.
+
+---
+
+## ZYTW-016 — Leer una variable de texto la copia: el texto del tree-walker no tiene `Rc`
+
+**Estado:** **corregido 2026-10-21** — por decisión del autor ese día, con la salida B de [`GLB-139`](GLOBAL.md):
+`Value::String` guarda un `Text` compartido (`zymbol_common::text`), y leer la variable copia un puntero. El programa de
+abajo, de 2 000 a 8 000: `bytes` 0,20 MB → 0,68 MB (antes 8,1 MB → 128 MB). Sujeto por `growth/read-a-text` y
+`growth/slice-a-text`, sin `open_finding` y por reloj también en el tree-walker. Antes: **abierto** — deuda declarada el
+2026-10-16, y **se mantenía en la v0.0.11** por decisión del autor del
+2026-10-19 (grupo 1 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`), junto con la mitad de [`GLB-139`](GLOBAL.md)
+que es del tree-walker. Antes de eso: el mapa de ruta de la v0.0.11
+(`interpreter/ROADMAP_V0011_ES.md`, etapa 2, PERF-05 b) dice que se archiva con su caso `KNOWN`, y el rendimiento del
+tree-walker no es prioridad salvo donde comparte el defecto con la VM. Sujeto por `growth/read-a-text` de
+`zyquality/cost` (`open_finding`)
+**Encontrado por:** el control de GLB-130: el mismo bucle sin cortes, sólo con `s$#`, era igual de cuadrático en el
+tree-walker
+**Familia:** `HLZ-012` y `HLZ-014`, que dieron un `Rc` a `Array`, `Tuple` y `NamedTuple` en el tree-walker y dejaron
+fuera el texto
+
+```zymbol
+s = ""
+@ _i:1..8000 { s = s "ñ" }
+k = 0
+@ _i:1..8000 { k = k + s$# }
+>> k ¶
+```
+
+`bytes` de 2 000 a 8 000: `zytw` 8,1 MB → 128 MB (×15,9); `zyvm` 2,29 MB → 2,58 MB.
+
+### Causa
+
+`Value::String(String)`: leer la variable clona el `String`. Cada `s$#`, cada corte, cada argumento de una llamada
+copia el texto entero.
+
+### Qué lo sujeta
+
+`growth/read-a-text` en `zyquality/cost/cost.toml`, por `--count` (`clock_off`), con
+`open_finding = { zytw = "ZYTW-016" }`. Y `growth/slice-a-text`, que también lo paga en el tree-walker.
+
+---
+
+## ZYTW-017 — Dentro de un `!?`, el tree-walker desactivaba la llamada en cola de todo lo que se llamara desde ahí
+
+**Estado:** **corregido 2026-10-16** — encontrado al alinear la llamada en cola para [`GLB-133`](GLOBAL.md)
+**Encontrado por:** la frontera de 10 000 llamadas: `!? { >> cuenta(30000) ¶ }`, con `cuenta` recursiva en cola, daba
+`##Depth` en el tree-walker y `cuerpo` en la VM
+**Familia:** [`GLB-133`](GLOBAL.md)
+
+```zymbol
+cuenta(n) {
+    ? n == 0 { <~ "cuerpo" }
+    <~ cuenta(n - 1)
+}
+!? { >> cuenta(30000) ¶ } :! { >> "no: " _err ¶ }
+```
+
+### Causa
+
+`try_depth` era un campo del intérprete, no de cada marco. La llamada en cola se desactiva con un `!?` abierto (el
+marco debe su manejador o su `:>`), y con el contador global bastaba un `!?` en **quien llama** para desactivarla en
+toda la cadena de llamadas de debajo, donde ningún manejador está armado. La VM lo decide por función (`try_stack`
+es de cada `FunctionCtx`). Antes del límite no se veía: el tree-walker abortaba hacia los 9 000 niveles por la pila, y
+la VM llegaba al final.
+
+Y al revés, el tree-walker sí tomaba la llamada en cola dentro de un `:!` o un `:>` propio, donde la VM no.
+
+### Corrección (2026-10-16)
+
+`try_depth` se guarda y se pone a 0 en `take_call_state`, y se restaura en `restore_call_state`. Y cuenta también
+durante la cláusula `:!` y el `:>`, no sólo durante el cuerpo, como el `try_stack` de la VM.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/depth_tail_calls.zy`.
+
+---
+
+## ZYTW-018 — `d[k>c]$~ v` con `c` ausente: el tree-walker abortaba en vez de añadir la clave
+
+**Estado:** **corregido 2026-10-19** — encontrado y corregido el mismo día, al comparar el tree-walker de antes y el de
+después de [`GLB-140`](GLOBAL.md)
+**Encontrado por:** `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`, que el tree-walker de antes no
+terminaba
+**Familia:** [`GLB-141`](GLOBAL.md), la otra cara de la misma regla
+
+```zymbol
+d = #(a: #(b: 1))
+d.a["c"]$~ 3
+k = "a"
+e = d[k>"c"]$~ 4
+>> d " " e ¶
+```
+
+`zyvm` y `zyjs` dan `#(a: #(b: 1, c: 3)) #(a: #(b: 1, c: 4))`; el tree-walker abortaba en la segunda línea con
+`Runtime error: no key 'c' in dictionary — available: b`. Con `d.a` sin `c`, la forma funcional de la cuarta línea
+abortaba igual. El control, `d["c"]$~ 3` de un nivel, añade la clave en los tres.
+
+### Causa
+
+`deep_update_value` leía el elemento de **cada** paso antes de escribirlo, también el del último. En un diccionario,
+leer una clave ausente es `##Key`, así que no llegaba nunca a `set_at_step`, cuyo comentario dice justo que la añade.
+
+### Corrección (2026-10-19)
+
+El último paso en un diccionario escribe su clave sin leerla antes, en el camino funcional; el camino en el sitio de
+`GLB-140` ya lo hacía. La sentencia, la forma funcional y la de claves en variables añaden la clave en los tres motores.
+
+### Qué lo sujeta
+
+`zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy` (`d.a["c"]$~ 3`).
+
+---
+
+## ZYTW-019 — El valor del tree-walker medía 120 bytes: un array de enteros ocupaba seis veces lo de la VM
+
+**Estado:** **corregido 2026-10-19** — medido el 2026-10-19 en la revisión de `zyquality/bench/big/HALLAZGOS.md` y
+corregido ese día por decisión del autor (grupo 3 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`)
+**Encontrado por:** la sonda de `$-[1]` por el principio, que en el tree-walker iba 36 veces más lenta que Python y 15
+veces más que la VM sin copiar nada
+**Familia:** `HLZ-012` y `HLZ-014`, que dieron a las colecciones del tree-walker un `Rc`; [`ZYTW-016`](zytw.md), el texto
+que sigue sin él
+
+```zymbol
+v = []
+@ i:1..40000 { v$+ i }
+@ _i:1..40000 { v$-[1] }
+>> v$# ¶
+```
+
+El control, `v$-[v$#]`, quita el último: no desplaza nada.
+
+### Causa
+
+Todo valor de un `enum` de Rust mide lo que su variante más grande. `Value::Function(FunctionValue)` iba en línea, y un
+`FunctionValue` mide 120 bytes (`ErrorValue`, 48; `String`, 24): cada entero de un array ocupaba 120. Quitar el primero
+desplaza los que quedan —en cualquier lenguaje—, y el tree-walker desplazaba 7,5 veces la memoria de la VM, cuyo valor
+mide 16.
+
+### Corrección (2026-10-19)
+
+`Function(Box<FunctionValue>)` y `Error(Box<ErrorValue>)`, con dos constructores, `Value::function` y `Value::error`. La
+variante más grande pasa a ser `String`, y la etiqueta cabe en un hueco de su capacidad: **un valor mide 24 bytes**.
+Medido contra el binario anterior, tres corridas:
+
+| programa | antes | ahora |
+|---|---:|---:|
+| array de 2 000 000 de enteros, pico de memoria | 236,1 MiB | 53,3 MiB |
+| ese mismo, tiempo | ~437 ms | ~305 ms |
+| el programa de arriba (`$-[1]`, 40 000) | ~2 640 ms | ~313 ms |
+| 1 000 000 de llamadas | ~597 ms | ~566 ms |
+| 300 000 cierres creados y llamados | ~382 ms | ~388 ms |
+| 200 000 errores capturados | ~124 ms | ~131 ms |
+
+Lo que cuesta es una reserva más al crear una función o un error como valor.
+
+### Qué lo sujeta
+
+La prueba `a_value_is_as_large_as_a_string` de `zymbol-interpreter/src/lib.rs`.

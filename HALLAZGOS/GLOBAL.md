@@ -3733,7 +3733,7 @@ operación»).
 
 ### Medido otra vez (2026-10-05)
 
-- **La parte 2 ya estaba corregida**: el commit `6159f04` del 2026-09-23 («vm: name what the reader
+- **La parte 2 ya estaba corregida**: el commit `0e0d766` del 2026-09-23 («vm: name what the reader
   wrote…») cambió «ms» por «duration», y la ficha no se actualizó. Los tres dicen hoy
   `@~ requires non-negative duration, got -5`. Ese mensaje nombra el valor, y está bien: es un
   error de **valor** (el tipo es correcto), como `replacement count must be non-negative, got -1`.
@@ -7589,7 +7589,7 @@ y `top-level-exit-of-a-string-in-a-match-value`. Con los motores de antes, las s
 **Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09 (D3): una mezcla ascendente estable
 con la regla B, la misma en los tres motores llamada por llamada
 **Encontrado por:** ZyBench, `BUG-BEN-001`, una medición de la VM contra Python hecha en otra sesión sobre
-`820a60a` (2026-10-04); validado aquí contra la rama `v0.0.10` el 2026-10-08
+`7af111b` (2026-10-04); validado aquí contra la rama `v0.0.10` el 2026-10-08
 
 ```zymbol
 x = 7
@@ -7760,7 +7760,7 @@ Al medir aparecieron dos cosas que **no** se tocaron: una ruta indirecta de `Int
 ([`GLB-113`](GLOBAL.md)), y que en una asignación los motores Rust no aceptan una cast como operando yuxtapuesto
 y `zyjs` sí ([`GLB-114`](GLOBAL.md)); `##'` se comporta en eso como sus hermanas. `zymbol-design/SYMBOLS.md` y
 `SIMBOLOS_ES.md` decían que `##'` es *«input typespec position only»*; corregidos con permiso del autor el
-2026-10-09 (`f51357b`), con la fila de v0.0.10 en § 19: ninguna marca nueva. GLB-114 se corrigió el mismo día.
+2026-10-09 (`a0924b5`), con la fila de v0.0.10 en § 19: ninguna marca nueva. GLB-114 se corrigió el mismo día.
 Y el escáner de ZyFmtCheck tomaba el `'` de `##'` por una comilla de apertura: ZyBF, con `##'cinta[p]`, lo puso en
 rojo en cuanto entró en la puerta; ya lee `##'` y `##"` como marcas.
 
@@ -8720,7 +8720,7 @@ x = [1, 2]
 
 ### Qué se observaba
 
-Medido el 2026-10-11 sobre `d736ae6`, los tres con `rc 0` y los tres con el mismo aviso
+Medido el 2026-10-11 sobre `0a8d29e`, los tres con `rc 0` y los tres con el mismo aviso
 (`if condition should be Bool, got …`):
 
 | `x` | `zytw` | `zyvm` | `zyjs` |
@@ -8997,7 +8997,7 @@ control `refusal/module-alias-reached-through-its-members`.
 ## GLB-126 — `zyq` no compila con el OCaml del runner de CI: `In_channel` es de 4.14, y el Gate de GitHub lleva 100 ejecuciones en rojo
 
 **Estado:** **corregido 2026-10-11** — `Toml.read_channel` sustituye a `In_channel.input_all`, y `zyq` compila y
-pasa `selftest` con OCaml 4.13.1, el del runner (`zyquality` `738ad5f`). Lo que **no** se ha visto todavía es un
+pasa `selftest` con OCaml 4.13.1, el del runner (`zyquality` `a5bac7e`). Lo que **no** se ha visto todavía es un
 Gate verde en GitHub: eso sólo lo dice el primer push, y lo que aparezca detrás es otro hallazgo
 **Encontrado por:** el plan de lanzamiento de la v0.0.10 (paso 2.4), al comprobar qué dispararía el push:
 `gh run list` dio 100 ejecuciones del Gate en `v0.0.10`, ninguna verde, y el log del job fallido el error
@@ -9008,7 +9008,7 @@ Gate verde en GitHub: eso sólo lo dice el primer push, y lo que aparezca detrá
 | último Gate verde, en cualquier rama | 2026-09-10 (`main` y `v0.0.9`, el día de la release anterior) |
 | ejecuciones en `v0.0.10` | 100 miradas, 100 rojas |
 | la más antigua de esas 100 (22 sep.) | `zyq` se construía y falló el paso `zyq suite`: ZyDDT `RED — a regression`, con `DIVERGE` en `runtime-modules-scripts/subscript-with-warnings-that-fails`. No se investigó más allá del log; esa celda está hoy de acuerdo |
-| desde `ee96870` (2 oct., `zyquality`) | `make` no termina, y sin `zyq` el paso siguiente sale con 127 |
+| desde `6b878cd` (2 oct., `zyquality`) | `make` no termina, y sin `zyq` el paso siguiente sale con 127 |
 
 ```text
 File "src/main.ml", line 747, characters 19-39:
@@ -9050,7 +9050,7 @@ Los otros nueve módulos compilaban ya en 4.13.1, y `main.ml` no escondía un se
 con 5.3.0, la puerta entera después del cambio: `all gates pass`, con las mismas cifras que antes de él.
 
 Decidido el mismo día por el autor, y aparte: OCaml no es ya un motor válido en Zymbol. El oráculo `ml` de
-`zyquality/engines.toml` se retiró (`f97e18e`) — no lo usaba nada: ningún programa `.ml` de oráculo en el
+`zyquality/engines.toml` se retiró (`72f0ca0`) — no lo usaba nada: ningún programa `.ml` de oráculo en el
 workspace, ninguna celda ni caso que nombrara el id. `zyq` sigue escrito en OCaml: es una herramienta, no un motor.
 
 ### Qué lo sujeta
@@ -9080,9 +9080,11 @@ una causa que no es ésta.
 
 ## GLB-127 — `>> +a`: el `+` unario al principio de un elemento de `>>` lo rechazan `zytw` y `zyvm`, y `zyjs` lo acepta
 
-**Estado:** **abierto** — hallado y sin corregir. Sujeto por la celda `runtime-operators/unary-plus-starts-an-output-item`
-(`open_finding`). No hay nada que decidir: la forma ya está decidida (GLB-019, 2026-09-15: *el `+` unario es forma del
-lenguaje*) y `GUIDE.md` la documenta. Falta que el parser de `>>` la acepte
+**Estado:** **corregido 2026-10-21** — sin decisión que tomar: la forma la decidió GLB-019 (2026-09-15, *el `+` unario es
+forma del lenguaje*). `parse_output_item_term` acepta `Plus` junto a `Not | Minus`; zyjs no cambia. Verificado en los tres
+motores con el valor y el código de salida: `>> +a`, `>> 0 + +a`, `>> 2 * +a`, `>> +a ^ 2`, `>> ++a` (rechazo igual en los
+tres), `>> +-a`, y `+` sobre String, `""`, array, `[]` y Bool (mismo aviso, mismo error de ejecución, salida 1 en los
+tres). El barrido destapó [`GLB-144`](GLOBAL.md), que este arreglo agravaba, y [`GLB-145`](GLOBAL.md)
 **Encontrado por:** el plan de lanzamiento de la v0.0.10, paso 3.5: al ejecutar todos los bloques de `GUIDE.md`, no sólo
 los anotados, `>> +a ¶ // 10` no pasaba `zymbol check`
 **Familia:** [`GLB-019`](GLOBAL.md) — la celda que lo decidió usa `(+v)` y `x = (+v)`, que sí pasan, y no cubría esta posición
@@ -9106,21 +9108,20 @@ puso ahí el `-`, lista exactamente esas dos. El `+` unario llegó a `parse_unar
 
 ### Qué lo sujeta
 
-La celda de arriba, con `open_finding = { zytw = "GLB-127", zyvm = "GLB-127" }`: el día que pasen, queda en rojo hasta
-cerrar esta ficha. El arreglo es de una línea en el parser (añadir `Plus` junto a `Not | Minus`), y **no se ha hecho**:
-es lo que el plan pide que no se haga fuera de su paso. `+"a"` dará entonces el error de tipo documentado en vez de uno
-de sintaxis.
+`runtime-operators/unary-plus-starts-an-output-item` (sin `open_finding` desde el 2026-10-21, con oráculo) y
+`runtime-operators/unary-plus-after-an-operator-in-output`, para la otra posición donde el término empieza: tras `+`,
+`*` y antes de `^`. `+"a"` da ya el error de tipo documentado en vez de uno de sintaxis.
 
 ## GLB-128 — El Gate de GitHub da dos «sin veredicto» que son del entorno: un repositorio privado y un runner más rápido que la máquina donde se calibró
 
-**Estado:** **corregido 2026-10-12** — el Gate de GitHub sobre `main` (`5a3d5b1`, intento 3, 18:49Z) da `all gates pass`
+**Estado:** **corregido 2026-10-12** — el Gate de GitHub sobre `main` (`22bc0f2`, intento 3, 18:49Z) da `all gates pass`
 con `zyquality` y `ZyDDT` en su `main` arreglado. **Lo que esa ejecución probó y lo que no:** `pins` se vio allí
 (`SKIPPED DM-02_array_equality.zy`, salida 0). El camino de `cost` no se ejerció en ella — ese runner dio todas las bases
-sobre el suelo — y sí en la siguiente, doce minutos después (`d2c53f8`, 19:01Z), que tocó un runner rápido: cinco filas
+sobre el suelo — y sí en la siguiente, doce minutos después (`2a69199`, 19:01Z), que tocó un runner rápido: cinco filas
 con bases de 28–39 ms salieron `SKIPPED` (`zyvm` ×4, `zytw` ×1), sus razones contadas pasaron, y el veredicto fue
 `GREEN — … 5 timed ratio(s) under the floor, answered by the counted ones` y `all gates pass`. Las dos mitades están
 vistas en CI. Eran dos «sin veredicto» (salida 2) en la ejecución real de CI del 2026-10-12, sobre `v0.0.10`
-(`2f4e7aa`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
+(`349c0db`), sin regresión detrás: todo lo que corrió allí da las cifras de la puerta local. **Decidido el 2026-10-12 por
 el autor** (ver la tabla): `pins` da por «saltado» un `DM-` cuyo repo no está clonado, y en `cost` el contado exacto basta
 cuando el cronometrado no llega al suelo. Arreglo en `main` de `zyquality` y `ZyDDT` — el autor lo pidió allí ese mismo
 día: son pruebas y no lenguaje, y `main` no debía quedarse con la marca roja de la v0.0.10; el intérprete no cambia —,
@@ -9168,15 +9169,1350 @@ cambie el recuento). `zyjs` sigue en el reloj y pasa.
 
 ### Y el Gate de `main` de la v0.0.10: otra causa, y no es de esta ficha
 
-El Gate que corrió sobre `main` (`5a3d5b1`, 11:51Z) dio además `expect` y `consensus` en rojo. No son estas dos: clonó los
+El Gate que corrió sobre `main` (`22bc0f2`, 11:51Z) dio además `expect` y `consensus` en rojo. No son estas dos: clonó los
 hermanos de `main`, que seguían en v0.0.9 — se fusionaron entre las 14:30 y las 14:37Z —, y vio 666 `.zy`, 41 rechazos y
 selftest de 51 donde la rama veía 683, 55 y 56. El árbol del intérprete en `main` es idéntico al de la rama, cuyo Gate
 (hermanos en `v0.0.10`) pasó todo salvo estas dos preguntas. El Gate clona los hermanos **al correr**, así que evalúa
 `main` contra el `main` de cada uno en ese instante: fusionar los hermanos primero y el intérprete el último evita ese
 rojo; si no, hay que relanzar el Gate de `main` al terminar.
 
-**Medido al relanzarlo** (16:07Z, `5a3d5b1`, hermanos ya fusionados): 56 / 683 / 55 como en la rama; `selftest`, `audit`,
+**Medido al relanzarlo** (16:07Z, `22bc0f2`, hermanos ya fusionados): 56 / 683 / 55 como en la rama; `selftest`, `audit`,
 `reject`, `expect` y `consensus` pasan y sólo `suites` falla — por `pins`. El «sin veredicto» de `cost` **no apareció**: ese
 runner dio bases de 59–225 ms en las mismas seis filas donde el de las 11:51Z dio 28–40 ms. El suelo de `cost` no depende
 sólo de la máquina de calibración: **varía entre ejecuciones del mismo workflow** en el mismo tipo de runner, así que subir
 `n` habría seguido a merced de cuál tocara.
+
+---
+
+## GLB-129 — `$[i:n]`, el corte por cuenta: los tres motores no coincidían en ninguno de sus errores
+
+**Estado:** **corregido 2026-10-16** — decidido por el autor ese día: la referencia es la VM, que escribe la forma como
+la escribió el lector y nombra la cuenta, como [`GLB-047`](GLOBAL.md) ya había hecho con `$-[i:n]`
+**Encontrado por:** una matriz de la forma de cuenta en los tres motores, al preparar PERF-05 a
+(`interpreter/ROADMAP_V0011_ES.md`); empezó por [`ZYVM-026`](zyvm.md), en la misma instrucción
+**Familia:** [`GLB-046`](GLOBAL.md) y [`GLB-047`](GLOBAL.md), que dejaron estricta y bien escrita la forma que
+**quita**, `$-[i:n]`, y no alcanzaron la que **corta**. Clase 2 de este fichero: no hay un motor que se salga
+
+```zymbol
+t = "ñandú"
+!? { >> t$[4:9] ¶ } :! ##Index { >> "Index: " _err ¶ } :! { >> "otro: " _err ¶ }
+!? { >> t$[2:-1] ¶ } :! ##Index { >> "Index: " _err ¶ } :! { >> "otro: " _err ¶ }
+!? { >> t$[2:2.0] ¶ } :! ##Type { >> "Type: " _err ¶ }
+```
+
+| | `t$[4:9]` | `t$[2:-1]` | `t$[2:2.0]` |
+|---|---|---|---|
+| `zytw` | `##Index`, «`[4..9]`» | **`##_`**, «slice start (2) cannot be greater than end (-1)» | «slice **end** must be an integer» |
+| `zyvm` | `##Index`, «`[4:9]`» | `##Index`, «slice count must be non-negative, got -1» | «slice **count** must be an integer» |
+| `zyjs` | `dú`, recortado | vacío | `an`: leyó el `2.0` como 2 |
+
+Lo mismo sobre un arreglo, y con el corte escrito a través de un parámetro. La familia no es un detalle del texto:
+`:! ##Index` capturaba la cuenta negativa en la VM y la dejaba pasar en el tree-walker.
+
+### Por qué no se veía
+
+Ningún fichero del corpus probaba un error de la forma de cuenta. Los que la usan la usan bien.
+
+### Corrección (2026-10-16)
+
+- **`zytw`** (`collection_ops.rs`, `eval_collection_slice`): una cuenta negativa se rechaza antes de los límites, como
+  `count_span` de la VM, con `##Index`; el mensaje de fuera de rango escribe `[i:n]`, y el de tipo dice `count`.
+- **`zyjs`** (`zymbol.js`, `$[i:n]`): estricto, como `$-[i:n]` desde GLB-046 — comprueba que los dos sean enteros,
+  rechaza la cuenta negativa y lo que se sale del texto, y deja de recortar.
+- **`zyvm`**: sin cambios. Era la referencia.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/slice_count_errors.zy`: lo que la forma acepta, lo que se sale por cada lado, la
+cuenta negativa y los tipos, sobre texto y arreglo, directo y a través de un parámetro, con la familia capturada por
+`:!`. Y `slice_count_not_integer.zy`, al lado, sin capturar: la suite `reach` sólo cuenta un diagnóstico como
+provocado cuando sale como `Runtime error:`.
+
+Al hacerlo salió un resto de la etapa 1 de la v0.0.11 en `reach.py`: ejecutaba cada programa con `run` y con
+`run --vm`, y desde que la VM es el motor por defecto los dos eran la VM. Ningún diagnóstico de ejecución del
+tree-walker podía verse provocado allí desde el 2026-10-13. Ahora nombra los dos motores.
+
+---
+
+## GLB-130 — `s$[a..b]` copia el texto entero para cortar un trozo: en la VM y en el tree-walker
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con `growth/slice-a-text` de `zyquality/cost` como deuda antes del arreglo. Es PERF-05 a de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`), con la
+recomendación «implementar» que el autor incorporó al plan el 2026-10-14
+**Encontrado por:** ZyBigBench (PERF-05), y `--count` en `zyquality/bench/big/` el 2026-10-14: un corte de 10
+caracteres sobre 73 728 pedía 516 KB al asignador en la VM y 590 KB en el tree-walker
+**Familia:** [`ZYVM-025`](zyvm.md) — buscar por posición en un texto; aquí, además, copiándolo. La otra mitad de
+PERF-05 —contar los caracteres de un texto en cada `s$#`, `s[i]` o corte— es PERF-05 b, aplazada por D8, y no se archiva
+aquí
+
+```zymbol
+s = ""
+@ _i:1..8000 { s = s "ñ" }
+corta(x, i) { <~ x$[i..i] }
+k = 0
+@ i:1..8000 { k = k + (s$[i..i])$# + (s$[i:1])$# + corta(s, i)$# }
+>> k ¶
+```
+
+`zymbol run --count`, `bytes`, de 2 000 a 8 000:
+
+| | 2 000 | 8 000 | razón |
+|---|---:|---:|---:|
+| `zyvm` | 74 MB | 1 155 MB | 15,5 |
+| `zytw` | 105 MB | 1 666 MB | 15,9 |
+
+### Causa
+
+Las tres instrucciones que cortan un texto en la VM (`StrSlice`, `StrSliceCount`, y `ArraySlice` cuando el tipo no
+se conoce) y el corte del tree-walker (`eval_collection_slice`) hacen `s.chars().collect::<Vec<char>>()` —4 bytes
+por carácter— y cortan el vector.
+
+### Qué lo sujeta
+
+`growth/slice-a-text` en `zyquality/cost/cost.toml`, sólo por `--count` (`clock_off`): el reloj sigue cuadrático por
+PERF-05 b aunque el corte deje de copiar. Para eso se añadió `clock_off` al corredor de `cost/`, con su razón impresa
+en cada corrida. En el tree-walker el caso sigue `KNOWN` por [`ZYTW-016`](zytw.md): leer `s` lo copia, haya corte o no.
+
+### Corrección (2026-10-16)
+
+`zymbol_common::text`: `char_len` y `char_range`, que localizan un trozo por posición de carácter y lo **prestan**
+—sin copiar el texto, y por bytes directamente si es ASCII—. Los usan las tres instrucciones de corte de la VM (por
+`str_slice` y `str_slice_count`) y el corte del tree-walker, y también los dos `s[i]` del tree-walker, que copiaban el
+texto para leer un carácter. `bytes` de 2 000 a 8 000:
+
+| | antes | ahora |
+|---|---:|---:|
+| `zyvm` | 74 MB → 1 155 MB | 2,33 MB → 2,66 MB |
+| `zytw` | 105 MB → 1 666 MB | 32 MB → 514 MB (ZYTW-016) |
+
+Los demás `chars().collect()` de los dos motores se revisaron: son ediciones que construyen un texto del mismo tamaño
+(quitar, insertar, escribir en una posición), búsquedas que recorren el texto de todos modos, y la interpolación. Ahí
+copiar a `Vec<char>` cuesta una constante, no una curva, y se quedan.
+
+---
+
+## GLB-131 — `#(a: 1, a: 2)`: un literal de diccionario con una clave repetida se aceptaba, y guardaba las dos
+
+**Estado:** **corregido 2026-10-16** — decidido por el autor ese día: una clave repetida en un literal se rechaza
+**Encontrado por:** el diseño de PERF-03 (`interpreter/ROADMAP_V0011_ES.md`, etapa 2): un diccionario indexado por
+clave no puede guardar dos veces la misma, y había que saber qué hacía el lenguaje con ella
+**Familia:** la revocación de D2 (2026-09-20): las colecciones son estrictas. Clase 1 de este fichero —los tres
+motores coincidían—: ningún diferencial podía verlo
+
+```zymbol
+x = #(a: 1, a: 2)
+>> x["a"] " " x$# ¶
+x["a"]$~ 5
+>> x ¶
+@ k:x { >> k " " }
+```
+
+Los tres motores daban `1 2`, `#(a: 5, a: 2)` y `a a`: la lectura y la escritura iban a la primera, `$#` contaba dos y
+el recorrido pasaba dos veces por la clave. `check` no avisaba. Y el diseño ya lo prohibía: `zymbol-design/COLLECTIONS.md`
+§ 5 dice *«Keys are unique»*. Los tres motores incumplían el documento, no un hueco de él.
+
+Control: escribir con `$~` una clave que el diccionario ya tiene la modifica y no la repite. La repetición sólo podía
+entrar por un literal.
+
+### La decisión
+
+Que las claves sean únicas lo decía el diseño; qué hacer con un literal que repite una, no. Tres salidas:
+rechazarla, que gane la última (Python, JavaScript), o que gane la primera (lo que ya devolvía una lectura). El autor
+eligió **rechazarla**: una clave escrita dos veces en un literal es casi siempre un error de
+escritura, y las dos otras la harían desaparecer en silencio.
+
+### Corrección (2026-10-16)
+
+Las claves de un literal son estáticas —un nombre o un texto sin interpolar—, así que se rechaza al **analizar** el
+programa, en los dos parsers (`zymbol-parser`, que comparten `zytw` y `zyvm`, y el de `zymbol.js`), con el mismo
+texto: «key 'a' appears twice in the dictionary». `check` lo dice y ningún motor ejecuta nada. Ninguno de los 3 580
+ficheros `.zy` del espacio de trabajo —corpus, ejemplos, aplicaciones, curso, celdas de ZyDDT— escribía una clave dos
+veces.
+
+### Qué lo sujeta
+
+`zyquality/reject/collections/18_clave_repetida.zy`: los tres motores lo rechazan.
+
+---
+
+## GLB-132 — El diccionario busca una clave recorriendo sus pares: insertar n claves cuesta n² en los tres motores
+
+**Estado:** **corregido 2026-10-16** — no cambia ninguna salida. Reproducido ese día sobre `v0.0.11` y archivado
+con `growth/dictionary-by-key` de `zyquality/cost` como deuda de los tres motores antes del arreglo. Es PERF-03 de la etapa 2 (`interpreter/ROADMAP_V0011_ES.md`),
+con la recomendación «implementar, como pieza propia» que el autor incorporó al plan el 2026-10-14
+**Encontrado por:** ZyBigBench (PERF-03), con la fila `dict_lookup_last` que se le añadió al traerlo: leer la
+**primera** clave parecía plano porque una búsqueda lineal la encuentra en seguida
+**Familia:** [`GLB-131`](GLOBAL.md), que tuvo que decidirse antes: un diccionario indexado por clave no puede guardar
+dos veces la misma
+
+```zymbol
+d = #(k0: 0)
+@ i:1..16000 {
+    k = "k" i
+    d[k]$~ i
+}
+s = 0
+@ i:1..16000 {
+    k = "k" i
+    s = s + d[k]
+}
+>> s ¶
+```
+
+Reloj, una corrida, de 4 000 a 16 000 claves:
+
+| | 4 000 | 16 000 | razón |
+|---|---:|---:|---:|
+| `zyvm` | 57 ms | 438 ms | 7,7 |
+| `zytw` | 66 ms | 651 ms | 9,9 |
+| `zyjs` | 302 ms | 2 685 ms | 8,9 |
+
+`--count` no lo ve: cada búsqueda es un paso.
+
+### Causa
+
+Los tres guardan el diccionario como una lista de pares y buscan recorriéndola: `Rc<Vec<(String, Value)>>` en los dos
+motores de Rust, y en `zymbol.js` los arreglos paralelos `v` y `keys`, con `keys.indexOf`.
+
+### Qué lo sujeta
+
+`growth/dictionary-by-key` en `zyquality/cost/cost.toml`, por reloj, en los tres motores, ya sin deuda. Y
+`zyquality/corpus/collections/diccionario_por_clave.zy`, que sujeta lo que escribir en el sitio podía romper: otro
+nombre, un argumento o un valor tomado en un bucle que comparten el diccionario conservan lo que tenían.
+
+### Corrección (2026-10-16)
+
+- **`zytw` y `zyvm`:** `NamedTuple(Rc<zymbol_common::Dict<Value>>)`, con `Dict<V> = IndexMap<String, V>`. Cada lectura,
+  escritura, consulta `$?`, desestructuración e igualdad busca por hash; borrar es `shift_remove`, que conserva el
+  orden que imprime `#(…)`. `count::make_mut_dict` cuenta la copia como `make_mut` la de un arreglo.
+- **`zyjs`:** un índice clave → posición por arreglo de claves (`dictIndex`, en un `WeakMap`), y la escritura de una
+  clave en el sitio cuando la variable es la única dueña del diccionario, con la marca `own` que ZYJS-014 dio a los
+  arreglos. Sin ella el índice no bastaba: cada escritura copiaba las dos listas. Un diccionario que una edición crea
+  como propio lleva sus propias claves, porque compartirlas con el original lo habría corrompido al escribir después.
+
+De paso salieron tres copias enteras del diccionario que no eran búsquedas: `d$-["k"]` en la VM clonaba el
+diccionario para quitar una clave, la escritura por ruta del tree-walker (`set_at_step`) clonaba el contenedor antes de
+`make_mut`, y `$-[a..b]` sobre un diccionario en la VM lo clonaba para rechazarlo. Las tres trabajan en el sitio.
+
+Reloj, 16 000 claves: `zyvm` 438 → 14 ms, `zytw` 651 → 28 ms, `zyjs` 2 685 → 399 ms.
+
+**Dos bordes cambian**, porque un `IndexMap` no guarda dos veces una clave: una consulta de `std/db` que nombra dos
+veces la misma columna, y un `json::decode_map` que renombra dos claves al mismo nombre, daban dos entradas y ahora una
+—en el sitio de la primera, con el valor de la última—. No se buscó en todo el espacio de trabajo; el corpus y las
+nueve aplicaciones de la puerta dan la misma salida que antes.
+
+---
+
+## GLB-133 — Una recursión profunda aborta el proceso sin un error de Zymbol, y cada motor a una profundidad distinta
+
+**Estado:** **corregido 2026-10-16** — reproducido, decidido (D7) y corregido ese día. Es PERF-07 de la etapa 2
+(`interpreter/ROADMAP_V0011_ES.md`), y D7 la decidió el autor ese día: el error se captura con `!?`, su familia es
+una nueva, `##Depth`, y el límite es de 10 000 llamadas activas, el mismo número en los tres motores
+**Encontrado por:** ZyBigBench (PERF-07)
+**Familia:** ninguna abierta. El hilo de 64 MiB que `zymbol-cli` creó para el programa (antes eran los 8 MiB del hilo
+principal: 1 099 niveles en el tree-walker, 593 por `$>` en la VM) subió el techo, pero no lo convirtió en un error
+
+```zymbol
+f(n) {
+    ? n == 0 { <~ 0 }
+    <~ 1 + f(n - 1)
+}
+!? { >> f(50000) ¶ } :! { >> "capturado: " _err ¶ }
+>> "sigue" ¶
+```
+
+Dónde muere cada motor, con la pila de 64 MiB:
+
+| | recursión directa | a través de `$>` |
+|---|---|---|
+| `zytw` | entre 8 000 y 10 000 | entre 5 000 y 8 000 |
+| `zyvm` | llega a 1 000 000 | entre 2 000 y 3 000 (unos 23 KB de pila de Rust por reentrada del bucle) |
+| `zyjs` | llega a 100 000; a 1 000 000, sin memoria | igual |
+
+Los dos de Rust terminan con código 134 y «fatal runtime error: stack overflow»; `!?` no lo ve y «sigue» no se
+imprime. La salida ya escrita sí sale. Los tres optimizan la llamada en cola: `<~ f(n - 1)` llega a 200 000.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/runtime/depth_limit.zy` —la frontera exacta, `$>`, la llamada en cola y la captura—,
+`depth_uncaught.zy`, sin capturar, y `depth_tail_calls.zy` (con su módulo), que fija qué llamada cuenta. Y la sonda
+`zyquality/docs/llm/126b_depth_limit.zy`, por la frase de `LLM.md` § 12 que cambió.
+
+### La decisión (D7, 2026-10-16)
+
+El autor eligió las tres recomendaciones: el error **se captura** con `!?`, como el `RecursionError` de Python; su
+familia es una **nueva, `##Depth`** —no `##Range`, que en Zymbol es un valor fuera de rango, ni `##_`, que `:!` no
+puede elegir—; y el límite es de **10 000 llamadas activas, el mismo número en los tres motores**, para que un programa
+a una profundidad dada conteste igual en todos. El coste, dicho al decidir: en la VM, la recursión directa que llegaba
+a 1 000 000 se corta en 10 000.
+
+### Corrección (2026-10-16)
+
+- **`zymbol_common::depth`**: el límite, el mensaje («call depth exceeded: more than 10000 calls active at once»), la
+  pila del programa —de 64 a **512 MiB**, reservada y no ocupada— y un seguro que mira cuánta pila queda y lanza el
+  mismo error antes de que se agote por un camino que no pase por una llamada. `errkind` lo clasifica como `Depth`.
+- **`zytw`**: un contador `active_calls` en sus dos entradas de llamada (`eval_lambda_call`,
+  `eval_traditional_function_call`). `call_depth` no servía: no cuenta la lambda que no toma el estado de llamada.
+- **`zyvm`**: la profundidad es `frame_stack.len() - 1`, comprobada en los tres sitios que apilan un marco: `Call`,
+  `CallDynamic` y `call_callable`, el de `$>`, `$|`, `$<` y `$^`. El seguro de pila sólo en `call_callable`, la única
+  que recurre en Rust: en las otras dos leía la pila del hilo en cada llamada y encarecía un ~8 % un bucle de llamadas
+  pequeñas (medido el 2026-10-17; se quitó ese día).
+- **`zyjs`**: un contador en `callFunc` y una pila de marcos `{función, !? abiertos}` que decide la llamada en cola con la
+  regla de los dos de Rust. Sus llamadas viven en el montón y no necesitan optimizarse; necesitan contar lo mismo.
+- **El hilo del programa** marca su base. `zymbol build` (`zymbol-standalone`) y el REPL, que corrían en el hilo
+  principal de 8 MiB, corren ahora en uno de `PROGRAM_STACK`.
+
+### La llamada en cola tuvo que alinearse antes
+
+Con un número, «qué llamada cuenta» pasó a ser una pregunta con respuesta visible, y los tres motores contestaban
+distinto. La regla que quedó es la de la VM: `<~ f(…)` a la propia función, en cualquier punto del cuerpo, sin un
+`!?` de esa función abierto —cuerpo, `:!` o `:>`—. Dos hallazgos salieron de ahí y se corrigieron con este:
+[`ZYTW-017`](zytw.md) y [`ZYVM-027`](zyvm.md).
+
+---
+
+## GLB-134 — El binario estático de Linux (musl) es hasta 17 veces más lento que el de glibc en lo que reserva bloques grandes
+
+**Estado:** **corregido 2026-10-19** — reproducido el 2026-10-16 con los binarios oficiales de la v0.0.10, y medido y
+corregido el 2026-10-19 en el `HEAD` por decisión del autor (grupo 4 del plan de cierre,
+`interpreter/ROADMAP_V0011_ES.md`: medir el estático y, si algo quedaba por encima de ×1,5, `mimalloc` sólo para ese
+target, debajo del asignador que cuenta). Sin celda: la puerta no construye el estático; lo sujeta la medición de abajo,
+que hay que repetir en la release
+**Encontrado por:** ZyBigBench (PERF-08), que lo midió en otra máquina; aquí no se había reproducido
+**Familia:** [`ZYVM-023`](zyvm.md) y [`GLB-130`](GLOBAL.md): lo que más se dispara es lo que copiaba un texto entero
+
+Los dos binarios de la release v0.0.10 para x86-64, del mismo commit, con su SHA-256 verificado contra
+`SHA256SUMS_x86_64_linux.txt`: `zymbol_lang_v0.0.10_x86_64_linux` (`static-pie linked`, la descarga para «cualquier
+Linux») y el `zymbol` del `.deb` (enlazado con glibc). `zyquality/bench/big/`, VM, tiempo de CPU (sin `perf`):
+
+| operación (`gap.py`) | n | estático | glibc | estático/glibc |
+|---|---:|---:|---:|---:|
+| `str_concat` | 128 000 | 4 578 ms | 263 ms | **17,4** |
+| `str_concat` | 64 000 | 1 207 ms | 40 ms | **30** |
+| `str_slice_small` | 147 456 | 659 ms | 144 ms | **4,6** |
+| `str_interp` | 1 000 000 | 244 ms | 183 ms | 1,33 |
+| `closure_create_call` | 1 000 000 | 255 ms | 200 ms | 1,28 |
+| los 16 programas de `run.py` | — | — | — | 1,005 (media geométrica) |
+
+Pasos y bytes de `--count` son idénticos en los dos: el programa hace lo mismo y cada petición al asignador cuesta
+más. Lo que se dispara es lo que pide y suelta bloques grandes una y otra vez; donde no, no hay diferencia.
+
+### Lo que ya cambió
+
+Las dos operaciones peores eran justo copias de un texto entero, y esta rama ya no las hace: `s = s "x"` amplía su
+búfer (ZYVM-023) y un corte copia sólo el trozo (GLB-130). Cuánto queda de la diferencia en el `HEAD` no se ha
+medido: hace falta construir el estático.
+
+### Medido en el `HEAD` (2026-10-19)
+
+Esta máquina no tenía el target: se instaló con `rustup target add x86_64-unknown-linux-musl`, y el C de `ring` y de
+`mimalloc` se compiló con el `gcc` del sistema (la CI usa `musl-gcc`, de `musl-tools`). Los dos binarios sin `std/db`,
+del mismo commit; tiempo de CPU, mediana de 5; pico de memoria (`ru_maxrss`):
+
+| programa | glibc | musl | musl + `mimalloc` |
+|---|---:|---:|---:|
+| «hola» | 10,9 MiB | 10,8 MiB | 10,8 MiB |
+| `s = s "x"`, 2 000 000 | 113 ms / 10,6 MiB | 233 ms / 10,8 MiB | 123 ms / 13,4 MiB |
+| interpolación, 2 000 000 | 436 ms | 652 ms | 454 ms |
+| 200 000 claves de diccionario | 67 ms / 24,5 MiB | 98 ms / 21,8 MiB | 60 ms / 23,4 MiB |
+| recorrer 2 000 000 «ñ» | 196 ms / 12,6 MiB | 301 ms / 10,9 MiB | 191 ms / 13,0 MiB |
+| 1 000 000 de cierres | 137 ms | 161 ms | 109 ms |
+| `hof_chain` | 342 ms / 16,0 MiB | 397 ms / 11,5 MiB | 348 ms / 19,3 MiB |
+| los 16 programas de `bench/big`, frente a glibc | — | ×1,052 | ×0,983 |
+
+Lo peor ya no era ×17 sino ×2,1 —`s = s "x"`—: esta rama dejó de copiar textos enteros (`ZYVM-023`, `GLB-130`). Seguía
+por encima de ×1,5.
+
+### Corrección (2026-10-19)
+
+`mimalloc` (0.1.52, con `libmimalloc-sys` 0.1.49) como asignador de debajo del `CountingAllocator`, sólo con
+`target_env = "musl"`: los binarios de glibc, macOS y Windows siguen con el del sistema. `--count` da exactamente las
+mismas cifras con los dos. Tal como viene, `mimalloc` retenía memoria: compromete un arena entero al empezar y devuelve
+las páginas libres al cabo de un segundo, y un programa que hace crecer un texto llegaba al doble de pico (21,2 MiB contra
+10,6). `tune_allocator` (`zymbol-cli/src/main.rs`) fija al arrancar tres opciones: compromiso bajo demanda, un primer
+arena de 4 MiB y purgar a los 20 ms. Purgar en el acto dejaba la memoria como glibc pero devolvía el tiempo perdido en
+`hof_chain` (×1,22, crea y suelta arrays de 100 000 en un bucle); a 20 ms, ×1,04. Lo que queda es un pico de 1 a 6 MiB
+más en los programas que hacen crecer colecciones o textos, y 160 KB más de binario.
+
+Comprobado con el estático: 672 de 672 goldens y 0 divergencias en 709 ficheros con los dos motores
+(`zyq … --without STD_DB`, porque el estático no lleva `std/db`).
+
+### Comprobación intermedia (2026-10-21)
+
+La medición de la release sigue pendiente; ésta es del `HEAD` de `v0.0.11` (`55665b8`), después de todo lo que cambió desde
+el 2026-10-19 —las etapas 3.1, 3.2 y 3.4, y el texto compartido del tree-walker (`GLB-139`)—. Los dos binarios del mismo
+commit, con las características por defecto (sin `std/db`, como los de la release): el estático con
+`RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target x86_64-unknown-linux-musl` y el C de `ring` y
+`mimalloc` con el `gcc` del sistema (`CC_x86_64_unknown_linux_musl=gcc`: esta máquina no tiene `musl-gcc`, sin lo cual
+la compilación falla), y el de glibc con `cargo build --release`.
+
+- **Los 16 programas** (`bench/big/ab.py`, VM, 5 rondas alternadas): media geométrica musl/glibc **×0,995**, entre ×0,860
+  y ×1,382, con los mismos pasos de `--count` en los 16. El ×1,382 era `strings_scan_long`, y era ruido: con 15 rondas,
+  ×1,039 (29,8 ms de glibc en la primera, 39,6 en la segunda).
+- **Las cuatro operaciones de la tabla de arriba** (`gap.py --no-tw --clock --runs 5`, la n mayor): `str_concat`
+  20 → 7 ms (el estático, más rápido), `str_interp` 137 → 147 ms (×1,07), `closure_create_call` 122 → 116 ms, y
+  `str_slice_small` por debajo de la resolución del reloj en los dos.
+- **Pico de memoria** (`ru_maxrss`): «hola» 10,9 → 11,0 MiB; `s = s "x"` con 2 000 000, 10,9 → 13,6; `hof_chain`
+  16,2 → 20,0 — el «de 1 a 6 MiB más» de la corrección.
+
+La corrección se sostiene. Para que la medición de la release no dependa de que alguien se acuerde, la fase 5 de
+`agents/release_installers.md` la pide ahora con los dos ficheros publicados, y dice qué cuenta como «se sostiene».
+
+### Segunda comprobación intermedia (2026-10-23)
+
+Sobre `30195b2`, después de cambiar justo lo que este binario ejecuta: las migas de la VM pasaron a las funciones
+compartidas con el tree-walker (`GLB-139`), `<\ \>` construye de otra forma su orden (G2), las órdenes se lanzan por
+`zymbol_common::shell::run_command` con un hilo vigilante posible (G3), y la CLI enlaza `crossterm`. Mismos dos
+binarios, mismo procedimiento.
+
+- **Los 16 programas** (`ab.py`, 5 rondas): media geométrica **×1,050**, con los mismos pasos de `--count`. Por encima
+  de ×1,2 salieron tres, y ninguno lo sostuvo: con 15 rondas, `strings_scan_short` ×0,96 y `array_update` ×1,10 (dura
+  5 ms); `strings_scan_long` siguió en ×1,30, y con 21 ejecuciones alternadas de cada binario resultó ser el ruido de
+  glibc: entre 26,5 y 43,5 ms el mismo binario, mediana ×1,085 y mínimos ×1,02.
+- **`s = s "x"` con 2 000 000** (la operación que era ×17 en la v0.0.10), 21 ejecuciones alternadas: mediana 130,7 ms
+  glibc frente a 133,9 el estático, **×1,025**. `gap.py` la mide con n = 128 000, unos 10 ms, donde cada lado ha salido
+  más rápido un día distinto: no sirve para esta pregunta a ese tamaño.
+- **Pico de memoria**: «hola» 10,9 → 10,8 MiB; `s = s "x"` 10,9 → 14,1; `hof_chain` 16,4 → 20,0 — lo mismo que el
+  2026-10-21.
+
+Se sostiene. Lo que esto deja para la medición de la release: un programa de decenas de milisegundos necesita la
+distribución y no la mediana de cinco, y `str_concat` de `gap.py` se lee a un tamaño mayor o no se lee.
+
+---
+
+## GLB-135 — `@ s() { … }`: la condición de un bucle se evaluaba una vez de más en los dos motores de Rust
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 1 de la etapa 1 de la v0.0.11 (bucles y
+variables calientes) y corregido el mismo día
+**Encontrado por:** una condición con efecto (`eco(x)` imprime y devuelve), el método de la sonda de operando con
+efecto
+**Familia:** la regla de `@ <expr>` (un `Int` es una cuenta, un `Bool` una condición), que obliga a leer el valor
+antes de saber qué bucle es
+
+```zymbol
+s() {
+    >> "?"
+    <~ #1
+}
+c = 0
+@ s() && c < 2 { c = c + 1 }
+```
+
+| condición | comprobaciones | `zytw` | `zyvm` | `zyjs` |
+|---|---:|---:|---:|---:|
+| `eco(k) < 2` | 3 | 4 | 3 | 3 |
+| `s() && c < 2` | 3 | 4 | 4 | 3 |
+| `c < 2 && s()` | 2 | 3 | 3 | 2 |
+| `s()` con `@!` en la segunda vuelta | 2 | 3 | 3 | 2 |
+
+### Causa
+
+Para saber si `@ <expr>` es una cuenta o una condición hay que leer el valor. El tree-walker
+(`loops.rs`, `run_loop`) lo leía para decidir y, si era `Bool`, entraba en un bucle que volvía a evaluar la condición
+antes de la primera vuelta; lo hacía con cualquier condición, también con una comparación. La VM sólo pasa por ahí
+cuando el tipo no se conoce al compilar (`compile_adaptive_loop`): con una comparación lo sabe, con una llamada no.
+
+### Corrección (2026-10-16)
+
+En los dos, el valor leído para decidir es la primera comprobación, y la condición se vuelve a evaluar después de
+cada vuelta. En la VM, `r_i` —que ya contaba las vueltas— dice cuál es la primera.
+
+### Qué lo sujeta
+
+`zyquality/corpus/loops/15_while_condition_once.zy`: las cuatro formas de arriba, `@>`, una condición falsa desde el
+principio y una cuenta.
+
+---
+
+## GLB-136 — Un entero negativo en base: complemento a dos de 64 bits en Rust, el signo dentro del relleno en zyjs
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 4 de la etapa 1 de la v0.0.11 (cadenas y
+formato), y decidido por el autor ese día: el signo delante
+**Encontrado por:** `0x|(0 - 1)|` en la sonda de cadenas
+**Familia:** el modelo de enteros (`zymbol_common::num`): ±(2⁵³ − 1), no un `i64`
+
+```zymbol
+>> 0x|255| " " 0x|(0 - 255)| " " 0d|(0 - 1)| " " 0b|(0 - 5)| ¶
+```
+
+| | antes | ahora |
+|---|---|---|
+| `zytw`, `zyvm` | `0x00FF 0xFFFFFFFFFFFFFF01 0d-001 0b111…1011` | `0x00FF -0x00FF -0d0001 -0b101` |
+| `zyjs` | `0x00FF 0x0-FF 0d00-1 0b-101` | igual que los de Rust |
+
+Los de Rust formateaban el `i64` de la implementación: un ancho que el modelo no tiene, y un valor que no se puede
+leer sin conocerlo. `zyjs` ponía el signo dentro del relleno. Con positivos los tres coincidían: `0x` y `0d` rellenan a
+cuatro dígitos y `0b` y `0o` no.
+
+### La decisión
+
+Tres salidas: el signo delante y los dígitos del valor absoluto (lo que hace Python: `hex(-255)` es `'-0xff'`),
+rechazarlo con `##Range`, o el complemento a dos. El autor eligió **el signo delante**. Ningún programa del espacio
+de trabajo formateaba un negativo en base: los cinco ficheros que usan el formato le pasan caracteres o enteros
+positivos.
+
+### Corrección (2026-10-16)
+
+`zymbol_common::num::base_string`, que usan el tree-walker y la VM, y la misma regla en `zymbol.js`. `GUIDE.md`
+§ 18 lo dice con un ejemplo.
+
+### Qué lo sujeta
+
+`zyquality/corpus/arithmetic/09_base_negative.zy`.
+
+---
+
+## GLB-137 — Tras un `>>` sin `¶`, una línea que empieza por una edición se imprime y no se hace, y `check` callaba
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 1 de la etapa 1 de la v0.0.11, y decidido
+por el autor ese día: un aviso en `check`, en los tres motores
+**Encontrado por:** la propia sonda: `>> c` y en la línea siguiente `d["z"]$~ 2`, que nunca editó `d`
+**Familia:** la regla del resultado (`zymbol-design/COLLECTIONS.md` § 1): un `$` cuyo resultado se usa construye. Los
+tres motores coincidían; es la clase 1 de este fichero
+
+```zymbol
+d = #(x: 1)
+>> "a"
+d["z"]$~ 2
+>> ¶
+>> d ¶
+```
+
+Los tres: `a#(x: 1, z: 2)` y después `#(x: 1)`. Un salto de línea no termina `>>` —termina en `¶`, `\\`, `}`, `;`,
+otro `>>`, una palabra de sentencia o una asignación—, así que la edición era un elemento más de la salida: imprimió
+lo que construiría y `d` no cambió. Una asignación en esa línea (`n = 7`) sí empieza una sentencia.
+
+### La decisión
+
+Repartir una salida en varias líneas es una forma usada: 181 veces en 1 261 ficheros del espacio de trabajo. Una línea
+que empieza por una edición sólo aparecía en la sonda. Tres salidas: un aviso en `check`, que una edición al principio
+de línea empiece siempre una sentencia, o dejarlo y documentarlo. El autor eligió **el aviso**, que no cambia ningún
+programa.
+
+### Corrección (2026-10-16)
+
+`zymbol-semantic` (`type_check.rs`, `Statement::Output`) y el comprobador de `zymbol.js` avisan con el mismo texto
+cuando un elemento de `>>` que empieza en una línea posterior a la del anterior es una edición (`$~`, `$+`, `$+[i]`,
+`$-`, `$--`, `$-[…]`, `$++`, `$^`, `$^+`, `$^-`): *this line continues the `>>` above: an edit here is printed, not
+made — end the output with ¶ to make it a statement*. `GUIDE.md` lo cuenta como trampa, junto a la del signo.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/semantic/salida_continua_con_edicion.zy`, un golden de `check`.
+
+---
+
+## GLB-138 — El formateador no era idempotente con un `??` dentro de una expresión, y P3 no normalizaba la línea de un error de ejecución
+
+**Estado:** **corregido 2026-10-16** — encontrado por la puerta al meter en el corpus los ficheros del sondeo de cinco
+zonas
+**Encontrado por:** la suite `fmt` (`zyquality/fmt/fmt_property.sh`), con P2 sobre `match/patrones_anidados_y_comparacion.zy`
+y `sondeo_v0011/zona2_patrones.zy`, y P3 sobre tres ficheros más
+**Familia:** `zymbol-design/FORMATTER_RULES.md`; [`GLB-137`](GLOBAL.md), que explica una de las tres P3
+
+```zymbol
+r = (?? 1 { 1 => "a" _ => "b" })
+```
+
+La primera pasada pone los brazos en líneas propias; la segunda metía una línea en blanco después de `{`.
+`fmt(fmt(x)) ≠ fmt(x)`.
+
+### Causa
+
+`zymbol-formatter`, `format_match`: la línea en blanco entre brazos se decide comparando con `last_src_line`, y un `??`
+no la ponía en la línea de su `{` —un bloque sí (`format_block`)—. Dentro de una expresión seguía valiendo el final de
+la sentencia anterior, y el primer brazo, una línea por debajo de su sentencia, parecía precedido de un hueco.
+
+Las P3 eran del arnés: `normalize_spans` sólo normalizaba `:línea:columna`, y un error de ejecución dice
+`--> fichero:línea`; y P3 comparaba los avisos del análisis, que hablan de la disposición del texto, que es justo lo
+que el formateador cambia —al unir una salida continuada en una línea, el aviso de GLB-137 desaparece y el programa
+hace lo mismo—.
+
+### Corrección (2026-10-16)
+
+`format_match` mide los brazos desde la línea del `{`, como un bloque. El arnés normaliza también `--> fichero:línea`
+y deja fuera de P3 los bloques `warning:`. Ningún fichero más pasó a saltarse: 48 antes y después.
+
+### Qué lo sujeta
+
+La propia suite `fmt`, sobre los dos ficheros que lo encontraron.
+
+---
+
+## GLB-139 — `s[i]` y un corte buscan su posición recorriendo el texto: cuadráticos dentro de un bucle — en la VM y el tree-walker con un texto no ASCII, en zyjs con cualquiera
+
+**Estado:** **corregido 2026-10-21 en `zytw` y `zyjs`** — decidido ese día por el autor, **B** entre tres salidas (A,
+sólo zyjs; C, mantener la deuda): deroga la deuda declarada del 2026-10-19 para estos dos motores, porque la etapa 4, que
+iba a sustituir zyjs, está en pausa, y zyjs tardaba 9,4 s con 32 000 caracteres. Cierra también [`ZYTW-016`](zytw.md).
+Lo que se hizo y lo que lo sujeta, en «Corrección en `zytw` y `zyjs`» abajo. Antes: **abierto** en `zytw` y `zyjs`, como
+deuda declarada de la v0.0.11 por decisión del autor;
+**corregido en `zyvm`** el mismo día que se encontró, el 2026-10-19, al revisar `zyquality/bench/big/HALLAZGOS.md`
+contra la rama `v0.0.11`. Es lo que [`ZYVM-028`](zyvm.md) dejó dicho en una frase («un texto no ASCII sigue
+recorriéndose hasta la posición») sin ficha ni caso. Sujeto por `growth/index-a-text` de `zyquality/cost`
+(`open_finding` en `zytw` y `zyjs`; la VM pasa)
+**Encontrado por:** la revisión de PERF-05 b, con una sonda de `s[i]` sobre un texto de «ñ» y su control en ASCII
+**Familia:** [`ZYVM-028`](zyvm.md), que dio a la VM el recuento de caracteres; [`GLB-130`](GLOBAL.md), que quitó la copia
+del corte; [`ZYTW-016`](zytw.md), la copia del texto en el tree-walker, que aquí no interviene
+
+```zymbol
+s = ""
+@ _i:1..32000 { s = s "ñ" }
+k = 0
+@ i:1..32000 { ? s[i] == 'ñ' { k = k + 1 } }
+>> k ¶
+```
+
+Tiempo de pared, n → 4n, el texto y el bucle a la vez (`--count` no lo ve: cada `s[i]` es un paso, y los bytes crecen
+lineales en los dos motores de Rust):
+
+| motor | texto | n → 4n | ms | razón |
+|---|---|---|---|---:|
+| `zyvm` | «ñ» | 32 000 → 128 000 | 71 → 941 | ×13 |
+| `zyvm` | ASCII | 32 000 → 128 000 | 19 → 19 | plano |
+| `zytw` | «ñ» | 16 000 → 64 000 | 140 → 1 820 | ×13 |
+| `zytw` | ASCII | 32 000 → 64 000 (×2) | 56 → 129 | ×2,3 |
+| `zyjs` | «ñ» | 6 000 → 24 000 | 378 → 5 609 | ×15 |
+| `zyjs` | ASCII | 8 000 → 32 000, menos el control | 377 → 9 168 | ×24 |
+
+Python indexa un texto en O(1) a cualquier tamaño: guarda los caracteres de ancho fijo.
+
+### Causa
+
+Una posición de Zymbol cuenta caracteres y el texto se guarda en UTF-8.
+
+- **`zyvm`**: desde `ZYVM-028` el texto sabe cuántos caracteres tiene, y si son tantos como bytes es ASCII y una
+  posición es un byte. Si no, `index_value` llega al carácter con `s.chars().nth(i)`
+  (`zymbol-vm/src/lib.rs`, ~1314), y un corte con `zymbol_common::text::char_range`, que recorre con `char_indices`.
+- **`zytw`**: `zymbol_common::text::char_len` y `char_range` en cada `s[i]` (`expr_eval.rs` ~443, `index_nav.rs` ~286).
+  Sin un recuento guardado, `char_len` cuenta el texto entero aunque se pida `s[1]`.
+- **`zyjs`**: `[...obj.v]` construye un array con todos los caracteres en cada `s[i]` (`zymbol.js` ~10692), y lo mismo
+  `s$#` (~10967). Por eso no depende de que el texto sea ASCII.
+
+### Decisión (el autor, 2026-10-19)
+
+Grupo 1 del plan de cierre de la v0.0.11 (`interpreter/ROADMAP_V0011_ES.md`): **migas en la VM**; el tree-walker y
+zyjs se quedan como deuda declarada en esta versión. Las otras dos salidas para la VM —recordar la última posición, que
+deja cuadrático el acceso hacia atrás o al azar, y un texto de ancho fijo como el de Python, que rehace `ZyStr`— se
+descartaron. En el tree-walker, arreglarlo pide que su texto deje de ser un `String` copiado en cada lectura
+(`ZYTW-016`); en zyjs, el motor se sustituye en la etapa 4.
+
+### Corrección en `zyvm` (2026-10-19)
+
+Un texto del montón que no es ASCII guarda, la primera vez que se le pide una posición, el byte donde empieza cada
+carácter 64 (`ZyStr::char_byte`, `zymbol-vm/src/zy_str.rs`). `s[i]` y un corte saltan a la miga anterior y caminan
+menos de 64 caracteres. La celda vacía ocupa una palabra (`OnceCell<Box<Vec<usize>>>`): el `Heap` de un texto pasa de
+32 a 40 bytes. Como el recuento de `ZYVM-028`, no puede quedarse viejo: el texto detrás de un `Rc` compartido no
+cambia, y uno que crece en el sitio es un `Heap` nuevo.
+
+| `zyvm`, «ñ» | antes | ahora |
+|---|---:|---:|
+| `s[i]`, 128 000 | 941 ms | 39 ms |
+| `s[i]`, 512 000 | — | 93 ms |
+| `growth/index-a-text`, n → 4n | ×12,1 | ×2,6 |
+| `growth/slice-a-text` por reloj, 200 000 → 800 000 | apagado | ×3,4 |
+
+### Qué lo sujeta
+
+`growth/index-a-text` y `growth/slice-a-text` en `zyquality/cost/cost.toml`, por reloj: los contadores no ven un
+recorrido dentro de una instrucción. La corrección, `zyquality/corpus/strings/34_position_crumbs.zy` —posiciones antes,
+en y después de cada miga con caracteres de uno a cuatro bytes, cortes que la cruzan, y un texto que crece después de
+indexarse— y las pruebas `char_byte_agrees_with_a_walk_from_the_start` y
+`the_crumbs_of_a_text_nobody_indexes_cost_one_word` de `zy_str.rs`.
+
+### Corrección en `zytw` y `zyjs` (2026-10-21)
+
+- **`zytw`**: `Value::String` guarda un `Text` (`zymbol_common::text`) en vez de un `String`: un `Rc` con su número de
+  caracteres y sus migas, el mismo modelo que `ZyStr` sin la forma en línea ni el código `unsafe`. Leer una variable ya
+  no copia el texto ([`ZYTW-016`](zytw.md)), y `s[i]`, un corte, `s$#` y la cuenta de `#?` usan el recuento guardado y
+  la miga más cercana. Una escritura en el sitio (`s = s x`, `$+`, `$++`) pasa por `Text::edit`, que copia antes si el
+  texto está compartido y olvida el recuento y las migas. Las migas se construyen y se recorren con las mismas funciones
+  que la VM (`crumbs_of`, `byte_from_crumb`), que dejó de tener su copia. Un `Value` pasa de 24 a 16 bytes, como el de la
+  VM.
+- **`zyjs`**: un texto guarda sus caracteres la primera vez que se le piden (`strChars`, en el valor). Es seguro porque
+  zyjs nunca cambia un texto en el sitio: cada edición hace uno nuevo con `mkStr`. Lo usan el índice, los tres cortes
+  (`$[a..b]`, hacia atrás y `$[a:n]`), `s$#`, `$??`, la cuenta de `#?` y las longitudes de los límites.
+
+| programa de arriba, «ñ» | antes | después |
+|---|---:|---:|
+| `zytw`, 8 000 → 32 000 | 55 → 718 ms (×13) | 14 → 36 ms (×2,6) |
+| `zyjs`, 8 000 → 32 000 | 536 → 9 438 ms (×17,6) | 190 → 537 ms (×2,8) |
+| `zyjs`, cortes (`growth/slice-a-text`), 6 000 → 24 000 | 677 → 11 534 ms | 318 → 714 ms |
+
+Verificado contra el alias, que es el riesgo de compartir: una escritura en el sitio por cada camino (`s = s x`, `$+`,
+`$++`, un parámetro, un texto dentro de un array) no llega a la variable que compartía el texto, y después de cada
+escritura el índice y el corte ven el texto nuevo, también más allá de la miga 64; los tres motores dan lo mismo. Lo
+sujetan los mismos casos de `cost`, ahora **por reloj en los tres motores** (el tree-walker a 200 000, zyjs a 6 000):
+`growth/index-a-text`, `growth/slice-a-text` y `growth/read-a-text`, estos dos con zyjs añadido; y en Rust,
+`text_positions_agree_with_a_walk_from_the_start` y `an_edit_forgets_what_the_text_knew_and_never_reaches_a_sharer`
+(`zymbol-common/src/text.rs`).
+
+---
+
+## GLB-140 — `m[i>j]$~ v`: una edición de dos niveles copia el array exterior entero en el tree-walker y en zyjs
+
+**Estado:** **corregido 2026-10-19** — encontrado ese día al probar lo que `zyquality/bench/big/HALLAZGOS.md` dejó en
+«Falta probar» (el coste de `$~` profundo), y corregido el mismo día en `zytw` y `zyjs` por decisión del autor (grupo 2
+del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`). Sujeto por `growth/update-nested` de `zyquality/cost`, que pasa
+en los tres motores
+**Encontrado por:** una sonda que fija las ediciones y dobla las filas
+**Familia:** `HLZ-012` y `HLZ-014`, que dieron a las colecciones del tree-walker un `Rc` y la copia al escribir;
+[`ZYVM-013`](zyvm.md), el mismo defecto en la VM con un nivel; [`ZYJS-014`](zyjs.md), la escritura en el sitio de zyjs
+con un nivel
+
+```zymbol
+fila = [0, 0, 0]
+m = []
+@ _i:1..400 { m$+ fila }
+@ k:1..4000 {
+    r = (k % 400) + 1
+    m[r>2]$~ k
+}
+>> m[1>2] ¶
+```
+
+4 000 ediciones, `--count`:
+
+| filas | `zytw` copied | `zytw` bytes | `zyvm` copied |
+|---:|---:|---:|---:|
+| 100 | 412 000 | 51 MB | 3 |
+| 200 | 812 000 | 99 MB | 3 |
+| 400 | 1 612 000 | 195 MB | 3 |
+| 800 | 3 212 000 | 388 MB | 3 |
+
+Son unas filas + 3 copias por edición, mientras que `m[r]$~ v`, de un nivel, copia 0 en los dos motores. A través de un
+parámetro `<~` pasa lo mismo: la VM copia 0 y el tree-walker, 1 612 000. En zyjs, 4 000 ediciones cuestan 61 ms con
+2 000 filas y 651 ms con 32 000, y la de un nivel no depende de las filas.
+
+### Causa
+
+- **`zytw`**: `eval_collection_update` lee la raíz con `self.eval_expr(&di.array)`, que clona el `Rc` de la variable,
+  y `deep_update_value` escribe sobre ese clon (`zymbol-interpreter/src/collection_ops.rs`, ~375). Con dos dueños,
+  `make_mut` copia el array exterior. La edición de un nivel pasa por `assign_update` y `edit_receiver_done`
+  (`variables.rs`), que escriben en la variable misma; la de varios niveles, dice su comentario, «takes the general
+  path».
+- **`zyjs`**: la edición por ruta reconstruye cada nivel con `[...col.v]` (`zymbol.js`, ~7754), sin el atajo de
+  «este valor es sólo mío» que `ZYJS-014` dio a la escritura de un nivel.
+
+### Corrección (2026-10-19)
+
+- **`zytw`**: `assign_update` lleva también la forma profunda (y lo que el parser reescribe en ella, `d.x["y"]$~ v` y
+  `d.x$+ 3`) por `edit_receiver_done`, con los operandos en el mismo orden. `deep_update_in` comprueba primero la ruta
+  sin leer ni copiar nada; si es de arrays, tuplas y diccionarios y cada paso está, la escribe nivel a nivel con
+  `make_mut`, y cada nivel se copia sólo si alguien más lo tiene. Cualquier otra forma —un texto en el camino, un paso
+  que no está, una posición en un diccionario— va por el `deep_update_value` de siempre, sobre una copia: falla con las
+  mismas palabras y deja la variable como estaba.
+- **`zyjs`**: `DeepUpdate` usa la marca `own` de `ZYJS-014`, y `deepUpdateValue` escribe en el sitio **el nivel de
+  fuera**. Los de dentro se siguen copiando: nada los marca, y una fila que otro nombre leyó de la matriz (`r = m[2]`)
+  no puede ver la escritura. Así deja de copiar las filas y copia sólo la que escribe.
+
+| | antes | ahora |
+|---|---:|---:|
+| `zytw`, 400 filas, 4 000 ediciones, `copied` | 1 612 000 | 0 |
+| `zytw`, lo mismo a través de `<~` | 1 612 000 | 0 |
+| `zytw`, `growth/update-nested` por reloj | ×15 (133 → 2 006 ms) | ×3,0 |
+| `zyjs`, `growth/update-nested`, 8 000 → 32 000 | 384 → 5 916 ms | 275 → 474 ms |
+
+Comparar el tree-walker de antes con el de ahora sacó dos divergencias que la puerta no veía, archivadas aparte y
+corregidas el mismo día: [`ZYTW-018`](zytw.md) (el tree-walker no añadía la clave en el último paso de una ruta) y
+[`GLB-141`](GLOBAL.md) (la VM y zyjs leían una clave ausente a medio camino como `Unit`).
+
+### Qué lo sujeta
+
+`growth/update-nested` en `zyquality/cost/cost.toml`, por `--count` (`copied` y `bytes`) en los motores de Rust y por
+reloj en los tres. La corrección, `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`: un alias que no ve la
+edición, una fila leída antes, una fila compartida, tres niveles con tuplas y posiciones negativas, un diccionario con una
+clave que se añade, un texto en el último paso, seis rechazos con la variable intacta y un operando que escribe el
+receptor (`GLB-115`).
+
+---
+
+## GLB-141 — `d[k>j]$~ v` con `k` ausente: la VM y zyjs leían la clave como `Unit` y decían «cannot index into Unit»
+
+**Estado:** **corregido 2026-10-19** — encontrado y corregido el mismo día, al comparar el tree-walker de antes y el de
+después de [`GLB-140`](GLOBAL.md)
+**Encontrado por:** la sección de rechazos de `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`
+**Familia:** [`ZYTW-018`](zytw.md), la otra cara de la misma regla: la clave se añade sólo en el último paso
+
+```zymbol
+d = #(a: #(b: 1), lista: [10, 20])
+k = "zz"
+!? { d[k>1]$~ 0 } :! { >> _err ¶ }
+!? { >> d[k>1] ¶ } :! { >> _err ¶ }
+```
+
+| | la edición | la lectura (el control) |
+|---|---|---|
+| `zytw` | `##Key(no key 'zz' in dictionary — available: a, lista)` | `##Key(…)` |
+| `zyvm` | `##Type(cannot index into Unit — expected array, tuple, or string)` | `##Key(…)` |
+| `zyjs` | `##Type(cannot index into Unit — expected array, tuple, or string)` | `##Key(…)` |
+
+### Causa
+
+Una clave ausente se **añade** cuando es el último paso, como en `d["k"]$~ v`. La VM (`vm_deep_set_in`) y zyjs
+(`deepUpdateValue`) la añadían en cualquier paso: creaban un `Unit` y seguían bajando por él, y el paso siguiente fallaba
+por no poder entrar en un `Unit`. Es el `undefined` de JavaScript que `zymbol-design/COLLECTIONS.md` descarta en «An
+absent key is `##Key`», y la lectura de la misma ruta ya daba `##Key` en los tres.
+
+### Corrección (2026-10-19)
+
+En los dos: una clave ausente con más pasos detrás es `##Key`, con el mensaje de la lectura (`missing_key_msg`,
+`Interpreter.missingKeyMsg`). No hacía falta decisión: el diseño ya lo decía.
+
+### Qué lo sujeta
+
+`E4` en `zyquality/corpus/collections/edicion_profunda_en_el_sitio.zy`.
+
+## GLB-142 — Una capa que reexporta N funciones de un módulo hacía parsear ese módulo N veces antes de ejecutar nada
+
+**Estado:** **corregido 2026-10-20** (`interpreter` `b6a9b64`) — encontrado el mismo día al medir 3.3 de la v0.0.11 (`.zyb`: cuánto del arranque es el
+front-end); está en la v0.0.10 publicada
+**Encontrado por:** `GO/試験/api試験.zy`, 899 líneas en 6 ficheros: `zymbol run` gasta 51 ms de CPU y el ejecutable que
+`zymbol build --release` hace del mismo programa —el mismo bytecode, sin front-end— 4,7. `zymbol check` sola, 56
+**Motores:** los dos de Rust, que comparten el análisis semántico; también `zymbol check` y el LSP, que usan las mismas
+tablas. `zyjs` tiene su propio comprobador y no se midió
+
+### Medición
+
+Cada fase del front-end de `zymbol run`, repetida 30 veces en un mismo proceso (un programa aparte que llama a las mismas
+funciones de `zymbol-semantic` y `zymbol-compiler`), en ms por pasada:
+
+| fase | `api試験` (importa `api/english`, `api/espanol`) | `盤試験` | `नियमपरीक्षा` (Chaturanga) |
+|---|---|---|---|
+| lexer + parser del fichero | 0,17 | 0,70 | 1,04 |
+| `module_arities` | **16,2** | 0,48 | 1,50 |
+| `module_out_slots` | 0,70 | 0,47 | 1,51 |
+| `module_exports` | **16,4** | 0,47 | 1,52 |
+| compilar el programa entero, módulos incluidos | 2,0 | 1,45 | 3,42 |
+
+`module_out_slots` recorre los mismos imports que las otras dos y tarda 23 veces menos. Lo que tiene `api試験` y no los
+otros son las dos capas de idioma de `api/`, que sólo reexportan: `english.zy` tiene 32 reexportaciones (25 funciones y 7 constantes) de `核/盤`,
+`核/規則` y `核/計算`.
+
+### Causa
+
+`zymbol-semantic/src/call_arity.rs`: `arities_of_file` y `exports_of_file` siguen cada `ExportItem::ReExport` llamando a
+`arities_of_import` / `exports_of_import`, que **lee y parsea de nuevo el módulo de origen** —para cada elemento, no para
+cada módulo—. Una capa que reexporta N nombres de un módulo de M líneas cuesta N × M, y `zymbol run` lo paga dos veces
+(`module_arities` y `module_exports`) antes de compilar. Es el patrón de i18n que recomienda `zymbol-design/I18N.md`: una
+capa por idioma sobre el núcleo.
+
+### Corrección (2026-10-20)
+
+Cada fichero se parsea una vez por consulta: `arities_of_file` y `exports_of_file` guardan lo que ya resolvieron, por
+ruta y profundidad, durante una misma llamada a `module_arities` / `module_exports`. La profundidad entra en la clave para
+que el resultado sea el de antes también en una cadena de más de `MAX_REEXPORT_DEPTH` saltos. Las dos tablas bajan de
+16,2 y 16,4 ms a 1,4 cada una en `api試験`, y `zymbol run 試験/api試験.zy` de 51 a 18 ms de CPU.
+
+### Qué lo sujeta
+
+`a_reexport_layer_parses_its_source_module_once`, en `zymbol-semantic/src/call_arity.rs`: una capa que reexporta diez
+funciones de un módulo, y un contador de parseos por fichero que sólo existe en las pruebas. Falla sin la corrección
+(«module_arities parsed core.zy 10 times for a layer re-exporting 10 of its functions»).
+
+### Lo que no corrige
+
+`zymbol check` construye esas tablas para los imports de **cada** fichero que comprueba, así que un módulo con k
+importadores se parsea k veces. `zymbol run` no: sólo las construye para el fichero principal. Va en su propia ficha.
+
+## GLB-143 — `zymbol check` parsea un módulo una vez por cada fichero que lo importa
+
+**Estado:** **corregido 2026-10-20** (`interpreter` `a4a59e1`, decisión del autor el mismo día) — encontrado al cerrar
+[`GLB-142`](GLOBAL.md); está en la v0.0.10 publicada
+**Encontrado por:** el mismo programa de `GLB-142`: corregido aquél, `zymbol check 試験/api試験.zy` seguía en 25 ms de CPU
+donde `zymbol run` gasta 18
+**Motores:** ninguno; es `zymbol check` (y por la misma vía el LSP, que comprueba fichero a fichero)
+
+### Medición
+
+Un módulo `m` de 803 líneas (200 funciones exportadas), k módulos `l0 … lk-1` que lo importan y exportan una función cada
+uno, y un principal que importa los k. CPU, mediana de 25:
+
+| k | `zymbol check` | `zymbol run` |
+|---|---|---|
+| 1 | 14,2 ms | 13,3 ms |
+| 2 | 11,5 | 14,3 |
+| 4 | 24,0 | 15,1 |
+| 8 | 29,9 | 9,4 |
+| 16 | 45,9 | 16,6 |
+| 32 | 76,8 | 12,6 |
+
+Unos 2 ms por importador, y lineal: no es cuadrático, es lo que cuesta parsear `m` otra vez cada vez.
+
+### Causa
+
+`check_file` (`zymbol-cli`) visita cada fichero una sola vez, pero `check_source` construye para cada uno las tablas de
+sus imports —`module_arities`, `module_out_slots`, `module_exports`—, y cada tabla lee y parsea el módulo importado. Un
+módulo con k importadores se parsea 3 k veces. `zymbol run` construye esas tablas sólo para el fichero principal.
+
+### Corrección (2026-10-20)
+
+`zymbol_semantic::ModuleTables` guarda los ficheros ya parseados y lo ya resuelto —la memoria de `GLB-142` es parte de él—;
+`check_file` mantiene uno para toda la comprobación, y `run` y `build` uno para sus tres tablas. Las funciones libres
+`module_arities`, `module_out_slots` y `module_exports` no cambian de firma: cada una usa uno nuevo, así que el LSP, que
+comprueba un búfer contra ficheros que cambian, ve lo que veía. Después, con el mismo programa de arriba:
+
+| k | `zymbol check` |
+|---|---|
+| 1 | 12,5 ms |
+| 4 | 13,2 |
+| 16 | 14,9 |
+| 32 | 18,0 |
+
+`zymbol check GO/試験/api試験.zy`: 5,9 ms (56 antes de `GLB-142`, 25 entre los dos).
+
+### Qué lo sujeta
+
+`one_module_tables_parses_a_shared_module_once`, en `zymbol-semantic/src/call_arity.rs`: dos ficheros que importan el
+mismo módulo y las tres tablas de cada uno con un solo `ModuleTables`; el contador de parseos exige uno. No pudo verse en
+rojo antes: el objeto es la corrección. Lo que estaba en rojo era la medición de arriba, que se archivó antes del arreglo.
+
+## GLB-144 — En `>>`, un texto interpolado no tomaba operadores ni postfijo en `zytw` y `zyvm`: `>> "a{x}" -1` imprimía `a3-1`
+
+**Estado:** **corregido 2026-10-21** — sin decisión que tomar: la regla está escrita (`REFERENCE.md` § `>>`, `GUIDE.md`
+§ salida: *`+` y `-` unen dos argumentos, no los separan*) y un texto interpolado es un literal de texto. `parse_output`
+(`zymbol-parser/src/io.rs`) ya no lo toma aparte: pasa por `parse_output_item` como cualquier otro elemento, y
+`parse_primary_expr` construye el mismo `InterpolatedString`, así que `zymbol fmt` reimprime lo mismo. zyjs no cambia
+**Encontrado por:** el barrido de tipos y posiciones de [`GLB-127`](GLOBAL.md): con `+` aceptado al empezar un elemento,
+`>> "a{x}" +a` pasaba de error de sintaxis a imprimir `a=1010` sin aviso; con `-` ya lo hacía antes
+**Familia:** [`GLB-127`](GLOBAL.md); `>>~` no lo tenía: `parse_output_items_same_line` siempre llamó a `parse_output_item`
+
+```zymbol
+x = 3
+>> "a{x}" -1 ¶
+```
+
+Antes del arreglo, cada forma con el texto interpolado y con su control en texto plano (`"a3"`):
+
+| forma | `zytw` = `zyvm`, interpolado | `zytw` = `zyvm`, plano | `zyjs`, los dos |
+|---|---|---|---|
+| `"a{x}" -1` | `a3-1` | error de aritmética | error de aritmética |
+| `"a{x}" +1` | `a31` | `+ is arithmetic only` | `+ is arithmetic only` |
+| `"a{x}" * 2` | `expected expression, found '*'` | error de aritmética | error de aritmética |
+| `"a{x}"$#` | `expected expression, found '$#'` | `2` | `2` |
+| `"a{x}"[1]` | `a3[1]` | `a` | `a` |
+| `"a{x}" [1, 2]` | `a3[1, 2]` | `expected ']' after index` | `expected ']' after index` |
+| `"a{x}" .x` | `expected expression, found '.'` | `the dot reaches a dictionary key` | ídem |
+
+Después, las 16 formas (las siete, sus controles y `"a{x}" (1)`, `"a{x}" !#1`) dan lo mismo en los tres motores, y el
+interpolado lo mismo que el plano.
+
+### Por qué
+
+El cierre de `parse_output` tenía una rama propia para `StringInterpolated`, de cuando el texto se expandía en piezas; al
+pasar a un solo literal (para que el formateador reimprimiera lo escrito) la rama se quedó, y con ella el atajo que saltaba
+los operadores y el postfijo. El comentario de al lado decía además que un literal no toma postfijo (`"text" [1,2,3]` como
+dos elementos), lo que ya era falso para el texto plano; se corrigió.
+
+### Qué lo sujeta
+
+Cuatro celdas de `runtime-operators`, la primera con oráculo: `interpolated-string-takes-postfix-in-output`,
+`interpolated-string-minus-joins-in-output`, `interpolated-string-plus-joins-in-output` y el control
+`interpolated-string-juxtaposes-in-output` (con oráculo: lo que va entre paréntesis o es un nombre sigue siendo un segundo
+elemento). Con el parser de antes, las tres primeras dan rojo; está en la tabla de arriba.
+
+## GLB-145 — `-v[1]`, `!b[1]`, `-v$#`: los motores Rust aplican el unario antes que el postfijo y zyjs después
+
+**Estado:** **corregido 2026-10-21** — decidido ese día por el autor: **A, el postfijo une más fuerte** (`-v[1]` es
+`-(v[1])`), entre tres salidas y con los programas de abajo delante. Los tres caminos del parser Rust donde empieza un
+unario —la expresión (`parse_unary`), el argumento de `$+` (`parse_postfix_structural`) y el elemento de `>>`
+(`parse_output_item_term`)— pasan por un solo `parse_prefixed`, al que cada uno da su postfijo. En zyjs, que ya leía
+A, el operando del unario conserva el «sin encadenar» del argumento de `$+`: `[1] $+ -4 $+ 5` fallaba con `cannot
+append to Int`, porque se leía `[1] $+ -(4 $+ 5)`; y su analizador nombra ya el tipo de `x#?`, `(String, Int, Any)`,
+así que `-x#?` avisa como en Rust. `IMPLEMENTATION.md` § 10 cambia el orden de sus dos niveles. La única
+forma que deja de dar un valor es `-x#?`, que antes era el tipo de `-x` y ahora niega la tupla de `#?` (error en los
+tres); `(-x)#?` es la forma que lo pregunta. En el código de las aplicaciones no aparece ninguna vez. Antes de decidirse,
+la celda no tenía `expect` y llevaba `open_finding = "GLB-145"`; la sustituyen las de abajo
+**Encontrado por:** el barrido de [`GLB-127`](GLOBAL.md): `>> +v[1]`, y después lo mismo fuera de `>>`
+**Motores:** divergen `zytw` = `zyvm` contra `zyjs`
+
+```zymbol
+v = [4, 5]
+r = -v[1]
+>> r ¶
+```
+
+| forma | `zytw` = `zyvm` | `zyjs` | `check` |
+|---|---|---|---|
+| `r = -v[1]` | `negation requires numeric operand, got Array` | `-4` | aviso `unary - on non-numeric type: [Int]` |
+| `r = +v[1]` | `unary plus requires numeric operand, got Array` | `4` | aviso |
+| `r = !b[1]` | error en ejecución | `#0` | aviso `logical not on non-boolean type: [Bool]` |
+| `r = -v$#` | error en ejecución | `-2` | aviso |
+| `>> -v$#` | `expected expression, found '$#'` | `-2` | — |
+| `r = -f()` | `-6` | `-6` | — |
+| `>> -(v[1])` | `-4` | `-4` | — |
+
+### Lo que hay escrito
+
+- `interpreter/IMPLEMENTATION.md` § 10 (la jerarquía de la EBNF) pone el unario **por encima** del postfijo, que es lo
+  que hacen los motores Rust. Pero ese documento es derivado: describe el parser, no lo decide (`HOW_TO_CHANGE_ZYMBOL.md`,
+  salida 1).
+- Los propios motores Rust no lo cumplen con las llamadas: `-f()` es `-(f())`, porque la llamada se reconoce dentro del
+  primario.
+- El comentario de DI-03 en `parse_output_item_term` lo dejó fuera a sabiendas: *«`>> -(arr$#)` is the form that works,
+  and changing that is a precedence question of its own»*.
+
+### Las dos salidas
+
+- **A — el postfijo une más fuerte** (zyjs, y Python, C y JavaScript): `-v[1]` es `-(v[1])`. Cambian los motores Rust en
+  `parse_unary` (que hoy termina en `parse_primary_expr`) y `IMPLEMENTATION.md` § 10.
+- **B — el unario une más fuerte** (lo escrito en `IMPLEMENTATION.md`): cambia zyjs, y las llamadas de los motores Rust
+  pasan a ser `(-f)()`.
+
+Recomendación: **A**. Con B, `-v[1]`, `!b[1]` y `-v$#` no tienen ningún programa correcto: negar una colección es siempre
+un error, y el analizador ya avisa de ello. A da a cada una de esas formas el único significado que puede funcionar, y es
+el que ya tienen las llamadas en los tres motores.
+
+Una consecuencia que no es del lenguaje: mientras la celda estuvo sin decidir, era lo único que provocaba el aviso
+`logical not on non-boolean type` (`!b[1]`), y se quitó de `zyquality/messages/reach.baseline`. Con A, `!b[1]` ya no
+avisa, y `reach` lo dio por no provocado. No volvió a la línea base: tiene una celda propia,
+`runtime-operators/logical-not-on-a-non-boolean` (`!n` con `n = 7`), como la tenía ya su hermano `unary -`.
+
+### Qué lo sujeta
+
+Seis celdas de `runtime-operators`, cinco con oráculo: `unary-binds-around-a-postfix` (índice, `$#`, clave y `!` sobre
+un elemento), `negated-membership-needs-no-parentheses` (`? !vistos$? 5`, la forma que diecisiete sitios escribían
+entre paréntesis), `unary-binds-around-a-postfix-in-output`, `unary-in-an-append-argument-does-not-chain`, el control
+`unary-and-a-call-unchanged` (`!es_par(3)` y `-2 ^ 2` = 4, como antes) y `unary-over-a-type-query-is-refused`. Con los
+motores de antes (el binario anterior y el `zymbol.js` anterior) las cinco que no son el control dan `WRONG`, y
+`unary-in-an-append-argument-does-not-chain` también en `zyjs`.
+
+El barrido destapó dos más que no son de precedencia: [`GLB-146`](GLOBAL.md) (la cuenta de `#?` sobre un número
+negativo) y [`ZYJS-069`](zyjs.md) (zyjs no comprobaba la colección estricta con un unario como operando).
+
+## GLB-146 — La cuenta de `#?` sobre un número: los motores Rust cuentan el signo y zyjs no
+
+**Estado:** **corregido 2026-10-21** — decidido ese día por el autor: **A, los caracteres de lo que se muestra**, signo
+y punto incluidos (`-3` → 2, `2.5` → 3, `-2.5` → 4), entre tres salidas: B, sólo las cifras (cambiaba los tres motores,
+6 ficheros del corpus y el ejemplo de `GUIDE.md`), y C, un número cuenta 1 como un Bool (además, 88 manuales). Era lo que
+ya contaban los motores Rust, lo que decía el ejemplo `(##., 4, 3.14)` de `GUIDE.md` y lo que fijaban los 20 goldens
+del corpus. Cambia zyjs, que cuenta ahora sobre la misma escritura que `>>` (`floatText`): dejaba fuera el signo, y
+contaba un Float con la escritura de JavaScript, así que `10000000000000000000000.0` daba 5 y `0.00000015` daba 6,
+contra 23 y 10. Cambia la tabla de `GUIDE.md` § 2, que decía «digit count». Verificado en los tres motores con 17 Float
+y 7 Int, los extremos incluidos (`1.5e300` → 301, `-9007199254740991` → 17), y bajo `#०९#` y `#٠٩#`: lo mismo en los
+tres. Sujeto por `type-symbol/negative-number-count` (con oráculo) y `type-symbol/float-count-is-its-display-length`;
+con el `zymbol.js` anterior las dos divergen
+**Encontrado por:** el barrido de [`GLB-145`](GLOBAL.md): `(-x)#?`
+**Motores:** divergen `zytw` = `zyvm` contra `zyjs`
+
+```zymbol
+a = -3
+b = 0
+c = -2.5
+d = 2.5
+e = -10
+f = "-3"
+>> a#? b#? c#? d#? e#? f#? ¶
+```
+
+| | `-3` | `0` | `-2.5` | `2.5` | `-10` | `"-3"` |
+|---|---|---|---|---|---|---|
+| `zytw` = `zyvm` | 2 | 1 | 4 | 3 | 3 | 2 |
+| `zyjs` | 1 | 1 | 3 | 3 | 2 | 2 |
+
+`GUIDE.md` § 2 llama a la cuenta de un Int *digit count*, y a la de un Float *digit count of display*. Ninguno de los tres
+lo cumple al pie de la letra: los motores Rust cuentan los caracteres del texto (signo y punto incluidos), y zyjs quita el
+signo pero cuenta el punto (`2.5` da 3 en los tres, con dos cifras). Hay que decidir qué es la cuenta de un número —las
+cifras, los caracteres del texto o las cifras más el punto— y corregir después `GUIDE.md` o los motores. La memoria del
+proyecto dice ya que no se pregunte nada por la cuenta de `#?` (*«nunca preguntar por la cuenta de `#?`»*), y esto es una
+razón más.
+
+## GLB-147 — Tras `\ x`, volver a asignar `x` dentro de un bloque: la VM recupera la `x` de fuera y el tree-walker y zyjs crean una del bloque
+
+**Estado:** **corregido 2026-10-23** — decidido por el autor ese día, opción B de 4: `\` deja el sitio del nombre, y
+una asignación desde cualquier bloque de su entorno fuerte lo devuelve allí (la regla de `GLB-120`, la del estado de un
+módulo, para todo nombre). Sujeto por cuatro celdas de `lifetime/`, tres con oráculo
+**Encontrado por:** las sondas de G4 (`interpreter/AGENTIC.md`), el 2026-10-23, al comprobar que una asignación vuelve a dar
+vida a un nombre destruido
+**Motores:** divergen `zyvm` contra `zytw` = `zyjs`
+
+```zymbol
+x = 5
+\x
+n = 0
+@ n < 2 {
+    n = n + 1
+    x = n
+}
+>> x ¶
+```
+
+| programa | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| el de arriba (asignación dentro del cuerpo de un bucle) | `'x' is undefined — did you mean 'x°'` | `2` | `'x' is undefined …` |
+| lo mismo dentro de un `!?` (`x = 1` y luego un fallo; `:!` lee `x`) | `'x' is undefined …` | `1` | `'x' is undefined …` |
+| `\x`, luego `@ x:1..3 { }`, luego `>> x` (nivel de fichero) | `'x' is undefined …` | `use after destruction …` | `'x' is undefined …` |
+| lo mismo con `x` estado de un módulo, en una función suya (`corpus/modules_scope/destruir_estado.zy`, 37) | `3` | `3` | `3` |
+| control: `\x`, luego `x = 3` en el mismo bloque, luego `>> x` | `3` | `3` | `3` |
+
+### La pregunta
+
+Tras `\ x`, el nombre no existe. Una asignación en el mismo bloque lo crea de nuevo (el control). Dentro de un bloque
+anidado, la regla de siempre es que una asignación a un nombre que no existe fuera crea uno del bloque (`MEM-6`), y eso
+hacen el tree-walker y zyjs; la VM, en cambio, reutiliza la `x` de fuera, como si `\` no la hubiera quitado del ámbito.
+Hay que decidir cuál de las dos es la del lenguaje:
+
+- **A — un nombre destruido no existe** (el tree-walker y zyjs): una asignación dentro de un bloque crea uno del bloque,
+  y leerlo después del bloque es «undefined». Cambia la VM. Es lo que `MEM-6` dice para cualquier otro nombre que no
+  existe.
+- **B — `\` deja el sitio del nombre** (la VM): una asignación en un bloque anidado lo devuelve a la vida en el ámbito de
+  fuera. Cambian el tree-walker y zyjs, y `MEM-6` necesitaría una excepción.
+
+En los dos casos queda la tercera fila: el mismo programa da dos mensajes distintos (`undefined` frente a `use after
+destruction`), y eso habría que igualarlo.
+
+El aviso de G4 no depende de la respuesta: en ninguno de estos casos avisa, porque la destrucción no es segura a la
+salida del bloque, y no avisar es lo prudente.
+
+### Medido otra vez el 2026-10-23, antes de decidir
+
+Con `zymbol 0.0.11` (`interpreter` en `0d09818`) y `zymbol.js` en `b38bb0f`, sobre lugares y clases de valor, cada lectura
+dentro de un `!?` para que un fallo no corte las demás:
+
+| lugar de la asignación tras `\` | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| cuerpo de un `@` mientras, Int | error | `2` | error |
+| `?`, String | error | `t` | error |
+| cuerpo de un `@` sobre un rango, Array | error | `[3]` | error |
+| la variable del propio `@` | error | **error** | error |
+| brazo de `??`, Bool | error | `#0` | error |
+| `?` dentro de `?` | error | `9` | error |
+| `\` en un bloque, `=` en otro hermano | error | `8` | error |
+| local de una función, `=` en un `?` | `-1` (el `:!`) | `4` | `-1` |
+
+La VM tampoco era coherente consigo misma: devolvía el nombre con `=` y no con la variable de un bucle ni con una
+desestructuración (`#(a: x, …) = d`). Y el estado de un módulo ya hacía B en los tres (`destruir_estado` 37 da `3`): era
+lo que el autor decidió en `GLB-120`, *«una variable destruida se puede volver a construir con ese nombre — no es muy
+distinto de asignarle `##_`»*. El analizador también suponía B: tras `\ x`, `? #1 { x° = 7 }` avisa *«`°` initializer
+is redundant; remove it»*, un consejo que con A habría roto el programa.
+
+Uso real: ninguno. Ni las doce aplicaciones, ni `web/examples`, ni el curso reasignan un nombre dentro de un bloque
+después de `\`; en el corpus sólo lo hace `destruir_estado` 37, que no cambiaba con ninguna opción.
+
+### Decisión (2026-10-23)
+
+El autor: **B**, de cuatro (A: un nombre destruido no existe y cambia la VM; C: rechazarlo al analizar, eximiendo el
+estado de un módulo; D: aplazarlo a v0.0.12). La regla: **`\` deja el sitio del nombre; una asignación desde
+cualquier bloque de su entorno fuerte lo devuelve allí.** Un bloque que no corre y un bucle que da cero vueltas no
+devuelven nada: leer el nombre sigue siendo `use after destruction`. Una lambda y una función tampoco: escriben sólo lo
+que declaran (`MEM-6`), y el nombre del fichero sigue destruido después de llamarlas.
+
+### Implementado el mismo día
+
+- **tree-walker** (`zymbol-interpreter/src/lib.rs`): `dead_variables` recuerda, de cada nombre, el ámbito del que lo
+  quitó el `\`, y `set_variable` lo devuelve a ese ámbito cuando no está a la vista. Cubre `=`, la variable de un bucle,
+  las desestructuraciones y el `:!`, porque todos pasan por ahí. Al cerrar un ámbito se olvida lo que murió en él.
+- **zyjs** (`Env.set`): la regla que ya valía para `isModuleScope` vale para cualquier entorno que tenga la marca. Y
+  `def` borra sólo la marca de su propio entorno: borrarla en todos los padres hacía que la variable de un bucle,
+  definida en el ámbito de cada vuelta, se llevara el `\` de fuera, y el bucle ya no tenía qué devolver.
+- **VM** (`zymbol-compiler`): `finish_binding` emite `Revive` tras escribir la variable de un bucle (rango, array,
+  texto) y cada nombre de una desestructuración, como `compile_assignment` ya hacía con `=`. No cuesta nada a un
+  programa que no escribe `\`: sólo se emite para los nombres que algún `\` del cuerpo nombra (`destroyable`).
+- **G4** (`zymbol-semantic/src/destroyed.rs` y `destroyedReads`): con B, el aviso de G4 *sí* dependía de la respuesta,
+  al revés de lo que decía esta ficha. Tras `\ x`, `@ i:1..3 { ? i > 1 { >> x ¶ }  x = i }` lee desde la segunda vuelta
+  lo que dejó la anterior, y G4 lo daba por destrucción segura. Ahora un nombre que el cuerpo asigna en algún punto no
+  se considera destruido con seguridad dentro del cuerpo.
+
+**Comprobado:** los 8 lugares de arriba y otros 24 programas (`_`, parámetros, lambdas, funciones, desestructuración por
+posición y por clave, `for` sobre array y texto, cero vueltas, `\` dos veces, `\` dentro de un bucle, el `:!`, un local
+de módulo) dan lo mismo en los tres motores, y el programa de control (mismo nivel, `\` en un bloque y `=` fuera, lectura
+dentro del bloque, lectura tras `\`, `##_`, un bloque que no corre) no cambia. `cargo test`: 1102 pasan, 0 fallan.
+Sujeto por `lifetime/assigning-a-destroyed-name-inside-a-block` y `lifetime/a-destroyed-name-keeps-its-place`, las dos
+con oráculo; por `lifetime/a-loop-turn-sees-the-earlier-assignment-is-not-warned` (G4), y por
+`lifetime/a-lambda-or-a-function-gives-nothing-back`, el control, también con oráculo. Las tres primeras salen en rojo contra el binario y el
+`zymbol.js` de antes. Además, la VM de antes falla 5 de las 14 líneas de la segunda contra el oráculo (las tres
+variables de bucle y las dos desestructuraciones).
+
+**Lo que queda, y no es esto** (la premisa ya no):
+
+- La premisa lo dice desde el 2026-10-24: el autor añadió al `Normative` de `MEM-8`, en un commit de
+  `zymbol-design` que no cambia nada más (`9414170`), *«A destroyed name keeps its place in its strong environment:
+  assigning it again, from any block of that environment, gives it back there.»* `MEM-6` hablaba de *«a name its
+  strong environment already holds»*, y `GLB-147` existía porque no estaba claro si un nombre destruido sigue «held».
+- El precio del arreglo de G4: tras `\ x`, `@ i:1..3 { >> x ¶  x = i }` falla seguro en la primera vuelta, y ya no se
+  avisa. Va en la dirección prudente, la de no dar avisos falsos.
+- El aviso *«`°` initializer is redundant»* sólo lo dan los dos motores Rust; zyjs no lo daba antes y sigue sin darlo.
+  Es anterior a esta ficha.
+- *«was destroyed after its last use»* es la redacción de los tres motores para un `\` explícito, aunque suena a la
+  liberación automática. No se ha tocado.
+
+## GLB-148 — Un rango dentro de un patrón de lista: `[1..5] =>` tiene tres respuestas
+
+**Estado:** **corregido 2026-10-24** — decidido por el autor ese día, opción A de 4: un elemento de un patrón de lista
+puede ser un rango o una comparación, y significa lo que el mismo patrón en un brazo. Sujeto por
+`runtime-match-patterns/range-inside-a-list-pattern`, con oráculo
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24, al probar un rango de Char dentro de una lista
+**Motores:** los tres contestan distinto
+
+```zymbol
+>> ?? [3] { [1..5] => "lista"  _ => "no" } ¶
+>> ?? 3 { [1..5] => "contiene"  _ => "no" } ¶
+```
+
+| | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|
+| `[3]` contra `[1..5]` (estructural) | `lista` | `lista` | `ranges can only be used in for-each loops` (al analizar) |
+| `3` contra `[1..5]` (pertenencia) | `contiene` | `no` | — |
+
+La gramática de Rust admite un rango como elemento de un patrón de lista (`parse_pattern_primary` dentro de `[ … ]`).
+`GUIDE.md` § 7 no lo menciona: un elemento es *«`_`, a nested list pattern, a name whose value is compared, or a
+value»*. El tree-walker trata el rango como en cualquier otro sitio; la VM lo ignora al probar la pertenencia, y zyjs no
+lo admite. Nada del corpus, de las aplicaciones ni de los ejemplos lo escribe (medido el 2026-10-24).
+
+### La pregunta
+
+- **A** — un elemento puede ser un rango, y significa lo que en un brazo: `[1..5]` contra un escalar es «está en 1..5», y
+  contra un array de un elemento, que ese elemento lo está. Cambian la VM (pertenencia) y zyjs.
+- **B** — un elemento no puede ser un rango: se rechaza al analizar, como ya hace zyjs. Cambian los dos Rust.
+
+### Medido otra vez el 2026-10-24, antes de decidir
+
+Con `interpreter` en `68da8d5` y `web` en `aa1112a`, sobre rangos de Int (con signo) y de Char, comparaciones, varios
+elementos, pertenencia y estructura:
+
+| | qué pregunta | `zytw` | `zyvm` | `zyjs` |
+|---|---|---|---|---|
+| `?? 3 { [1..5] => … }` | ¿3 está en 1..5? | sí | **no** | rechaza el programa |
+| `?? 4 { [1..2, 4..6] => … }` | ¿en alguno de los dos? | sí | **no** | rechaza |
+| `?? 'c' { ['a'..'e'] => … }` | un rango de Char | sí | **no** | rechaza |
+| `?? [9] { [1..5] => … }` | estructura | no | **sí** | rechaza |
+| `?? [3, 7] { [1..5, _] => … }` | estructura con `_` | sí | sí | rechaza |
+| `?? 2 { [< 3] => … }` | una comparación | sí | **no** | rechaza |
+| `?? [5] { [< 3] => … }` | comparación, estructura | no | **sí** | rechaza |
+
+El analizador que comparten los dos Rust ya trataba el elemento como un rango: `?? "x" { [1..5] => … }` es `range
+pattern type Int does not match scrutinee type String`. Nada del corpus, de `reject/`, de las doce aplicaciones, del curso
+ni de `web/examples` escribe un rango o una comparación dentro de un patrón de lista.
+
+### Decisión (2026-10-24)
+
+El autor: **A**, de cuatro (B: no se admite, rechazo al analizar en los tres; C: el rango sí y la comparación no; D:
+aplazar a v0.0.12). Un elemento de un patrón de lista **significa lo que el mismo patrón en un brazo**: contra un escalar,
+la lista es «uno de estos»; contra un array, elemento a elemento. Es la equivalencia que `GUIDE.md` § 7 ya enseñaba
+(`['p', 'P']` es `'p' || 'P'`), ahora para todos los patrones que la gramática admite dentro de `[ … ]`: `[1..5, 7]` es
+`1..5 || 7`.
+
+### Implementado el mismo día
+
+- **VM** (`emit_pattern_test`, `zymbol-compiler`): los dos caminos de un patrón de lista mandan a `emit_pattern_test`
+  cada elemento que trataban con un brazo vacío. En la estructura, un rango, una comparación o una lista anidada se
+  probaba como `_`, y por eso `[9]` encajaba con `[1..5]` y `[[9, 2]]` con `[[1, _]]`. En la pertenencia no encajaba
+  nunca, tampoco un nombre: `?? 3 { [a] => … }` con `a = 3` iba al `_`.
+- **zyjs**: el parser lee un rango o una comparación dentro de `[ … ]` con `parseMatchPatternPrimary`, igual que en un
+  brazo y con las mismas comprobaciones, y lo guarda como un elemento `nested`. La pertenencia prueba ahora un `nested` y
+  un nombre como `match_stmt.rs`; el `?? 3 { [a] => … }` de arriba también iba al `_` aquí.
+- De paso, en zyjs: `checkMatchPattern` no leía el valor de una comparación, y `tope = 3` y luego `?? 2 { < tope => … }`
+  avisaba *«unused variable 'tope'»*, un aviso que los dos Rust no dan; tampoco bajaba a un elemento `nested`.
+
+**Comprobado:** las 17 líneas de la celda, los rechazos de tipo (`[1..5]` contra un String, `['a'..'e']` contra un Int)
+con su línea y su columna, y el programa de control (pertenencia con valores, estructura con `_`, rangos como
+alternativas, comparación en un brazo, lista dentro de lista), igual en los tres motores. Sujeto por
+`runtime-match-patterns/range-inside-a-list-pattern`, con oráculo; en rojo contra el binario y el `zymbol.js` de antes,
+y la VM de antes falla 9 de sus 17 líneas contra el oráculo.
+
+**Lo que queda, y no es esto:** `||` sigue sin admitirse dentro de una lista (`[1 || 3]` es `expected ']' to close
+list pattern` en los tres motores, como dice `GUIDE.md`), y un error (`##Kind`) tampoco.
+
+## GLB-149 — Los analizadores Rust rechazaban una comparación en `??` sobre un parámetro que infieren numérico
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: `Number` es Int o Float todavía sin decidir, un escalar
+**Encontrado por:** al dar a zyjs el chequeo de tipo de patrones (`ZYJS-071`), el 2026-10-24
+**Motores:** `zytw` y `zyvm`, por el analizador que comparten. `zyjs` lo ejecutaba
+
+```zymbol
+signo(x) {
+    y = x * 2
+    <~ ?? x {
+        < 0 => y - 1
+        _ => y + 1
+    }
+}
+>> signo(-3) " " signo(4) ¶
+```
+
+| | `zytw` = `zyvm` antes | después, y `zyjs` |
+|---|---|---|
+| el de arriba | `error: comparison pattern requires scalar scrutinee, got Number` | `-7 9` |
+
+`check_pattern_type` admitía en una comparación Int, Float, Char, String, `Any` y `Unknown`, y no `Number`, el tipo que
+el analizador da a un parámetro usado en aritmética. Así que `?? x { < 0 => … }` no corría en ninguno de los dos motores
+Rust en cuanto la función hacía una cuenta con `x`. Ahora `Number` es uno más.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/comparison-on-a-number-parameter`, con oráculo.
+
+## GLB-150 — `zymbol run --timeout` mataba todos los procesos del usuario en Ubuntu 22.04
+
+**Estado:** **corregido 2026-10-25** — sin decisión que tomar: G3 ya decía qué termina (los comandos de `<\ \>` y lo
+que ellos lanzaron), y esto terminaba también todo lo demás
+**Encontrado por:** la puerta de GitHub, roja en las siete subidas de `interpreter` desde `662a963` (G3, 2026-10-23),
+siempre en «Unit and integration tests», siempre a los 51–54 minutos y siempre con *The hosted runner lost communication
+with the server*, sin log. Visto al auditar los documentos el 2026-10-25
+**Motores:** `zytw` y `zyvm`, por el CLI que comparten. `zyjs` no tiene `--timeout`
+
+```zymbol
+r = <\ "sleep 5" \>
+>> r ¶
+```
+
+`zymbol run --timeout 0.5` sobre ese programa, en `ubuntu:22.04` (procps 3.3.17), con un `sleep 60` testigo en otro grupo
+de procesos y pids de dos cifras que empiezan por 1, binarios estáticos de los dos commits:
+
+| | `11d121d` | después |
+|---|---|---|
+| código de salida de `zymbol` | 137 — se mató a sí mismo | 124, con su aviso |
+| el testigo | muerto | vivo |
+| el `sleep 5` | — | terminado con el programa |
+
+`stop_running_commands` terminaba cada comando lanzando `kill -KILL -<pgid>`. procps-ng 3.3 lee `-17` como una opción y
+se queda con su primera cifra: hace `kill(-1, SIGKILL)`, que alcanza **todos los procesos del usuario**. En el runner de
+GitHub eso es su propio agente, y el job moría sin dejar log. procps 4 (Debian 13, donde se escribió G3) lo lee bien, por
+eso pasaba aquí. `--` no lo arregla: procps 3.3 lo rechaza. Ahora es la llamada al sistema, `libc::kill(-pgid, SIGKILL)`,
+y nunca con un pgid de 0 o 1.
+
+No era sólo de la integración continua: cualquiera que corriera `--timeout` con un comando en marcha en Ubuntu 22.04 o
+Debian 11 y 12 perdía todas sus sesiones.
+
+### Qué lo sujeta
+
+`interpreter/crates/zymbol-cli/tests/cli_timeout.rs`, `ending_a_command_spares_every_other_process`: un proceso fuera del
+grupo del comando sigue vivo después de `--timeout`, en los dos motores. Lo corre `cargo test` en la puerta de GitHub,
+que es Ubuntu 22.04: el sitio donde falla. Una celda de ZyDDT no puede: pregunta qué imprime un programa, no qué
+procesos quedan vivos.
+
+## GLB-151 — Dos workflows publicaban el mismo binario estático aarch64, y una de sus dos sumas no casaba con él
+
+**Estado:** **corregido 2026-10-31** — decisión del autor (la opción recomendada de tres): se retira
+`release-aarch64-static.yml`; `release-linux.yml` ya construía ese binario y publica su suma en
+`SHA256SUMS_aarch64_linux.txt`
+**Encontrado por:** el ensayo de los cuatro workflows de release desde la rama `v0.0.11`, contra un release en borrador
+(`v0.0.11-rc1`, nunca publicado), el 2026-10-31, al pasar `sha256sum -c` por **todos** los ficheros de suma
+**Motores:** ninguno: es la publicación. Afecta a la descarga `zymbol_lang_vX.Y.Z_aarch64_linux`
+
+Los dos construían `zymbol_lang_v0.0.11_aarch64_linux` con `cross` y lo subían con `--clobber`:
+
+| workflow | subió | su fichero de suma |
+|---|---|---|
+| `release-aarch64-static.yml` | 18:32Z | `SHA256_aarch64_linux.txt`: `6010008f…` |
+| `release-linux.yml` (publica después de verificar el `.deb`) | 18:39Z | `SHA256SUMS_aarch64_linux.txt`: `2706bef7…` |
+
+En la release queda el último que sube, y el orden es fijo: `publish-linux` espera al verify del `.deb`. El binario
+publicado era el de `release-linux.yml`, y `SHA256_aarch64_linux.txt` no casaba con él. Hasta la v0.0.10 los dos builds
+salían idénticos byte a byte y las dos sumas coincidían; `agents/release_installers.md` ya avisaba de que nada lo
+obligaba. En la v0.0.11 dejaron de serlo. Publicada así, la release habría llevado un fichero de suma falso, y quien
+verificara la descarga con él la habría visto alterada.
+
+`sha256sum -c SHA256SUMS_*.txt`, la orden que el agente daba para la fase 5, no lo habría visto: no lee `SHA256_*.txt`.
+
+### Qué se cambió
+
+- `interpreter/.github/workflows/release-aarch64-static.yml`, borrado. La release pasa de 17 ficheros a 16: el binario
+  sigue, con su suma en `SHA256SUMS_aarch64_linux.txt`.
+- `interpreter/packaging/build-release.sh`: los dos comentarios que lo nombraban.
+- `agents/release_installers.md` (tres workflows, 16 ficheros, `sha256sum -c SHA256*.txt`) y `agents/web_release.md`
+  (cinco ficheros de suma).
+
+### Qué lo sujeta
+
+Ninguna prueba: no hay nada que ejecutar antes de que exista una release. Lo sujeta la fase 5 de
+`agents/release_installers.md`, que ahora comprueba cada fichero `SHA256*` de la release contra el fichero que nombra.

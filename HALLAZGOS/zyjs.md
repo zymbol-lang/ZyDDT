@@ -28,8 +28,9 @@
 | [`ZYJS-021`](#zyjs-021--los-errores-de-sintaxis-de-los-operadores--nombran-tokens-y-dos-dicen-object-object) | **corregido 2026-09-15** | los errores de sintaxis de `$` nombraban tokens internos, y dos decían `[object Object]` |
 | [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **corregido 2026-09-15** | un módulo importado con el bloque de exportación mal escrito se cargaba sin error |
 | ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
+| [`ZYJS-072`](#zyjs-072--la-cuenta-de-decimales-de-un-operador-de-formato-solo-admite-cifras-ascii) | **corregido 2026-10-29** | `#.२\|x\|`, `#!२\|x\|`, `#,.२\|x\|` y `#^.२\|x\|` se rechazaban; los dos Rust los aceptan |
 
-**Ninguno abierto.** Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Ninguno abierto.** `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3432,3 +3433,354 @@ patrón crearía aquello con lo que compara. zyjs lo leía como una expresión.
 
 `refusal/hot-name-as-a-match-pattern`.
 
+
+---
+
+## ZYJS-063 — `()` es un valor en zyjs: `<~ ()` corría en el navegador y en ningún otro motor
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 1 de la etapa 1 de la v0.0.11, al escribir
+`<~ ()` en una sonda
+**Encontrado por:** la sonda de bucles: los dos parsers de Rust la rechazaron y zyjs siguió
+**Familia:** la notación de las colecciones de la v0.0.9 (`zymbol-design/COLLECTIONS.md`): no hay tupla vacía, el
+diccionario vacío es `#()` y la ausencia de valor es `##_`
+
+```zymbol
+f() { <~ () }
+>> "[" f() "]" ¶
+```
+
+`zytw` y `zyvm`: `error: expected expression, found ')'`. `zyjs`: `[]`. `REFERENCE.md` y `GUIDE.md` lo dicen
+expresamente: `()` no parsea, «there is no empty tuple in Zymbol».
+
+### Causa
+
+`zymbol.js`, el paréntesis en `parsePrimary`: `()` devolvía `{ type: 'Literal', kind: 'unit' }`.
+
+### Corrección (2026-10-16)
+
+Lo rechaza con el texto de los parsers de Rust. Ningún ejemplo del playground lo usaba: las suites de `web` y el
+consenso de los ejemplos siguen en verde.
+
+### Qué lo sujeta
+
+`zyquality/reject/collections/19_parentesis_vacios.zy`.
+
+---
+
+## ZYJS-064 — Un `_` dentro de una lista de patrones anidada: zyjs abortaba con «'_' is undefined»
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 2 de la etapa 1 de la v0.0.11 (`??`)
+**Encontrado por:** `?? #[1, [2, 3]] { [1, [2, _]] => … }`, que los dos de Rust casan
+**Familia:** [`ZYJS-065`](zyjs.md), la misma sonda
+
+### Causa
+
+`zymbol.js`, el análisis de una lista de patrones: un elemento que abría `[` se analizaba como una expresión —un
+arreglo literal— y su `_` se evaluaba como una variable al casar.
+
+### Corrección (2026-10-16)
+
+`parseListPattern`, que se llama a sí mismo cuando un elemento abre `[`; `matchPattern` casa el elemento anidado como
+un patrón, con la misma doble lectura que arriba (estructura sobre un arreglo, pertenencia sobre un escalar).
+
+### Qué lo sujeta
+
+`zyquality/corpus/match/patrones_anidados_y_comparacion.zy`.
+
+---
+
+## ZYJS-065 — El operando de un patrón `==` o `<>` se evaluaba dos veces en zyjs
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 2 de la etapa 1 de la v0.0.11
+**Encontrado por:** `== eco(1) || == eco(7)`, con `eco` que imprime: `<1><1><7><7>` en zyjs, `<1><7>` en Rust
+**Familia:** [`ZYJS-064`](zyjs.md)
+
+### Causa
+
+`matchPattern`, `case 'comparison'`: evaluaba el operando al principio y, para `==` y `<>`, otra vez.
+
+### Corrección (2026-10-16)
+
+Una evaluación, usada por las seis comparaciones.
+
+### Qué lo sujeta
+
+`zyquality/corpus/match/patrones_anidados_y_comparacion.zy`.
+
+---
+
+## ZYJS-066 — Un `:!` dentro de otro `:!`: zyjs creaba un segundo `_err`, y el de fuera volvía a leer su propio error
+
+**Estado:** **corregido 2026-10-16** — encontrado por el sondeo de la zona 3 de la etapa 1 de la v0.0.11 (flujo de
+errores)
+**Encontrado por:** un `!?` dentro de un `:!`, y `_err` leído después en el `:!` de fuera
+**Familia:** MEM-7 (`zymbol-design/PREMISES.md`): dentro de un entorno fuerte un nombre designa una cosa, y un bloque
+no puede tener una segunda con el mismo nombre. Es la regla con la que nace el `m` de `##Kind(m) =>`
+
+```zymbol
+!? { y = [1][3] } :! {
+    !? { z = 1 / 0 } :! { >> "in:" _err " " }
+    >> "out:" _err ¶
+}
+```
+
+`zytw` y `zyvm`: `in:##Div(…) out:##Div(…)` — el `_err` es uno, y el `:!` de dentro lo asignó. `zyjs`:
+`out:##Index(…)` — el de dentro era otro.
+
+### Causa
+
+`zymbol.js`, `execTryCatch`: cada `:!` hacía `catchEnv.def('_err', …)`, un `_err` nuevo que tapaba al visible. La
+asignación normal no servía para corregirlo: en zyjs un nombre con `_` no se asigna ni se lee a través de un padre.
+
+### Corrección (2026-10-16)
+
+La cláusula define el suyo, para leerlo dentro, y además asigna el `_err` visible del mismo entorno fuerte, buscado
+a mano subiendo hasta la frontera de la función.
+
+### Qué lo sujeta
+
+`zyquality/corpus/errors/catchable/err_anidado.zy`.
+
+---
+
+## ZYJS-067 — `$>` sobre un texto: zyjs pegaba los resultados en un texto aunque no fuesen caracteres
+
+**Estado:** **corregido 2026-10-17** — encontrado al escribir la sonda de `$>`, `$|` y `$<` sin reentrada en la VM, en
+la etapa 2 de la v0.0.11
+**Encontrado por:** `"abc" $> (c -> ##!c)`: `zytw` y `zyvm` dan `[97, 98, 99]`, un array; `zyjs`, `979899`, un texto
+
+### Causa
+
+`zymbol.js`, `evalCollectionOp`, `fromStr`: lo que sale de recorrer un texto se reconstruía siempre como texto,
+pegando la representación de cada resultado. Los dos motores de Rust (`hof_rebuild`) reconstruyen un texto sólo si
+todos los resultados son caracteres o textos; si no, la lambda ha dejado el texto atrás y la respuesta es un array.
+Ningún fichero del corpus pasaba por ahí con resultados que no fuesen caracteres.
+
+### Corrección (2026-10-17)
+
+La regla de Rust: texto si todos son `char` o `str`, array si no.
+
+### Qué lo sujeta
+
+`zyquality/corpus/strings/33_map_over_text_shape.zy`: números, caracteres, textos, una mezcla, `$|` y `$<`.
+
+---
+
+## ZYJS-068 — `m$+ [0, 0, 0]`: con un literal de colección como operando, zyjs copia el receptor en cada añadido
+
+**Estado:** **corregido 2026-10-19** — encontrado ese día al calibrar `growth/update-nested` para
+[`GLB-140`](GLOBAL.md) (construir las filas costaba más que editarlas) y corregido el mismo día por decisión del autor
+(grupo 2 del plan de cierre, `interpreter/ROADMAP_V0011_ES.md`). Sujeto por `growth/append-rows` de `zyquality/cost`,
+que pasa en los tres motores
+**Encontrado por:** la calibración de un caso de `cost/`, al separar la construcción de la edición
+**Familia:** [`ZYJS-014`](zyjs.md), que dio a zyjs la escritura en el sitio; [`GLB-115`](GLOBAL.md), el orden de
+evaluación que decide cuándo puede usarla
+
+```zymbol
+m = []
+@ i:1..20000 { m$+ [i, 0, 0] }
+>> m$# ¶
+```
+
+| forma | 10 000 | 20 000 | 40 000 |
+|---|---:|---:|---:|
+| `m$+ [0, 0, 0]` | 369 ms | 2 123 ms | 9 818 ms |
+| `m = m $+ [0, 0, 0]` | 393 ms | — | 9 744 ms |
+| `m$+ #[0, 0, 0]` | 366 ms | — | 9 858 ms |
+| `m$+ fila`, con `fila = [0, 0, 0]` | — | 211 ms | — |
+| `m$+ 0` | 139 ms | 200 ms | — |
+
+`zytw` y `zyvm` son lineales en las cinco formas, y `--count` da `copied = 0`.
+
+### Causa
+
+`zymbol.js`, `plainOperand` (~7537): una edición escribe en el sitio sólo si sus operandos «sólo leen» —porque un
+operando que escribiera el receptor tiene que encontrarlo como estaba (GLB-115)—, y la lista acepta `Literal`,
+`Ident`, aritmética, un índice y `$#`. Un literal de array o de tupla (`type: 'Array'`) no está en ella, aunque sus
+elementos sean de esa lista, así que el añadido toma el camino que copia.
+
+### Corrección (2026-10-19)
+
+`plainOperand` acepta un literal de array o de tupla (también `#(…)`, que es un `Tuple` con claves) cuyos elementos sean
+todos `plainOperand`: un literal no ejecuta código del programa, así que no puede escribir el receptor. Uno que lleve una
+llamada, `[f()]`, sigue por el camino que copia. `growth/append-rows`, 8 000 → 32 000: 312 → 6 634 ms antes, 171 →
+317 ms ahora.
+
+### Qué lo sujeta
+
+`growth/append-rows` en `zyquality/cost/cost.toml`, por reloj en zyjs y por `--count` en los motores de Rust.
+
+## ZYJS-069 — `[1] $+ !#1`: con un unario como operando, zyjs no comprobaba la colección estricta y ejecutaba lo que Rust rechaza
+
+**Estado:** **corregido 2026-10-21** — sin decisión que tomar: la colección `[…]` es homogénea (COL-3) y la edición entera
+se comprueba (L46). `staticKind` no conocía `UnaryOp` y devolvía `null`, que en esa comprobación significa «no digo
+nada». Ahora un `!` sobre un Bool es Bool, y un `-` o `+` sobre un Int o un Float conserva su tipo; cualquier otro
+operando sigue sin decir nada
+**Encontrado por:** el barrido de [`GLB-145`](GLOBAL.md), al probar un unario como argumento de `$+`
+**Motores:** `zyjs`. Los dos analizadores Rust lo rechazaban ya
+
+```zymbol
+a = [1] $+ !#1
+>> a ¶
+```
+
+| forma | `zytw` = `zyvm` | `zyjs` antes | `zyjs` después |
+|---|---|---|---|
+| `[1] $+ !#1` | `cannot append Bool to [Int]` | `[1, #0]` | `cannot append Bool to [Int]` |
+| `[#1] $+ -3` | `cannot append Int to [Bool]` | `[#1, -3]` | `cannot append Int to [Bool]` |
+| `a[1]$~ !#1`, con `a = [1]` | `cannot write Bool to [Int]` | `[#0]` | `cannot write Bool to [Int]` |
+| `[1, !#1]` (el literal) | rechazo | rechazo | rechazo |
+
+El comentario de `shapeOf` dice que, donde sólo Rust decide, Rust *avisa* y no rechaza, y que por eso los dos ejecutan
+los mismos programas. Aquí Rust rechazaba, así que eso dejaba de ser cierto.
+
+Al darle celda salió el resto, que ya estaba antes sin unario (`[1] $+ #0`): el rechazo de la edición no decía en qué
+línea —un `CollectionOp` no la lleva— y plegaba la ayuda en el mensaje con una raya, donde los motores Rust la dan en su
+línea `= help:`. Ahora señala el elemento (o, sin él, el receptor) y separa la ayuda, como ya hacía el rechazo del
+literal; `zyquality/messages/baseline.txt` cambia esas dos entradas de zyjs a la forma nueva.
+
+### Qué lo sujeta
+
+`collections/a-negated-bool-appended-to-ints-is-checked`, `collections/a-negated-bool-written-into-ints-is-checked` y el
+control `collections/a-negated-number-appended-to-numbers-is-not-a-mix`, las tres de COL-3.
+
+## ZYJS-070 — zyjs leía un patrón de `??` como una expresión y ejecutaba formas que Rust rechaza
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: un patrón es lo que lee `parse_pattern_primary` en Rust
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24
+**Motores:** `zyjs`. Los dos Rust rechazan todas estas formas al analizar
+
+| forma | `zytw` = `zyvm` | `zyjs` antes | `zyjs` después |
+|---|---|---|---|
+| `1 + 2 =>` | `expected '=>' after pattern` | la suma, comparada | el mismo rechazo, en la misma columna |
+| `f(3) =>` | `expected '=>' after pattern` | la llamada, comparada | el mismo |
+| `a[1] =>` | `expected '=>' after pattern` | el índice, comparado | el mismo |
+| `[1 + 2] =>` | `expected ']' to close list pattern` | la suma, comparada | el mismo |
+| `1.0..5.0 =>`, `"a".."c" =>` | `expected '=>' after pattern` | `range pattern type mismatch` al ejecutar | el mismo rechazo |
+| `a..b =>`, con variables | `expected '=>' after pattern` | ejecutado | el mismo rechazo |
+| `_? x > 1 =>` | `expected pattern, found '_?'` | ejecutado como guarda | el mismo rechazo |
+
+### Causa y corrección
+
+`parseMatchPatternPrimary` leía el valor con `parseAdditive`, así que cualquier expresión era un patrón, y un `..` detrás
+de cualquiera de ellas formaba un rango; `_?` construía un patrón `guard` que Rust nunca tuvo. Ahora un patrón literal
+es un token —dos con signo— y si el parser consumió más, el error es el de Rust en el token siguiente; el `..` sólo
+sigue a un Int o a un Char literal; el elemento de un patrón de lista se lee igual; y `_?` es `expected pattern`. El
+caso `guard` del intérprete se ha quitado: ya no se puede construir.
+
+### Qué no cubre
+
+El elemento de un patrón de lista que es un rango (`[1..5] =>`) sigue rechazado aquí: qué significa no está decidido
+(`GLB-148`).
+
+### Qué lo sujeta
+
+`runtime-match-patterns/pattern-is-not-an-expression`, `pattern-is-not-a-call`,
+`list-pattern-element-is-not-an-expression`, `float-range-pattern-is-refused`, `string-range-pattern-is-refused`,
+`variable-range-pattern-is-refused` y `guard-pattern-is-refused`.
+
+## ZYJS-071 — zyjs no comprobaba el tipo de un patrón contra el del sujeto
+
+**Estado:** **corregido 2026-10-24** — sin decisión que tomar: es `check_pattern_type` de `type_check.rs`
+**Encontrado por:** las sondas de G5 (`interpreter/AGENTIC.md`), el 2026-10-24
+**Motores:** `zyjs`. Los dos Rust rechazan estos programas al analizar
+
+| programa | `zytw` = `zyvm` | `zyjs` antes | `zyjs` después |
+|---|---|---|---|
+| `t = (1, 2)`, `?? t { 1 => "uno"  _ => "otro" }` | `pattern type Int does not match scrutinee type (Int, Int)` | `otro` | el mismo rechazo |
+| `u = ##_`, `?? u { 1 => "uno" }` | `pattern type Int does not match scrutinee type Unit` | `no pattern matched` al ejecutar | el mismo rechazo |
+| `?? "x" { 1..5 => 1  _ => 2 }` | `range pattern type Int does not match scrutinee type String` | `range pattern type mismatch` al ejecutar | el mismo rechazo |
+| `?? 'b' { 1..200 => … }`, `?? 66 { 'a'..'z' => … }` | el rechazo de rango, con sus tipos | al ejecutar | el mismo rechazo |
+
+### Corrección
+
+`Checker.checkPatternType` sigue a `check_pattern_type`, con sus palabras: el tipo de un literal y del principio de un
+rango contra el del sujeto, con la misma relación de compatibilidad (`typesCompatibleStatic`); una comparación contra un
+sujeto que no es escalar; las alternativas de `||` y los elementos de una lista, contra el elemento cuando el sujeto es
+un array. El tipo del sujeto lo nombra `argType`; donde no lo nombra no dice nada, como Rust con `Unknown`. Los patrones
+llevan ahora la línea y la columna de su primer token, para que el rechazo diga dónde. `zyquality/messages/baseline.txt`
+pierde las tres entradas de Rust que ya no son de un solo lado.
+
+### Qué no cubre
+
+Donde sólo Rust sabe el tipo del sujeto, sólo Rust rechaza: `par() { <~ (1, 2) }` y luego `?? par() { 1 => … }` sigue
+corriendo en zyjs (`otro`), porque su comprobador no infiere lo que devuelve una función. Es el límite de ese comprobador,
+no de `??`.
+
+### Qué lo sujeta
+
+`runtime-match-patterns/pattern-of-another-type-is-refused` y `range-of-another-type-is-refused`.
+
+---
+
+## ZYJS-072 — La cuenta de decimales de un operador de formato sólo admite cifras ASCII
+
+**Estado:** **corregido 2026-10-29** — abierto y corregido el mismo día, sin decisión que tomar: los dos Rust ya decían lo que
+el lenguaje hace, y `zyjs` era el que no lo seguía. Sujeto por tres celdas de `runtime-format-convert`, que pasan en los tres
+motores
+**Encontrado por:** la revisión de los manuales v0.0.11 (`web/data/manuals/v0011/`), al comparar los 76 bloques `zymbol` de cada manual en los tres motores, el 2026-10-29
+**Motores:** `zyjs`. `zytw` y `zyvm` coinciden entre sí
+
+| programa | `zytw` = `zyvm` | `zyjs` |
+|---|---|---|
+| `>> #.२\|3.14159\| ¶` | `3.14` | `expected a decimal count after '#.'` |
+| `>> #!२\|3.14159\| ¶` | `3.14` | `expected a decimal count after '#!'` |
+| `>> #,.२\|3.14159\| ¶` | `3.14` | `expected a decimal count after '#,'` |
+| `>> #^.२\|3.14159\| ¶` | `3.14e0` | `expected a decimal count after '#^'` |
+| `>> #.٢\|…\|`, `#.２\|…\|`, `#.𝟚\|…\|` | `3.14` | el mismo rechazo |
+| `n = 2` y `>> #.n\|3.14159\| ¶` | `3.14` | `3.14` |
+
+No depende de `#०९#`: con o sin modo numeral, `zyjs` sólo lee `[0-9]` como cuenta (`readDigits` del lexer de
+`web/src/zymbol/zymbol.js`). Los dos Rust aceptan una cifra de cualquiera de los 69 bloques, que es lo que el lenguaje
+promete en el resto de sus literales. Una cuenta dada por un nombre (`#.n|x|`) funciona en los tres.
+
+### Qué rompe
+
+Cualquier manual v0.0.11 que escriba sus literales en cifras propias tiene un bloque de redondeo con `#.<cifra>|π|`, y
+ese bloque (el 72 de los 76) da distinto en el navegador. Son **20 manuales**: hi, ar, bn, ur, pa, te, ta, mr, fa, th,
+gu, kn, my, ps, ml, ne, lo, ku, si y km. Los otros 31 no escriben la cuenta en cifras propias y los tres motores coinciden
+en los 76 bloques.
+
+### Qué no se decidió
+
+Si se corregía `readDigits` para que aceptara una cifra de cualquiera de los 69 bloques —que es lo que hace el lexer de
+Rust— o si los manuales dejaban la cuenta en ASCII, que es válido en los tres. Se tomó lo primero, que es lo que dice la
+premisa del lenguaje; lo segundo sólo escondía la diferencia, y los manuales no se tocan.
+
+### Corrección (2026-10-29)
+
+En Rust la cuenta es un token `Integer` del lexer de números, así que tiene sus reglas; `zymbol.js` la lee dentro del
+token del operador y tenía las suyas. Ahora son las mismas:
+
+- `readDigits` lee con `digitValue` —la tabla `DIGIT_BLOCKS`, que ya usaba el lexer de números— y devuelve la cuenta en
+  ASCII para `parseInt`. Una cuenta con cifras de dos bloques (`#.२2|x|`) se rechaza con las palabras de Rust,
+  `mixed digit scripts in numeric literal`, en la columna en que empieza la cuenta.
+- `readName` lee el nombre con `isIdentStart`/`isIdentContinue`, la regla de todo nombre: leía `[\p{L}_0-9]`, así que
+  `#.n२|x|` se cortaba en `२`, y `#.1_0|x|` pasaba por un nombre (`undefined variable '1_0'`) donde Rust dice
+  `expected '|' after precision`.
+- Los dos rechazos de `#.` y `#!` incompletos apuntan donde apunta Rust (`posAhead`), como ya hacían los de `#,` y `#^`:
+  señalaban el `#`.
+- Los otros dos lexers tenían la misma regla y la misma falta, y la puerta lo vio en cuanto `zyjs` dejó de rechazar la
+  línea (`zyddt surfaces` excusa las líneas que un motor rechaza): el resaltador del playground
+  (`web/src/playground/highlight.js`, `digitsAt`) y la gramática de VS Code (`vscode/syntaxes/zymbol.tmGrammar.json`, las
+  cuatro reglas de `format-expressions`) dejaban `#.२|x|` y `#.n२|x|` sin marcar: 7 y 21 sitios. El resaltador lee ahora
+  la cuenta con `digAt` y el nombre con `isIdentStart`/`isIdentContinue`; la gramática, con la clase de cifra de su regla
+  `#d0d9#` y `\p{N}` en la continuación del nombre.
+
+| programa | antes en `zyjs` | ahora, en los tres |
+|---|---|---|
+| `>> #.१२\|π\| ¶` | `expected a decimal count after '#.'` | `3.14159265359` |
+| `n२ = 3` y `>> #.n२\|π\| ¶` | `expected '\|' after precision` | `3.142` |
+| `>> #.२2\|π\| ¶` | `expected a decimal count after '#.'`, 1:4 | `mixed digit scripts in numeric literal`, 1:6 |
+| `>> #.२ \|π\| ¶` | `expected a decimal count after '#.'`, 1:4 | `expected '\|' after precision`, 1:8 |
+
+### Qué no cubre
+
+`#.0x2|x|`: Rust lo rechaza con `expected a decimal count after '#.'` (el lexer de Rust hace de `0x` un prefijo de base),
+`zyjs` con `expected '|' after precision`. Los dos lo rechazan en la misma línea; sólo cambian las palabras.
+
+### Qué lo sujeta
+
+Tres celdas de `runtime-format-convert`: `decimal-count-in-native-digits` (sin `open_finding` desde la corrección; dio
+`DEBT PAID` al aplicarla), `decimal-count-in-mixed-digit-scripts-is-refused` y `decimal-count-name-with-native-digits`.
+Las tres se ponen en rojo con el `zymbol.js` de antes (`WRONG`, `WORDING`, `WRONG`).

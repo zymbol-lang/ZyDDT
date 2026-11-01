@@ -69,8 +69,8 @@ t(v) {
 
 [[cell]]
 id     = "no-pattern-matched-in-match-expression-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received — and `check` warned first, since the `??` has no `_` (G5)"
 src    = """
 t(v) {
     <~ ?? v { 1 => "uno" }
@@ -255,8 +255,8 @@ f(v) {
 
 [[cell]]
 id     = "match-statement-no-arm-matches-met"
-expect = "ok"
-what   = "and inside `!?` it is met, with the family the catch received: `##_`, in the three engines"
+expect = "warn"
+what   = "and inside `!?` it is met, with the family the catch received: `##_`, in the three engines — and `check` warned first, since the `??` has no `_` (G5)"
 src    = """
 v = 2
 !? {
@@ -328,7 +328,9 @@ src    = """
 # Object]` (GLB-107, corrected 2026-10-07: the signal leaves the expression in
 # the tree-walker, and a statement takes a thrown one in zyjs). The same
 # unwinding serves a `<~` inside a function and an `@!` inside a loop — the
-# three cells after the first two.
+# three cells after the first two. The first two gained a `_ => 0` arm that
+# never runs on 2026-10-24, when a `??` without `_` began to be warned (G5):
+# what they ask is the `<~`, and an `ok` is what they assert.
 
 [[cell]]
 id     = "top-level-return-inside-a-match-value-exits"
@@ -340,6 +342,7 @@ x = ?? v {
     1 => {
         <~ 5
     }
+    _ => 0
 }
 >> x ¶
 """
@@ -354,6 +357,7 @@ x = 1 + (?? v {
     1 => {
         <~ 7
     }
+    _ => 0
 })
 >> x ¶
 """
@@ -411,4 +415,300 @@ f(v) {
     <~ 9
 }
 >> f(1) ¶
+"""
+
+# ── A `??` that may find no arm is warned before it runs (G5) ───────────────
+#
+# Decided by the author on 2026-10-24, option A of four: `check`, `run` and the
+# LSP warn about a `??` with no `_` arm that is not provably complete — a Bool
+# with `#1` and `#0`, or two comparisons against constants that leave no number
+# out. The run-time error stays the error; each program below meets a value an
+# arm does match, so what the cell asserts is the warning alone. Measured over
+# 1 327 files of the corpus and the applications: it warns once, in the probe
+# that exists to raise the error (`sondeo_v0011/zona2_patrones.zy`).
+
+[[cell]]
+id     = "match-without-wildcard-is-warned"
+expect = "warn"
+what   = "a `??` giving a value, with no `_` arm, is warned though this value matches (G5)"
+src    = """
+n = 2
+>> ?? n {
+    1 => "uno"
+    2 => "dos"
+} ¶
+"""
+
+[[cell]]
+id     = "match-statement-without-wildcard-is-warned"
+expect = "warn"
+what   = "the same as a statement, over a String (G5)"
+src    = """
+s = "azul"
+?? s {
+    "azul" => { >> 1 ¶ }
+    "verde" => { >> 2 ¶ }
+}
+"""
+
+[[cell]]
+id     = "match-half-a-bool-is-warned"
+expect = "warn"
+what   = "a Bool with only `#1` is not complete (G5)"
+src    = """
+b = 4 > 3
+>> ?? b { #1 => "si" } ¶
+"""
+
+[[cell]]
+id     = "match-comparisons-that-leave-a-gap-are-warned"
+expect = "warn"
+what   = "`< 0` and `> 0` leave 0 out, and a name used as a pattern is known only when it runs (G5)"
+src    = """
+k = 3
+>> ?? k {
+    < 0 => "neg"
+    > 0 => "pos"
+} ¶
+dias = ["lun", "mar"]
+>> ?? "mar" { dias => "laborable" } ¶
+"""
+
+[[cell]]
+id     = "match-in-a-function-and-a-lambda-is-warned"
+expect = "warn"
+what   = "inside a function and inside a lambda, whose bodies are checked where they are written (G5)"
+src    = """
+f(x) {
+    <~ ?? x { 1 => "uno" }
+}
+g = x -> ?? x { 2 => "dos" }
+>> f(1) g(2) ¶
+"""
+
+[[cell]]
+id     = "complete-match-is-not-warned"
+expect = "ok"
+what   = "the control of G5: `_`, `_` as an alternative, a Bool with both values, and comparisons that cover every number are complete, and nothing is said"
+src    = """
+n = 7
+>> ?? n { 1 => "uno"  _ => "otro" } ¶
+>> ?? n { 1 || _ => "cualquiera" } ¶
+b = 3 > 4
+>> ?? b { #1 => "si"  #0 => "no" } ¶
+>> ?? b { #1 || #0 => "siempre" } ¶
+>> ?? n { < 0 => "neg"  >= 0 => "no neg" } ¶
+>> ?? n { <= 5 => "poco"  > 5 => "mucho" } ¶
+>> ?? n { == 7 => "siete"  <> 7 => "otro" } ¶
+"""
+
+# ── What a pattern is: the three engines accept and refuse the same ones ────
+#
+# Found by G5's probes on 2026-10-24. A pattern is one token — two with a sign —
+# or a range between two Int literals or two Char literals, a list of those, a
+# comparison, `_`, a name or an error kind; that is the Rust grammar, and the
+# language. The VM did not compile a Char range (ZYVM-032); zyjs read a pattern
+# as an expression and ran `1 + 2 =>`, `f(3) =>`, `[1 + 2] =>`, Float, String
+# and variable ranges and a `_? cond =>` guard (ZYJS-070), and checked no
+# pattern's type against the scrutinee's (ZYJS-071); and both Rust analysers
+# refused a comparison on a parameter inferred as a number (GLB-149).
+
+[[cell]]
+id     = "char-range-pattern"
+expect = "ok"
+what   = "`'a'..'z' =>` and `'A'..'Z' || '0'..'9' =>` classify characters, and a Char range against an Int is a run-time `##Type` — the VM refused to compile the program (ZYVM-032)"
+src    = """
+clase(c) {
+    <~ ?? c {
+        'a'..'z' => 1
+        'A'..'Z' || '0'..'9' => 2
+        _ => 3
+    }
+}
+t = 0
+@ c:"qM7-az" { t = t * 10 + clase(c) }
+>> t ¶
+!? { >> clase(5) ¶ } :! { >> (_err#?)[1] ¶ }
+"""
+oracle.py = """
+def clase(c):
+    if 'a' <= c <= 'z': return 1
+    if 'A' <= c <= 'Z' or '0' <= c <= '9': return 2
+    return 3
+t = 0
+for c in "qM7-az": t = t * 10 + clase(c)
+print(t)
+print("##Type")
+"""
+oracle_literal_ok = "the second line is the family the catch receives, which names a kind rather than computing one"
+
+[[cell]]
+id     = "pattern-is-not-an-expression"
+expect = "error"
+what   = "`1 + 2 =>` is not a pattern: a pattern is one token — zyjs read an expression and ran it (ZYJS-070)"
+src    = """
+n = 3
+>> ?? n { 1 + 2 => "suma"  _ => "no" } ¶
+"""
+
+[[cell]]
+id     = "pattern-is-not-a-call"
+expect = "error"
+what   = "`f(3) =>` is not a pattern — zyjs called the function and compared (ZYJS-070)"
+src    = """
+f(x) { <~ x }
+n = 3
+>> ?? n { f(3) => "llamada"  _ => "no" } ¶
+"""
+
+[[cell]]
+id     = "list-pattern-element-is-not-an-expression"
+expect = "error"
+what   = "`[1 + 2] =>`: an element of a list pattern is one token too (ZYJS-070)"
+src    = """
+>> ?? [3] { [1 + 2] => "x"  _ => "no" } ¶
+"""
+
+[[cell]]
+id     = "float-range-pattern-is-refused"
+expect = "error"
+what   = "`1.0..5.0 =>`: a range is Int..Int or Char..Char — zyjs accepted it and failed only when it ran (ZYJS-070)"
+src    = """
+f = 2.5
+>> ?? f { 1.0..5.0 => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "string-range-pattern-is-refused"
+expect = "error"
+what   = "`\"a\"..\"c\" =>` is refused as a Float range is (ZYJS-070)"
+src    = """
+s = "b"
+>> ?? s { "a".."c" => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "variable-range-pattern-is-refused"
+expect = "error"
+what   = "`a..b =>`, with `a` and `b` variables, is refused — zyjs ran it (ZYJS-070)"
+src    = """
+a = 1
+b = 9
+n = 4
+>> ?? n { a..b => "dentro"  _ => "fuera" } ¶
+"""
+
+[[cell]]
+id     = "guard-pattern-is-refused"
+expect = "error"
+what   = "`_? x > 1 =>` is not a pattern — zyjs ran it as a guard (ZYJS-070)"
+src    = """
+x = 2
+>> ?? x { _? x > 1 => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "pattern-of-another-type-is-refused"
+expect = "error"
+what   = "an Int pattern against a tuple is refused before running — zyjs took the `_` and went on (ZYJS-071)"
+src    = """
+t = (1, 2)
+>> ?? t { 1 => "uno"  _ => "otro" } ¶
+"""
+
+[[cell]]
+id     = "range-of-another-type-is-refused"
+expect = "error"
+what   = "an Int range against a String is refused before running — zyjs failed only when it ran (ZYJS-071)"
+src    = """
+s = "x"
+>> ?? s { 1..5 => 1  _ => 2 } ¶
+"""
+
+[[cell]]
+id     = "comparison-on-a-number-parameter"
+expect = "ok"
+what   = "`?? x { < 0 => … }` on a parameter used in arithmetic runs: `Number` is a scalar — both Rust analysers refused it (GLB-149)"
+src    = """
+signo(x) {
+    y = x * 2
+    <~ ?? x {
+        < 0 => y - 1
+        _ => y + 1
+    }
+}
+>> signo(-3) " " signo(4) ¶
+"""
+oracle.py = """
+def signo(x):
+    y = x * 2
+    return y - 1 if x < 0 else y + 1
+print(signo(-3), signo(4))
+"""
+
+# ── A range or a comparison inside a list pattern (GLB-148) ─────────────────
+#
+# Found by G5's probes on 2026-10-24: `?? 3 { [1..5] => … }` had three answers —
+# the tree-walker matched, the VM did not, zyjs refused the program — and the
+# same for `[< 3]`. Decided by the author the same day, option A of four: an
+# element means what the same pattern means in an arm. Against a scalar the
+# list is "one of these"; against an array, element by element. The VM had
+# taken every element it did not know for a `_` in the structural test (`[9]`
+# matched `[1..5]`, `[[9, 2]]` matched `[[1, _]]`) and for "never" in the
+# containment test, a name included (`?? 3 { [a] => … }` with `a = 3`); zyjs
+# shared the last one.
+
+[[cell]]
+id     = "range-inside-a-list-pattern"
+expect = "ok"
+what   = "a range, a comparison, a nested list and a name inside a list pattern mean what they mean in an arm — against a scalar and against an array (GLB-148)"
+src    = """
+p(etq, r) {
+    >> etq " " r ¶
+}
+a = 3
+p("01", ?? 3 { [1..5] => "sí"  _ => "no" })
+p("02", ?? 9 { [1..5] => "sí"  _ => "no" })
+p("03", ?? 4 { [1..2, 4..6] => "sí"  _ => "no" })
+p("04", ?? -2 { [-5..-1] => "sí"  _ => "no" })
+p("05", ?? 'c' { ['a'..'e'] => "sí"  _ => "no" })
+p("06", ?? [3] { [1..5] => "sí"  _ => "no" })
+p("07", ?? [9] { [1..5] => "sí"  _ => "no" })
+p("08", ?? [3, 7] { [1..5, _] => "sí"  _ => "no" })
+p("09", ?? [3, 7] { [1..5, 6..9] => "sí"  _ => "no" })
+p("10", ?? [3, 7] { [1..5] => "sí"  _ => "no" })
+p("11", ?? ['b'] { ['a'..'e'] => "sí"  _ => "no" })
+p("12", ?? 2 { [< 3] => "sí"  _ => "no" })
+p("13", ?? 5 { [< 3] => "sí"  _ => "no" })
+p("14", ?? [2] { [< 3] => "sí"  _ => "no" })
+p("15", ?? [5] { [< 3] => "sí"  _ => "no" })
+p("16", ?? [[9, 2]] { [[1, _]] => "sí"  _ => "no" })
+p("17", ?? 3 { [a] => "sí"  _ => "no" })
+"""
+oracle.py = """
+# A pattern, as an arm reads it: ('rng', lo, hi), ('cmp', f), ('lst', [...]),
+# ('val', v) or '_'. A list against an array is element by element; against
+# anything else, "one of these".
+def m(p, v):
+    if p == '_': return True
+    k = p[0]
+    if k == 'rng': return p[1] <= v <= p[2]
+    if k == 'cmp': return p[1](v)
+    if k == 'val': return v == p[1]
+    if isinstance(v, list):
+        return len(v) == len(p[1]) and all(m(q, x) for q, x in zip(p[1], v))
+    return any(m(q, v) for q in p[1])
+L = lambda *ps: ('lst', list(ps))
+a = 3
+cases = [
+    (3, L(('rng', 1, 5))), (9, L(('rng', 1, 5))), (4, L(('rng', 1, 2), ('rng', 4, 6))),
+    (-2, L(('rng', -5, -1))), ('c', L(('rng', 'a', 'e'))), ([3], L(('rng', 1, 5))),
+    ([9], L(('rng', 1, 5))), ([3, 7], L(('rng', 1, 5), '_')), ([3, 7], L(('rng', 1, 5), ('rng', 6, 9))),
+    ([3, 7], L(('rng', 1, 5))), (['b'], L(('rng', 'a', 'e'))),
+    (2, L(('cmp', lambda x: x < 3))), (5, L(('cmp', lambda x: x < 3))),
+    ([2], L(('cmp', lambda x: x < 3))), ([5], L(('cmp', lambda x: x < 3))),
+    ([[9, 2]], L(L(('val', 1), '_'))), (3, L(('val', a))),
+]
+for i, (v, p) in enumerate(cases, 1):
+    print("%02d %s" % (i, "sí" if m(p, v) else "no"))
 """

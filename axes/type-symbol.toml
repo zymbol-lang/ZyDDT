@@ -88,3 +88,36 @@ src  = """
 v = «value.expr»
 >> (v#?)[«field.n»] ¶
 """
+
+# ── The count of a number is the length of its display (GLB-146) ────────────
+#
+# Decided by the author on 2026-10-21, option A of three: the characters the
+# number is displayed with, sign and point included (`-3` → 2, `-2.5` → 4).
+# The Rust engines already counted so; zyjs left the sign out, and counted a
+# Float through JavaScript's own spelling, so `1e22` was 5 and not 23. The
+# other two options were the digits alone, and 1 for every number.
+
+[[cell]]
+id     = "negative-number-count"
+expect = "ok"
+what   = "the count of `#?` on `-3`, `-10` and `-2.5`: 2, 3 and 4, the sign counted (GLB-146)"
+src    = """
+a = -3
+b = -10
+c = -2.5
+>> (a#?)[2] " " (b#?)[2] " " (c#?)[2] ¶
+"""
+oracle.py = """
+print(len(str(-3)), len(str(-10)), len(str(-2.5)))
+"""
+
+[[cell]]
+id     = "float-count-is-its-display-length"
+expect = "ok"
+what   = "a Float too large or too small for a short spelling counts what is displayed, not an exponent form: zyjs said 5 and 6 (GLB-146)"
+src    = """
+a = 10000000000000000000000.0
+b = 0.00000015
+>> a " " (a#?)[2] ¶
+>> b " " (b#?)[2] ¶
+"""

@@ -461,6 +461,19 @@ def _():
     assert Fi.stale_summary(text, dict(states, **{"XX-1": "open"})) == []
 
 
+@case("findings/a-summary-in-bold-or-after-a-comma-is-read-too",
+      "«**Uno abierto:** `X`» and «**Uno abierto, `X`**» are how the headers write it")
+def _():
+    from zyddt import findings as Fi
+    text = ("**Uno abierto:** `XX-1`, que no está en la tabla.\n"
+            "**Uno abierto, `XX-2`**, deuda declarada.\n"
+            "**Ninguno abierto.** `XX-1` se corrigió.\n"
+            "\n## XX-1 — t\n")
+    states = {"XX-1": "closed", "XX-2": "closed"}
+    assert Fi.stale_summary(text, states) == [(1, "XX-1", "open", "closed"),
+                                              (2, "XX-2", "open", "closed")]
+
+
 @case("debt/no-declaration-changes-nothing", "a cell with no open_finding is judged as before")
 def _():
     assert C.debt(None, True, frozenset({"zyjs"})) == (None, [])

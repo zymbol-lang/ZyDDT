@@ -58,7 +58,7 @@
 #
 # Those four cells fail today, in all three engines, and the failure is the
 # open question rather than a regression: the isolation was removed deliberately
-# (`fbccc8e`, 2026-08-24) and `GUIDE.md` § 10b, which documented it as
+# (`5f74974`, 2026-08-24) and `GUIDE.md` § 10b, which documented it as
 # deliberate, was retired with it. They are declared WITHOUT a skip on purpose —
 # a skip would make the hole invisible in exactly the place the author asked for
 # a watch. The axis is not registered in `zyquality/suites.toml` while they are
