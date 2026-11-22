@@ -29,8 +29,9 @@
 | [`ZYJS-022`](#zyjs-022--un-módulo-importado-con-el-bloque-de-exportación-mal-escrito-se-carga-sin-error) | **corregido 2026-09-15** | un módulo importado con el bloque de exportación mal escrito se cargaba sin error |
 | ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
 | [`ZYJS-072`](#zyjs-072--la-cuenta-de-decimales-de-un-operador-de-formato-solo-admite-cifras-ascii) | **corregido 2026-10-29** | `#.२\|x\|`, `#!२\|x\|`, `#,.२\|x\|` y `#^.२\|x\|` se rechazaban; los dos Rust los aceptan |
+| [`ZYJS-073`](#zyjs-073--los-textos-se-comparaban-por-unidad-utf-16-y-no-por-punto-de-código) | **corregido 2026-11-22** | `"😀" < "～"` daba `#1`; los otros tres, `#0` |
 
-**Ninguno abierto.** `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Ninguno abierto.** `ZYJS-073` se abrió y se corrigió el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3784,3 +3785,29 @@ token del operador y tenía las suyas. Ahora son las mismas:
 Tres celdas de `runtime-format-convert`: `decimal-count-in-native-digits` (sin `open_finding` desde la corrección; dio
 `DEBT PAID` al aplicarla), `decimal-count-in-mixed-digit-scripts-is-refused` y `decimal-count-name-with-native-digits`.
 Las tres se ponen en rojo con el `zymbol.js` de antes (`WRONG`, `WORDING`, `WRONG`).
+
+---
+
+## ZYJS-073 — Los textos se comparaban por unidad UTF-16 y no por punto de código
+
+**Estado:** **corregido 2026-11-22** (v0.0.12) — sin decisión propia que tomar: la decisión D-05 del autor, ese día, es que
+el texto se ordena por punto de código en los cuatro motores. Sujeto por `zyquality/corpus/collections/sort_orden_natural.zy`
+**Encontrado por:** la sonda de la decisión D-05 (BUG-TET-001), con un carácter fuera del plano básico, el 2026-11-22
+**Motores:** `zyjs`. `zytw`, `zyvm` y `zymbol_vm.js` coinciden entre sí
+
+| programa | `zytw` = `zyvm` = `zymbol_vm.js` | `zyjs` |
+|---|---|---|
+| `>> ("😀" < "～") ¶` | `#0` | `#1` |
+| `>> ["😀", "～"] $^ (x, y -> x < y) ¶` | `[～, 😀]` | `[😀, ～]` |
+
+`orderValues`, que da el orden de `<`, `<=`, `>` y `>=` y por eso el de todo comparador, comparaba dos textos que no son
+números —y dos `Char`— con el `<` de JavaScript, que va por unidad UTF-16. Un carácter fuera del plano básico es un par
+sustituto cuya primera unidad (U+D800–U+DBFF) queda por debajo de U+E000–U+FFFF: `😀` (U+1F600) iba antes de `～`
+(U+FF5E). Rust compara `str` por bytes UTF-8, que es el orden de punto de código, y `zymbol_vm.js` ya lo corregía en su
+`cmpStr`.
+
+### Corrección (2026-11-22)
+
+`cmpCodePoint` en `web/src/zymbol/zymbol.js`, con la misma corrección de sustitutos que `cmpStr` de `vm/values.js`, para los
+textos y los `Char` de `orderValues` y para el orden natural de `$^+`/`$^-` (GLB-152). Los textos que son números siguen
+comparándose como números bajo `<`.

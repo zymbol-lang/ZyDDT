@@ -78,7 +78,6 @@ bloquea.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| BUG-TET-001 · GAP-TET-002 | El texto se ordena por **punto de código** en los motores de Rust y en zymbol_vm.js (`Ё` antes de `А`); zyjs ordena `$^+`/`$^-` por la configuración regional del navegador. Falta decidir qué lado tiene razón y la frase que lo documente (`GUIDE.md` dice «lexicográfico») | `ZyTetris/HALLAZGOS.md` § BUG-TET-001 y § GAP-TET-002 | `["b", "A", "a", "B"] $^+`: zyjs `[a, A, b, B]`; zytw, zyvm y zymbol_vm.js `[A, B, a, b]` |
 | GAP-ZYE-010 · GAP-TET-005 | No hay conversión de mayúsculas a minúsculas: ZyEdit la hace con una tabla ASCII y ZyTetris pliega A–Z y А–Я por punto de código | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-010; `ZyTetris/HALLAZGOS.md` § GAP-TET-005 | ningún operador ni módulo de `std/` la tiene |
 | GAP-ZYE-007 | El lenguaje no segmenta en clústeres de grafemas: un `Char` es un punto de código, y el editor aproxima el clúster con `t::width(c) == 0` | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-007 | `continues` sigue en `ZyEdit/src/buffer.zy` |
 | GAP-TET-003 | `й` (U+0439) e `и`+U+0306 son identificadores distintos que se ven igual; `check` avisa de uno como sin uso y del otro como indefinido. El lenguaje no ha dicho si normaliza | `ZyTetris/HALLAZGOS.md` § GAP-TET-003 | `check`: *unused variable 'й'* sobre la grafía compuesta |
@@ -102,8 +101,8 @@ Nada, a 2026-11-01.
 
 ## 4. Documentación
 
-Nada, a 2026-10-30. La frase sobre el orden del texto depende de una decisión y está en la § 2
-(BUG-TET-001 · GAP-TET-002).
+Nada, a 2026-11-22. La frase sobre el orden del texto (BUG-TET-001 · GAP-TET-002) entró en `GUIDE.md`
+ese día, con la decisión D-05.
 
 ## 5. Restos en las aplicaciones
 

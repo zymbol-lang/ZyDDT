@@ -10540,3 +10540,78 @@ verificara la descarga con él la habría visto alterada.
 
 Ninguna prueba: no hay nada que ejecutar antes de que exista una release. Lo sujeta la fase 5 de
 `agents/release_installers.md`, que ahora comprueba cada fichero `SHA256*` de la release contra el fichero que nombra.
+
+---
+
+## GLB-152 — `$^+` y `$^-` no ordenaban los `Char`, y devolvían intacto, sin error, lo que no tiene orden natural
+
+**Estado:** **corregido 2026-11-22** (v0.0.12) — decisiones del autor D-05, D-07 y D-08 de ese día, las tres con la opción
+recomendada. Sujeto por `zyquality/corpus/collections/sort_orden_natural.zy`, que pasa igual en los cuatro motores
+**Encontrado por:** la sonda de la decisión D-05 (orden del texto, BUG-TET-001 · GAP-TET-002), al barrer el rango de tipos
+que pide `zymbol-design/HOW_TO_CHANGE_ZYMBOL.md` § 5 y no sólo el texto, el 2026-11-22
+**Motores:** los cuatro (`zytw`, `zyvm`, `zyjs`, `zymbol_vm.js`), que coincidían. Clase 1: los cuatro coinciden y los cuatro
+están mal, y ningún diferencial podía verlo
+
+| programa | los cuatro, antes |
+|---|---|
+| `>> ['b', 'A', 'a'] $^+ ¶` | `[b, A, a]` — intacto |
+| `>> ['b', 'A', 'a'] $^- ¶` | `[a, A, b]` — el de entrada, al revés (`zyjs`: `[b, A, a]`) |
+| `>> [[2], [1]] $^+ ¶` | `[[2], [1]]` |
+| `>> [(2, 1), (1, 2)] $^+ ¶` | `[(2, 1), (1, 2)]` |
+| `>> #[3, "a", 1] $^+ ¶` | `[3, a, 1]` — ni siquiera los dos enteros |
+
+`GUIDE.md` decía *«Chars compare by code point»*, y `('b' < 'A')` daba `#0` en los cuatro. Lo que faltaba era el brazo de
+`Char` en la comparación natural: `natural_cmp` del tree-walker devolvía `None` y la llamada lo leía como `Equal`;
+`vm_natural_cmp` y `naturalCmp` de `zymbol_vm.js` respondían `Equal`/`0` a todo lo que no conocían, y `zyjs` restaba
+`a.v - b.v`, `NaN` con dos textos. Un orden en que todo es igual deja el arreglo como estaba, y `$^-`, que ordena y luego
+invierte, lo daba al revés. Con arreglos, tuplas, diccionarios o un `#[…]` mezclado pasaba lo mismo, y `<` entre esos
+mismos valores ya era un `##Type` (*cannot compare values with operator '<': Array and Array*).
+
+### Qué se decidió
+
+- **D-05:** el texto se ordena por punto de código en los cuatro motores (lo que ya hacían tres; `zyjs` es BUG-TET-001).
+- **D-07:** `$^+` **no** usa la lectura numérica de `<` (`"10" > "9"`). Mezclada con textos que no son números no es un
+  orden total —`"2" < "10"`, `"10" < "1a"` y `"1a" < "2"` forman un ciclo— y el comparador `$^ (x, y -> x < y)` da
+  `[1a, 2, 10]` o `[2, 10, 1a]` según el orden en que entren los mismos tres textos. Python, el oráculo, ordena
+  `["10", "9", "100"]` como `['10', '100', '9']`, que es lo que da `$^+`.
+- **D-08:** dos elementos sin orden natural entre ellos son un `##Type`, levantado antes de mover nada, como `<`.
+
+### Corrección (2026-11-22)
+
+El orden natural existe entre números (Int y Float juntos), entre textos, entre caracteres y entre Bools. Los cuatro motores
+comprueban primero el arreglo —el primer elemento y el primero que no es de su clase, o los dos primeros si su clase no
+tiene orden— y nombran esa pareja, que no depende del algoritmo de ordenación y es por eso la misma en los cuatro:
+
+| motor | dónde |
+|---|---|
+| `zytw` | `natural_kind`, `natural_unordered` y el brazo `Char` de `natural_cmp`, en `crates/zymbol-interpreter/src/collection_ops.rs` |
+| `zyvm` | `vm_natural_kind`, `vm_natural_unordered` y el brazo `Char` de `vm_natural_cmp`, en `crates/zymbol-vm/src/lib.rs` |
+| `zyjs` | `naturalKind`, `naturalUnordered`, `naturalCmp` y `cmpCodePoint`, en `web/src/zymbol/zymbol.js`; `$^-` ordena y luego invierte, como los demás |
+| `zymbol_vm.js` | `naturalUnordered` y el brazo `T_CHAR` de `naturalCmp`, en `web/src/zymbol/vm/values.js`; la comprobación, en `ArraySort` de `vm/machine.js` |
+
+| programa | los cuatro, ahora |
+|---|---|
+| `>> ['b', 'A', 'a'] $^+ ¶` | `[A, a, b]` |
+| `>> ['b', 'A', 'a'] $^- ¶` | `[b, a, A]` |
+| `>> [[2], [1]] $^+ ¶` | `##Type($^+ cannot order Array and Array` + `help: give the order with a comparator: $^ (a, b -> …))` |
+| `>> #[3, "a", 1] $^+ ¶` | `##Type($^+ cannot order Int and String …)` |
+| `>> [[1]] $^+ ¶`, `>> [] $^+ ¶` | `[[1]]`, `[]`: sin dos elementos no hay nada que comparar ni que rechazar |
+
+### Qué no cubre
+
+`NaN`: sigue ordenándose como igual a todo, como antes, en los cuatro. No se decidió nada sobre él.
+
+### Qué lo sujeta
+
+`zyquality/corpus/collections/sort_orden_natural.zy` y su golden: textos con mayúsculas, acentos, cirílico y un carácter
+fuera del plano básico, textos numéricos frente a `<`, caracteres, los casos de menos de dos elementos y los cinco
+rechazos, uno de ellos capturado por su familia (`:! ##Type`). Y
+`zyquality/corpus/errors/runtime/sort_sin_orden_natural.zy`, el mismo rechazo sin capturar, que es lo que
+`zyquality/messages/reach.py` lee.
+
+### Lo que salió al sujetarlo
+
+`reach.py` emparejaba los diagnósticos línea por línea, y un mensaje que lleva su ayuda dentro (`"…\nhelp: …"`) sale en
+dos líneas: ninguno podía verse provocado. Los siete que había estaban en `messages/reach.baseline` como «nada lo
+provoca», con ficheros del corpus que los provocaban. Ahora une la línea del diagnóstico con la línea `help:` que la sigue;
+los siete salieron de la línea base con `--prune`.
