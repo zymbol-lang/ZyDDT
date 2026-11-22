@@ -49,7 +49,6 @@ decisión del autor que espera su implementación.
 | BUG-VMJS-001 | `#^.N` en zyjs redondea los empates hacia arriba y escribe un `.0` que los motores Rust no escriben | `web/zymbol_vm/HALLAZGOS.md` § BUG-VMJS-001 | zyjs `1.3e0 3.0e0 1.13e0 5.0e-1`; zytw, zyvm y zymbol_vm.js `1.2e0 2e0 1.12e0 5e-1` |
 | BUG-ZYE-011 | Tras `(a, k) = v[1]` y `v[1]$~ otra`, la VM copia entero el array `a` en la primera edición; el tree-walker no copia nada. Coste, no salida: la puerta no lo ve | `ZyEdit/HALLAZGOS.md` § BUG-ZYE-011 | `ZyEdit/hypotheses/replaced_tuple/` — HOLDS |
 | BUG-ZYE-014 | Insertar en una posición (`a$+[i] v`) y quitar un rango (`a$-[i..j]`) cuestan el array entero en los dos motores de Rust, aunque tenga un solo dueño | `ZyEdit/HALLAZGOS.md` § BUG-ZYE-014 | `ZyEdit/hypotheses/mid_array/` — HOLDS; `ZyEdit/tests/run.sh` lo da como KNOWN en los dos motores |
-| GAP-ZYE-015 | No hay **fotograma**: ningún programa puede enseñar una pantalla entera de una vez. Decisión del autor (2026-10-27): la opción 1 en la v0.0.11 (hecha: una escritura por `>>~`), la 2 en la v0.0.12 | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-015 | `ZyEdit/hypotheses/frame/` — HOLDS |
 
 ## 2. Decisiones de diseño sin tomar
 

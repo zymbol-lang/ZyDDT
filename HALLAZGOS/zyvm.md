@@ -13,6 +13,7 @@
 | [`ZYVM-020`](#zyvm-020--n--sobre-un-nombre-que-es-estado-del-módulo-la-vm-le-da-un-registro-propio) | **corregido 2026-10-10** | `n° = n + i` con `n` estado del módulo: 3 donde los otros dos dan 16 |
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
 | [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
+| [`ZYVM-033`](#zyvm-033--dentro-de--la-vm-escribía--como-lf-y-dibujaba----en-escalera) | **corregido 2026-11-22** | dentro de `>>\|`, `¶` salía como LF y no como CR LF: `>> … ¶` se dibujaba en escalera |
 
 **Ninguno abierto.** `ZYVM-022` y `ZYVM-031`, que no están en la tabla, se corrigieron el 2026-10-19 y el 2026-10-20. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
@@ -2114,3 +2115,48 @@ tablas del compilador que enumeran los saltos de una instrucción la conocen. Cu
 ### Qué lo sujeta
 
 `runtime-match-patterns/char-range-pattern`, con oráculo.
+
+---
+
+## ZYVM-033 — Dentro de `>>|`, la VM escribía `¶` como LF y dibujaba `>> … ¶` en escalera
+
+**Estado:** **corregido 2026-11-22** — sin decisión que tomar: el tree-walker siempre escribió CR LF ahí, y su
+comentario dice por qué
+**Encontrado por:** el fotograma (GAP-ZYE-015, D-09), al llevar `>>` y `¶` al mismo búfer que `>>~`, el 2026-11-22
+**Motores:** `zyvm` en un terminal real. `zytw` ya lo hacía bien. zyjs y zymbol_vm.js pintan en un canvas que no tiene
+modo raw
+
+```zymbol
+>>| {
+    >> "ab" ¶
+    >> "cd" ¶
+    <<| k
+}
+```
+
+| bytes tras `ESC[?25l` | `zytw` | `zyvm` antes | `zyvm` después |
+|---|---|---|---|
+| el de arriba | `ab\r\ncd\r\n` | `ab\ncd\n` | `ab\r\ncd\r\n` |
+
+El modo raw (`cfmakeraw`) apaga `OPOST`, así que el terminal ya no traduce un LF a CR LF: la línea baja y no vuelve a la
+primera columna. `cd` salía debajo de la `b`. Era así en el motor por defecto desde la v0.0.11, y nadie lo vio porque
+los juegos dibujan con `>>~`, que posiciona cada fila.
+
+### Por qué no lo vio nadie
+
+Ninguna puerta ejecuta `>>|` en un terminal real salvo la suite `tui`, y sus tres casos no escribían `¶` dentro del
+bloque. Por una tubería, `>>|` se niega a arrancar (`not a terminal`); con `--keys` dibuja en una pantalla virtual que
+no tiene modo raw.
+
+### Causa y corrección
+
+`Instruction::PrintNewline` escribía `writeln!` en la salida de la VM, dentro y fuera de `>>|`. Ahora el terminal
+nativo dice en `enter_tui` que se queda con lo que `>>` escribe dentro del bloque (`Ok(true)`, como ya hacía
+`--keys`), y un `¶` le llega por un método nuevo del trait, `Terminal::newline`, cuya implementación por defecto sigue
+siendo `\n` (la pantalla virtual de `--keys` no cambia). El terminal nativo escribe `\r\n`.
+
+### Qué lo sujeta
+
+`zyquality/tui/frame_newline.zy`, con golden: los dos motores por un pty, comparados entre sí y contra los bytes
+leídos.
+
