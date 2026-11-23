@@ -64,7 +64,6 @@ bloquea.
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
 | DIS-ZYE-003 (resto) | Corregido con `<<\| k, m` (D-14), salvo una cosa: en un terminal, Ctrl+/ llega como `7` (y Ctrl+\\, Ctrl+], Ctrl+^ como `4` `5` `6`), con `m = 4`; en el navegador llega como `/`. Los bytes `1c`–`1f` no distinguen esas teclas. Arreglarlo pide el protocolo de teclado de kitty, sin decidir | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-003 | nada: ningún caso pasa por terminal y navegador a la vez |
-| DIS-ZYE-004 | Dentro de `>>\|` el cursor del terminal está oculto y nada lo muestra ni lo coloca | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-004 | `ZyEdit/hypotheses/cursor/` — HOLDS |
 | DIS-ZYE-005 | Ningún programa Zymbol puede arrancar otro en un terminal, escribirle y leer lo que dibuja. Es el resto de GAP-GOL-009, y bloquea las etapas 4 y 5 de ZyEdit | `ZyEdit/HALLAZGOS.md` § DIS-ZYE-005 | las comprobaciones de `ZyEdit/hypotheses/` siguen escritas en Python |
 | GAP-ZYE-012 | Un programa bloqueado en `<<\|` no se entera de que la ventana cambió de tamaño hasta la tecla siguiente; ZyEdit sondea con `<<\|?` cada 40 ms | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-012 | `ZyEdit/hypotheses/resize/` — HOLDS |
 | Serpiente IDEA-001 | Un módulo `std/ansi` con nombres para los colores de `>>~`, en vez de números sueltos | `serpiente/HALLAZGOS_ES.md` § IDEA-001 | «propuesto», sin decisión |
