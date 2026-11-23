@@ -1,0 +1,26 @@
+# The term-width axis — what `t::width` says of a whole cluster.
+#
+# `unicode-width` 0.2, which both Rust engines measure with, does not add the
+# columns of a cluster's code points: a family joined by U+200D is 2 columns, an
+# emoji with a skin tone 2, a hangul syllable spelled as jamo 2, and CR LF 1.
+# zyjs adds them per code point and says 6, 4, 4 and 0 (ZYJS-075, filed on
+# 2026-11-23 when `tx::graphemes` brought these clusters into the corpus). The
+# cell is a pure differential: the engines must agree, and they do not yet.
+
+id      = "term-width"
+what    = "the display width of a cluster whose code points do not add up"
+engines = ["zytw", "zyvm", "zyjs"]
+
+[[cell]]
+id     = "width-of-clusters"
+what   = "a ZWJ family, a skin tone, jamo and CR LF, each built from code points"
+src    = """
+<# std/term => t
+de(cps) {
+    s = ""
+    @ cp:cps { s = s ##'cp }
+    <~ s
+}
+>> t::width(de([128104, 8205, 128105, 8205, 128103])) " " t::width(de([128077, 127997])) " " t::width(de([4352, 4449, 4520])) " " t::width(de([13, 10])) ¶
+"""
+open_finding = "ZYJS-075"

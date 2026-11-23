@@ -31,8 +31,9 @@
 | [`ZYJS-072`](#zyjs-072--la-cuenta-de-decimales-de-un-operador-de-formato-solo-admite-cifras-ascii) | **corregido 2026-10-29** | `#.२\|x\|`, `#!२\|x\|`, `#,.२\|x\|` y `#^.२\|x\|` se rechazaban; los dos Rust los aceptan |
 | [`ZYJS-073`](#zyjs-073--los-textos-se-comparaban-por-unidad-utf-16-y-no-por-punto-de-código) | **corregido 2026-11-22** | `"😀" < "～"` daba `#1`; los otros tres, `#0` |
 | [`ZYJS-074`](#zyjs-074--en-el-navegador-tab-retroceso-y-ctrlletra-no-llegaban-como-en-un-terminal-y-un-shift-suelto-era-una-tecla) | **corregido 2026-11-22** | Tab y Retroceso llegaban como `'\0'`, Ctrl+S como `s`; un Shift suelto entraba en la cola |
+| [`ZYJS-075`](#zyjs-075--twidth-suma-las-columnas-de-cada-punto-de-código-de-un-clúster) | **abierto** | `t::width` de una familia con ZWJ da 6, de un tono de piel 4, de jamo 4 y de CR LF 0; los motores Rust, 2 2 2 1 |
 
-**Ninguno abierto.** `ZYJS-074` y `ZYJS-073` se abrieron y se corrigieron el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Uno abierto:** `ZYJS-075`, desde el 2026-11-23. `ZYJS-074` y `ZYJS-073` se abrieron y se corrigieron el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3854,3 +3855,30 @@ físico y para las teclas con nombre del teclado en pantalla. `test_keys.mjs` ha
 - pasa `zyquality/corpus/output/teclas_modificadores.zy` por los dos motores del navegador, con los
   eventos de navegador de las mismas teclas que nombra su guion `.keys`, y exige el golden que
   grabaron los motores Rust.
+
+## ZYJS-075 — `t::width` suma las columnas de cada punto de código de un clúster
+
+**Estado:** **abierto** desde el 2026-11-23 — sin decisión: los motores Rust dan la respuesta de
+`unicode-width` 0.2 y zyjs debe darla igual. Declarado como deuda en `axes/term-width.toml`
+(`open_finding`), así que es `KNOWN` y no rojo
+**Encontrado por:** el programa de corpus de `tx::graphemes` (D-19), `zyquality/corpus/stdlib/stdlib_text_graphemes.zy`,
+que medía con `t::width` los mismos clústeres que cortaba, el 2026-11-23
+**Motores:** los dos del navegador, `zyjs` y `zymbol_vm.js` (que llama al `std/term` de zyjs). Ningún motor Rust
+
+| texto, por puntos de código | `zytw` = `zyvm` | `zyjs` = `zyjsvm` |
+|---|---|---|
+| familia 👨 ZWJ 👩 ZWJ 👧 | 2 | 6 |
+| 👍 + tono de piel 🏽 | 2 | 4 |
+| jamo ᄀ ᅡ ᆨ (una sílaba) | 2 | 4 |
+| CR LF | 1 | 0 |
+
+`displayWidth` en `zymbol.js` suma `codePointDisplayWidth` punto a punto, que es lo que hacía
+`unicode-width` hasta la 0.1. La 0.2, la que usan los motores Rust, mide la cadena con una máquina de
+estados: una secuencia de emoji unida por ZWJ, un emoji con modificador, una sílaba de jamo y otros
+casos (selectores de variación, lam-alef, Lisu…) ocupan lo que ocupa el conjunto. Sólo se nota con
+clústeres de varios puntos de código, y el corpus no tenía ninguno hasta D-19.
+
+**El arreglo** es portar a JavaScript la regla de cadena de `unicode-width` 0.2 (`tables.rs`,
+`width_in_str`) con sus tablas, generadas como `casemap.js` y `graphemes.js`, y comprobarla contra el
+binario de Rust. Cuando se haga, la celda pasa a `DEBT PAID` y hay que quitar el `open_finding`.
+
