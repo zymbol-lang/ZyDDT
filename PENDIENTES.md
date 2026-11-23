@@ -73,7 +73,6 @@ bloquea.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| GAP-ZYE-010 · GAP-TET-005 | No hay conversión de mayúsculas a minúsculas: ZyEdit la hace con una tabla ASCII y ZyTetris pliega A–Z y А–Я por punto de código | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-010; `ZyTetris/HALLAZGOS.md` § GAP-TET-005 | ningún operador ni módulo de `std/` la tiene |
 | GAP-ZYE-007 | El lenguaje no segmenta en clústeres de grafemas: un `Char` es un punto de código, y el editor aproxima el clúster con `t::width(c) == 0` | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-007 | `continues` sigue en `ZyEdit/src/buffer.zy` |
 | GAP-TET-003 | `й` (U+0439) e `и`+U+0306 son identificadores distintos que se ven igual; `check` avisa de uno como sin uso y del otro como indefinido. El lenguaje no ha dicho si normaliza | `ZyTetris/HALLAZGOS.md` § GAP-TET-003 | `check`: *unused variable 'й'* sobre la grafía compuesta |
 | GAP-TET-004 | La `a` latina y la `а` cirílica son variables distintas y nada avisa | `ZyTetris/HALLAZGOS.md` § GAP-TET-004 | `check`: *No errors or warnings* |
