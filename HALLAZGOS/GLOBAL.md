@@ -10615,3 +10615,29 @@ rechazos, uno de ellos capturado por su familia (`:! ##Type`). Y
 dos líneas: ninguno podía verse provocado. Los siete que había estaban en `messages/reach.baseline` como «nada lo
 provoca», con ficheros del corpus que los provocaban. Ahora une la línea del diagnóstico con la línea `help:` que la sigue;
 los siete salieron de la línea base con `--prune`.
+
+---
+
+## GLB-153 — `zymbol fmt` escribía `>>|  {`, con dos espacios, en todo programa con un bloque TUI
+
+**Estado:** **corregido 2026-11-22** (v0.0.12) — sin decisión que tomar. Sujeto por
+`test_format_tui_block_and_key_input` en `crates/zymbol-formatter/src/lib.rs`
+**Encontrado por:** el formateo de `zyquality/tui/keys_mods.zy` al construir D-14, el 2026-11-22
+**Motores:** ninguno: es el formateador, que comparten la CLI y el LSP
+
+| programa | `zymbol fmt` daba | da |
+|---|---|---|
+| `>>| {` ⏎ `    >> "a" ¶` ⏎ `}` | `>>|  {` | `>>| {` |
+
+El brazo de `Statement::TuiBlock` escribía `">>| "` y luego llamaba a `format_block`, que ya pone el
+espacio delante de `{` (`open_brace`). Todos los demás bloques escriben su operador sin espacio y
+dejan el espacio a `format_block`.
+
+**Por qué nada lo veía.** El resultado es idempotente: formatear `>>|  {` vuelve a dar `>>|  {`, y
+eso es lo que miran las propiedades de `zyquality/fmt/`. ZyFmtCheck sólo compara sus propias
+reglas, y ningún golden guarda un programa formateado con `>>|`. Una salida mal formada y estable
+pasa todas esas comprobaciones.
+
+### Corrección (2026-11-22)
+
+`self.output.write(">>|")`, sin el espacio, en `crates/zymbol-formatter/src/visitor.rs`.

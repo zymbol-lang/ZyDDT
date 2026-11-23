@@ -30,8 +30,9 @@
 | ~~`ZYJS-060`~~ | **reencaminado 2026-10-11** | no era sólo de `zyjs`: `\ nombre` sobre el estado de un módulo, tres motores y tres respuestas → [`GLB-120`](GLOBAL.md) |
 | [`ZYJS-072`](#zyjs-072--la-cuenta-de-decimales-de-un-operador-de-formato-solo-admite-cifras-ascii) | **corregido 2026-10-29** | `#.२\|x\|`, `#!२\|x\|`, `#,.२\|x\|` y `#^.२\|x\|` se rechazaban; los dos Rust los aceptan |
 | [`ZYJS-073`](#zyjs-073--los-textos-se-comparaban-por-unidad-utf-16-y-no-por-punto-de-código) | **corregido 2026-11-22** | `"😀" < "～"` daba `#1`; los otros tres, `#0` |
+| [`ZYJS-074`](#zyjs-074--en-el-navegador-tab-retroceso-y-ctrlletra-no-llegaban-como-en-un-terminal-y-un-shift-suelto-era-una-tecla) | **corregido 2026-11-22** | Tab y Retroceso llegaban como `'\0'`, Ctrl+S como `s`; un Shift suelto entraba en la cola |
 
-**Ninguno abierto.** `ZYJS-073` se abrió y se corrigió el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Ninguno abierto.** `ZYJS-074` y `ZYJS-073` se abrieron y se corrigieron el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3811,3 +3812,45 @@ sustituto cuya primera unidad (U+D800–U+DBFF) queda por debajo de U+E000–U+F
 `cmpCodePoint` en `web/src/zymbol/zymbol.js`, con la misma corrección de sustitutos que `cmpStr` de `vm/values.js`, para los
 textos y los `Char` de `orderValues` y para el orden natural de `$^+`/`$^-` (GLB-152). Los textos que son números siguen
 comparándose como números bajo `<`.
+
+---
+
+## ZYJS-074 — En el navegador, Tab, Retroceso y Ctrl+letra no llegaban como en un terminal, y un Shift suelto era una tecla
+
+**Estado:** **corregido 2026-11-22** (v0.0.12) — sin decisión propia: lo que cada tecla da lo decidieron
+BUG-ZYB-006 (v0.0.9) y D-13, D-14 y D-15 (v0.0.12). Sujeto por `web/tests/test_keys.mjs`, dentro de la puerta
+**Encontrado por:** la construcción de D-14 en el navegador, al leer `BrowserTUI._mapKey`, el 2026-11-22
+**Motores:** los dos del navegador, `zyjs` y `zymbol_vm.js`: comparten el `BrowserTUI` de
+`src/playground/playground.js`. Ningún motor Rust
+
+| tecla | `zytw` = `zyvm` (terminal) | navegador, antes |
+|---|---|---|
+| Tab | `0d9` | `'\0'` |
+| Retroceso | `0d127` | `'\0'` |
+| Ctrl+S | `0d19` | `'s'` |
+| Shift pulsado solo | nada | un `'\0'` en la cola, delante de la tecla siguiente |
+
+BUG-ZYB-006 (v0.0.9) enseñó a `map_key_code` de los motores Rust a dar Tab, Retroceso y Ctrl+letra
+como lo que manda el terminal. `_mapKey` del navegador se quedó como estaba: Tab y Retroceso caían en
+`'\0'`, el mismo valor de «no hay tecla» de `<<|?`, y Ctrl+S llegaba como la letra `s`. Es el mismo
+fallo que BUG-ZYB-006 describió: un atajo Ctrl+X se disparaba al escribir una `x`.
+
+El navegador emite `keydown` también al pulsar Shift, Ctrl o Alt solos. Un terminal no manda nada.
+`_mapKey` los convertía en `'\0'` y los metía en la cola, así que con Shift+→ un `<<| k` leía
+primero un `'\0'`. Hasta D-14 eso pasaba inadvertido, porque Shift+→ no tenía nada que dar.
+
+El teclado en pantalla sí traducía Tab y Retroceso: tenía su propio mapa, distinto del de `_mapKey`.
+
+**Por qué nada lo veía.** Los dos motores del navegador no pasan por la suite `tui`, que necesita un
+pty, y el corpus excluye `pantalla_virtual.zy` en el navegador, porque `--keys` sólo existe en la CLI.
+Nada daba a los motores del navegador una tecla real.
+
+### Corrección (2026-11-22)
+
+`web/src/zymbol/keys.js`, gemelo de `zymbol_common::keys`: `keyOf(e)` da `[carácter, m]` para un
+`KeyboardEvent`, y `null` para un modificador pulsado solo. `BrowserTUI` lo usa para el teclado
+físico y para las teclas con nombre del teclado en pantalla. `test_keys.mjs` hace dos cosas:
+- comprueba `keyOf` con la tabla de las pruebas de Rust;
+- pasa `zyquality/corpus/output/teclas_modificadores.zy` por los dos motores del navegador, con los
+  eventos de navegador de las mismas teclas que nombra su guion `.keys`, y exige el golden que
+  grabaron los motores Rust.
