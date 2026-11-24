@@ -435,6 +435,6 @@ what   = "among the items of `$++`, a cast and `#|…|` open operands too (GLB-1
 expect = "ok"
 src    = """
 c = 66
-s = "a"$++ "b" ##'c #|"7"|
+s = "a"$++ "b" 0d|c| #|"7"|
 >> s ¶
 """

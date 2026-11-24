@@ -7684,7 +7684,10 @@ Lo que la comprueba:
 ## GLB-109 — Un valor calculado no se puede convertir en `Char`: hay literal por código, pero ningún paso de entero a carácter
 
 **Estado:** **corregido 2026-10-09** — decidido por el autor el 2026-10-09 (D1): `##'expr` convierte un `Int` en
-su carácter, con la forma de sus hermanas
+su carácter, con la forma de sus hermanas. **Revisado el 2026-11-24 (D-24, v0.0.12):** el autor retiró `##'` de las
+expresiones, y `##!` sobre un `Char`: un carácter y su código pasan sólo por `0d|…|` (`0d|n|` y `0d|c|`). El hallazgo
+sigue corregido —el paso de entero a carácter existe—, con otra forma; lo sujetan `casts/07_int_to_char.zy` y las
+celdas `decimal-door-*` de `runtime-format-convert`
 **Encontrado por:** ZyBF, `GAP-BF-001`: un intérprete de Brainf\*\*\* escrito en Zymbol (`ZyBrainfuck/`,
 2026-10-01), cuya instrucción `.` imprime «el carácter cuyo código es el valor de la celda»; validado contra la
 rama `v0.0.10` el 2026-10-09

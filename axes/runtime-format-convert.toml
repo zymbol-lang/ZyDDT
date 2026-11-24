@@ -81,7 +81,7 @@ t(v) {
 [[cell]]
 id     = "trunc-cast-requires-a-numeric-value-or"
 expect = "error"
-what   = "##! requires a numeric value or Char, got {}"
+what   = "##! requires a numeric value, got {} — it took a Char until v0.0.11 (D-24)"
 src    = """
 t(v) {
     <~ ##!v
@@ -459,37 +459,39 @@ src  = """
 [[cell]]
 id     = "base-literal-is-a-char"
 expect = "ok"
-what   = "`0xFF`, `0x3042` and `0d65` are Chars — `ÿ`, `あ`, `A` — and `##!` gives their codes (GLB-110)"
+what   = "`0xFF`, `0x3042` and `0d65` are Chars — `ÿ`, `あ`, `A` — and `0d|…|` gives their codes (GLB-110, D-24)"
 src    = """
 a = 0xFF
 b = 0x3042
 c = 0d65
 >> a " " b " " c ¶
 >> (a#?)[1] " " (b#?)[1] " " (c#?)[1] ¶
->> (##!a + 1) ¶
+>> (0d|a| + 1) ¶
 """
 
-# ── `##'expr`: an Int code point to its Char (added 2026-10-09) ─────────────
+# ── `0d|…|`: a character and its code (D-24, decided 2026-11-24) ─────────────
 #
-# Decided by the author on 2026-10-09 (GLB-109, D1): `##'` is the pair of `##!`
-# on a Char, and fails the way its siblings `###`, `##.` and `##!` do — at run
-# time, with the kind declared: a wrong type is `##Type`, a code with no
-# character (past 0x10FFFF, a surrogate, below 0) is `##Range`. Only an Int is a
-# code; a Float is not, even a whole one. A Char stays itself.
+# `0d` is the one door between a character and its code: `0d|n|` is the Char
+# with code point n and `0d|c|` is the code of c — the element of a character
+# in decimal is the number. It replaced `##'n` (GLB-109, 2026-10-09) and `##!c`,
+# removed in v0.0.12. It fails at run time with the kind declared, as `##'` did:
+# a code with no character (past 0x10FFFF, a surrogate, below 0) is `##Range`,
+# and only an Int is a code — a Float is not, even a whole one: `##Type`.
 
 [[cell]]
-id     = "char-cast-from-an-int"
-what   = "`##'n` is the Char with code point n — computed, past ASCII and at Unicode's last code — and `##!` reads it back (GLB-109)"
+id     = "decimal-door-from-an-int"
+what   = "`0d|n|` is the Char with code point n — computed, past ASCII and at Unicode's last code — and `0d|c|` reads it back (D-24)"
 expect = "ok"
 src    = """
 n = 65
->> ##'n ¶
->> ##'(n + 12289) ¶
->> ##'0x41 ¶
-c = ##'n
+>> 0d|n| ¶
+>> 0d|n + 12289| ¶
+>> 0d|(0d|0x41|)| ¶
+c = 0d|n|
 >> (c#?)[1] ¶
 @ code:[0, 55295, 57344, 1114111] {
-    >> (##!##'code + 7) ¶
+    back = 0d|code|
+    >> (0d|back| + 7) ¶
 }
 """
 oracle.py = """
@@ -502,13 +504,13 @@ for code in [0, 55295, 57344, 1114111]:
 """
 
 [[cell]]
-id     = "char-cast-code-with-no-character-is-range"
-what   = "`##'` on an Int that is no character — past 0x10FFFF, a surrogate, below 0 — is caught by `:! ##Range` (GLB-109)"
+id     = "decimal-door-code-with-no-character-is-range"
+what   = "`0d|n|` on an Int that is no character — past 0x10FFFF, a surrogate, below 0 — is caught by `:! ##Range` (D-24)"
 expect = "ok"
 src    = """
 @ code:[1114112, 55296, 57343, -1] {
     !? {
-        >> ##'code ¶
+        >> 0d|code| ¶
     } :! ##Range {
         >> "range" ¶
     }
@@ -516,23 +518,34 @@ src    = """
 """
 
 [[cell]]
-id     = "char-cast-of-a-non-int-is-type"
-what   = "`##'` on a Float, even a whole one, a String or a Bool is caught by `:! ##Type`: only an Int is a code (GLB-109)"
+id     = "decimal-door-of-a-float-or-bool-is-type"
+what   = "`0d|…|` on a Float, even a whole one, or a Bool is caught by `:! ##Type`: only an Int is a code (D-24)"
 expect = "ok"
 src    = """
-l = #[65.0, "A", #1]
+l = #[65.0, #1]
 @ v:l {
     !? {
-        >> ##'v ¶
+        >> 0d|v| ¶
     } :! ##Type {
         >> "type" ¶
     }
 }
 """
 
+[[cell]]
+id     = "trunc-cast-of-a-char-is-type"
+expect = "error"
+what   = "##! requires a numeric value, got Char: a character's code is 0d|c| — a Char the analyzer cannot see, through a parameter (D-24)"
+src    = """
+t(v) {
+    <~ ##!v
+}
+>> t('A') ¶
+"""
+
 # GLB-113 (decided 2026-10-09): a base literal also reads a TEXT of digits —
 # `0d|"65"|` is 'A' — so a code reached through text with no character is the
-# same failure as `##'` on that Int: `##Range`, without the value.
+# same failure as `0d|n|` on that Int: `##Range`, without the value.
 [[cell]]
 id     = "code-with-no-character-through-text-is-range"
 what   = "`0d|\"{n}\"|` with a code past 0x10FFFF or a surrogate, in each base, is caught by `:! ##Range` (GLB-113)"
@@ -556,23 +569,12 @@ for_text = ["{n}", "{s}"]
 """
 
 [[cell]]
-id     = "char-cast-requires-an-int-or-char"
+id     = "decimal-door-character-out-of-range"
 expect = "error"
-what   = "##' requires an Int or Char, got {} — uncaught, as its siblings' cells above (GLB-109)"
+what   = "character out of range: 0d|…| cannot represent this code — uncaught (D-24)"
 src    = """
 t(v) {
-    <~ ##'v
-}
->> t(65.0) ¶
-"""
-
-[[cell]]
-id     = "char-cast-character-out-of-range"
-expect = "error"
-what   = "character out of range: ##' cannot represent this Int — uncaught (GLB-109)"
-src    = """
-t(v) {
-    <~ ##'v
+    <~ 0d|v|
 }
 >> t(1114112) ¶
 """

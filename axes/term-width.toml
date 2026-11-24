@@ -18,7 +18,7 @@ src    = """
 <# std/term => t
 de(cps) {
     s = ""
-    @ cp:cps { s = s ##'cp }
+    @ cp:cps { s = s 0d|cp| }
     <~ s
 }
 >> t::width(de([128104, 8205, 128105, 8205, 128103])) " " t::width(de([128077, 127997])) " " t::width(de([4352, 4449, 4520])) " " t::width(de([13, 10])) ¶
