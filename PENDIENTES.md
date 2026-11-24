@@ -73,7 +73,6 @@ bloquea.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| GAP-ZYE-006 | Un fichero que no es UTF-8 válido no se puede abrir: no hay lectura de bytes | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-006 | `io::read` de `a\xffb`: `##IO(stream did not contain valid UTF-8)` |
 
 ### Forma y diagnóstico
 

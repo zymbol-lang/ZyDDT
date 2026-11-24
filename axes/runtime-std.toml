@@ -158,6 +158,46 @@ t(v) {
 """
 
 [[cell]]
+id     = "io-read-bytes-expected-string-path"
+expect = "error"
+what   = "io::read_bytes: expected String path (D-22)"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::read_bytes(v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
+id     = "io-read-bytes-expected-string-path-met"
+expect = "ok"
+what   = "and inside `!?` it is met, with the family the catch received"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::read_bytes(v)
+}
+!? {
+    >> t(5) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
+id     = "io-write-bytes-expected-string-string"
+expect = "error"
+what   = "io::write_bytes: expected (String, String) (D-22)"
+src    = """
+<# std/io => io
+t(v) {
+    <~ io::write_bytes("zy_ddt_never_written.bin", v)
+}
+>> t(5) ¶
+"""
+
+[[cell]]
 id     = "json-decode-expected-string"
 expect = "error"
 what   = "json::decode: expected String"
