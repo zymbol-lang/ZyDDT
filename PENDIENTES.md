@@ -73,7 +73,6 @@ bloquea.
 
 | ID | Qué | Origen | Comprobado |
 |---|---|---|---|
-| GAP-TET-003 | `й` (U+0439) e `и`+U+0306 son identificadores distintos que se ven igual; `check` avisa de uno como sin uso y del otro como indefinido. El lenguaje no ha dicho si normaliza | `ZyTetris/HALLAZGOS.md` § GAP-TET-003 | `check`: *unused variable 'й'* sobre la grafía compuesta |
 | GAP-TET-004 | La `a` latina y la `а` cirílica son variables distintas y nada avisa | `ZyTetris/HALLAZGOS.md` § GAP-TET-004 | `check`: *No errors or warnings* |
 | GAP-ZYE-006 | Un fichero que no es UTF-8 válido no se puede abrir: no hay lectura de bytes | `ZyEdit/HALLAZGOS.md` § GAP-ZYE-006 | `io::read` de `a\xffb`: `##IO(stream did not contain valid UTF-8)` |
 
