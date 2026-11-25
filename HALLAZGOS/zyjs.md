@@ -32,9 +32,10 @@
 | [`ZYJS-073`](#zyjs-073--los-textos-se-comparaban-por-unidad-utf-16-y-no-por-punto-de-código) | **corregido 2026-11-22** | `"😀" < "～"` daba `#1`; los otros tres, `#0` |
 | [`ZYJS-074`](#zyjs-074--en-el-navegador-tab-retroceso-y-ctrlletra-no-llegaban-como-en-un-terminal-y-un-shift-suelto-era-una-tecla) | **corregido 2026-11-22** | Tab y Retroceso llegaban como `'\0'`, Ctrl+S como `s`; un Shift suelto entraba en la cola |
 | [`ZYJS-075`](#zyjs-075--twidth-suma-las-columnas-de-cada-punto-de-código-de-un-clúster) | **abierto** | `t::width` de una familia con ZWJ da 6, de un tono de piel 4, de jamo 4 y de CR LF 0; los motores Rust, 2 2 2 1 |
-| [`ZYJS-076`](#zyjs-076--escribir-un-byte-en-su-sitio-copia-el-texto-entero) | **abierto** | `b[i]$~ v` sobre un String copia el texto entero por cada byte: 16 000 bytes, 4,8 s y 5,8 s; los motores Rust, 25 y 46 ms |
+| [`ZYJS-076`](#zyjs-076--escribir-un-byte-en-su-sitio-copia-el-texto-entero) | **corregido 2026-11-25** | ~~`b[i]$~ v` sobre un String copia el texto entero por cada byte~~: 16 000 bytes, de 4,8 s y 5,8 s a lineal; en `zymbol_vm.js`, leer `b[i]` también recorría el texto |
+| [`ZYJS-077`](#zyjs-077--concatenar-en-un-bucle-copiaba-el-texto-entero) | **corregido 2026-11-25** | `s = s x` en un bucle copiaba el texto entero en cada vuelta: 200 000 vueltas, 9,3 s |
 
-**Dos abiertos:** `ZYJS-076`, desde el 2026-11-25, y `ZYJS-075`, desde el 2026-11-23. `ZYJS-074` y `ZYJS-073` se abrieron y se corrigieron el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
+**Uno abierto:** `ZYJS-075`, desde el 2026-11-23. `ZYJS-076` y `ZYJS-077` se abrieron y se corrigieron el 2026-11-25. `ZYJS-074` y `ZYJS-073` se abrieron y se corrigieron el 2026-11-22. `ZYJS-072` se abrió y se corrigió el 2026-10-29. `ZYJS-068` se abrió y se corrigió el 2026-10-19. Esta línea dijo «cinco abiertos» hasta el 2026-10-10, con los cinco corregidos — cuatro desde el 2026-09-15. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha. `ZYJS-016`, `ZYJS-017` y `ZYJS-018` salieron el 2026-09-14 de ejes declarados para la VM (`error-flow`) y de los que se escribieron para medir lo que esos encontraron, y se corrigieron ese día.
 
 ---
 
@@ -3885,10 +3886,11 @@ binario de Rust. Cuando se haga, la celda pasa a `DEBT PAID` y hay que quitar el
 
 ## ZYJS-076 — Escribir un byte en su sitio copia el texto entero
 
-**Estado:** **abierto** desde el 2026-11-25 — decidido por el autor (B-2 de `zymbol-design/BYTES.md`):
-los motores Rust escriben en su sitio y el navegador queda como deuda declarada. En
-`zyquality/cost/cost.toml`, caso `growth/byte-write-in-place` (`open_finding`), así que es `KNOWN` y
-no rojo
+**Estado:** **corregido 2026-11-25** — ~~abierto desde el 2026-11-25 — decidido por el autor (B-2 de
+`zymbol-design/BYTES.md`): los motores Rust escriben en su sitio y el navegador queda como deuda declarada~~.
+El autor pidió el mismo día depurarlo. Sujeto por `zyquality/cost/cost.toml`, caso
+`growth/byte-write-in-place`, ya sin `open_finding` y con `zyjsvm` entre sus motores, y por
+`zyquality/corpus/strings/buffer_write_in_place.zy`
 **Encontrado por:** la medición de § 7 de `zymbol-design/BYTES.md`, el 2026-11-24
 **Motores:** los dos del navegador, `zyjs` y `zymbol_vm.js`. Ningún motor Rust desde el 2026-11-25
 
@@ -3910,9 +3912,66 @@ un bucle sobre las posiciones de un buffer es cuadrático. Los motores Rust ten�
 (59 ms → 600 ms en la VM) hasta el 2026-11-25, cuando `Text` y `ZyStr` aprendieron a cambiar un
 carácter por otro del mismo ancho en UTF-8 sin mover ningún byte, si nadie más tiene el texto.
 
-**El arreglo** necesita otra forma del String en el navegador mientras se edita — un array de
+~~**El arreglo** necesita otra forma del String en el navegador mientras se edita — un array de
 puntos de código, o bytes en un `Uint8Array` para un texto en que todo carácter es `≤ 0xFF` — que se
 vuelve texto cuando se lee como texto. Es la opción que el autor no tomó en B-2 por su tamaño: toca
-todas las operaciones de texto de los dos motores. Cuando se haga, el caso pasa y hay que quitar el
-`open_finding`.
+todas las operaciones de texto de los dos motores.~~
+
+**CORREGIDO** el 2026-11-25, sin tocar las demás operaciones de texto, de un modo distinto en cada
+motor:
+
+- **`zyjs`** ya guardaba en cada texto el array de sus caracteres (GLB-139) y ya sabía qué variable
+  es la única dueña de un Array (`own`, ZYJS-014). Un texto que su variable posee es ahora un
+  `OwnedText`: los caracteres son la verdad, `b[i]$~ v` cambia uno de ellos, y el string se construye
+  cuando alguien lee el texto entero. `Env.get` le quita la marca en cuanto el texto pasa a otro
+  nombre, a un argumento o a una captura, y desde entonces ese objeto no vuelve a cambiar.
+- **`zymbol_vm.js`** guarda el texto en un registro como string de JavaScript, y no tiene dónde
+  apuntar nada. Los textos que se indexan dejan en una caché pequeña su cuenta y si algún carácter
+  ocupa dos unidades UTF-16; el mismo string, el mismo puntero, la encuentra sin leerse. El primer
+  `b[i]$~ v` sobre un texto largo lo parte en un árbol de trozos de 64 puntos de código cuya raíz
+  es el propio texto, unido con `+`, que V8 hace sin copiar. Una escritura rehace su trozo y los
+  log n nodos de encima; una lectura va a su trozo y no aplana nada. **Leer** `b[i]` también era
+  cuadrático en este motor: contaba los puntos de código desde el principio cada vez.
+
+| n | `zyjs` antes | `zyjs` después | `zyjsvm` antes | `zyjsvm` después |
+|---:|---:|---:|---:|---:|
+| 16 000 escrituras | 4 792 ms | 235 ms (escritas y leídas) | 5 763 ms | 204 ms (escritas y leídas) |
+| 256 000 escrituras y lecturas | — | 1 311 ms | — | 363 ms |
+| 1 000 000 escrituras y lecturas | — | — | — | 857 ms |
+
+Una escritura que cambia el ancho (un carácter de una unidad por uno de dos, o por un texto de
+varios) sigue cortando el texto, como en los motores Rust.
+
+### Por qué no lo vio nadie
+
+`zyquality/cost/` no medía `zymbol_vm.js`, el motor por defecto del playground desde la v0.0.11: su
+tabla de motores tenía `zytw`, `zyvm` y `zyjs`. Tiene `zyjsvm` desde este hallazgo.
+
+## ZYJS-077 — Concatenar en un bucle copiaba el texto entero
+
+**Estado:** **corregido 2026-11-25** — sin decisión que tomar: el texto que resulta es el mismo, y
+`growth/concat-local` ya declaraba que construir un texto añadiendo es lineal
+**Encontrado por:** el caso de coste de ZYJS-076, cuyo buffer se construye byte a byte, el 2026-11-25
+**Motores:** `zyjs`. `zymbol_vm.js` ya era lineal
+
+```zymbol
+b = ""
+@ _i:1..n { b = b 0x80 }
+```
+
+| n | `zyjs` antes | `zyjs` después |
+|---:|---:|---:|
+| 50 000 | 498 ms | 256 ms |
+| 200 000 | 9 314 ms | 597 ms |
+| 800 000 | — | 1 707 ms |
+
+La yuxtaposición unía sus partes con `join('')`, que escribe un string nuevo con el texto entero:
+`b = b x` copiaba `b` en cada vuelta. Ahora las une con `+`, que V8 hace sin copiar (una cadena de
+pares que se aplana una sola vez, cuando se lee), y es por lo que `s += x` en un bucle es lineal en
+JavaScript. Lo mismo en la forma con `°` y en la unión por comas.
+
+### Por qué no lo vio nadie
+
+`growth/concat-local` mide a `zyjs` con `n = 20 000`, donde la copia todavía no domina. Sube a
+200 000 con este hallazgo.
 
