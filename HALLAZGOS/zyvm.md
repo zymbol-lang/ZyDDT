@@ -14,6 +14,7 @@
 | [`ZYVM-021`](#zyvm-021--una-lambda-escrita-en-una-función-de-un-módulo-lee-el-estado-del-módulo-como-está-no-como-lo-capturó) | **corregido 2026-10-10** | una lambda en una función de módulo leía el estado del módulo como estaba, no como lo capturó |
 | [`ZYVM-023`](#zyvm-023--s--s-x-copia-el-texto-entero-en-cada-añadido-construir-un-texto-es-cuadrático-en-la-vm) | **corregido 2026-10-16** | `s = s "x"` copiaba el texto entero en cada añadido: construir un texto era cuadrático |
 | [`ZYVM-033`](#zyvm-033--dentro-de--la-vm-escribía--como-lf-y-dibujaba----en-escalera) | **corregido 2026-11-22** | dentro de `>>\|`, `¶` salía como LF y no como CR LF: `>> … ¶` se dibujaba en escalera |
+| [`ZYVM-034`](#zyvm-034--añadir-un-carácter-a-un-texto-copiaba-el-texto-entero) | **corregido 2026-11-25** | `b = b c` con `c` un `Char` copiaba el texto entero en cada vuelta: 64 000 vueltas, 261 ms contra 26 del tree-walker |
 
 **Ninguno abierto.** `ZYVM-022` y `ZYVM-031`, que no están en la tabla, se corrigieron el 2026-10-19 y el 2026-10-20. La tabla no es la lista entera ni el estado vivo: el estado de cada ficha es su línea **Estado**, y `./bin/zyddt findings` lo calcula de ahí — y desde el 2026-10-10 pone en rojo (`STALE SUMMARY`) la fila o la frase de aquí arriba que contradiga a su ficha.
 
@@ -2159,4 +2160,32 @@ siendo `\n` (la pantalla virtual de `--keys` no cambia). El terminal nativo escr
 
 `zyquality/tui/frame_newline.zy`, con golden: los dos motores por un pty, comparados entre sí y contra los bytes
 leídos.
+
+## ZYVM-034 — Añadir un carácter a un texto copiaba el texto entero
+
+**Estado:** **corregido 2026-11-25** — sin decisión que tomar: añadir un `String`, un `Int` o un `Float`
+ya escribía en el búfer del receptor, y el texto que resulta es el mismo
+**Encontrado por:** el caso de coste de B-2 (`growth/byte-write-in-place`, D-26), cuyo buffer se construye byte
+a byte, el 2026-11-25. La VM salía ×26 al cuadruplicar `n`, y no era la escritura: era la construcción
+**Motores:** `zyvm`. `zytw` ya era lineal
+
+```zymbol
+b = ""
+@ _i:1..n { b = b 0x80 }
+```
+
+| n | `zytw` | `zyvm` antes | `zyvm` después |
+|---:|---:|---:|---:|
+| 16 000 | 7 ms | 18 ms | 7 ms |
+| 64 000 | 26 ms | 261 ms | 30 ms |
+
+`ConcatStr` reutiliza el búfer de la izquierda cuando el destino es el mismo registro (ZYVM-023), pero sólo en
+tres brazos: un `String`, un `Int` o un `Float` a la derecha. Un `Char` caía al brazo general, que escribe los
+dos lados de nuevo en un texto nuevo: el texto entero en cada vuelta. Con `"x"` era lineal; con `'x'` o
+`0x80`, cuadrático. Lo arregla un cuarto brazo, `String` + `Char`, que hace `push`.
+
+### Por qué no lo vio nadie
+
+`growth/concat-local` añade `"x"`, un `String`. Ningún caso de coste añadía un carácter, que es lo que hace un
+programa que construye bytes desde D-22.
 
