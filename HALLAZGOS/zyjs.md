@@ -3891,7 +3891,7 @@ binario de Rust. Cuando se haga, la celda pasa a `DEBT PAID` y hay que quitar el
 El autor pidió el mismo día depurarlo. Sujeto por `zyquality/cost/cost.toml`, caso
 `growth/byte-write-in-place`, ya sin `open_finding` y con `zyjsvm` entre sus motores, y por
 `zyquality/corpus/strings/buffer_write_in_place.zy`
-**Encontrado por:** la medición de § 7 de `zymbol-design/BYTES.md`, el 2026-11-24
+**Encontrado por:** la medición de § 7 de `zymbol-design/BYTES.md` (hoy § 6), el 2026-11-24
 **Motores:** los dos del navegador, `zyjs` y `zymbol_vm.js`. Ningún motor Rust desde el 2026-11-25
 
 El bucle escribe `n` bytes de `0x80` a `0xFF`, uno por uno, en un buffer de `n`:
