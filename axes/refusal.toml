@@ -251,19 +251,19 @@ x = ##.(noexiste + 1)
 
 [[cell]]
 id   = "arity-inside-a-base-conversion"
-what = "a call with the wrong argument count, inside `0d|…|`: refused before running, as inside a cast (GLB-112) — `##'` held this cell until v0.0.11"
+what = "a call with the wrong argument count, inside the bare bars `|…|`: refused before running, as inside a cast (GLB-112) — `##'` held this cell until v0.0.11"
 src  = """
 g(a) {
     <~ a
 }
 >> "antes" ¶
-x = 0d|g(1, 2)|
+x = |g(1, 2)|
 >> x ¶
 """
 
 [[cell]]
 id   = "char-cast-removed"
-what = "`##'n`, the cast from a code to its character, was removed in v0.0.12: refused before running, with a help line naming `0d|n|` (D-24)"
+what = "`##'n`, the cast from a code to its character, was removed in v0.0.12: refused before running, with a help line naming `|n|` (D-24, D-25)"
 src  = """
 n = 65
 >> "antes" ¶
@@ -272,7 +272,7 @@ n = 65
 
 [[cell]]
 id   = "trunc-cast-of-a-known-char"
-what = "`##!` on an operand known to be a Char: refused before running since v0.0.12, with a help line naming `0d|c|` (D-24)"
+what = "`##!` on an operand known to be a Char: refused before running since v0.0.12, with a help line naming `#|c|` (D-24, D-25)"
 src  = """
 c = 'A'
 >> "antes" ¶

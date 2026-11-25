@@ -7687,7 +7687,9 @@ Lo que la comprueba:
 su carácter, con la forma de sus hermanas. **Revisado el 2026-11-24 (D-24, v0.0.12):** el autor retiró `##'` de las
 expresiones, y `##!` sobre un `Char`: un carácter y su código pasan sólo por `0d|…|` (`0d|n|` y `0d|c|`). El hallazgo
 sigue corregido —el paso de entero a carácter existe—, con otra forma; lo sujetan `casts/07_int_to_char.zy` y las
-celdas `decimal-door-*` de `runtime-format-convert`
+celdas `decimal-door-*` de `runtime-format-convert`. **Revisado otra vez el mismo día (D-25):** `0d` volvió a dar texto como sus tres hermanas, y quedaron tres
+puertas: la base da el texto (`0d|'A'|` es `"0d65"`), las barras solas el carácter (`|65|`, `|"0x41"|`) y `#|…|` el
+número (`#|'A'|` es 65). Las celdas conservan el nombre `decimal-door-*`.
 **Encontrado por:** ZyBF, `GAP-BF-001`: un intérprete de Brainf\*\*\* escrito en Zymbol (`ZyBrainfuck/`,
 2026-10-01), cuya instrucción `.` imprime «el carácter cuyo código es el valor de la celda»; validado contra la
 rama `v0.0.10` el 2026-10-09

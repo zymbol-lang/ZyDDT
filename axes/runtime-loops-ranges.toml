@@ -108,12 +108,12 @@ t(v) {
 [[cell]]
 id     = "character-code-must-be-in-range-0"
 expect = "error"
-what   = "a code past 0x10FFFF read by `0x|…|`: `character out of range: 0x|…| cannot represent this code` — it was `character code must be in range 0..0x10FFFF, got {}`, a `##_` that quoted the value (GLB-113)"
+what   = "a code past 0x10FFFF read through the bare bars (D-25): `character out of range: |…| cannot represent this code` — it was `character code must be in range 0..0x10FFFF, got {}`, a `##_` that quoted the value (GLB-113)"
 src    = """
 t(v) {
-    <~ 0x|v|
+    <~ |v|
 }
->> t("110000") ¶
+>> t("0x110000") ¶
 """
 
 [[cell]]
@@ -122,10 +122,10 @@ expect = "ok"
 what   = "and inside `!?` it is met, with the family the catch received"
 src    = """
 t(v) {
-    <~ 0x|v|
+    <~ |v|
 }
 !? {
-    >> t("110000") ¶
+    >> t("0x110000") ¶
 } :! {
     >> (_err#?)[1] ¶
 }
