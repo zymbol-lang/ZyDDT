@@ -31,6 +31,50 @@ what    = "the runtime diagnostics of the `$` collection operators: that each ha
 engines = ["zytw", "zyvm", "zyjs"]
 
 [[cell]]
+id     = "repeat-of-a-char"
+expect = "ok"
+what   = "`$*` repeats a Char as the one-character text it is: `0x00 $* n` is a buffer of n bytes (D-27, BYTES.md B-3)"
+src    = """
+z = 0x00
+b = z $* 4
+>> b$# " " (b#?)[1] ¶
+t(c) {
+    <~ c $* 3
+}
+>> t('é') " " t(0x41) ¶
+"""
+oracle.py = """
+print(4, '##"')
+print("éé" + "é", "AAA")
+"""
+
+[[cell]]
+id     = "repeat-requires-a-string-or-char"
+expect = "error"
+what   = "$* requires a string or char, got {} — through a parameter the analyzer cannot see"
+src    = """
+t(v) {
+    <~ v $* 2
+}
+>> t([1]) ¶
+"""
+
+[[cell]]
+id     = "repeat-requires-a-string-or-char-met"
+expect = "ok"
+what   = "and inside `!?` it is met, as a `##Type` in every engine (the tree-walker answered `##_`, found with D-27)"
+src    = """
+t(v) {
+    <~ v $* 2
+}
+!? {
+    >> t([1]) ¶
+} :! {
+    >> (_err#?)[1] ¶
+}
+"""
+
+[[cell]]
 id     = "repeat-repetition-count-must-be-an-integer"
 expect = "error"
 what   = "$* repetition count must be an integer, got {}"

@@ -834,3 +834,201 @@ src    = """
 _p = net::timeout(-2)
 >> "no llega" ¶
 """
+
+# ── std/bits (D-28, decided by the author 2026-11-25) ─────────────────────────
+#
+# The bits of a non-negative integer up to 2^53 - 1, and words of 1 to 6 bytes.
+# Python's int is the oracle: `&`, `|`, `^`, `<<`, `>>`, `int.to_bytes`,
+# `int.from_bytes`.
+
+[[cell]]
+id     = "bits-against-python"
+expect = "ok"
+what   = "and, or, xor, shl, shr, not, signed, to_le, to_be, from_le and from_be over values from 0 to 2^53 - 1, against Python's int (D-28)"
+src    = """
+<# std/bits => b
+xs = [0, 1, 165, 255, 4660, 65535, 1234567, 281474976710655, 9007199254740991]
+@ x:xs {
+    @ y:xs {
+        >> b::and(x, y) " " b::or(x, y) " " b::xor(x, y) ¶
+    }
+    >> b::shr(x, 3) " " b::shr(x, 52) " " b::not(x, 53) ¶
+}
+@ k:0..52 { >> b::shl(1, k) " " }
+>> ¶
+@ w:1..6 {
+    n = b::shr(281474976710655, 48 - w * 8)
+    le = b::to_le(n, w)
+    be = b::to_be(n, w)
+    >> w " " #|le[1]| " " #|be[1]| " " b::from_le(le) " " b::from_be(be) " " b::signed(n, w * 8) ¶
+}
+"""
+oracle.py = """
+xs = [0, 1, 165, 255, 4660, 65535, 1234567, 281474976710655, 9007199254740991]
+for x in xs:
+    for y in xs:
+        print(x & y, x | y, x ^ y)
+    print(x >> 3, x >> 52, ((1 << 53) - 1) ^ x)
+print(" ".join(str(1 << k) for k in range(53)) + " ")
+for w in range(1, 7):
+    n = 281474976710655 >> (48 - w * 8)
+    le = n.to_bytes(w, "little")
+    be = n.to_bytes(w, "big")
+    s = n - (1 << (w * 8)) if n >= 1 << (w * 8 - 1) else n
+    print(w, le[0], be[0], int.from_bytes(le, "little"), int.from_bytes(be, "big"), s)
+"""
+
+[[cell]]
+id     = "bits-argument-type-must-be-int-or-char"
+expect = "error"
+what   = "bits::{f}: argument type must be Int or Char, got {} (D-28)"
+src    = """
+<# std/bits => b
+t(v) {
+    <~ b::xor(v, 1)
+}
+>> t(1.5) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-argument-type-must-be-string-or-char"
+expect = "error"
+what   = "bits::{f}: argument type must be String or Char, got {} (D-28)"
+src    = """
+<# std/bits => b
+t(v) {
+    <~ b::from_be(v)
+}
+>> t(1) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-negative-is-out-of-range"
+expect = "error"
+what   = "bits::{f}: {} is out of range: bits are taken of integers from 0 to 9007199254740991 (D-28)"
+src    = """
+<# std/bits => b
+t(v) {
+    <~ b::and(v, 1)
+}
+>> t(0 - 1) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-shl-overflow"
+expect = "error"
+what   = "integer overflow: bits::shl({}, {}) — past the integer range, as `*` is (D-28)"
+src    = """
+<# std/bits => b
+t(k) {
+    <~ b::shl(3, k)
+}
+>> t(52) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-negative-shift-is-out-of-range"
+expect = "error"
+what   = "bits::{f}: a shift of {} is out of range: it goes from 0 (D-28)"
+src    = """
+<# std/bits => b
+t(k) {
+    <~ b::shr(1, k)
+}
+>> t(0 - 1) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-width-is-out-of-range"
+expect = "error"
+what   = "bits::{f}: a width of {} bits is out of range: it goes from 1 to 53 (D-28)"
+src    = """
+<# std/bits => b
+t(w) {
+    <~ b::not(1, w)
+}
+>> t(54) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-does-not-fit-in-the-width"
+expect = "error"
+what   = "bits::{f}: {} is out of range for {} bits (D-28)"
+src    = """
+<# std/bits => b
+t(n) {
+    <~ b::signed(n, 8)
+}
+>> t(256) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-word-size-is-out-of-range"
+expect = "error"
+what   = "bits::{f}: {} bytes is out of range: a word goes from 1 to 6 (D-28)"
+src    = """
+<# std/bits => b
+t(k) {
+    <~ b::to_le(1, k)
+}
+>> t(7) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-does-not-fit-in-the-word"
+expect = "error"
+what   = "bits::{f}: {} is out of range for {} bytes (D-28)"
+src    = """
+<# std/bits => b
+t(n) {
+    <~ b::to_be(n, 1)
+}
+>> t(256) ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-char-is-no-byte"
+expect = "error"
+what   = "bits::{f}: '{}' is U+{}, out of range for a byte: a byte is a Char from 0x00 to 0xFF (D-28)"
+src    = """
+<# std/bits => b
+t(s) {
+    <~ b::from_le(s)
+}
+>> t("a€") ¶
+>> "no llega" ¶
+"""
+
+[[cell]]
+id     = "bits-refusals-met"
+expect = "ok"
+what   = "and inside `!?` every refusal of std/bits is met, with the family its words give: `##Type` for a type, `##Range` for the rest (D-28)"
+src    = """
+<# std/bits => b
+t(f) {
+    !? {
+        >> f() ¶
+    } :! {
+        >> (_err#?)[1] ¶
+    }
+}
+t(() -> b::xor(1.5, 1))
+t(() -> b::from_be(1))
+t(() -> b::and(0 - 1, 1))
+t(() -> b::shl(3, 52))
+t(() -> b::shr(1, 0 - 1))
+t(() -> b::not(1, 54))
+t(() -> b::signed(256, 8))
+t(() -> b::to_le(1, 7))
+t(() -> b::to_be(256, 1))
+t(() -> b::from_le("a€"))
+"""
